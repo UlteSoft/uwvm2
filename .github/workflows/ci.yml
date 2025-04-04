@@ -1,0 +1,42 @@
+name: CI
+on:
+  push:
+    paths-ignore:
+      - "documents/**"
+  pull_request:
+    paths-ignore:
+      - "documents/**"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: sudo apt install xmake
+      - name: Configure
+        run: xmake config
+      - name: Build
+        run: xmake build
+  # ---------------------------------------------------------------------------
+  msys2-clang64:
+    name: MSYS2 CLANG64
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: |
+            mingw-w64-clang-x86_64-cc
+            mingw-w64-clang-x86_64-xmake
+      - name: Configure
+        run: xmake config -p mingw --use-llvm=y
+      - name: Build
+        run: xmake build
