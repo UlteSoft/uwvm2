@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup
-        run: sudo apt install clang clang-tools xmake
+        run: sudo apt install clang clang-17-tools xmake
         run: ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/local/bin/clang-scan-deps
       - name: Check Xmake Version
         run: xmake --version
