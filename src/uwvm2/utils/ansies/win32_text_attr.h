@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -31,6 +31,7 @@ import fast_io;
 #  include <cstdint>
 #  include <cstddef>
 #  include <concepts>
+#  include <utility>
 // import
 #  include <fast_io.h>
 # endif
@@ -38,6 +39,8 @@ import fast_io;
 # ifndef UWVM_MODULE_EXPORT
 #  define UWVM_MODULE_EXPORT
 # endif
+
+/// @brief In win7 to win95, cmd does not support ansi escape sequence
 
 UWVM_MODULE_EXPORT namespace uwvm2::utils::ansies
 {
@@ -116,14 +119,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::ansies
 
     struct win32_text_attr
     {
-        void* handle{};
         text_attr attr{};
     };
 
-    template <::std::integral char_type, typename s>
-    inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, win32_text_attr>, s&&, win32_text_attr attr) noexcept
+    template <::std::integral char_type, typename Stm>
+    inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, win32_text_attr>, Stm && stm, win32_text_attr attr) noexcept
     {
-        ::fast_io::win32::SetConsoleTextAttribute(attr.handle, static_cast<::std::int_least32_t>(attr.attr));
+        static_assert(::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_nt_io_observer<char_type>> ||
+                      ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_zw_io_observer<char_type>> ||
+                      ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::wide_nt, char_type>> ||
+                      ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::ansi_9x, char_type>>);
+        ::fast_io::win32::SetConsoleTextAttribute(::std::forward<Stm>(stm).native_handle(), static_cast<::std::int_least32_t>(attr.attr));
     }
 }  // namespace uwvm2::utils::ansies
 

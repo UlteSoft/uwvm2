@@ -86,7 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     struct table_type
     {
         limits_type limits{};
-        
+
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte reftype{
             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(0x70)};
 
@@ -297,3 +297,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
         inline static constexpr bool value = true;
     };
 }  // namespace fast_io::freestanding
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+#endif

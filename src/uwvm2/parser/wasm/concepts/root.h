@@ -102,10 +102,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
 
     /// @brief      binfmt handle version func
     template <typename module_stroate_t, has_feature_name... Fs>
-    using binfmt_handle_version_func_p_type = module_stroate_t (*)(::std::byte const*,
-                                                                   ::std::byte const*,
-                                                                   ::uwvm2::parser::wasm::base::error_impl&,
-                                                                   feature_parameter_t<Fs...> const&) UWVM_THROWS;
+    using binfmt_handle_version_func_p_type =
+        module_stroate_t (*)(::std::byte const*, ::std::byte const*, ::uwvm2::parser::wasm::base::error_impl&, feature_parameter_t<Fs...> const&) UWVM_THROWS;
 
     /// @brief      Define the version number of the required wasm file binary format tagging
     /// @see        test\non-platform-specific\0001.parser\0001.concept\binfmt.cc

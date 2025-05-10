@@ -14,6 +14,8 @@ set_allowedplats("windows", "mingw", "linux", "djgpp", "unix", "bsd", "freebsd",
 includes("xmake/impl.lua")
 includes("xmake/platform/impl.lua")
 
+add_plugindirs("xmake/plugins")
+
 set_defaultmode("releasedbg")
 set_allowedmodes(support_rules_table)
 
@@ -183,7 +185,6 @@ function def_build()
 	)
 
 end
-
 target("uwvm")
 	set_kind("binary")
 	def_build()
@@ -205,6 +206,8 @@ target("uwvm")
 	-- src
 	add_includedirs("src/")
 
+	add_headerfiles("src/**.h")
+
 	if enable_cxx_module then
 		-- utils
 		add_files("src/uwvm2/utils/**.cppm", {public = is_debug_mode})
@@ -225,7 +228,7 @@ target("uwvm")
 target_end()
 
 -- test unit
-for _, file in ipairs(os.files("test/non-platform-specific/**.cc")) do
+for _, file in ipairs(os.files("test/**.cc")) do
     local name = path.basename(file)
     target(name)
         set_kind("binary")

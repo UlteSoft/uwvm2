@@ -288,8 +288,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     {
         if constexpr(sizeof...(Fs) == 0)
         {
-            // If there is no feature then just return
-            return {};
+            // If there is no feature then just check wasm format
+            if(module_begin > module_end) [[unlikely]]
+            {
+                err.err_curr = module_begin;
+                err.err_selectable.err_end = module_end;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_begin_pointer;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            wasm_binfmt_ver1_module_extensible_storage_t<Fs...> ret{};
+
+            ret.module_span.module_begin = module_begin;
+            ret.module_span.module_end = module_end;
+
+            ::std::byte const* module_curr{module_begin};
+
+            // 00 61 73 6D 01 00 00 00 ...
+            // unsafe (could be the module_end)
+            // ^^ module_curr
+
+            // Short-circuit summation, safe
+            if(static_cast<::std::size_t>(module_end - module_curr) < 8uz || !::uwvm2::parser::wasm::binfmt::is_wasm_file_unchecked(module_curr)) [[unlikely]]
+            {
+                err.err_curr = module_curr;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_wasm_file_format;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+
+            // [00 61 73 6D 01 00 00 00] ...
+            // [         safe          ] unsafe (could be the module_end)
+            // ^^ module_curr
+
+            return ret;
         }
         else
         {
@@ -317,6 +348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
             // unsafe (could be the module_end)
             // ^^ module_curr
 
+            // Short-circuit summation, safe
             if(static_cast<::std::size_t>(module_end - module_curr) < 8uz || !::uwvm2::parser::wasm::binfmt::is_wasm_file_unchecked(module_curr)) [[unlikely]]
             {
                 err.err_curr = module_curr;
@@ -350,8 +382,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
             // [         safe                 ] unsafe (could be the module_end)
             //                          ^^ module_curr
 
+            // First loop with module_curr != module_end, so can use do-while. 
+
             do {
-                // Each time loop, module_curr is less than module_end.
+                // existence of valid information
+
+                // Each time loop, module_curr is less than module_end. 
 
                 // [... sec_id] sec_len ...
                 // [   safe   ] unsafe (could be the module_end)
@@ -365,9 +401,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
                 // get section type
                 ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte sec_id{};
                 ::fast_io::freestanding::my_memcpy(::std::addressof(sec_id), module_curr, sizeof(::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte));
-                
+
                 static_assert(sizeof(sec_id) == 1);
-                // Size equal to one does not need to do small end-order conversion
+                // Size equal to one does not need to do little-endian conversion
 
                 // get section length
                 ++module_curr;

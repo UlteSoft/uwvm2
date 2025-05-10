@@ -48,8 +48,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
         inline bool log_output_is_exist{};
         inline constexpr ::fast_io::u8string_view log_output_alias{u8"-log"};
         extern "C++" ::uwvm2::utils::cmdline::parameter_return_type log_output_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

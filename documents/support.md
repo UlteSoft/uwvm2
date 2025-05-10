@@ -13,8 +13,8 @@
 
 ## Windows NT
 * Supported system versions: Windows 2000 (Windows Server 2000), Windows XP (Windows Server 2003), Windows XP SP2 (Windows Server 2003 SP1), Windows Vista (Windows Server 2008), Windows 7 (Windows Server 2008 R2), Windows 8 (Windows Server 2012), Windows Blue (Windows Server 2012 R2), Windows 10 (Windows Server 2016, Windows Server 2019, Windows Server 2022), Windows 11 (Windows Server 2025)
-* MSVC: (x86\_64, i686, aarch64, arm)-windows-msvc
-* MinGW: (x86\_64, i686, aarch64, arm)-windows-gnu (aka. unknown(4)-w64-mingw32)
+* MSVC: (x86\_64, i686, aarch64, arm, arm64ec)-windows-msvc
+* MinGW: (x86\_64, i686, aarch64, arm, arm64ec)-windows-gnu (aka. unknown(4)-w64-mingw32)
 
 ## Windows 9x
 * Supported system versions: Windows 95, Windows 98, Windows ME

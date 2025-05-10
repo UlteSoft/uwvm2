@@ -31,5 +31,6 @@
 # include "custom_section.h"
 # include "type_section.h"
 # include "import_section.h"
+# include "function_section.h"
 # include "binfmt.h"
 #endif

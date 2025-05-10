@@ -49,3 +49,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::proposal::relaxed_simd::value_
 #endif
 
 }  // namespace uwvm2::parser::wasm::proposal::relaxed_simd::value_type
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+#endif

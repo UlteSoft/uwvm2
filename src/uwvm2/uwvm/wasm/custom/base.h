@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -71,11 +71,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom
     inline int handle_binfmt1_custom_section(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t const& module_storage,
                                              ::std::map<::fast_io::u8string, handlefunc_ptr_t> const& custom_handler) noexcept
     {
-        auto& customsec{
+        auto const& customsec{
             ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>(
                 module_storage.sections)};
 
-        for(auto& cs: customsec.customs)
+        for(auto const& cs: customsec.customs)
         {
             if(auto const curr_custom_handler{custom_handler.find(::fast_io::u8string{cs.custom_name})}; curr_custom_handler != custom_handler.cend())
             {

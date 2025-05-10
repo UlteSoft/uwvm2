@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -9,7 +9,7 @@
  * @details     antecedent dependency: null
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-09
+ * @date        2025-04-27
  * @copyright   APL-2 License
  */
 
@@ -266,6 +266,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
+        // There is no need to check it here, it can be checked later in handle_import_func with index
+        // Turning on checking can instead cause non-typesection import dependencies to error out
+#if 0
         // check has typesec
         auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
 
@@ -277,6 +280,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::forward_dependency_missing;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
+#endif
 
         using wasm_byte_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte const*;
 
@@ -309,6 +313,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         importsec.imports.reserve(import_count);
 
+        // Since all subsequent ones are pushback_unchecked, the capacity will not grow, so end is used to denote the end of the buffer
+        auto const importsec_imports_end{importsec.imports.imp.end_ptr};
+
+        // Since the internal end is to be used later, check to see if it is the size of the counter
+        UWVM_ASSERT(static_cast<::std::size_t>(importsec_imports_end - importsec.imports.cbegin()) == import_count);
+
         section_curr = reinterpret_cast<::std::byte const*>(import_count_next);  // never out of bounds
         // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
 
@@ -316,17 +326,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // [        safe                         ] unsafe (could be the section_end)
         //                                         ^^ section_curr
 
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 import_counter{};  // use for check
         constexpr ::std::size_t importdesc_count{importsec.importdesc_count};
         ::fast_io::array<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32, importdesc_count> importdesc_counter{};  // use for reserve
         // desc counter
 
-        do {
-            // Note that section_curr may be equal to section_end
-            // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+        while(section_curr != section_end)
+        {
+            // Ensuring the existence of valid information
 
-            ::uwvm2::parser::wasm::standard::wasm1::features::final_import_type<Fs...> fit{};
-            if(++import_counter > import_count) [[unlikely]]
+            // [...  module_namelen] ... module_name ... extern_namelen ... extern_name ... import_type extern_func ...
+            // [       safe        ] unsafe (could be the section_end)
+            //       ^^ section_curr
+
+            // check import counter
+            // Ensure content is available before counting (section_curr != section_end)
+            if(importsec.imports.cend() == importsec_imports_end) [[unlikely]]
             {
                 err.err_curr = section_curr;
                 err.err_selectable.u32 = import_count;
@@ -334,9 +348,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
 
-            // [... ] module_namelen ... module_name ... extern_namelen ... extern_name ... import_type extern_func ...
-            // [safe] unsafe (could be the section_end)
-            //        ^^ section_curr
+            // storage fit (need move)
+            ::uwvm2::parser::wasm::standard::wasm1::features::final_import_type<Fs...> fit{};
 
             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 module_namelen{};
             auto const [module_namelen_next, module_namelen_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
@@ -470,7 +483,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::fast_io::freestanding::my_memcpy(::std::addressof(fit.imports.type), section_curr, sizeof(fit.imports.type));
 
             static_assert(sizeof(fit.imports.type) == 1);
-            // Size equal to one does not need to do small end-order conversion
+            // Size equal to one does not need to do little-endian conversion
 
             // importdesc_count never > 256 (max=255+1), convert to unsigned
             if(static_cast<unsigned>(fit.imports.type) >= static_cast<unsigned>(importdesc_count)) [[unlikely]]
@@ -500,19 +513,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             importsec.imports.push_back_unchecked(::std::move(fit));
         }
-        while(section_curr != section_end);
 
         // [... ] (section_end)
         // [safe] unsafe (could be the section_end)
         //        ^^ section_curr
 
         // check import counter match
-        if(import_counter != import_count) [[unlikely]]
+        if(importsec.imports.cend() != importsec_imports_end) [[unlikely]]
         {
             err.err_curr = section_curr;
-            err.err_selectable.u32arr[0] = import_counter;
+            err.err_selectable.u32arr[0] = static_cast<::std::uint_least32_t>(importsec.imports.size());
             err.err_selectable.u32arr[1] = import_count;
-            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::import_section_resolved_exceeded_the_actual_number;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::import_section_resolved_not_match_the_actual_number;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 

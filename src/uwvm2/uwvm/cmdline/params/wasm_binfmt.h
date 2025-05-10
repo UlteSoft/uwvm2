@@ -47,8 +47,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
         inline bool wasm_binfmt_is_exist{};
         inline constexpr ::fast_io::u8string_view wasm_binfmt_alias{u8"-Wbf"};
         extern "C++" ::uwvm2::utils::cmdline::parameter_return_type wasm_binfmt_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

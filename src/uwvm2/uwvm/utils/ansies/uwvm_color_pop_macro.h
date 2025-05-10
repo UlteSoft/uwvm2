@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -140,4 +140,5 @@
 #pragma pop_macro("UWVM_COLOR_RST_ALL_AND_SET_WHITE")
 #pragma pop_macro("UWVM_COLOR_RST_ALL")
 
+#include <uwvm2/utils/ansies/win32_text_attr_pop_macro.h>
 #include <uwvm2/utils/ansies/ansi_pop_macro.h>

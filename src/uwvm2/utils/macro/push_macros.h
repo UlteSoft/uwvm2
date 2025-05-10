@@ -25,6 +25,9 @@
 
 // #pragma once
 
+/// @brief This file defines those header files that can only be imported once in push_macro. h
+#include "push_macros_include_header_pragma_once.h"
+
 /// @brief std and windows.h macro
 
 #pragma push_macro("erase")
@@ -103,6 +106,7 @@
 
 /// @brief        Modify function symbol linkage via ASM on GCC or Clang
 /// @see          UWVM_WINSTDCALL
+/// @note         Need to include <climit> (SIZE_MAX) and <cstdint> (UINT_LEAST32_MAX) before
 #pragma push_macro("UWVM_WINSTDCALL_RENAME")
 #undef UWVM_WINSTDCALL_RENAME
 #if defined(__clang__) || defined(__GNUC__)

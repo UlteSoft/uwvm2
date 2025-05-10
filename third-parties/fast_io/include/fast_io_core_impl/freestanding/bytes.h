@@ -8,13 +8,13 @@ struct overlapped_copy_buffer_ptr
 {
 	T *ptr;
 	inline explicit constexpr overlapped_copy_buffer_ptr(::std::size_t n) noexcept
-		: ptr(new T[n])
+		: ptr(::new T[n])
 	{}
 	inline overlapped_copy_buffer_ptr(overlapped_copy_buffer_ptr const &) = delete;
 	inline overlapped_copy_buffer_ptr &operator=(overlapped_copy_buffer_ptr const &) = delete;
 	inline constexpr ~overlapped_copy_buffer_ptr()
 	{
-		delete[] ptr;
+		::delete[] ptr;
 	}
 };
 

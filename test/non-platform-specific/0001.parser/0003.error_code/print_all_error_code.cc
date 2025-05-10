@@ -58,7 +58,7 @@ int main()
         ::fast_io::u32obuf_file u32f{u8"error_code_test_u32c.log"};
         ::uwvm2::parser::wasm::base::error_output_t errout;
         errout.err.err_selectable.u64 = 0xcdcdcdcdcdcdcdcd;
-        for(::std::uint_least32_t i{}; i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm::base::wasm_parse_error_code::global_type_illegal_mut) + 1u; ++i)
+        for(::std::uint_least32_t i{}; i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm::base::wasm_parse_error_code::func_section_resolved_not_match_the_actual_number) + 1u; ++i)
         {
             errout.err.err_code = static_cast<::uwvm2::parser::wasm::base::wasm_parse_error_code>(i);
             ::fast_io::io::perrln(cf, errout);

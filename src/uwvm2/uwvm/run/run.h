@@ -94,6 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return -2;  // The specified file is not available or cannot be opened
         }
 
+        // storage module name
         auto const module_name{::uwvm2::uwvm::cmdline::wasm_file_ppos->str};
 
 #ifdef __cpp_exceptions
@@ -131,7 +132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #endif
 
         // If not specified by the user, detect it
-        if(::uwvm2::uwvm::wasm::storage::execute_wasm_binfmt_ver == 0u)
+        if(::uwvm2::uwvm::wasm::storage::execute_wasm_binfmt_ver == static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(0u))
         {
             ::uwvm2::uwvm::wasm::storage::execute_wasm_binfmt_ver = ::uwvm2::parser::wasm::binfmt::detect_wasm_binfmt_version(
                 reinterpret_cast<::std::byte const*>(::uwvm2::uwvm::wasm::storage::execute_wasm_file.cbegin()),
@@ -146,7 +147,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_binfmt_ver)
         {
-            case 0u:
+            case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(0u):
             {
 #ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
                 ::fast_io::io::perr(
@@ -173,7 +174,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #endif
                 return -3;  // wasm parsing error
             }
-            case 1u:
+            case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(1u):
             {
                 // handle exec module
                 {

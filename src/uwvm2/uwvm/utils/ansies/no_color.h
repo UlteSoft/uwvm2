@@ -63,15 +63,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::utils::ansies
                                                     .MaximumLength = sizeof(env_str),
                                                     .Buffer = const_cast<char16_t*>(env_str)};
         ::fast_io::win32::nt::unicode_string out_us{};
-        auto status{
+        auto const status{
             ::fast_io::win32::nt::RtlQueryEnvironmentVariable_U(curr_peb->ProcessParameters->Environment, ::std::addressof(env_us), ::std::addressof(out_us))};
         return status == 0xc0000023 || status == 0x00000000;
 # else
-        auto no_color_env{::fast_io::win32::GetEnvironmentVariableA(reinterpret_cast<char const*>(u8"NO_COLOR"), nullptr, 0)};
+        auto const no_color_env{::fast_io::win32::GetEnvironmentVariableA(reinterpret_cast<char const*>(u8"NO_COLOR"), nullptr, 0)};
         return static_cast<bool>(no_color_env);
 # endif
 #else
-        auto no_color_env{details::posix::libc_getenv(reinterpret_cast<char const*>(u8"NO_COLOR"))};
+        auto const no_color_env{details::posix::libc_getenv(reinterpret_cast<char const*>(u8"NO_COLOR"))};
         return static_cast<bool>(no_color_env);
 #endif
     }

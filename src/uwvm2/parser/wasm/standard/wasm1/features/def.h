@@ -323,6 +323,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     using final_global_type = ::uwvm2::parser::wasm::concepts::operation::replacement_structure_t<decltype(get_global_type<Fs>())...>;
 
+    /// @brief final_local_function_type
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct final_local_function_type
+    {
+        final_function_type<Fs...> const* func_type{};
+        
+        ::fast_io::u8string_view custom_name{};  // The name used for the data segment
+
+        bool is_exported{};
+    };
+
 }  // namespace uwvm2::parser::wasm::standard::wasm1::features
 
 /// @brief Define container optimization operations for use with fast_io
@@ -336,6 +347,12 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct is_zero_default_constructible<::uwvm2::parser::wasm::standard::wasm1::features::final_import_type<Fs...>>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct is_zero_default_constructible<::uwvm2::parser::wasm::standard::wasm1::features::final_local_function_type<Fs...>>
     {
         inline static constexpr bool value = true;
     };

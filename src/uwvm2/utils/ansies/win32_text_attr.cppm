@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -26,6 +26,7 @@ module;
 #include <cstdint>
 #include <cstddef>
 #include <concepts>
+# include <utility>
 
 export module uwvm2.utils.ansies:win32_text_attr;
 

@@ -5,10 +5,10 @@
  *************************************************************/
 
 /**
- * @author      MacroModel
- * @version     2.0.0
- * @date        2025-03-29
- * @copyright   APL-2 License
+ * @author MacroModel
+ * @version 2.0.0
+ * @date 2025-05-06
+ * @copyright APL-2 License
  */
 
 /****************************************
@@ -20,25 +20,9 @@
  *                                      *
  ****************************************/
 
-module;
+/// @brief This file defines those header files that can only be imported once in push_macro. h
 
-// std
-# include <cstddef>
-# include <cstdint>
-# include <concepts>
-# include <utility>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#pragma once
 
-export module uwvm2.uwvm.utils.memory:print;
-
-#ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
-#endif
-
-#include "print.h"
-
+#include <cstdint>
+#include <climits>

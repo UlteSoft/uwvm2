@@ -38,4 +38,10 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::proposal::custom_page_size::value_type {}  // namespace uwvm2::parser::wasm::proposal::custom_page_size::value_type
+UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::proposal::custom_page_size::value_type {
+}  // namespace uwvm2::parser::wasm::proposal::custom_page_size::value_type
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+#endif

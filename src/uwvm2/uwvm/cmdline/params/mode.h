@@ -48,8 +48,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
         inline bool mode_is_exist{};
         inline constexpr ::fast_io::u8string_view mode_alias{u8"-m"};
         extern "C++" ::uwvm2::utils::cmdline::parameter_return_type mode_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
@@ -58,11 +58,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter mode{.name{u8"--mode"},
-                                                            .describe{u8"Select operation mode, (DEFAULT: objdump)."},
-                                                            .usage{u8"[objdump]"},
-                                                            .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::mode_alias), 1}},
-                                                            .handle{::std::addressof(details::mode_callback)},
-                                                            .is_exist{::std::addressof(details::mode_is_exist)}};
+                                                             .describe{u8"Select operation mode, (DEFAULT: objdump)."},
+                                                             .usage{u8"[objdump]"},
+                                                             .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::mode_alias), 1}},
+                                                             .handle{::std::addressof(details::mode_callback)},
+                                                             .is_exist{::std::addressof(details::mode_is_exist)}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
 #endif

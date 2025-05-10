@@ -52,13 +52,29 @@ namespace uwvm2::uwvm::cmdline::paras::details
                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
     {
-        // "--mode" xxxxxxxxx
-        //           currp1^
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //      ^^ para_curr
+
         auto currp1{para_curr + 1};
+
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //            ^^ currp1
 
         // Check for out-of-bounds and not-argument
         if(currp1 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
         {
+            // (currp1 == para_end):
+            // [... curr] ...
+            // [  safe  ] unsafe (could be the module_end)
+            //            ^^ currp1
+
+            // (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg):
+            // [... curr para] ...
+            // [     safe    ] unsafe (could be the module_end)
+            //           ^^ currp1
+
             ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -80,6 +96,10 @@ namespace uwvm2::uwvm::cmdline::paras::details
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
+
+        // [... curr arg] ...
+        // [     safe   ] unsafe (could be the module_end)
+        //           ^^ currp1
 
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;

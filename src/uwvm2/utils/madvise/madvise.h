@@ -150,12 +150,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
         {
             case madvise_flag::willneed:
             {
+                // "va" will not be modified, the pass parameter requires
                 void* va{const_cast<void*>(addr)};
                 ::fast_io::win32::nt::memory_range_entry mre{.VirtualAddress = va, .NumberOfBytes = length};
                 ::std::uint_least32_t VmInformation{0u};
                 ::fast_io::win32::nt::nt_set_information_virtual_memory<false>(reinterpret_cast<void*>(static_cast<::std::ptrdiff_t>(-1)),
                                                                                ::fast_io::win32::nt::virtual_memory_information_class::VmPrefetchInformation,
-                                                                               1,
+                                                                               1uz,
                                                                                ::std::addressof(mre),
                                                                                ::std::addressof(VmInformation),
                                                                                sizeof(::std::uint_least32_t));
@@ -163,13 +164,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
             }
             case madvise_flag::normal:
             {
+                // "va" will not be modified, the pass parameter requires
                 void* va{const_cast<void*>(addr)};
                 ::fast_io::win32::nt::memory_range_entry mre{.VirtualAddress = va, .NumberOfBytes = length};
                 ::std::uint_least32_t VmInformation{5u};  // Default priority is highest priority 5
                 ::fast_io::win32::nt::nt_set_information_virtual_memory<false>(
                     reinterpret_cast<void*>(static_cast<::std::ptrdiff_t>(-1)),
                     ::fast_io::win32::nt::virtual_memory_information_class::VmPagePriorityInformation,
-                    1,
+                    1uz,
                     ::std::addressof(mre),
                     ::std::addressof(VmInformation),
                     sizeof(::std::uint_least32_t));
@@ -177,13 +179,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
             }
             case madvise_flag::dontneed:
             {
+                // "va" will not be modified, the pass parameter requires
                 void* va{const_cast<void*>(addr)};
                 ::fast_io::win32::nt::memory_range_entry mre{.VirtualAddress = va, .NumberOfBytes = length};
                 ::std::uint_least32_t VmInformation{3u};  // Default priority is highest priority 5, set to 3 to lower priority
                 ::fast_io::win32::nt::nt_set_information_virtual_memory<false>(
                     reinterpret_cast<void*>(static_cast<::std::ptrdiff_t>(-1)),
                     ::fast_io::win32::nt::virtual_memory_information_class::VmPagePriorityInformation,
-                    1,
+                    1uz,
                     ::std::addressof(mre),
                     ::std::addressof(VmInformation),
                     sizeof(::std::uint_least32_t));
@@ -198,9 +201,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
         {
             case madvise_flag::willneed:
             {
+                // "va" will not be modified, the pass parameter requires
                 void* va{const_cast<void*>(addr)};
                 ::fast_io::win32::win32_memory_range_entry mre{.VirtualAddress = va, .NumberOfBytes = length};
-                ::fast_io::win32::PrefetchVirtualMemory(reinterpret_cast<void*>(static_cast<::std::ptrdiff_t>(-1)), 1, ::std::addressof(mre), 0);
+                ::fast_io::win32::PrefetchVirtualMemory(reinterpret_cast<void*>(static_cast<::std::ptrdiff_t>(-1)), 1uz, ::std::addressof(mre), 0);
                 break;
             }
             default:
@@ -211,9 +215,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::madvise
 # if defined(__linux__) && defined(__NR_madvise)
         // linux syscall
         ::fast_io::system_call<__NR_madvise, int>(addr, length, static_cast<int>(flag));
-# elif _POSIX_C_SOURCE >= 200112L
+# elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE >= 200112L
         // The madvise function first appeared in 4.4BSD.  The posix_madvise function
         // is part of IEEE 1003.1-2001 and was first implemented in Mac OS X 10.2.
+
+        // "addr" will not be modified, the pass parameter requires
         details::posix::posix_madvise(const_cast<void*>(addr), length, static_cast<int>(flag));
 # endif
 #endif

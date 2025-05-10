@@ -52,9 +52,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter run{.name{u8"--run"},
-                                                           .describe{u8"Run WebAssembly."},
-                                                           .usage{u8"<file> <argv[1]> <arg[2]> ..."},
-                                                           .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::run_alias), 1}}};
+                                                            .describe{u8"Run WebAssembly."},
+                                                            .usage{u8"<file> <argv[1]> <arg[2]> ..."},
+                                                            .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::run_alias), 1}}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
 #endif

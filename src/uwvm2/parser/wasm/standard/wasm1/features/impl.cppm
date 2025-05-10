@@ -31,6 +31,7 @@ export import :types;
 export import :custom_section;
 export import :type_section;
 export import :import_section;
+export import :function_section;
 export import :binfmt;
 
 #ifndef UWVM_MODULE

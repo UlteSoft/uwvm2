@@ -48,8 +48,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::paras
         inline bool wasm_abi_is_exist{};
         inline constexpr ::fast_io::u8string_view wasm_abi_alias{u8"-Wa"};
         extern "C++" ::uwvm2::utils::cmdline::parameter_return_type wasm_abi_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                     ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                     ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

@@ -67,6 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
         ::fast_io::u8string_view custom_name{};  // The name used for the data segment
 
         ::uwvm2::parser::wasm::standard::wasm1::type::function_type const* func_type{};
+        
         bool is_exported{};
     };
 

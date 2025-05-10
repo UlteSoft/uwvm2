@@ -351,3 +351,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
         return details::print_reserve_v128_i8x16_impl(iter, v128_val);
     }
 }  // namespace uwvm2::parser::wasm::standard::wasm1p1::type
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+#endif

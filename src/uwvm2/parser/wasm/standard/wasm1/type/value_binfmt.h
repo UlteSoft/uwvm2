@@ -246,3 +246,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     }
 
 }  // namespace uwvm2::parser::wasm::standard::wasm1::type
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+#endif

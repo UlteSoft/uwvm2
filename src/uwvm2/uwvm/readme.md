@@ -9,3 +9,6 @@ Providing a UWVM command line program
 * `run` Run the wasm program
 * `utils` Some other miscellaneous items
 * `wasm` Storing wasm-related stuff
+
+# Caveat
+Since the uwvm command-line program is an independent program without external dependencies, global variables are allowed.

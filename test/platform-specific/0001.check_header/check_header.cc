@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2 License (see LICENSE file).      *
@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-29
+ * @date        2025-04-12
  * @copyright   APL-2 License
  */
 
@@ -20,25 +20,35 @@
  *                                      *
  ****************************************/
 
-module;
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
+#include <concepts>
+#include <memory>
 
-// std
-# include <cstddef>
-# include <cstdint>
-# include <concepts>
-# include <utility>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#include <uwvm2/uwvm/crtmain/impl.h>
 
-export module uwvm2.uwvm.utils.memory:print;
+int main()
+{
+    /// @brief Check if all headers are popped out
 
-#ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
+#ifdef UWVM_DLLIMPORT
+    static_assert(false);
 #endif
 
-#include "print.h"
+#ifdef UWVM_WASM_SUPPORT_WASM1
+    static_assert(false);
+#endif
 
+#ifdef UWVM_AES_RST_ALL
+    static_assert(false);
+#endif
+
+#ifdef UWVM_COLOR_RST_ALL
+    static_assert(false);
+#endif
+
+#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
+    static_assert(false);
+#endif
+}

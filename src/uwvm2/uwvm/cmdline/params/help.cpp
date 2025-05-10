@@ -21,6 +21,7 @@
  ****************************************/
 
 #include <memory>
+#include <utility>
 
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
@@ -59,21 +60,22 @@ namespace uwvm2::uwvm::cmdline::paras::details
     // max parameter + left "  " + right "  "
     inline constexpr auto parameter_max_principal_name_size_u8nspace{u8nspace<::uwvm2::uwvm::cmdline::parameter_max_principal_name_size + 4>()};
 
-    inline void help_output_singal_cate(::uwvm2::utils::cmdline::categorization cate) noexcept
+    template <typename Stm>
+    inline void help_output_singal_cate(Stm&& stm, ::uwvm2::utils::cmdline::categorization cate) noexcept
     {
         for(auto const p: ::uwvm2::uwvm::cmdline::parameters)
         {
             if(p->cate != cate) { continue; }
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(::std::forward<Stm>(stm),
                                 u8"  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                 ::fast_io::mnp::left(p->name, ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size));
-            ::fast_io::io::perrln(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perrln(::std::forward<Stm>(stm),
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                   u8"  -----  ",
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   p->describe);
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(::std::forward<Stm>(stm),
                                 parameter_max_principal_name_size_u8nspace.element,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_PURPLE),
                                 u8"Usage: ",
@@ -83,13 +85,13 @@ namespace uwvm2::uwvm::cmdline::paras::details
                                 p->name);
             for(auto curr_base{p->alias.base}; curr_base != p->alias.base + p->alias.len; ++curr_base)
             {
-                ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+                ::fast_io::io::perr(::std::forward<Stm>(stm),
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"|",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                     *curr_base);
             }
-            ::fast_io::io::perrln(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perrln(::std::forward<Stm>(stm),
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   u8"] ",
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
@@ -98,20 +100,21 @@ namespace uwvm2::uwvm::cmdline::paras::details
         }
     }
 
-    inline void help_output_all() noexcept
+    template <typename Stm>
+    inline void help_output_all(Stm&& stm) noexcept
     {
         for(auto const p: ::uwvm2::uwvm::cmdline::parameters)
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(::std::forward<Stm>(stm),
                                 u8"  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                 ::fast_io::mnp::left(p->name, ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size));
-            ::fast_io::io::perrln(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perrln(::std::forward<Stm>(stm),
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                   u8"  -----  ",
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   p->describe);
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(::std::forward<Stm>(stm),
                                 parameter_max_principal_name_size_u8nspace.element,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_PURPLE),
                                 u8"Usage: ",
@@ -121,13 +124,13 @@ namespace uwvm2::uwvm::cmdline::paras::details
                                 p->name);
             for(auto curr_base{p->alias.base}; curr_base != p->alias.base + p->alias.len; ++curr_base)
             {
-                ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+                ::fast_io::io::perr(::std::forward<Stm>(stm),
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"|",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                     *curr_base);
             }
-            ::fast_io::io::perrln(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perrln(::std::forward<Stm>(stm),
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   u8"] ",
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
@@ -141,18 +144,44 @@ namespace uwvm2::uwvm::cmdline::paras::details
                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                       ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
     {
-        auto currp1{para_curr + 1};
+        // No copies will be made here.
+        auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::u8log_output)};
+        // Add raii locks while unlocking operations
+        ::fast_io::operations::decay::stream_ref_decay_lock_guard u8log_output_lg{
+            ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8log_output_osr)};
+        // No copies will be made here.
+        auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
+
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //      ^^ para_curr
+
+        auto currp1{para_curr + 1u};
+
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //            ^^ currp1
 
         // Check for out-of-bounds and not-argument
         if(currp1 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            // (currp1 == para_end):
+            // [... curr] (end) ...
+            // [  safe  ] unsafe (could be the module_end)
+            //            ^^ currp1
+
+            // (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg):
+            // [... curr para] ...
+            // [     safe    ] unsafe (could be the module_end)
+            //           ^^ currp1
+
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"Arguments:\n");
-            help_output_singal_cate(::uwvm2::utils::cmdline::categorization::global);
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::global);
 
             // display other parameter
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 // ln
                                 u8"\n",
                                 // debug
@@ -188,55 +217,59 @@ namespace uwvm2::uwvm::cmdline::paras::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
         }
 
+        // [... curr arg1] ...
+        // [     safe     ] unsafe (could be the module_end)
+        //           ^^ currp1
+
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
         if(auto const currp1_str{currp1->str}; currp1_str == u8"all")
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"Arguments:\n");
-            help_output_all();
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
+            help_output_all(u8log_output_ul);
+            ::fast_io::io::perr(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
         }
         else if(currp1_str == u8"global")
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"Arguments:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
                                 u8"  <global>",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8":\n");
-            help_output_singal_cate(::uwvm2::utils::cmdline::categorization::global);
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::global);
+            ::fast_io::io::perr(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
         }
         else if(currp1_str == u8"debug")
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"Arguments:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
                                 u8"  <debug>",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8":\n");
-            help_output_singal_cate(::uwvm2::utils::cmdline::categorization::debug);
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::debug);
+            ::fast_io::io::perr(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
         }
         else if(currp1_str == u8"wasm")
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"Arguments:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
                                 u8"  <wasm>",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8":\n");
-            help_output_singal_cate(::uwvm2::utils::cmdline::categorization::wasm);
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::wasm);
+            ::fast_io::io::perr(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL), u8"\n");
         }
         else
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
+            ::fast_io::io::perr(u8log_output_ul,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),

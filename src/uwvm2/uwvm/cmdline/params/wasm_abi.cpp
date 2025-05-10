@@ -52,13 +52,29 @@ namespace uwvm2::uwvm::cmdline::paras::details
                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
     {
-        // "--abi" xxxxxxxxx
-        //          currp1^
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //      ^^ para_curr
+
         auto currp1{para_curr + 1};
+
+        // [... curr] ...
+        // [  safe  ] unsafe (could be the module_end)
+        //            ^^ currp1
 
         // Check for out-of-bounds and not-argument
         if(currp1 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
         {
+            // (currp1 == para_end):
+            // [... curr] ...
+            // [  safe  ] unsafe (could be the module_end)
+            //            ^^ currp1
+
+            // (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg):
+            // [... curr para] ...
+            // [    safe     ] unsafe (could be the module_end)
+            //           ^^ currp1
+
             ::fast_io::io::perr(::uwvm2::uwvm::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -81,10 +97,17 @@ namespace uwvm2::uwvm::cmdline::paras::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
+        // [... curr arg] ...
+        // [    safe    ] unsafe (could be the module_end)
+        //           ^^ currp1
+
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        if(auto const currp1_str{currp1->str}; currp1_str == u8"bare") { ::uwvm2::uwvm::wasm::storage::execute_wasm_abi = ::uwvm2::uwvm::wasm::base::abi::bare; }
+        if(auto const currp1_str{currp1->str}; currp1_str == u8"bare")
+        {
+            ::uwvm2::uwvm::wasm::storage::execute_wasm_abi = ::uwvm2::uwvm::wasm::base::abi::bare;
+        }
         else if(currp1_str == u8"emscripten") { ::uwvm2::uwvm::wasm::storage::execute_wasm_abi = ::uwvm2::uwvm::wasm::base::abi::emscripten; }
         else if(currp1_str == u8"wasip1") { ::uwvm2::uwvm::wasm::storage::execute_wasm_abi = ::uwvm2::uwvm::wasm::base::abi::wasip1; }
         else if(currp1_str == u8"wasip2") { ::uwvm2::uwvm::wasm::storage::execute_wasm_abi = ::uwvm2::uwvm::wasm::base::abi::wasip2; }

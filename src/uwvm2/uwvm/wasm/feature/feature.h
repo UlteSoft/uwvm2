@@ -68,5 +68,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::feature
     inline constexpr auto binfmt_ver1_handler{::uwvm2::parser::wasm::concepts::operation::get_binfmt_handler_func_p_from_tuple<1>(wasm_binfmt1_features)};
     static_assert(::std::is_pointer_v<decltype(binfmt_ver1_handler)>);  // check is func pointer
     /// @brief binfmt ver1 module parameter storage_t (feature_parameter_t)
-    using wasm_binfmt_ver1_feature_parameter_storage_t = decltype(::uwvm2::parser::wasm::concepts::get_feature_parameter_type_from_tuple(wasm_binfmt1_features));
+    using wasm_binfmt_ver1_feature_parameter_storage_t =
+        decltype(::uwvm2::parser::wasm::concepts::get_feature_parameter_type_from_tuple(wasm_binfmt1_features));
 }  // namespace uwvm2::uwvm::wasm::feature
