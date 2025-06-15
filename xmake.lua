@@ -278,3 +278,20 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_warnings("all", "extra", "error")
 	target_end()
 end
+	function def_build()
+    if is_mode("debug") then
+        add_rules("mode.debug")    
+    elseif is_mode("release") then
+        add_rules("mode.release")   
+    elseif is_mode("minsizerel") then
+        add_rules("mode.minsizerel") 
+    elseif is_mode("releasedbg") then
+        add_rules("mode.releasedbg")  
+    end
+end
+
+def_build()
+
+target("test_function")
+    set_kind("binary")
+    add_files("test/profile/*.cpp")

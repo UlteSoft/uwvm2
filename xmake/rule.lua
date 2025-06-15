@@ -53,7 +53,13 @@ rule("releasedbg", function()
         target:set("strip", debug_strip)
     end)
 end)
-
+rule("profile.generate")
+    on_config(function(target)
+    if target:toolchain("gcc") or target:toochain("gcc-cross") then
+        targer:add("cxflags","-fprofile-generate",{force = true})
+        rger:add("ldflags","-fprofile-generate",{force = true})
+    end
+end)
 
 ---rule tables
 ---@type string[]
