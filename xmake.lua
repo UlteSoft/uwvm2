@@ -345,22 +345,18 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
         add_files(file)
 
-		if is_mode("debug") and get_config("use-llvm") then
-			-- Enable libFuzzer sanitizers for files under test/libfuzzer/
-			if string.find(file, "test/libfuzzer/") then
-				-- Prefer clang toolchain for libFuzzer if available via config
-				-- Only set sanitizers for this target
-				add_cxflags("-fsanitize=fuzzer,address,undefined", {force = true})
-				add_ldflags("-fsanitize=fuzzer,address,undefined", {force = true})
-			end
+		local is_libfuzzer = string.find(file, "test/libfuzzer/", 1, true) ~= nil
+
+		if is_mode("debug") and get_config("use-llvm") and is_libfuzzer then
+			add_cxflags("-fsanitize=fuzzer", {force = true})
+			add_ldflags("-fsanitize=fuzzer", {force = true})
 		end
 
-		if is_mode("debug") then
-			add_cxflags("-fsanitize=address,undefined", "-fno-omit-frame-pointer", {force = true})
-			add_ldflags("-fsanitize=address,undefined", {force = true})
+		if is_libfuzzer then
+			add_tests("fuzz", {group = "libfuzzer"})
+		else
+			add_tests("unit", {group = "default"})
 		end
-
-        add_tests("default")
 
 		set_warnings("all", "extra", "error")
 	target_end()
