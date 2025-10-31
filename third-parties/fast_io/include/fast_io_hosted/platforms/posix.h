@@ -525,7 +525,33 @@ io_bytes_stream_ref_define(basic_posix_family_io_observer<family, ch_type> other
 	return {other.handle};
 }
 
-#if !(defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__)) && defined(AT_FDCWD)
+#if defined(__CYGWIN__)
+
+// https://github.com/cygwin/cygwin/blob/c43ec5f5951c7f4b882a0f8e619601a45ae70a91/newlib/libc/include/sys/_default_fcntl.h#L168
+
+inline constexpr posix_at_entry posix_at_fdcwd() noexcept
+{
+	return posix_at_entry(
+#if defined(AT_FDCWD)
+			AT_FDCWD
+#else
+			-2
+#endif
+	);
+}
+
+inline constexpr posix_at_entry at_fdcwd() noexcept
+{
+	return posix_at_entry(
+#if defined(AT_FDCWD)
+			AT_FDCWD
+#else
+			-2
+#endif
+	);
+}
+
+#elif !(defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__)) && defined(AT_FDCWD)
 
 inline constexpr posix_at_entry posix_at_fdcwd() noexcept
 {
@@ -536,6 +562,7 @@ inline constexpr posix_at_entry at_fdcwd() noexcept
 {
 	return posix_at_entry(AT_FDCWD);
 }
+
 #elif defined(__MSDOS__) || defined(__DJGPP__)
 
 inline constexpr posix_at_entry posix_at_fdcwd() noexcept
@@ -547,6 +574,7 @@ inline constexpr posix_at_entry at_fdcwd() noexcept
 {
 	return posix_at_entry(-100);
 }
+
 #endif
 
 namespace details
