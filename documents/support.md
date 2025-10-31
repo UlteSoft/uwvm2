@@ -21,11 +21,15 @@
 * Supported system versions: Windows 9x 4.0 (Windows 95), Windows 9x 4.1 (Windows 98), Windows 9x 4.9 (Windows ME)
 * MinGW: i686-windows-gnu (aka. i686-w64-mingw32)
 
+## CYGWIN
+* Supported Windows versions: Windows 7 (NT 6.1) and later
+* Compilers: GCC >= 16 (via Cygwin toolchain), LLVM Clang >= 21 (via Cygwin)
+
 ## DOS
 * MS-DOS, FreeDOS (DJGPP): i586-msdosdjgpp
 
 ## Host C Library Environment
-* newlib: unknown-elf; (x86\_64, i386, etc.)-(cygwin, msys2)
+* newlib: unknown-elf
 * avr: avr-elf
 
 # C++ Version Required
