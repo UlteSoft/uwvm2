@@ -69,8 +69,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_advise_base(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd,
-        ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,
-        ::uwvm2::imported::wasi::wasip1::abi::filesize_t len,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_t offset,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_t len,
         ::uwvm2::imported::wasi::wasip1::abi::advice_t advice) noexcept
     {
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

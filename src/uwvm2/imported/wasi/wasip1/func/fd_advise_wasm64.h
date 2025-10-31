@@ -70,8 +70,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t fd_advise_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd,
-        ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t offset,
-        ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t len,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t offset,
+        [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t len,
         ::uwvm2::imported::wasi::wasip1::abi::advice_wasm64_t advice) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
