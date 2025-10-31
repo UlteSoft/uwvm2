@@ -951,6 +951,18 @@ inline int my_posix_openat(int dirfd, char const *pathname, int flags, mode_t mo
 	return fd;
 }
 
+#elif defined(__CYGWIN__)
+
+extern int my_posix_openat_noexcept(int fd, char const *path, int aflag, ... /*mode_t mode*/) noexcept __asm__("openat");
+
+template <bool always_terminate = false>
+inline int my_posix_openat(int dirfd, char const *pathname, int flags, mode_t mode)
+{
+	int fd{my_posix_openat_noexcept(dirfd, pathname, flags, mode)};
+	system_call_throw_error<always_terminate>(fd);
+	return fd;
+}
+
 #elif defined(__NEWLIB__) || defined(_PICOLIBC__)
 
 template <bool always_terminate = false>
@@ -1082,7 +1094,17 @@ struct my_posix_open_paramter
 	}
 };
 
-#if (defined(__NEWLIB__) && !defined(AT_FDCWD)) || defined(_PICOLIBC__)
+#if defined(__CYGWIN__)
+
+template <::fast_io::constructible_to_os_c_str T>
+inline constexpr int posix_openat_file_impl(int dirfd, T const &t, open_mode om, perms pm)
+{
+	return ::fast_io::posix_api_common(
+		t,
+		my_posix_at_open_paramter{dirfd, ::fast_io::details::calculate_posix_open_mode(om), static_cast<mode_t>(pm)});
+}
+
+#elif (defined(__NEWLIB__) && !defined(AT_FDCWD)) || defined(_PICOLIBC__)
 
 template <::fast_io::constructible_to_os_c_str T>
 inline constexpr int posix_openat_file_impl(int, T const &, open_mode, perms)
