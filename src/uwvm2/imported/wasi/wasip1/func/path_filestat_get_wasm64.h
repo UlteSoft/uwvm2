@@ -981,10 +981,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // directory. However, under the current fast_io strategy, `dir_file` does not utilize `CreateFileW`.
                                     // Instead, it employs `NTCreateFile` on NT systems and `FindNextFile` on Win9x systems.
 
-#if defined(__MSDOS__) || defined(__DJGPP__)
+#if defined(__CYGWIN__)
+                                    // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
+                                    // opened simultaneously. A check must be added here.
+                                    struct ::stat st;
+                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+#elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
-                                    ::fast_io::details::check_dos_fd_is_dir(next.fd);
+                                    ::fast_io::details::check_dos_fd_is_dir(next.native_handle());
 #endif
                                 }
 #ifdef UWVM_CPP_EXCEPTIONS
@@ -1059,10 +1065,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // directory. However, under the current fast_io strategy, `dir_file` does not utilize `CreateFileW`.
                                     // Instead, it employs `NTCreateFile` on NT systems and `FindNextFile` on Win9x systems.
 
-#if defined(__MSDOS__) || defined(__DJGPP__)
+#if defined(__CYGWIN__)
+                                    // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
+                                    // opened simultaneously. A check must be added here.
+                                    struct ::stat st;
+                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+#elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
-                                    ::fast_io::details::check_dos_fd_is_dir(next.fd);
+                                    ::fast_io::details::check_dos_fd_is_dir(next.native_handle());
 #endif
                                 }
 #ifdef UWVM_CPP_EXCEPTIONS
