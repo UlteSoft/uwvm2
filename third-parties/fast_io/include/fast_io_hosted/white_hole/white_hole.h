@@ -79,7 +79,7 @@ using basic_native_white_hole =
 #elif (((defined(__linux__) && defined(__GLIBC__)) || (defined(__BSD_VISIBLE) && !defined(__DARWIN_C_LEVEL)))) && 0
 	basic_bsd_arc4random<char_type>;
 #elif (defined(__linux__) && defined(__NR_getrandom)) || \
-	(!defined(__linux__) && __has_include(<sys/random.h>)) && !defined(__DARWIN_C_LEVEL)
+	(!defined(__linux__) && __has_include(<sys/random.h>)) && !defined(__DARWIN_C_LEVEL) && !defined(__CYGWIN__)
 	basic_linux_getrandom<char_type>;
 #else
 	basic_posix_dev_urandom<char_type>;
