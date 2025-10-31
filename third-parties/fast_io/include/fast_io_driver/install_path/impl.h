@@ -8,9 +8,9 @@
 #include "argv0.h"
 #endif
 
-#if (defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__CYGWIN__) || defined(__sun)
+#if (defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__sun)
 #include "linux.h"
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(__CYGWIN__)
 #if defined(_WIN32_WINDOWS)
 #include "win32_9xa.h"
 #else

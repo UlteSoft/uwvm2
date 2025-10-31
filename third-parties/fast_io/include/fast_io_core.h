@@ -9,12 +9,13 @@
 #if !defined(__cpp_concepts)
 #error "fast_io requires at least C++20 standard compiler."
 #else
-#include <bit>
-#include <limits>
+
+#include <version>
 #include <cstdint>
 #include <cstddef>
 #include <climits>
-#include <version>
+#include <bit>
+#include <limits>
 
 #if __cpp_lib_three_way_comparison >= 201907L
 #include <compare>
