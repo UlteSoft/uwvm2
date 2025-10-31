@@ -46,10 +46,14 @@
 #undef move
 
 #pragma push_macro("new")
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wkeyword-macro"
-#undef new
-#pragma GCC diagnostic pop
+#if __GNUC__ >= 16
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wkeyword-macro"
+# undef new
+# pragma GCC diagnostic pop
+#else
+# undef new
+#endif
 
 #pragma push_macro("refresh")
 #undef refresh
