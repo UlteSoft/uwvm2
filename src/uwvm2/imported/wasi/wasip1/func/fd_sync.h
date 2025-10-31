@@ -279,7 +279,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#elif ((!defined(__NEWLIB__) || defined(__CYGWIN__)) && !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(_WIN32) || defined(__CYGWIN__)) &&            \
+#elif ((!defined(__NEWLIB__) || defined(__CYGWIN__)) && !(defined(__MSDOS__) || defined(__DJGPP__)) && !defined(_WIN32) &&                                     \
        __has_include(<dirent.h>) && !defined(_PICOLIBC__)) || ((defined(__MSDOS__) || defined(__DJGPP__)) || defined(__hpux))
 
         auto const& curr_fd_native_file{file_fd};
