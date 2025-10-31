@@ -12,7 +12,7 @@ inline int dirp_to_fd(DIR *dirp) noexcept
 	{
 		return -1;
 	}
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) && (__MISC_VISIBLE || __POSIX_VISIBLE >= 200809 || __XSI_VISIBLE >= 700)
 	return dirp->__d_fd;
 #else
 	return dirfd(dirp);
