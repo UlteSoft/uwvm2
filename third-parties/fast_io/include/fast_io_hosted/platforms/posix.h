@@ -271,11 +271,11 @@ inline constexpr int calculate_posix_open_mode(open_mode value) noexcept
 #ifdef _O_SEQUENTIAL
 	if ((value & open_mode::random_access) != open_mode::none)
 	{
-		mode |= _O_SEQUENTIAL;
+		mode |= _O_RANDOM;
 	}
 	else
 	{
-		mode |= _O_RANDOM;
+		mode |= _O_SEQUENTIAL;
 	}
 #endif
 #ifdef O_LARGEFILE
@@ -522,7 +522,7 @@ template <::fast_io::posix_family family, ::std::integral ch_type>
 inline constexpr basic_posix_family_io_observer<family, char>
 io_bytes_stream_ref_define(basic_posix_family_io_observer<family, ch_type> other) noexcept
 {
-	return {other.handle};
+	return {other.fd};
 }
 
 #if defined(__CYGWIN__)
@@ -803,7 +803,7 @@ template <::fast_io::posix_family family, ::std::integral ch_type>
 inline auto redirect_handle(basic_posix_family_io_observer<family, ch_type> h) noexcept
 {
 #if (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__))
-	return my_get_osfile_handle(h.fd);
+	return details::my_get_osfile_handle(h.fd);
 #else
 	return h.fd;
 #endif
@@ -1010,11 +1010,11 @@ inline constexpr unsigned calculate_win32_cygwin_open_mode(open_mode value)
 	unsigned access{};
 	if ((value & open_mode::out) == open_mode::out)
 	{
-		access |= 0x80000000;
+		access |= 0x40000000 /*GENERIC_WRITE*/;
 	}
 	if ((value & open_mode::in) == open_mode::in)
 	{
-		access |= 0x40000000;
+		access |= 0x80000000 /*GENERIC_READ*/;
 	}
 	return access;
 }
@@ -1558,7 +1558,7 @@ public:
 		{
 			throw_posix_error();
 		}
-#elif (defined(__MSDOS__) || defined(__DJGPP__)) || defined(__NEWLIB__)
+#elif (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(__NEWLIB__) && !defined(__CYGWIN__))
 		if (noexcept_call(::pipe, a2) == -1)
 		{
 			throw_posix_error();
