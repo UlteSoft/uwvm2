@@ -190,7 +190,7 @@ int main()
             memory,
             static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(stat_ptr + 48u));
 
-# if defined(_WIN32)
+# if defined(_WIN32) || defined(__CYGWIN__)
         auto const q100 = [](u_timestamp ns) constexpr -> u_timestamp { return static_cast<u_timestamp>((ns / 100u) * 100u); };
 # else
         auto const q100 = [](u_timestamp ns) constexpr -> u_timestamp { return static_cast<u_timestamp>(ns); };
