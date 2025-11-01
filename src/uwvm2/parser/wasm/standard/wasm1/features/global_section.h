@@ -52,6 +52,7 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include "def.h"
 # include "feature_def.h"
+# include "parser_limit.h"
 # include "types.h"
 #endif
 
@@ -700,6 +701,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 err.err_curr = section_curr;
                 err.err_selectable.u64 = static_cast<::std::uint_least64_t>(global_count);
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::size_exceeds_the_maximum_value_of_size_t;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+
+        if constexpr((::std::same_as<wasm1, Fs> || ...))
+        {
+            auto const& wasm1_feapara_r{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1>(fs_para)};
+            auto const& parser_limit{wasm1_feapara_r.parser_limit};
+            if(static_cast<::std::size_t>(global_count) > parser_limit.max_global_sec_globals) [[unlikely]]
+            {
+                err.err_curr = section_curr;
+                err.err_selectable.exceed_the_max_parser_limit.name = u8"globalsec_globals";
+                err.err_selectable.exceed_the_max_parser_limit.value = static_cast<::std::size_t>(global_count);
+                err.err_selectable.exceed_the_max_parser_limit.maxval = parser_limit.max_global_sec_globals;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         }

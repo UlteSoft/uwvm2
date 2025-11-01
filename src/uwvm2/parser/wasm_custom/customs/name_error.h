@@ -78,11 +78,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
         invalid_section_canonical_order,
         duplicate_name_section,
         invalid_function_index_order,
-        invalid_function_local_index_order
+        invalid_function_local_index_order,
+        exceed_the_max_name_parser_limit
+    };
+
+    /// @brief Used to set the output of exceed_the_max_parser_limit errors
+    struct exceed_the_max_name_parser_limit_t
+    {
+        ::uwvm2::utils::container::u8string_view name;
+        ::std::size_t value;
+        ::std::size_t maxval;
     };
 
     union name_err_storage_t
     {
+        exceed_the_max_name_parser_limit_t exceed_the_max_name_parser_limit;
+        static_assert(::std::is_trivially_copyable_v<exceed_the_max_name_parser_limit_t> && ::std::is_trivially_destructible_v<exceed_the_max_name_parser_limit_t>);
+
         ::std::byte const* err_end;
         ::std::size_t err_uz;
         ::std::ptrdiff_t err_pdt;

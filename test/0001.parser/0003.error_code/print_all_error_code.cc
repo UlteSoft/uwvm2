@@ -54,7 +54,7 @@ int main()
         ::fast_io::u32obuf_file u32f{u8"error_code_test_u32c.log"};
         ::uwvm2::parser::wasm::base::error_output_t errout;
 
-        for(::std::uint_least32_t i{}; i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm::base::wasm_parse_error_code::missing_code_body_end) + 1u;
+        for(::std::uint_least32_t i{}; i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit) + 1u;
             ++i)
         {
             // Specialization of the addressing section
@@ -116,6 +116,13 @@ int main()
                     errout.err.err_selectable.illegal_custom_section_order.custom_order = 0u;
                     errout.err.err_selectable.illegal_custom_section_order.wasm_order = 0u;
                     errout.err.err_selectable.illegal_custom_section_order.wasm_sec = 0u;
+                    break;
+                }
+                case ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit:
+                {
+                    errout.err.err_selectable.exceed_the_max_parser_limit.name = u8"custom_name";
+                    errout.err.err_selectable.exceed_the_max_parser_limit.value = 0u;
+                    errout.err.err_selectable.exceed_the_max_parser_limit.maxval = 0u;
                     break;
                 }
                 default:

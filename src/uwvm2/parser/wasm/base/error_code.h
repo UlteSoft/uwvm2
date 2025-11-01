@@ -26,9 +26,9 @@
 // std
 # include <cstddef>
 # include <cstdint>
-#if __has_include(<stdfloat>)
-# include <stdfloat>
-#endif
+# if __has_include(<stdfloat>)
+#  include <stdfloat>
+# endif
 # include <limits>
 # include <type_traits>
 // macro
@@ -167,7 +167,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         init_const_expr_ref_illegal_imported_global,
         init_const_expr_ref_mutable_imported_global,
         illegal_custom_section_order,
-        missing_code_body_end
+        missing_code_body_end,
+        exceed_the_max_parser_limit
     };
 
     /// @brief used for duplicate_imports_of_the_same_import_type
@@ -238,6 +239,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         ::std::uint_least8_t wasm_sec;
     };
 
+    /// @brief Used to set the output of exceed_the_max_parser_limit errors
+    struct exceed_the_max_parser_limit_t
+    {
+        ::uwvm2::utils::container::u8string_view name;
+        ::std::size_t value;
+        ::std::size_t maxval;
+    };
+
     /// @brief define IEEE 754 F32 and F64
 #ifdef __STDCPP_FLOAT32_T__
     using error_f32 = ::std::float32_t;  // IEEE 754-2008
@@ -279,6 +288,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         static_assert(::std::is_trivially_copyable_v<elem_func_index_exceeds_maxvul_t> && ::std::is_trivially_destructible_v<elem_func_index_exceeds_maxvul_t>);
         illegal_custom_section_order_t illegal_custom_section_order;
         static_assert(::std::is_trivially_copyable_v<illegal_custom_section_order_t> && ::std::is_trivially_destructible_v<illegal_custom_section_order_t>);
+        exceed_the_max_parser_limit_t exceed_the_max_parser_limit;
+        static_assert(::std::is_trivially_copyable_v<exceed_the_max_parser_limit_t> && ::std::is_trivially_destructible_v<exceed_the_max_parser_limit_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

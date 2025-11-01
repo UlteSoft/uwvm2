@@ -49,6 +49,7 @@
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include "def.h"
 # include "feature_def.h"
+# include "parser_limit.h"
 # include "types.h"
 #endif
 
@@ -206,6 +207,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 err.err_selectable.imp_def_num_exceed_u32max.defined = table_count;
                 err.err_selectable.imp_def_num_exceed_u32max.imported = imported_table_size;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::imp_def_num_exceed_u32max;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+
+        if constexpr((::std::same_as<wasm1, Fs> || ...))
+        {
+            auto const& wasm1_feapara_r{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1>(fs_para)};
+            auto const& parser_limit{wasm1_feapara_r.parser_limit};
+            if(static_cast<::std::size_t>(table_count) > parser_limit.max_table_sec_tables) [[unlikely]]
+            {
+                err.err_curr = section_curr;
+                err.err_selectable.exceed_the_max_parser_limit.name = u8"tablesec_tables";
+                err.err_selectable.exceed_the_max_parser_limit.value = static_cast<::std::size_t>(table_count);
+                err.err_selectable.exceed_the_max_parser_limit.maxval = parser_limit.max_table_sec_tables;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         }

@@ -683,6 +683,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 #include "error_code_outputs/eco_missing_code_body_end.h"
                 return;
             }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::exceed_the_max_parser_limit:
+            {
+#include "error_code_outputs/eco_exceed_the_max_parser_limit.h"
+                return;
+            }
         }
     }
 }

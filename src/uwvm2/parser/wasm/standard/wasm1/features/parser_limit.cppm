@@ -9,7 +9,7 @@
  * @details     antecedent dependency: null
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-07-04
+ * @date        2025-04-16
  * @copyright   APL-2.0 License
  */
 
@@ -27,33 +27,29 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <climits>
 #include <concepts>
 #include <type_traits>
 #include <utility>
 #include <memory>
-#include <limits>
+#include <compare>
+#include <algorithm>
+#include <compare>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 
-export module uwvm2.parser.wasm.standard.wasm1.features:export_section;
+export module uwvm2.parser.wasm.standard.wasm1.features:parser_limit;
 
 import fast_io;
-import uwvm2.utils.debug;
 import uwvm2.utils.container;
-import uwvm2.parser.wasm.base;
-import uwvm2.parser.wasm.utils;
+import uwvm2.utils.hash;
+import uwvm2.utils.debug;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1.section;
 import uwvm2.parser.wasm.standard.wasm1.opcode;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
-import :def;
-import :feature_def;
-import :parser_limit;
-import :import_section;
-import :types;
+import uwvm2.parser.wasm.text_format;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -62,4 +58,4 @@ import :types;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "export_section.h"
+#include "parser_limit.h"

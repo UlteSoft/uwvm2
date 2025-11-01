@@ -211,6 +211,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 #include "name_error_code_outputs/name_eco_invalid_function_local_index_order.h"
                 return;
             }
+            case ::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit:
+            {
+#include "name_error_code_outputs/name_eco_exceed_the_max_name_parser_limit.h"
+                return;
+            }
         }
     }
 }

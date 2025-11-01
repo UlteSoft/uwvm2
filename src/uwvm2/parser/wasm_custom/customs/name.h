@@ -66,10 +66,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
         bool has_analyzed{};
     };
 
+    inline constexpr ::std::size_t default_max_name_sec_function_names{::uwvm2::parser::wasm::standard::wasm1::features::saturating_cast_size_t(262144u)};
+    inline constexpr ::std::size_t default_max_name_sec_code_local_functions{::uwvm2::parser::wasm::standard::wasm1::features::saturating_cast_size_t(262144u)};
+    inline constexpr ::std::size_t default_max_name_sec_code_local_names_per_function{
+        ::uwvm2::parser::wasm::standard::wasm1::features::saturating_cast_size_t(65536u)};
+
+    struct name_parser_limit_t
+    {
+        ::std::size_t max_name_sec_function_names{default_max_name_sec_function_names};
+        ::std::size_t max_name_sec_code_local_functions{default_max_name_sec_code_local_functions};
+        ::std::size_t max_name_sec_code_local_names_per_function{default_max_name_sec_code_local_names_per_function};
+    };
+
+    struct name_parser_param_t
+    {
+        name_parser_limit_t name_parser_limit{};
+    };
+
     inline constexpr void parse_name_storage(name_storage_t & ns,
                                              ::std::byte const* const begin,
                                              ::std::byte const* const end,
-                                             ::uwvm2::utils::container::vector<::uwvm2::parser::wasm_custom::customs::name_err_t>& err) noexcept
+                                             ::uwvm2::utils::container::vector<::uwvm2::parser::wasm_custom::customs::name_err_t>& err,
+                                             name_parser_param_t const& param) noexcept
     {
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse custom section: name"};
@@ -397,6 +415,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                         }
                     }
 
+                    if(name_count > param.name_parser_limit.max_name_sec_function_names) [[unlikely]]
+                    {
+                        err.emplace_back(curr,
+                                         ::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit,
+                                         ::uwvm2::parser::wasm_custom::customs::name_err_storage_t{
+                                             .exceed_the_max_name_parser_limit = {.name = u8"custom_name_funcnames",
+                                                                                  .value = name_count,
+                                                                                  .maxval = param.name_parser_limit.max_name_sec_function_names}
+                        });
+                        curr = map_end;
+                        // End of current map
+                        continue;
+                    }
+
                     ns.function_name.reserve(name_count);
 
                     curr = reinterpret_cast<::std::byte const*>(name_count_next);
@@ -651,6 +683,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                         }
                     }
 
+                    if(local_count > param.name_parser_limit.max_name_sec_code_local_functions) [[unlikely]]
+                    {
+                        err.emplace_back(curr,
+                                         ::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit,
+                                         ::uwvm2::parser::wasm_custom::customs::name_err_storage_t{
+                                             .exceed_the_max_name_parser_limit = {.name = u8"custom_name_codelocal_funcs",
+                                                                                  .value = local_count,
+                                                                                  .maxval = param.name_parser_limit.max_name_sec_code_local_functions}
+                        });
+                        curr = map_end;
+                        // End of current map
+                        continue;
+                    }
+
                     ns.code_local_name.reserve(local_count);
 
                     curr = reinterpret_cast<::std::byte const*>(local_count_next);
@@ -758,6 +804,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                         ::uwvm2::utils::container::unordered_flat_map<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32,
                                                                       ::uwvm2::utils::container::u8string_view>
                             ns_code_local_name_function_index{};
+
+                        if(function_local_count > param.name_parser_limit.max_name_sec_code_local_names_per_function) [[unlikely]]
+                        {
+                            err.emplace_back(
+                                curr,
+                                ::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit,
+                                ::uwvm2::parser::wasm_custom::customs::name_err_storage_t{
+                                    .exceed_the_max_name_parser_limit = {.name = u8"custom_name_codelocal_name_per_funcs",
+                                                                         .value = function_local_count,
+                                                                         .maxval = param.name_parser_limit.max_name_sec_code_local_names_per_function}
+                            });
+                            curr = map_end;
+                            // End of current map
+                            continue;
+                        }
 
                         ns_code_local_name_function_index.reserve(function_local_count);
 

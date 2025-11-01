@@ -47,6 +47,7 @@ import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.parser.wasm.text_format;
 import :def;
 import :feature_def;
+import :parser_limit;
 import :custom_section;
 import :type_section;
 import :import_section;

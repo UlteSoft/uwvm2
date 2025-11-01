@@ -51,7 +51,7 @@ int main()
         ::uwvm2::parser::wasm_custom::customs::name_error_output_t errout{};
 
         for(::std::uint_least32_t i{};
-            i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm_custom::customs::name_err_type_t::invalid_function_local_index_order) + 1u;
+            i != static_cast<::std::uint_least32_t>(::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit) + 1u;
             ++i)
         {
             switch(static_cast<::uwvm2::parser::wasm_custom::customs::name_err_type_t>(i))
@@ -59,6 +59,13 @@ int main()
                 case ::uwvm2::parser::wasm_custom::customs::name_err_type_t::illegal_char_sequence:
                 {
                     errout.name_err.err.u32 = 0x00;
+                    break;
+                }
+                case ::uwvm2::parser::wasm_custom::customs::name_err_type_t::exceed_the_max_name_parser_limit:
+                {
+                    errout.name_err.err.exceed_the_max_name_parser_limit.name = u8"function_names";
+                    errout.name_err.err.exceed_the_max_name_parser_limit.value = 0u;
+                    errout.name_err.err.exceed_the_max_name_parser_limit.maxval = 0u;
                     break;
                 }
                 default:

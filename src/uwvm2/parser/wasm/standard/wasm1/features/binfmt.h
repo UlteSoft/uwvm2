@@ -46,6 +46,7 @@
 # include <uwvm2/parser/wasm/text_format/impl.h>
 # include "def.h"
 # include "feature_def.h"
+# include "parser_limit.h"
 # include "custom_section.h"
 # include "type_section.h"
 # include "import_section.h"
@@ -68,11 +69,18 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
+    struct wasm_binfmt1_feature_parameter
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_parser_limit_t parser_limit{};
+    };
+
     /// @brief wasm1 feature
     struct wasm1
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view feature_name{u8"WebAssembly Release 1.0 (2019-07-20)"};
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_version{1u};
+
+        using parameter = wasm_binfmt1_feature_parameter;
 
         /// @brief      text format of Name
         /// @see        WebAssembly Release 1.0 (2019-07-20) § 5.2.4

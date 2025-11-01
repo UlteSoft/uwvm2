@@ -51,6 +51,7 @@ import uwvm2.parser.wasm.standard.wasm1.opcode;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import :def;
 import :feature_def;
+import :parser_limit;
 import :types;
 
 #ifndef UWVM_MODULE

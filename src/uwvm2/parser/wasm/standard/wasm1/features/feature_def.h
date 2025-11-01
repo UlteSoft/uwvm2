@@ -56,6 +56,12 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
+
+    ////////////////////////////
+    /// @brief Binary Format ///
+    ////////////////////////////
+    struct wasm1;
+
     ///
     /// @brief Defining structures or concepts related to wasm1 versions
     ///
