@@ -200,27 +200,41 @@ namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 set_type_name,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\".\n"
-                                u8"uwvm: ",
+                                u8"\".\n" u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Available types: \n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"              - codesec_codes\n"
-                                u8"              - code_locals\n"
-                                u8"              - datasec_entries\n"
-                                u8"              - elemsec_funcidx\n"
-                                u8"              - elemsec_elems\n"
-                                u8"              - exportsec_exports\n"
-                                u8"              - globalsec_globals\n"
-                                u8"              - importsec_imports\n"
-                                u8"              - memorysec_memories\n"
-                                u8"              - tablesec_tables\n"
-                                u8"              - typesec_types\n"
-                                u8"              - custom_name_funcnames\n"
-                                u8"              - custom_name_codelocal_funcs\n"
-                                u8"              - custom_name_codelocal_name_per_funcs\n\n",
+                                u8"              - codesec_codes (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_code_sec_codes,
+                                u8")\n" u8"              - code_locals (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_code_locals,
+                                u8")\n" u8"              - datasec_entries (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_data_sec_entries,
+                                u8")\n" u8"              - elemsec_funcidx (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_funcidx,
+                                u8")\n" u8"              - elemsec_elems (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_elem_sec_elems,
+                                u8")\n" u8"              - exportsec_exports (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_export_sec_exports,
+                                u8")\n" u8"              - globalsec_globals (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_global_sec_globals,
+                                u8")\n" u8"              - importsec_imports (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_import_sec_imports,
+                                u8")\n" u8"              - memorysec_memories (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_memory_sec_memories,
+                                u8")\n" u8"              - tablesec_tables (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_table_sec_tables,
+                                u8")\n" u8"              - typesec_types (default=",
+                                ::uwvm2::parser::wasm::standard::wasm1::features::default_max_type_sec_types,
+                                u8")\n" u8"              - custom_name_funcnames (default=",
+                                ::uwvm2::parser::wasm_custom::customs::default_max_name_sec_function_names,
+                                u8")\n" u8"              - custom_name_codelocal_funcs (default=",
+                                ::uwvm2::parser::wasm_custom::customs::default_max_name_sec_code_local_functions,
+                                u8")\n" u8"              - custom_name_codelocal_name_per_funcs (default=",
+                                ::uwvm2::parser::wasm_custom::customs::default_max_name_sec_code_local_names_per_function,
+                                u8")\n\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
