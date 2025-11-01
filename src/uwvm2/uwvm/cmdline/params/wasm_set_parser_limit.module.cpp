@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -20,36 +19,17 @@
  *                                      *
  ****************************************/
 
-#pragma once
+// import
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.ansies;
+import uwvm2.utils.cmdline;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.utils.depend;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.wasm.custom.customs;
 
-#ifndef UWVM_MODULE
-// global
-# include "version.h"
-# include "run.h"
-# include "help.h"
-# include "mode.h"
-
-// debug
-# ifdef _DEBUG
-#  include "debug_test.h"
-# endif
-
-// wasm
-# include "wasm_set_main_module_name.h"
-# include "wasm_preload_library.h"
-# include "wasm_register_dl.h"
-# include "wasm_depend_recursion_limit.h"
-# include "wasm_set_parser_limit.h"
-
-// wasi
-# include "wasip1_set_fd_limit.h"
-# include "wasi_mount_dir.h"
-
-// log
-# include "log_output.h"
-# include "log_disable_warning.h"
-# include "log_convert_warn_to_fatal.h"
-# include "log_verbose.h"
-# include "log_win32_use_ansi.h"
-
-#endif
+#include "wasm_set_parser_limit.default.cpp"

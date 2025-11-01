@@ -59,6 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_register_dl),
 #endif
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
 
             // wasi
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),

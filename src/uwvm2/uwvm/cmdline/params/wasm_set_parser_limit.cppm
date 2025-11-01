@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -22,33 +21,18 @@
 
 module;
 
-export module uwvm2.uwvm.cmdline.params;
-// global
-export import :version;
-export import :run;
-export import :help;
-export import :mode;
+// std
+#include <memory>
+#include <type_traits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-// debug
-export import :debug_test;
+export module uwvm2.uwvm.cmdline.params:wasm_set_parser_limit;
 
-// wasm
-export import :wasm_set_main_module_name;
-export import :wasm_preload_library;
-export import :wasm_register_dl;
-export import :wasm_depend_recursion_limit;
-export import :wasm_set_parser_limit;
-
-// wasi
-export import :wasip1_set_fd_limit;
-export import :wasi_mount_dir;
-
-// log
-export import :log_output;
-export import :log_disable_warning;
-export import :log_convert_warn_to_fatal;
-export import :log_verbose;
-export import :log_win32_use_ansi;
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.cmdline;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -57,4 +41,4 @@ export import :log_win32_use_ansi;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "wasm_set_parser_limit.h"

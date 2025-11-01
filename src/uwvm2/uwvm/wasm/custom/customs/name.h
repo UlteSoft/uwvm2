@@ -50,6 +50,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom::customs
 {
+    inline ::uwvm2::parser::wasm_custom::customs::name_parser_param_t name_parser_param{};  // [global]
+
     inline constexpr void name_handler(::uwvm2::uwvm::wasm::type::wasm_file_t & file,
                                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte const* const begin,
                                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte const* const end) noexcept
@@ -58,7 +60,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom::customs
         ::uwvm2::parser::wasm_custom::customs::parse_name_storage(file.wasm_custom_name,
                                                                   reinterpret_cast<::std::byte const*>(begin),
                                                                   reinterpret_cast<::std::byte const*>(end),
-                                                                  name_err);
+                                                                  name_err,
+                                                                  name_parser_param);
 #ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
         if(!name_err.empty()) [[unlikely]]
         {
