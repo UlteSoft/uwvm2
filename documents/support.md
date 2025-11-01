@@ -42,5 +42,5 @@
 
 # C++ Standard Library Support
 - GNU libstdc++ >= 15
-- LLVM libc++ >= 21 (If `<stdfloat>` is not provided, please touch stdfloat yourself.)
-- MSVC STL >= 202501 (triplet: unknown-windows-msvc)
+- LLVM libc++ >= 21
+- MSVC STL >= 202501 (Cross-compile to unknown-windows-msvc using Clang)
