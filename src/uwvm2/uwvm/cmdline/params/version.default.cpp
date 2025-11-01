@@ -847,6 +847,8 @@ namespace uwvm2::uwvm::cmdline::params::details
                                 u8"VMS"
 #elif defined(__LIBREL__)
                                 u8"z/OS"
+#elif defined(__NEWLIB__)
+                                u8"Newlib"
 #elif defined(__PICOLIBC__)
                                 u8"picolibc"
 #elif defined(__LLVM_LIBC__) || defined(__LLVM_LIBC_TYPES_FILE_H__)
