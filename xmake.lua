@@ -358,7 +358,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		if is_libfuzzer then
 			-- change the env variables in ci to change the default values
 			local rss      = os.getenv("FUZZ_RSS") or "512"
-			local maxtime  = os.getenv("FUZZ_MAX_TIME") or "5"
+			local maxtime  = os.getenv("FUZZ_MAX_TIME") or "10"
 			local maxlen   = os.getenv("FUZZ_MAX_LEN") or "1024"
 			add_tests("fuzz", {group = "libfuzzer",runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen }}) -- xmake test -g libfuzzer
 		else
