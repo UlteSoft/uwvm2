@@ -131,7 +131,9 @@ jobs:
           version: "14.2"
           run: |
             sudo pkg install -y llvm-devel xmake-io
-            xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
+            clang -v
+            which llvm-22
+            xmake f -m debug --use-llvm=y --sdk=/usr/local/lib/llvm-22 -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
             xmake b -rv
             xmake run uwvm --version
             xmake test -v
