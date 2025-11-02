@@ -31,6 +31,7 @@ module;
 #include <memory>
 #include <bit>
 #include <limits>
+#include <type_traits>
 #if __has_include(<stdfloat>)
 # include <stdfloat>
 #endif

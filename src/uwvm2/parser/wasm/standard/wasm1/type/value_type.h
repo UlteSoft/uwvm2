@@ -107,8 +107,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     ///             754-20089 standard (Section 3.3).
     /// @details    New feature
     /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.2.3
-    using error_f32 = ::uwvm2::utils::precfloat::float32_t;
-    using error_f64 = ::uwvm2::utils::precfloat::float64_t;
+    static_assert(::uwvm2::utils::precfloat::supports_float32_t);
+    using wasm_f32 = ::uwvm2::utils::precfloat::float32_t;
+
+    static_assert(::uwvm2::utils::precfloat::supports_float64_t);
+    using wasm_f64 = ::uwvm2::utils::precfloat::float64_t;
 
     /// @brief      wasm base instruction, using a byte composition, instruction or extension instruction.
     /// @details    New feature
