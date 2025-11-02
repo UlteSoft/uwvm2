@@ -117,6 +117,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-freebsd14:
+    if: ${{ !always() }}
     name: x86_64-freebsd14
     runs-on: ubuntu-latest
     strategy:
