@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-27
+ * @date        2025-05-31
  * @copyright   APL-2.0 License
  */
 
@@ -22,19 +22,9 @@
 
 module;
 
-// std
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
+export module uwvm2.utils.precfloat;
 
-export module uwvm2.parser.wasm.base:error_code;
-
-import fast_io;
-import uwvm2.utils.precfloat;
-import uwvm2.utils.container;
+export import :precfloat;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -43,4 +33,4 @@ import uwvm2.utils.container;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "error_code.h"
+#include "impl.h"

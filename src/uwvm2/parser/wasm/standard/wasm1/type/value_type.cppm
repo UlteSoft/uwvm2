@@ -28,9 +28,6 @@ module;
 #include <climits>
 #include <concepts>
 #include <bit>
-#if __has_include(<stdfloat>)
-# include <stdfloat>
-#endif
 #include <limits>
 // macro
 #include <uwvm2/parser/wasm/feature/feature_push_macro.h>
@@ -38,6 +35,7 @@ module;
 export module uwvm2.parser.wasm.standard.wasm1.type:value_type;
 
 import fast_io;
+import uwvm2.utils.precfloat;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -24,9 +24,6 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
-#if __has_include(<stdfloat>)
-# include <stdfloat>
-#endif
 #include <limits>
 #include <type_traits>
 // macro

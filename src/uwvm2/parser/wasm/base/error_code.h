@@ -26,15 +26,13 @@
 // std
 # include <cstddef>
 # include <cstdint>
-# if __has_include(<stdfloat>)
-#  include <stdfloat>
-# endif
 # include <limits>
 # include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/precfloat/impl.h>
 # include <uwvm2/utils/container/impl.h>
 #endif
 
@@ -248,23 +246,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
     };
 
     /// @brief define IEEE 754 F32 and F64
-#ifdef __STDCPP_FLOAT32_T__
-    using error_f32 = ::std::float32_t;  // IEEE 754-2008
-#else
-    using error_f32 = float;  // The C++ Standard doesn't specify it. Gotta check.
-#endif
-    static_assert(::std::numeric_limits<error_f32>::is_iec559 && ::std::numeric_limits<error_f32>::digits == 24 &&
-                      ::std::numeric_limits<error_f32>::max_exponent == 128 && ::std::numeric_limits<error_f32>::min_exponent == -125,
-                  "error_f32 ain't of the IEC 559/IEEE 754 floating-point types");
-
-#ifdef __STDCPP_FLOAT64_T__
-    using error_f64 = ::std::float64_t;  // IEEE 754-2008
-#else
-    using error_f64 = double;  // The C++ Standard doesn't specify it. Gotta check.
-#endif
-    static_assert(::std::numeric_limits<error_f64>::is_iec559 && ::std::numeric_limits<error_f64>::digits == 53 &&
-                      ::std::numeric_limits<error_f64>::max_exponent == 1024 && ::std::numeric_limits<error_f64>::min_exponent == -1021,
-                  "error_f64 ain't of the IEC 559/IEEE 754 floating-point types");
+    using error_f32 = ::uwvm2::utils::precfloat::float32_t;
+    using error_f64 = ::uwvm2::utils::precfloat::float64_t;
 
     /// @brief Additional information provided by wasm error
     union err_selectable_t
