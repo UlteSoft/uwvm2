@@ -117,7 +117,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-freebsd14:
-    if: ${{ !always() }} # Remove it once update to LLVM22
     name: x86_64-freebsd14
     runs-on: ubuntu-latest
     strategy:
