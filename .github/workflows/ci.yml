@@ -129,11 +129,17 @@ jobs:
         with:
           operating_system: freebsd
           version: "14.2"
-          run: |
-            sudo pkg install -y llvm-devel xmake-io
-            clang -v
-            which llvm-22
-            xmake f -m debug --use-llvm=y --sdk=/usr/local/lib/llvm-22 -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
-            xmake b -rv
-            xmake run uwvm --version
-            xmake test -v
+      - name: Setup
+        run: |
+          clang -v
+          which clang-22
+          which lld-22
+          which xmake
+      - name: Configure
+        run: xmake f -m debug --use-llvm=y --sdk=/usr/local/lib/llvm-22 -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
+      - name: Build
+        run: xmake b -rv
+      - name: Check UWVM version
+        run: xmake run uwvm --version
+      - name: Unit tests
+        run: xmake test -v
