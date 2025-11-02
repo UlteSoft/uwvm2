@@ -198,10 +198,10 @@ function def_build()
 						is_dirty = true -- There are uncommitted modifications or untracked files
 					end
 
-					target:add("defines", "UWVM_GIT_COMMIT_ID=u8\"" .. commit_id .. "\"")
-					target:add("defines", "UWVM_GIT_REMOTE_URL=u8\"" .. remote_url .. "\"")
-					target:add("defines", "UWVM_GIT_COMMIT_DATA=u8\"" .. commit_date .. "\"")
-					target:add("defines", "UWVM_GIT_UPSTREAM_BRANCH=u8\"" .. upstream_branch .. "\"")
+					target:add("defines", "UWVM_GIT_COMMIT_ID=u8\'" .. commit_id .. "\'")
+					target:add("defines", "UWVM_GIT_REMOTE_URL=u8\'" .. remote_url .. "\'")
+					target:add("defines", "UWVM_GIT_COMMIT_DATA=u8\'" .. commit_date .. "\'")
+					target:add("defines", "UWVM_GIT_UPSTREAM_BRANCH=u8\'" .. upstream_branch .. "\'")
 					if is_dirty then 
 						target:add("defines", "UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS")
 					end
