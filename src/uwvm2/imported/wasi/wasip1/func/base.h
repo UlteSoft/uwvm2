@@ -38,6 +38,9 @@
 # if !defined(_WIN32)
 #  include <errno.h>
 # endif
+# if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+#  include <uwvm2/imported/wasi/wasip1/func/posix.h>
+# endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -950,7 +953,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode))
+                                    {
+                                        res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                                        return res;
+                                    }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
@@ -1048,7 +1055,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode))
+                                    {
+                                        res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                                        return res;
+                                    }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
