@@ -36,7 +36,7 @@
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
 // platform
-# if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+#if ((defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !defined(_WIN32))) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #  include <time.h>
 #  include <fcntl.h>
 #  include <sys/stat.h>
@@ -67,7 +67,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
-#if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+#if ((defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !defined(_WIN32))) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
     namespace posix
     {
         // https://github.com/torvalds/linux/blob/07e27ad16399afcd693be20211b0dfae63e0615f/include/uapi/linux/time_types.h#L7
