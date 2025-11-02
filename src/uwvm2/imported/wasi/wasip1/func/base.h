@@ -38,9 +38,6 @@
 # if !defined(_WIN32)
 #  include <errno.h>
 # endif
-# if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
-#  include <uwvm2/imported/wasi/wasip1/func/posix.h>
-# endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -51,6 +48,7 @@
 # include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
 # include <uwvm2/imported/wasi/wasip1/memory/impl.h>
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
+# include "posix.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
