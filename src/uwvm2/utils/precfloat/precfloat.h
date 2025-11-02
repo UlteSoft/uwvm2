@@ -51,73 +51,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
     };
 
     // =============================
-    // float16_t
-    // =============================
-
-    namespace details
-    {
-#if defined(__STDCPP_FLOAT16_T__)
-        using float16_t_unchecked = _Float16;  // C23
-#elif defined(__SIZEOF_FLOAT16__)
-        using float16_t_unchecked = __float16;  // GCC / Clang intrinsic
-#elif defined(__fp16)
-        using float16_t_unchecked = __fp16;  // ARM / Clang half float
-#else
-        using float16_t_unchecked = error_float_t;
-#endif
-
-    }  // namespace details
-
-    inline constexpr bool supports_float16_t{::std::numeric_limits<details::float16_t_unchecked>::is_specialized &&
-                                             (::std::numeric_limits<details::float16_t_unchecked>::is_iec559 &&
-                                              ::std::numeric_limits<details::float16_t_unchecked>::digits == 11 &&
-                                              ::std::numeric_limits<details::float16_t_unchecked>::max_exponent == 16 &&
-                                              ::std::numeric_limits<details::float16_t_unchecked>::min_exponent == -13)};
-
-    using float16_t = ::std::conditional_t<supports_float16_t, details::float16_t_unchecked, error_float_t>;
-
-    // =============================
-    // bfloat16_t
-    // =============================
-
-    namespace details
-    {
-#if defined(__STDCPP_BFLOAT16_T__)
-        using bfloat16_t_unchecked = decltype(0.0bf16);
-#elif defined(__bf16)
-        using bfloat16_t_unchecked = __bf16;  // GCC/Clang extension
-#else
-        using bfloat16_t_unchecked = error_float_t;
-#endif
-    }  // namespace details
-
-    inline constexpr bool supports_bfloat16_t{::std::numeric_limits<details::bfloat16_t_unchecked>::is_specialized &&
-                                              (::std::numeric_limits<details::bfloat16_t_unchecked>::digits == 8 &&
-                                               ::std::numeric_limits<details::bfloat16_t_unchecked>::max_exponent == 128 &&
-                                               ::std::numeric_limits<details::bfloat16_t_unchecked>::min_exponent == -125)};
-
-    using bfloat16_t = ::std::conditional_t<supports_bfloat16_t, details::bfloat16_t_unchecked, error_float_t>;
-
-    // =============================
     // float32_t
     // =============================
 
 #ifdef __STDCPP_FLOAT32_T__
     using float32_t = _Float32;  // C23 IEEE 754-2008
-#elif defined(__FLT32_MANT_DIG__) && __FLT32_MANT_DIG__ == 24
-    using float32_t = _Float32;  // GCC/Clang extension before C23
 #else
     using float32_t = float;  // The C++ Standard doesn't specify it. Gotta check.
+
+    static_assert(::std::numeric_limits<float>::is_specialized &&
+                      (::std::numeric_limits<float>::is_iec559 && ::std::numeric_limits<float>::digits == 24 &&
+                       ::std::numeric_limits<float>::max_exponent == 128 && ::std::numeric_limits<float>::min_exponent == -125),
+                  "float ain't of the IEC 559/IEEE 754 floating-point types");
 #endif
-
-    // always support float32_t
-    inline constexpr bool supports_float32_t{true};
-
-    // always check
-    static_assert(::std::numeric_limits<float32_t>::is_specialized &&
-                      (::std::numeric_limits<float32_t>::is_iec559 && ::std::numeric_limits<float32_t>::digits == 24 &&
-                       ::std::numeric_limits<float32_t>::max_exponent == 128 && ::std::numeric_limits<float32_t>::min_exponent == -125),
-                  "float32_t ain't of the IEC 559/IEEE 754 floating-point types");
 
     // =============================
     // float64_t
@@ -125,20 +71,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
 
 #ifdef __STDCPP_FLOAT64_T__
     using float64_t = _Float64;  // C23 IEEE 754-2008
-#elif defined(__FLT64_MANT_DIG__) && __FLT64_MANT_DIG__ == 53
-    using float64_t = _Float64;  // GCC/Clang extension before C23
 #else
     using float64_t = double;  // The C++ Standard doesn't specify it. Gotta check.
+
+    static_assert(::std::numeric_limits<double>::is_specialized &&
+                      (::std::numeric_limits<double>::is_iec559 && ::std::numeric_limits<double>::digits == 53 &&
+                       ::std::numeric_limits<double>::max_exponent == 1024 && ::std::numeric_limits<double>::min_exponent == -1021),
+                  "double ain't of the IEC 559/IEEE 754 floating-point types");
 #endif
 
-    // always support float64_t
-    inline constexpr bool supports_float64_t{true};
+    // not support yet
+    /// @TODO: support float16_t, bfloat16_t, float80_t, float128_t
+    
+#if 0
+    // =============================
+    // float16_t
+    // =============================
 
-    // always check
-    static_assert(::std::numeric_limits<float64_t>::is_specialized &&
-                      (::std::numeric_limits<float64_t>::is_iec559 && ::std::numeric_limits<float64_t>::digits == 53 &&
-                       ::std::numeric_limits<float64_t>::max_exponent == 1024 && ::std::numeric_limits<float64_t>::min_exponent == -1021),
-                  "float64_t ain't of the IEC 559/IEEE 754 floating-point types");
+# if defined(__STDCPP_FLOAT16_T__)
+    using float16_t = _Float16;  // C23 (IEEE 754, no necessary to check)
+# else
+    using float16_t = error_float_t;
+# endif
+
+    // =============================
+    // bfloat16_t
+    // =============================
+
+    // bf16 still requires inspection
+
+# if defined(__STDCPP_BFLOAT16_T__)
+    using bfloat16_t = decltype(0.0bf16);  // C23 (IEEE 754, no necessary to check)
+# else
+    using bfloat16_t = error_float_t;
+# endif
 
     // =============================
     // float80_t
@@ -146,11 +112,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
 
     namespace details
     {
-#if defined(__SIZEOF_FLOAT80__)
+# if defined(__SIZEOF_FLOAT80__)
         using float80_t_unchecked = __float80;
-#else
+# else
         using float80_t_unchecked = long double;
-#endif
+# endif
     }  // namespace details
 
     inline constexpr bool supports_float80_t{::std::numeric_limits<details::float80_t_unchecked>::is_specialized &&
@@ -167,13 +133,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
 
     namespace details
     {
-#if defined(__STDCPP_FLOAT128_T__)
+# if defined(__STDCPP_FLOAT128_T__)
         using float128_t_unchecked = _Float128;
-#elif defined(__SIZEOF_FLOAT128__)
+# elif defined(__SIZEOF_FLOAT128__)
         using float128_t_unchecked = __float128;
-#else
+# else
         using float128_t_unchecked = long double;
-#endif
+# endif
     }  // namespace details
 
     inline constexpr bool supports_float128_t{::std::numeric_limits<details::float128_t_unchecked>::is_specialized &&
@@ -183,6 +149,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
                                                ::std::numeric_limits<details::float128_t_unchecked>::min_exponent == -16381)};
 
     using float128_t = ::std::conditional_t<supports_float128_t, details::float128_t_unchecked, error_float_t>;
+#endif
 }
 
 #ifndef UWVM_MODULE
