@@ -183,59 +183,65 @@ namespace
 
 int main()
 {
+    ::fast_io::io::perr("Starting export-section fuzzer for wasm binfmt v1 (wasm1) ...\n");
+
     std::mt19937_64 rng{std::random_device{}()};
 
-    // Build module
-    std::vector<std::byte> mod;
-    mod.reserve(1024);
-    push_header(mod);
-
-    // Type
-    auto type_sec = make_type_section();
-    push_section(mod, 1, type_sec);
-
-    // Import: empty (id=2, payload=0 count)
-    std::vector<std::byte> import_payload;
-    push_leb_u32(import_payload, 0);
-    push_section(mod, 2, import_payload);
-
-    // Function (1)
-    auto func_sec = make_function_section();
-    push_section(mod, 3, func_sec);
-
-    // Table (1)
-    auto tab_sec = make_table_section();
-    push_section(mod, 4, tab_sec);
-
-    // Memory (1)
-    auto mem_sec = make_memory_section();
-    push_section(mod, 5, mem_sec);
-
-    // Global (1)
-    auto glo_sec = make_global_section();
-    push_section(mod, 6, glo_sec);
-
-    // Export (randomized)
-    auto exp_payload = make_export_section_payload(rng);
-    push_section(mod, 7, exp_payload);
-
-    // Parse
-    try
+    for(unsigned round{}; round != 10000u; ++round)
     {
-        using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
-        ::uwvm2::parser::wasm::base::error_impl err{};
-        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        // Build module
+        std::vector<std::byte> mod;
+        mod.reserve(1024);
+        push_header(mod);
 
-        (void)::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Feature>(reinterpret_cast<::std::byte const*>(mod.data()),
-                                                                                         reinterpret_cast<::std::byte const*>(mod.data() + mod.size()),
-                                                                                         err,
-                                                                                         fs_para);
-    }
-    catch(...)
-    {
-        // swallow parse exceptions for fuzzer
+        // Type
+        auto type_sec = make_type_section();
+        push_section(mod, 1, type_sec);
+
+        // Import: empty (id=2, payload=0 count)
+        std::vector<std::byte> import_payload;
+        push_leb_u32(import_payload, 0);
+        push_section(mod, 2, import_payload);
+
+        // Function (1)
+        auto func_sec = make_function_section();
+        push_section(mod, 3, func_sec);
+
+        // Table (1)
+        auto tab_sec = make_table_section();
+        push_section(mod, 4, tab_sec);
+
+        // Memory (1)
+        auto mem_sec = make_memory_section();
+        push_section(mod, 5, mem_sec);
+
+        // Global (1)
+        auto glo_sec = make_global_section();
+        push_section(mod, 6, glo_sec);
+
+        // Export (randomized)
+        auto exp_payload = make_export_section_payload(rng);
+        push_section(mod, 7, exp_payload);
+
+        // Parse
+        try
+        {
+            using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+            ::uwvm2::parser::wasm::base::error_impl err{};
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+
+            (void)::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Feature>(reinterpret_cast<::std::byte const*>(mod.data()),
+                                                                                             reinterpret_cast<::std::byte const*>(mod.data() + mod.size()),
+                                                                                             err,
+                                                                                             fs_para);
+        }
+        catch(...)
+        {
+            // swallow parse exceptions for fuzzer
+        }
     }
 
+    ::fast_io::io::perr("Export-section fuzzing finished.\n");
     return 0;
 }
 
