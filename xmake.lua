@@ -345,7 +345,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
         add_files(file)
 
-		local is_libfuzzer = string.find(file, "test/libfuzzer/", 1, true) ~= nil
+		local is_libfuzzer = string.find(file, "test/0000.libfuzzer/", 1, true) ~= nil
 
 		if is_mode("debug") and get_config("use-llvm") and is_libfuzzer then
 			add_cxflags("-fsanitize=fuzzer", {force = true})
