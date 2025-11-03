@@ -324,6 +324,9 @@ int main()
                                           static_cast<timestamp_wasm64_t>(0u),
                                           fstflags_wasm64_t::filestat_set_atim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent
+#if defined(_WIN32) && defined(_WIN32_WINDOWS)
+           && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval
+#endif
 #if defined(__MSDOS__) || defined(__DJGPP__)
            && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval
 #endif
@@ -671,6 +674,7 @@ int main()
         if(!(r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
+             || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval
 #endif
 #if defined(__MSDOS__) || defined(__DJGPP__)
              || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval
@@ -691,6 +695,7 @@ int main()
         if(!(r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess
 # if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
+             || r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval
 # endif
              ))
         {
