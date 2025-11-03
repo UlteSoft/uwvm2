@@ -213,7 +213,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
 
-                // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1961, the conversion requires no maximum
+                // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1601, the conversion requires no maximum
                 // value checks whatsoever.
                 ::std::uint_least64_t const atim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 100u + gap};
                 ::std::uint_least64_t const mtim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 100u + gap};
@@ -1003,7 +1003,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
 
-                // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1961, the conversion requires no maximum
+                // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1601, the conversion requires no maximum
                 // value checks whatsoever.
                 ::std::uint_least64_t const atim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 100u + gap};
                 ::std::uint_least64_t const mtim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 100u + gap};

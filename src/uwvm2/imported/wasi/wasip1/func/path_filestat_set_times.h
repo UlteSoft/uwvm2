@@ -71,12 +71,731 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
-    inline void set_dir_time(::fast_io::dir_file& dirfile, 
-        ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
-        ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
-        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags)
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_file & dirfile,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
     {
+        [[maybe_unused]] auto const& file_fd{dirfile};
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+        // Windows
+# if !defined(_WIN32_WINDOWS)
+        // Windows NT
+
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
+
+        // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1601, the conversion requires no maximum
+        // value checks whatsoever.
+        ::std::uint_least64_t const atim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 100u + gap};
+        ::std::uint_least64_t const mtim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 100u + gap};
+
+        ::std::uint_least64_t lpLastAccessTime{};  // omit default
+        ::std::uint_least64_t lpLastWriteTime{};   // omit default
+
+        ::std::uint_least64_t currtime{};  // zero default
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
+            // Windows 8 or later
+            currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
+#  else
+            ::fast_io::win32::filetime ftm;  // no initialize
+            ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
+            currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
+#  endif
+
+            lpLastAccessTime = currtime;
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            lpLastAccessTime = atim_win32time;
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            // If not previously obtained, obtain it this time.
+            if(!currtime) [[unlikely]]
+            {
+#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
+                // Windows 8 or later
+                currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
+#  else
+                ::fast_io::win32::filetime ftm;  // no initialize
+                ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
+                currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
+#  endif
+            }
+
+            lpLastWriteTime = currtime;
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            lpLastWriteTime = mtim_win32time;
+        }
+
+        // file_basic_information passing 0 indicates no modification to the attribute
+        ::fast_io::win32::nt::file_basic_information fbi{.CreationTime = {},
+                                                         .LastAccessTime = lpLastAccessTime,
+                                                         .LastWriteTime = lpLastWriteTime,
+                                                         .ChangeTime = {},
+                                                         .FileAttributes = {}};
+        ::fast_io::win32::nt::io_status_block isb;  // no initialize
+        constexpr bool zw{false};
+        auto const status{::fast_io::win32::nt::nt_set_information_file<zw>(curr_fd_native_handle,
+                                                                            ::std::addressof(isb),
+                                                                            ::std::addressof(fbi),
+                                                                            static_cast<::std::uint_least32_t>(sizeof(fbi)),
+                                                                            ::fast_io::win32::nt::file_information_class::FileBasicInformation)};
+
+        switch(status)
+        {
+            [[likely]] case 0x00000000uz /*STATUS_SUCCESS*/:
+                break;
+            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+            case 0xC0000008uz /*STATUS_INVALID_HANDLE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC0000022uz /*STATUS_ACCESS_DENIED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+            case 0xC0000002uz /*STATUS_NOT_IMPLEMENTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+            case 0xC00000BBuz /*STATUS_NOT_SUPPORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+            case 0xC00000A2uz /*STATUS_MEDIA_WRITE_PROTECTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+            case 0xC000000Duz /*STATUS_INVALID_PARAMETER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+            case 0xC0000185uz /*STATUS_IO_DEVICE_ERROR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC0000001uz /*STATUS_UNSUCCESSFUL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC00000E8uz /*STATUS_INVALID_USER_BUFFER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
+            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+        }
+
+# else
+        // Windows 9x
+        // For Windows 9x, it is impossible to modify a directory's timestamp via the Win32 API and directory name without directly manipulating FAT32
+        // or FAT16.
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+# endif
+
+#elif defined(__MSDOS__) || defined(__DJGPP__)
+        // MSDOS-DJGPP
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        // Since MS-DOS can obtain the file descriptor name and then call utime, this can be implemented here.
+        auto const fd_native_handle_pathname_cstr{::fast_io::noexcept_call(::__get_fd_name, curr_fd_native_handle)};
+
+        if(fd_native_handle_pathname_cstr == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+        ::fast_io::unix_timestamp omit_atim_unix_timestamp{};
+        ::fast_io::unix_timestamp omit_mtim_unix_timestamp{};
+        ::fast_io::unix_timestamp now_unix_timestamp{};
+
+        // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
+        // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
+        struct utimbuf timestamp_spec;
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+            if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // utime uses time_t seconds; assign seconds (ns truncated).
+            timestamp_spec.actime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            // utime uses time_t seconds; convert ns to seconds.
+            timestamp_spec.actime = static_cast<::std::time_t>(atim_seconds);
+        }
+        else
+        {
+            if(omit_atim_unix_timestamp.seconds == 0u && omit_atim_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    auto const tmp_status{status(curr_fd_native_file)};
+                    omit_atim_unix_timestamp = tmp_status.atim;
+                    omit_mtim_unix_timestamp = tmp_status.mtim;
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // No need to check, because it will never overflow.
+            // utime uses time_t seconds; assign preserved seconds.
+            timestamp_spec.actime = static_cast<::std::time_t>(omit_atim_unix_timestamp.seconds);
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // utime uses time_t seconds; assign seconds (ns truncated).
+            timestamp_spec.modtime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            // utime uses time_t seconds; convert ns to seconds.
+            timestamp_spec.modtime = static_cast<::std::time_t>(mtim_seconds);
+        }
+        else
+        {
+            if(omit_mtim_unix_timestamp.seconds == 0u && omit_mtim_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    auto const tmp_status{status(curr_fd_native_file)};
+                    omit_atim_unix_timestamp = tmp_status.atim;
+                    omit_mtim_unix_timestamp = tmp_status.mtim;
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // No need to check, because it will never overflow.
+            // utime uses time_t seconds; assign preserved seconds.
+            timestamp_spec.modtime = static_cast<::std::time_t>(omit_mtim_unix_timestamp.seconds);
+        }
+
+        // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
+        // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
+        if(::uwvm2::imported::wasi::wasip1::func::posix::utime(fd_native_handle_pathname_cstr, ::std::addressof(timestamp_spec)) == -1) [[unlikely]]
+        {
+            switch(errno)
+            {
+                // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+                case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+# endif
+# if defined(ENOTSUP)
+                case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+# endif
+                case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+        }
+
+#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && !defined(__MSDOS__) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+        // posix
+# if defined(__linux__)
+        // linux
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least64_t>::max())
+        {
+            // 64 bit
+            // All fields in the 64-bit timespec are 64-bit fields.
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+#  if defined(__NR_utimensat)
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#  else
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#  endif
+        }
+        else if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least32_t>::max())
+        {
+            // 32bit
+
+#  if defined(__NR_utimensat_time64)
+            ::uwvm2::imported::wasi::wasip1::func::posix::linux_kernel_timespec64 timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                timestamp_spec[0] = {
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u),
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                timestamp_spec[1] = {
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u),
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
+            }
+
+            auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+
+#  else
+
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+#   if defined(__NR_utimensat)
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+#    if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#   else
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+#    if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#   endif
+#  endif
+        }
+        else
+        {
+            // unknown
+
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+#  if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+        }
+# elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE >= 200809L
+        // POSIX 2008
+
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        struct timespec timestamp_spec[2];
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+            timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+            auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+        }
+        else
+        {
+            timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+            auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+        }
+        else
+        {
+            timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+        }
+
+        if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+        {
+            switch(errno)
+            {
+                // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+                case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+#  if defined(ENOTSUP)
+                case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+                case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+        }
+# else
+        // POSIX.1-2008 formally introduced the ability to modify a file's nanosecond-precision time directly based on the file descriptor.
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+# endif
+#else
+        // unsupported platform
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+#endif
+
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }
 
     /// @brief     WasiPreview1.path_filestat_set_times
@@ -384,49 +1103,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 #endif
 
-        // for fast_io::native_utimensat
-        constexpr ::fast_io::unix_timestamp_option creation_time{::fast_io::utime_flags::omit};
-
-        ::fast_io::unix_timestamp_option last_access_time; // no initialize
-        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-        {
-            last_access_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::now};
-        }
-        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-        {
-            last_access_time = ::fast_io::unix_timestamp_option{
-                ::fast_io::unix_timestamp{static_cast<::std::int_least64_t>(static_cast<::std::uint_least64_t>(atim) / 1'000'000'000u),
-                                          static_cast<::std::uint_least64_t>(static_cast<::std::uint_least64_t>(atim) % 1'000'000'000u) *
-                                              (::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)}
-            };
-        }
-        else
-        {
-            last_access_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::omit};
-        }
-
-        ::fast_io::unix_timestamp_option last_modification_time; // no initialize
-        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-        {
-            last_modification_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::now};
-        }
-        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-        {
-            last_modification_time = ::fast_io::unix_timestamp_option{
-                ::fast_io::unix_timestamp{static_cast<::std::int_least64_t>(static_cast<::std::uint_least64_t>(mtim) / 1'000'000'000u),
-                                          static_cast<::std::uint_least64_t>(static_cast<::std::uint_least64_t>(mtim) % 1'000'000'000u) *
-                                              (::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)}
-            };
-        }
-        else
-        {
-            last_modification_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::omit};
-        }
-
         // path stack
         ::uwvm2::utils::container::vector<::fast_io::dir_file> path_stack{};
         path_stack.reserve(split_path_res.res.size());
@@ -446,33 +1122,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(path_stack.empty())
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
-                            try
-#endif
-                            {
-                                open_file_status = ::fast_io::status(curr_fd_native_file);
-                            }
-#ifdef UWVM_CPP_EXCEPTIONS
-                            catch(::fast_io::error e)
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                            }
-#endif
+                            auto const res{set_dir_time(curr_fd_native_file, atim, mtim, fstflags)};
+                            if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
-                            try
-#endif
-                            {
-                                open_file_status = ::fast_io::status(path_stack.back_unchecked());
-                            }
-#ifdef UWVM_CPP_EXCEPTIONS
-                            catch(::fast_io::error e)
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                            }
-#endif
+                            auto const res{set_dir_time(path_stack.back_unchecked(), atim, mtim, fstflags)};
+                            if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
                         }
 
                         break;
@@ -483,39 +1139,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         if(path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
                         else if(path_stack_size == 1uz)
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
-                            try
-#endif
-                            {
-                                open_file_status = ::fast_io::status(curr_fd_native_file);
-                            }
-#ifdef UWVM_CPP_EXCEPTIONS
-                            catch(::fast_io::error e)
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                            }
-#endif
+                            auto const res{set_dir_time(curr_fd_native_file, atim, mtim, fstflags)};
+                            if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
-                            try
-#endif
-                            {
-                                open_file_status = ::fast_io::status(path_stack.index_unchecked(path_stack_size - 2uz));
-                            }
-#ifdef UWVM_CPP_EXCEPTIONS
-                            catch(::fast_io::error e)
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                            }
-#endif
+                            auto const res{set_dir_time(path_stack.index_unchecked(path_stack_size - 2uz), atim, mtim, fstflags)};
+                            if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
                         }
 
                         break;
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::next:
                     {
+                        // for fast_io::native_utimensat
+                        constexpr ::fast_io::unix_timestamp_option creation_time{::fast_io::utime_flags::omit};
+
+                        ::fast_io::unix_timestamp_option last_access_time;  // no initialize
+                        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+                           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+                        {
+                            last_access_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::now};
+                        }
+                        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+                        {
+                            last_access_time = ::fast_io::unix_timestamp_option{
+                                ::fast_io::unix_timestamp{static_cast<::std::int_least64_t>(static_cast<::std::uint_least64_t>(atim) / 1'000'000'000u),
+                                                          static_cast<::std::uint_least64_t>(static_cast<::std::uint_least64_t>(atim) % 1'000'000'000u) *
+                                                              (::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)}
+                            };
+                        }
+                        else
+                        {
+                            last_access_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::omit};
+                        }
+
+                        ::fast_io::unix_timestamp_option last_modification_time;  // no initialize
+                        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+                           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+                        {
+                            last_modification_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::now};
+                        }
+                        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+                        {
+                            last_modification_time = ::fast_io::unix_timestamp_option{
+                                ::fast_io::unix_timestamp{static_cast<::std::int_least64_t>(static_cast<::std::uint_least64_t>(mtim) / 1'000'000'000u),
+                                                          static_cast<::std::uint_least64_t>(static_cast<::std::uint_least64_t>(mtim) % 1'000'000'000u) *
+                                                              (::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)}
+                            };
+                        }
+                        else
+                        {
+                            last_modification_time = ::fast_io::unix_timestamp_option{::fast_io::utime_flags::omit};
+                        }
+
+                        // detect symlink
                         auto const& next_name{split_curr->next_name};
 
                         ::uwvm2::utils::container::u8string symlink_symbol{};
@@ -554,39 +1234,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
-                                        open_file_status =
-                                            ::fast_io::native_fstatat(at(curr_fd_native_file), open_file_name, ::fast_io::native_at_flags::symlink_nofollow);
+                                        ::fast_io::native_utimensat(at(curr_fd_native_file),
+                                                                    open_file_name,
+                                                                    creation_time,
+                                                                    last_access_time,
+                                                                    last_modification_time,
+                                                                    ::fast_io::native_at_flags::symlink_nofollow);
                                     }
 #ifdef UWVM_CPP_EXCEPTIONS
                                     catch(::fast_io::error e)
                                     {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                        // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                        if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                        {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                            try
-#  endif
-                                            {
-                                                // default is nofollow
-                                                ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
-                                                open_file_status = ::fast_io::status(tmp_dir_file);
-                                            }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                            catch(::fast_io::error)
-                                            {
-                                                // Use external error
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-#  endif
-                                        }
-                                        else
-                                        {
-                                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                        }
-# else
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                     }
 #endif
                                 }
@@ -612,40 +1270,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
-                                            open_file_status = ::fast_io::native_fstatat(at(curr_fd_native_file),
-                                                                                         open_file_name,
-                                                                                         ::fast_io::native_at_flags::symlink_nofollow);
+                                            ::fast_io::native_utimensat(at(curr_fd_native_file),
+                                                                        open_file_name,
+                                                                        creation_time,
+                                                                        last_access_time,
+                                                                        last_modification_time,
+                                                                        ::fast_io::native_at_flags::symlink_nofollow);
                                         }
 #ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                            // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                            if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                            {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                try
-#  endif
-                                                {
-                                                    // default is nofollow
-                                                    ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
-                                                    open_file_status = ::fast_io::status(tmp_dir_file);
-                                                }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                catch(::fast_io::error)
-                                                {
-                                                    // Use external error
-                                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                                }
-#  endif
-                                            }
-                                            else
-                                            {
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-# else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                         }
 #endif
                                     }
@@ -655,40 +1290,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
-                                            open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
-                                                                                         open_file_name,
-                                                                                         ::fast_io::native_at_flags::symlink_nofollow);
+                                            ::fast_io::native_utimensat(at(path_stack.back_unchecked()),
+                                                                        open_file_name,
+                                                                        creation_time,
+                                                                        last_access_time,
+                                                                        last_modification_time,
+                                                                        ::fast_io::native_at_flags::symlink_nofollow);
                                         }
 #ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                            // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                            if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                            {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                try
-#  endif
-                                                {
-                                                    // default is nofollow
-                                                    ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
-                                                    open_file_status = ::fast_io::status(tmp_dir_file);
-                                                }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                catch(::fast_io::error)
-                                                {
-                                                    // Use external error
-                                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                                }
-#  endif
-                                            }
-                                            else
-                                            {
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-# else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                         }
 #endif
                                     }
@@ -706,39 +1318,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 try
 #endif
                                 {
-                                    open_file_status =
-                                        ::fast_io::native_fstatat(at(curr_fd_native_file), open_file_name, ::fast_io::native_at_flags::symlink_nofollow);
+                                    ::fast_io::native_utimensat(at(curr_fd_native_file),
+                                                                open_file_name,
+                                                                creation_time,
+                                                                last_access_time,
+                                                                last_modification_time,
+                                                                ::fast_io::native_at_flags::symlink_nofollow);
                                 }
 #ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                    // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                    if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                    {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                        try
-#  endif
-                                        {
-                                            // default is nofollow
-                                            ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
-                                            open_file_status = ::fast_io::status(tmp_dir_file);
-                                        }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                        catch(::fast_io::error)
-                                        {
-                                            // Use external error
-                                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                        }
-#  endif
-                                    }
-                                    else
-                                    {
-                                        return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                    }
-# else
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                 }
 #endif
                             }
@@ -775,40 +1365,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
-                                        open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
-                                                                                     open_file_name,
-                                                                                     ::fast_io::native_at_flags::symlink_nofollow);
+                                        ::fast_io::native_utimensat(at(path_stack.back_unchecked()),
+                                                                    open_file_name,
+                                                                    creation_time,
+                                                                    last_access_time,
+                                                                    last_modification_time,
+                                                                    ::fast_io::native_at_flags::symlink_nofollow);
                                     }
 #ifdef UWVM_CPP_EXCEPTIONS
                                     catch(::fast_io::error e)
                                     {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                        // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                        if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                        {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                            try
-#  endif
-                                            {
-                                                // default is nofollow
-                                                ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
-                                                open_file_status = ::fast_io::status(tmp_dir_file);
-                                            }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                            catch(::fast_io::error)
-                                            {
-                                                // Use external error
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-#  endif
-                                        }
-                                        else
-                                        {
-                                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                        }
-# else
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                     }
 #endif
                                 }
@@ -834,40 +1401,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
-                                            open_file_status = ::fast_io::native_fstatat(at(curr_fd_native_file),
-                                                                                         open_file_name,
-                                                                                         ::fast_io::native_at_flags::symlink_nofollow);
+                                            ::fast_io::native_utimensat(at(curr_fd_native_file),
+                                                                        open_file_name,
+                                                                        creation_time,
+                                                                        last_access_time,
+                                                                        last_modification_time,
+                                                                        ::fast_io::native_at_flags::symlink_nofollow);
                                         }
 #ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                            // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                            if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                            {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                try
-#  endif
-                                                {
-                                                    // default is nofollow
-                                                    ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
-                                                    open_file_status = ::fast_io::status(tmp_dir_file);
-                                                }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                catch(::fast_io::error)
-                                                {
-                                                    // Use external error
-                                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                                }
-#  endif
-                                            }
-                                            else
-                                            {
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-# else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                         }
 #endif
                                     }
@@ -877,40 +1421,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
-                                            open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
-                                                                                         open_file_name,
-                                                                                         ::fast_io::native_at_flags::symlink_nofollow);
+                                            ::fast_io::native_utimensat(at(path_stack.back_unchecked()),
+                                                                        open_file_name,
+                                                                        creation_time,
+                                                                        last_access_time,
+                                                                        last_modification_time,
+                                                                        ::fast_io::native_at_flags::symlink_nofollow);
                                         }
 #ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                            // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                            if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                            {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                try
-#  endif
-                                                {
-                                                    // default is nofollow
-                                                    ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
-                                                    open_file_status = ::fast_io::status(tmp_dir_file);
-                                                }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                                catch(::fast_io::error)
-                                                {
-                                                    // Use external error
-                                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                                }
-#  endif
-                                            }
-                                            else
-                                            {
-                                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                            }
-# else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                         }
 #endif
                                     }
@@ -928,40 +1449,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 try
 #endif
                                 {
-                                    open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
-                                                                                 open_file_name,
-                                                                                 ::fast_io::native_at_flags::symlink_nofollow);
+                                    ::fast_io::native_utimensat(at(path_stack.back_unchecked()),
+                                                                open_file_name,
+                                                                creation_time,
+                                                                last_access_time,
+                                                                last_modification_time,
+                                                                ::fast_io::native_at_flags::symlink_nofollow);
                                 }
 #ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                    // Windows 9x distinguishes between directory and file operations while attempting directory operations.
-                                    if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
-                                    {
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                        try
-#  endif
-                                        {
-                                            // default is nofollow
-                                            ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
-                                            open_file_status = ::fast_io::status(tmp_dir_file);
-                                        }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                                        catch(::fast_io::error)
-                                        {
-                                            // Use external error
-                                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                        }
-#  endif
-                                    }
-                                    else
-                                    {
-                                        return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                                    }
-# else
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
                                 }
 #endif
                             }
@@ -1185,138 +1683,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                 }
             }
-        }
-
-        // set
-
-        st_dev = static_cast<::uwvm2::imported::wasi::wasip1::abi::device_t>(open_file_status.dev);
-        st_ino = static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_t>(open_file_status.ino);
-
-        switch(open_file_status.type)
-        {
-            case ::fast_io::file_type::none:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            case ::fast_io::file_type::not_found:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            case ::fast_io::file_type::regular:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_regular_file;
-                break;
-            }
-            case ::fast_io::file_type::directory:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_directory;
-                break;
-            }
-            case ::fast_io::file_type::symlink:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_symbolic_link;
-                break;
-            }
-            case ::fast_io::file_type::block:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_block_device;
-                break;
-            }
-            case ::fast_io::file_type::character:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_character_device;
-                break;
-            }
-            case ::fast_io::file_type::fifo:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            case ::fast_io::file_type::socket:
-            {
-                // A socket does not exist as a file.
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            case ::fast_io::file_type::unknown:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            case ::fast_io::file_type::remote:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-            [[unlikely]] default:
-            {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
-                break;
-            }
-        }
-
-        st_nlink = static_cast<::uwvm2::imported::wasi::wasip1::abi::linkcount_t>(open_file_status.nlink);
-        st_size = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(open_file_status.size);
-
-        constexpr ::std::uint_least64_t mul_factor{::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u};
-
-        // Since fast_io directly obtains the clock value via clock_getres, this operation will not overflow and will not produce negative
-        // values.
-        st_atim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
-            static_cast<::std::uint_least64_t>(open_file_status.atim.seconds * 1'000'000'000u + open_file_status.atim.subseconds / mul_factor));
-        st_mtim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
-            static_cast<::std::uint_least64_t>(open_file_status.mtim.seconds * 1'000'000'000u + open_file_status.mtim.subseconds / mul_factor));
-        st_ctim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
-            static_cast<::std::uint_least64_t>(open_file_status.ctim.seconds * 1'000'000'000u + open_file_status.ctim.subseconds / mul_factor));
-
-        // write
-        if constexpr(is_default_wasi_filestat_data_layout())
-        {
-            wasi_filestat_t const tmp_wasi_filestat{st_dev, st_ino, st_filetype, st_nlink, st_size, st_atim, st_mtim, st_ctim};
-
-            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz,
-                reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_filestat)),
-                reinterpret_cast<::std::byte const*>(::std::addressof(tmp_wasi_filestat)) + sizeof(tmp_wasi_filestat));
-        }
-        else
-        {
-            // Fallback for non-default host layout: store members individually at WASI-defined offsets.
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_dev)>>>(st_dev));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 8u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_ino)>>>(st_ino));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 16u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_filetype)>>>(st_filetype));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 24u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_nlink)>>>(st_nlink));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 32u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_size)>>>(st_size));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 40u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_atim)>>>(st_atim));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 48u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_mtim)>>>(st_mtim));
-            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked(
-                memory,
-                buf_ptrsz + 56u,
-                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(st_ctim)>>>(st_ctim));
         }
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
