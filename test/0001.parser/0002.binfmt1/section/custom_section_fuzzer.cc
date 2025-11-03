@@ -173,6 +173,37 @@ int main()
     }
 
     ::fast_io::io::perr("Custom-section fuzzing finished.\n");
+    
+    // Per-function fuzzer: handle_binfmt_ver1_extensible_section_define for custom section
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    for(unsigned round{}; round != 5000u; ++round)
+    {
+        ::uwvm2::utils::container::u8string payload;
+        int mode = prob(eng) < 5 ? 1 : (prob(eng) < 10 ? 2 : 0);
+        test::build_one_custom_payload(payload, eng, mode);
+
+        auto const* begin = reinterpret_cast<::std::byte const*>(payload.data());
+        auto const* end = begin + payload.size();
+
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+        ::uwvm2::parser::wasm::binfmt::ver1::max_section_id_map_sec_id_t wasm_order{};
+        try
+        {
+            ::uwvm2::parser::wasm::standard::wasm1::features::handle_binfmt_ver1_extensible_section_define<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>{},
+                strg,
+                begin,
+                end,
+                err,
+                fs_para,
+                wasm_order,
+                /*sec_id_module_ptr*/ begin);
+        }
+        catch(...) { }
+    }
 }
 
 

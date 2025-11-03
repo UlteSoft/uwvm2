@@ -242,6 +242,51 @@ int main()
     }
 
     ::fast_io::io::perr("Export-section fuzzing finished.\n");
+    
+    // Per-function fuzzer: define_handler_export_index
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    std::uniform_int_distribution<int> kindd(0, 3);
+    for(unsigned round{}; round != 5000u; ++round)
+    {
+        // Prepare module storage with one imported of each kind
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+        auto& importsec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(strg.sections);
+        importsec.importdesc.index_unchecked(0uz).push_back_unchecked(nullptr); // func
+        importsec.importdesc.index_unchecked(1uz).push_back_unchecked(nullptr); // table
+        importsec.importdesc.index_unchecked(2uz).push_back_unchecked(nullptr); // mem
+        importsec.importdesc.index_unchecked(3uz).push_back_unchecked(nullptr); // global
+
+        // Choose kind and build just the export_idx encoding
+        auto const kind = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::external_types>(kindd(rng));
+        std::vector<std::byte> idxbuf;
+        // 80% in-range, 20% OOB
+        std::uint32_t idx = (rng() % 5u) ? 0u : 3u;
+        push_leb_u32(idxbuf, idx);
+
+        auto const* begin_idx = reinterpret_cast<::std::byte const*>(idxbuf.data());
+        auto const* end_idx = begin_idx + idxbuf.size();
+
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        try
+        {
+            ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_final_export_type<Feature> fwet{};
+            fwet.type = kind;
+            (void)::uwvm2::parser::wasm::standard::wasm1::features::define_handler_export_index<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Feature>>{},
+                fwet.storage,
+                fwet.type,
+                strg,
+                begin_idx,
+                end_idx,
+                err,
+                fs_para);
+        }
+        catch(...) { }
+    }
+
     return 0;
 }
 

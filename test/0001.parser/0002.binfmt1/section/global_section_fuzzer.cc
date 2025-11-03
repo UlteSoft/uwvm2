@@ -215,6 +215,54 @@ int main()
     }
 
     ::fast_io::io::perr("Global-section fuzzing finished.\n");
+    
+    // Per-function fuzzer: global_section_global_handler + parse_and_check_global_expr_valid
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    for(unsigned round{}; round != 5000u; ++round)
+    {
+        std::vector<std::byte> buf;
+        // Global type: i32 + immutable
+        push_byte(buf, 0x7F); // i32
+        push_byte(buf, 0x00); // const
+        // init expr: i32.const 0; end
+        push_byte(buf, 0x41);
+        push_leb_u32(buf, 0u);
+        push_byte(buf, 0x0B);
+
+        auto const* begin = reinterpret_cast<::std::byte const*>(buf.data());
+        auto const* end = begin + buf.size();
+
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+
+        try
+        {
+            ::uwvm2::parser::wasm::standard::wasm1::features::final_local_global_type<Feature> lg{};
+            auto const* after_type = ::uwvm2::parser::wasm::standard::wasm1::features::global_section_global_handler<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Feature>>{},
+                lg.global,
+                strg,
+                begin,
+                end,
+                err,
+                fs_para);
+
+            (void)::uwvm2::parser::wasm::standard::wasm1::features::parse_and_check_global_expr_valid<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Feature>>{},
+                lg.global,
+                lg.expr,
+                strg,
+                after_type,
+                end,
+                err,
+                fs_para);
+        }
+        catch(...) { }
+    }
+
     return 0;
 }
 

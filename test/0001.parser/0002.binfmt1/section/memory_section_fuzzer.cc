@@ -200,6 +200,60 @@ int main()
     }
 
     ::fast_io::io::perr("Memory-section fuzzing finished.\n");
+    // Per-function fuzzer: memory_section_memory_handler (curr != end ensured)
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    std::uniform_int_distribution<int> flagd(0, 5);
+    for(unsigned round{}; round != 5000u; ++round)
+    {
+        std::vector<std::byte> one;
+        int f = flagd(rng);
+        switch(f)
+        {
+            case 0: // valid: min only
+                push_byte(one, 0x00); push_leb_u32(one, 1 + static_cast<std::uint32_t>(rng()%3u)); break;
+            case 1: // valid: min<=max
+            {
+                push_byte(one, 0x01);
+                std::uint32_t minv = 1 + static_cast<std::uint32_t>(rng()%3u);
+                std::uint32_t maxv = minv + static_cast<std::uint32_t>(rng()%3u);
+                push_leb_u32(one, minv); push_leb_u32(one, maxv); break;
+            }
+            case 2: // invalid flag
+                push_byte(one, 0xFF); push_leb_u32(one, 0); break;
+            case 3: // min>max
+            {
+                push_byte(one, 0x01);
+                std::uint32_t maxv = 1 + static_cast<std::uint32_t>(rng()%2u);
+                std::uint32_t minv = maxv + 1u;
+                push_leb_u32(one, minv); push_leb_u32(one, maxv); break;
+            }
+            case 4: // shared-like
+                push_byte(one, 0x03); push_leb_u32(one, 1); push_leb_u32(one, 2); break;
+            default: // degenerate small numbers
+                push_byte(one, 0x00); push_leb_u32(one, 0); break;
+        }
+
+        ::uwvm2::parser::wasm::base::error_impl e{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+        try
+        {
+            auto const* b = reinterpret_cast<::std::byte const*>(one.data());
+            auto const* eend = b + one.size();
+            ::uwvm2::parser::wasm::standard::wasm1::features::final_memory_type<Feature> mem{};
+            (void)::uwvm2::parser::wasm::standard::wasm1::features::memory_section_memory_handler<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Feature>>{},
+                mem,
+                strg,
+                b,
+                eend,
+                e,
+                fs_para);
+        }
+        catch(...) { }
+    }
+
     return 0;
 }
 

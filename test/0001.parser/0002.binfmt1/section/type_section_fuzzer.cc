@@ -161,6 +161,144 @@ int main()
     }
 
     ::fast_io::io::perr("Type-section fuzzing finished.\n");
+
+    // Per-function fuzzers for concept-dispatched handlers in type section
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+
+    // 1) Fuzz define_check_typesec_value_type with random bytes
+    for(unsigned i{}; i != 4096u; ++i)
+    {
+        auto const vt_byte{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(rng() & 0xFFu)};
+        (void)::uwvm2::parser::wasm::standard::wasm1::features::define_check_typesec_value_type<Feature>(
+            ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
+            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(vt_byte));
+    }
+
+    // 2) Fuzz handle_type_prefix_functype with crafted bodies (curr != end ensured)
+    for(unsigned i{}; i != 2048u; ++i)
+    {
+        std::vector<std::byte> entry;
+        switch(rng() % 5u)
+        {
+            case 0: entry = make_type_entry_valid(rng); break;
+            case 1: entry = make_type_entry_illegal_value_type(rng); break;
+            case 2: entry = make_type_entry_multi_results(rng); break;
+            case 3: entry = make_type_entry_illegal_prefix(rng); break;
+            default: entry = make_type_entry_invalid_param_len_leb(rng); break;
+        }
+
+        if(entry.empty()) { continue; }
+
+        ::uwvm2::parser::wasm::base::error_impl e{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+
+        // If prefix is present (0x60), call handler starting after prefix; otherwise call via define_type_prefix_handler to validate prefix
+        try
+        {
+            auto const* begin = reinterpret_cast<::std::byte const*>(entry.data());
+            auto const* end = begin + entry.size();
+
+            if(static_cast<unsigned char>(entry[0]) == 0x60u)
+            {
+                (void)::uwvm2::parser::wasm::standard::wasm1::features::handle_type_prefix_functype<Feature>(
+                    ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
+                    strg,
+                    begin + 1,
+                    end,
+                    e,
+                    fs_para);
+            }
+            else
+            {
+                // Dispatch via define_type_prefix_handler with arbitrary prefix
+                auto const prefix = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::function_type_prefix>(
+                    static_cast<unsigned char>(entry[0]));
+                (void)::uwvm2::parser::wasm::standard::wasm1::features::define_type_prefix_handler<Feature>(
+                    ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
+                    ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Feature>>{},
+                    prefix,
+                    strg,
+                    begin + 1 <= end ? begin + 1 : end, // ensure curr <= end; avoid 0-length where handler assumes byte access
+                    end,
+                    e,
+                    fs_para,
+                    begin);
+            }
+        }
+        catch(...) { }
+    }
+
+    // 3) Fuzz define_check_duplicate_types by injecting duplicates/non-duplicates
+    {
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+        auto& typesec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>(strg.sections);
+
+        // Build two identical functypes: 0x60 () -> ()
+        std::vector<std::byte> identical;
+        push_byte(identical, 0x60);
+        push_leb_u32(identical, 0u);
+        push_leb_u32(identical, 0u);
+
+        auto parse_into_typesec = [&](std::vector<std::byte> const& buf)
+        {
+            ::uwvm2::parser::wasm::base::error_impl e{};
+            ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+            auto const* b = reinterpret_cast<::std::byte const*>(buf.data());
+            auto const* eend = b + buf.size();
+            if(static_cast<unsigned char>(buf[0]) == 0x60u)
+            {
+                (void)::uwvm2::parser::wasm::standard::wasm1::features::handle_type_prefix_functype<Feature>(
+                    ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                        ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
+                    strg,
+                    b + 1,
+                    eend,
+                    e,
+                    fs_para);
+            }
+        };
+
+        // Insert one valid type
+        parse_into_typesec(identical);
+
+        // Insert either duplicate or slightly different type
+        std::vector<std::byte> maybe_dup = identical;
+        if((rng() & 1u) == 0u)
+        {
+            // make it different: add one param i32
+            maybe_dup.clear();
+            push_byte(maybe_dup, 0x60);
+            push_leb_u32(maybe_dup, 1u);
+            push_byte(maybe_dup, 0x7Fu);
+            push_leb_u32(maybe_dup, 0u);
+        }
+
+        parse_into_typesec(maybe_dup);
+
+        ::uwvm2::parser::wasm::base::error_impl e{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        try
+        {
+            ::uwvm2::parser::wasm::standard::wasm1::features::define_check_duplicate_types<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Feature>>{},
+                strg,
+                reinterpret_cast<::std::byte const*>(nullptr),
+                reinterpret_cast<::std::byte const*>(nullptr),
+                e,
+                fs_para);
+        }
+        catch(...) { }
+    }
+
     return 0;
 }
 

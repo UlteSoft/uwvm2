@@ -227,6 +227,50 @@ int main()
     }
 
     ::fast_io::io::perr("Element-section fuzzing finished.\n");
+    
+    // Per-function fuzzer: define_handler_element_type + parse_and_check_element_expr_valid
+    using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+    for(unsigned round{}; round != 5000u; ++round)
+    {
+        // Prepare a minimal elem entry: table_idx=0, expr=i32.const 0; end, func_count=1, funcidx=0
+        ::uwvm2::utils::container::u8string buf;
+        test::append_uleb128(buf, 0u);        // table_idx
+        buf.push_back(static_cast<char8_t>(0x41)); // i32.const
+        buf.push_back(static_cast<char8_t>(0x00)); // 0
+        buf.push_back(static_cast<char8_t>(0x0B)); // end
+        test::append_uleb128(buf, 1u);        // funcidx_count
+        test::append_uleb128(buf, 0u);        // funcidx
+
+        auto const* begin = reinterpret_cast<::std::byte const*>(buf.data());
+        auto const* end = begin + buf.size();
+
+        ::uwvm2::parser::wasm::base::error_impl err{};
+        ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
+
+        // Make imported func size=1 and table size=1 to allow in-range indices without needing real objects
+        auto& importsec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(strg.sections);
+        importsec.importdesc.index_unchecked(0uz).push_back_unchecked(nullptr); // func
+        importsec.importdesc.index_unchecked(1uz).push_back_unchecked(nullptr); // table
+
+        try
+        {
+            ::uwvm2::parser::wasm::standard::wasm1::features::final_element_type_t<Feature> fet{};
+            // type defaults to 0 (table index 0)
+            (void)::uwvm2::parser::wasm::standard::wasm1::features::define_handler_element_type<Feature>(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::element_section_storage_t<Feature>>{},
+                fet.storage,
+                fet.type,
+                strg,
+                begin,
+                end,
+                err,
+                fs_para);
+        }
+        catch(...) { }
+    }
 }
 
 
