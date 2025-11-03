@@ -99,20 +99,20 @@ int main()
 
     auto write_string = [&](wasi_void_ptr_wasm64_t p, char8_t const* s) { write_path64(memory, p, s, ::std::char_traits<char8_t>::length(s)); };
 
-    constexpr wasi_void_ptr_wasm64_t P0{1024u};
-    constexpr wasi_void_ptr_wasm64_t P1{4096u};
-    constexpr wasi_void_ptr_wasm64_t P2{8192u};
-    constexpr wasi_void_ptr_wasm64_t P3{12288u};
-    constexpr wasi_void_ptr_wasm64_t P4{16384u};
-    constexpr wasi_void_ptr_wasm64_t P5{20480u};
-    constexpr wasi_void_ptr_wasm64_t P6{24576u};
-    constexpr wasi_void_ptr_wasm64_t P7{28672u};
-    constexpr wasi_void_ptr_wasm64_t P8{32768u};
-    constexpr wasi_void_ptr_wasm64_t P9{36864u};
-    constexpr wasi_void_ptr_wasm64_t P10{40960u};
-    constexpr wasi_void_ptr_wasm64_t P11{45056u};
-    constexpr wasi_void_ptr_wasm64_t P12{49152u};
-    constexpr wasi_void_ptr_wasm64_t P13{53248u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P0{1024u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P1{4096u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P2{8192u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P3{12288u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P4{16384u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P5{20480u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P6{24576u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P7{28672u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P8{32768u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P9{36864u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P10{40960u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P11{45056u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P12{49152u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t P13{53248u};
 
     // ===== Case 0: negative fd -> ebadf =====
     {
@@ -125,7 +125,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf)
         {
-            ::fast_io::io::perrln("pfst64 Case 0 expected ebadf", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 0 expected ebadf ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -143,7 +143,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst64 Case 1 expected enotcapable", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 1 expected enotcapable ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -161,7 +161,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perrln("pfst64 Case 2 expected enotdir", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 2 expected enotdir ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -180,7 +180,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perrln("pfst64 Case 3 expected eperm", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 3 expected eperm ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -196,7 +196,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perrln("pfst64 Case 4 expected einval", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 4 expected einval ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -217,7 +217,7 @@ int main()
 #endif
              ))
         {
-            ::fast_io::io::perrln("pfst64 Case 5 expected esuccess (or enosys)", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 5 expected esuccess (or enosys) ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -234,7 +234,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perrln("pfst64 Case 6 expected eperm", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 6 expected eperm ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -278,7 +278,7 @@ int main()
 #endif
              ))
         {
-            ::fast_io::io::perrln("pfst64 Case 7 expected esuccess (or enosys)", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 7 expected esuccess (or enosys) ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -299,7 +299,7 @@ int main()
 #endif
              ))
         {
-            ::fast_io::io::perrln("pfst64 Case 8 expected esuccess (or enosys)", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 8 expected esuccess (or enosys) ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -316,7 +316,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_atim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
         {
-            ::fast_io::io::perrln("pfst64 Case 9 expected enoent", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 9 expected enoent ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -333,7 +333,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perrln("pfst64 Case 10 expected enotdir", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 10 expected enotdir ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -367,7 +367,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 11 expected esuccess", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 11 expected esuccess ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -384,7 +384,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_atim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 12 expected esuccess", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 12 expected esuccess ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -423,7 +423,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 13 expected esuccess", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 13 expected esuccess ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -462,7 +462,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_atim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 14 expected esuccess", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 14 expected esuccess ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -488,7 +488,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eloop)
         {
-            ::fast_io::io::perrln("pfst64 Case 15a expected eloop", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 15a expected eloop ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -505,7 +505,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_atim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 15b expected esuccess", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 15b expected esuccess ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -529,7 +529,7 @@ int main()
                                           fstflags_wasm64_t::filestat_set_mtim_now);
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eloop)
         {
-            ::fast_io::io::perrln("pfst64 Case 16 expected eloop", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 16 expected eloop ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -553,7 +553,7 @@ int main()
                                          fstflags_wasm64_t::filestat_set_atim_now);
         if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perrln("pfst64 Case 17a expected eperm", ' ', static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("pfst64 Case 17a expected eperm ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
         auto const r2 = call_set_times64(static_cast<wasi_posix_fd_wasm64_t>(5),
@@ -565,7 +565,7 @@ int main()
                                          fstflags_wasm64_t::filestat_set_mtim_now);
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln("pfst64 Case 17b expected esuccess", ' ', static_cast<unsigned>(r2));
+            ::fast_io::io::perrln("pfst64 Case 17b expected esuccess ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
     }
@@ -588,7 +588,7 @@ int main()
                                           static_cast<fstflags_wasm64_t>(0));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq)
         {
-            ::fast_io::io::perrln("pfst64 Case 18 expected eilseq", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 18 expected eilseq ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -640,7 +640,7 @@ int main()
                                                             static_cast<::std::underlying_type_t<fstflags_wasm64_t>>(fstflags_wasm64_t::filestat_set_atim)));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perrln("pfst64 Case 20 expected einval", ' ', static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 20 expected einval ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -657,11 +657,11 @@ int main()
                                          fstflags_wasm64_t::filestat_set_mtim);
         if(!(r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
-             || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enosys
+             || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
 #endif
              ))
         {
-            ::fast_io::io::perrln("pfst64 Case 21a expected esuccess (or enosys)", ' ', static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("pfst64 Case 21a expected esuccess (or eacces) ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
         auto const r2 = call_set_times64(static_cast<wasi_posix_fd_wasm64_t>(5),
@@ -673,11 +673,11 @@ int main()
                                          fstflags_wasm64_t::filestat_set_atim);
         if(!(r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
-             || r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enosys
+             || r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
 #endif
              ))
         {
-            ::fast_io::io::perrln("pfst64 Case 21b expected esuccess (or enosys)", ' ', static_cast<unsigned>(r2));
+            ::fast_io::io::perrln("pfst64 Case 21b expected esuccess (or eacces) ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
     }
