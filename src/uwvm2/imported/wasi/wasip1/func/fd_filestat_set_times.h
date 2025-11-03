@@ -72,6 +72,734 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
+
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_file & dirfile,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
+                                                                      ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
+    {
+        [[maybe_unused]] auto const& file_fd{dirfile};
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+// Windows
+# if !defined(_WIN32_WINDOWS)
+        // Windows NT
+
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
+
+        // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1601, the conversion requires no maximum
+        // value checks whatsoever.
+        ::std::uint_least64_t const atim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 100u + gap};
+        ::std::uint_least64_t const mtim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 100u + gap};
+
+        ::std::uint_least64_t lpLastAccessTime{};  // omit default
+        ::std::uint_least64_t lpLastWriteTime{};   // omit default
+
+        ::std::uint_least64_t currtime{};  // zero default
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
+            // Windows 8 or later
+            currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
+#  else
+            ::fast_io::win32::filetime ftm;  // no initialize
+            ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
+            currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
+#  endif
+
+            lpLastAccessTime = currtime;
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            lpLastAccessTime = atim_win32time;
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            // If not previously obtained, obtain it this time.
+            if(!currtime) [[unlikely]]
+            {
+#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
+                // Windows 8 or later
+                currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
+#  else
+                ::fast_io::win32::filetime ftm;  // no initialize
+                ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
+                currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
+#  endif
+            }
+
+            lpLastWriteTime = currtime;
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            lpLastWriteTime = mtim_win32time;
+        }
+
+        // file_basic_information passing 0 indicates no modification to the attribute
+        ::fast_io::win32::nt::file_basic_information fbi{.CreationTime = {},
+                                                         .LastAccessTime = lpLastAccessTime,
+                                                         .LastWriteTime = lpLastWriteTime,
+                                                         .ChangeTime = {},
+                                                         .FileAttributes = {}};
+        ::fast_io::win32::nt::io_status_block isb;  // no initialize
+        constexpr bool zw{false};
+        auto const status{::fast_io::win32::nt::nt_set_information_file<zw>(curr_fd_native_handle,
+                                                                            ::std::addressof(isb),
+                                                                            ::std::addressof(fbi),
+                                                                            static_cast<::std::uint_least32_t>(sizeof(fbi)),
+                                                                            ::fast_io::win32::nt::file_information_class::FileBasicInformation)};
+
+        switch(status)
+        {
+            [[likely]] case 0x00000000uz /*STATUS_SUCCESS*/:
+                break;
+            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+            case 0xC0000008uz /*STATUS_INVALID_HANDLE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC0000022uz /*STATUS_ACCESS_DENIED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+            case 0xC0000002uz /*STATUS_NOT_IMPLEMENTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+            case 0xC00000BBuz /*STATUS_NOT_SUPPORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+            case 0xC00000A2uz /*STATUS_MEDIA_WRITE_PROTECTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+            case 0xC000000Duz /*STATUS_INVALID_PARAMETER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+            case 0xC0000185uz /*STATUS_IO_DEVICE_ERROR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC0000001uz /*STATUS_UNSUCCESSFUL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            case 0xC00000E8uz /*STATUS_INVALID_USER_BUFFER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
+            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+        }
+
+# else
+        // Windows 9x
+        // For Windows 9x, it is impossible to modify a directory's timestamp via the Win32 API and directory name without directly manipulating FAT32
+        // or FAT16.
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+# endif
+
+#elif defined(__MSDOS__) || defined(__DJGPP__)
+        // MSDOS-DJGPP
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        // Since MS-DOS can obtain the file descriptor name and then call utime, this can be implemented here.
+        auto const fd_native_handle_pathname_cstr{::fast_io::noexcept_call(::__get_fd_name, curr_fd_native_handle)};
+
+        if(fd_native_handle_pathname_cstr == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+        ::fast_io::unix_timestamp omit_atim_unix_timestamp{};
+        ::fast_io::unix_timestamp omit_mtim_unix_timestamp{};
+        ::fast_io::unix_timestamp now_unix_timestamp{};
+
+        // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
+        // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
+        struct utimbuf timestamp_spec;
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+            if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // utime uses time_t seconds; assign seconds (ns truncated).
+            timestamp_spec.actime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            // utime uses time_t seconds; convert ns to seconds.
+            timestamp_spec.actime = static_cast<::std::time_t>(atim_seconds);
+        }
+        else
+        {
+            if(omit_atim_unix_timestamp.seconds == 0u && omit_atim_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    auto const tmp_status{status(curr_fd_native_file)};
+                    omit_atim_unix_timestamp = tmp_status.atim;
+                    omit_mtim_unix_timestamp = tmp_status.mtim;
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // No need to check, because it will never overflow.
+            // utime uses time_t seconds; assign preserved seconds.
+            timestamp_spec.actime = static_cast<::std::time_t>(omit_atim_unix_timestamp.seconds);
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // utime uses time_t seconds; assign seconds (ns truncated).
+            timestamp_spec.modtime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            // utime uses time_t seconds; convert ns to seconds.
+            timestamp_spec.modtime = static_cast<::std::time_t>(mtim_seconds);
+        }
+        else
+        {
+            if(omit_mtim_unix_timestamp.seconds == 0u && omit_mtim_unix_timestamp.subseconds == 0u)
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    auto const tmp_status{status(curr_fd_native_file)};
+                    omit_atim_unix_timestamp = tmp_status.atim;
+                    omit_mtim_unix_timestamp = tmp_status.mtim;
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+# endif
+            }
+
+            // No need to check, because it will never overflow.
+            // utime uses time_t seconds; assign preserved seconds.
+            timestamp_spec.modtime = static_cast<::std::time_t>(omit_mtim_unix_timestamp.seconds);
+        }
+
+        // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
+        // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
+        if(::uwvm2::imported::wasi::wasip1::func::posix::utime(fd_native_handle_pathname_cstr, ::std::addressof(timestamp_spec)) == -1) [[unlikely]]
+        {
+            switch(errno)
+            {
+                // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+                case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+# endif
+# if defined(ENOTSUP)
+                case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+# endif
+                case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+        }
+
+#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && !defined(__MSDOS__) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+// posix
+# if defined(__linux__)
+        // linux
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least64_t>::max())
+        {
+            // 64 bit
+            // All fields in the 64-bit timespec are 64-bit fields.
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+#  if defined(__NR_utimensat)
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#  else
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#  endif
+        }
+        else if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least32_t>::max())
+        {
+            // 32bit
+
+#  if defined(__NR_utimensat_time64)
+            ::uwvm2::imported::wasi::wasip1::func::posix::linux_kernel_timespec64 timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                timestamp_spec[0] = {
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u),
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                timestamp_spec[1] = {
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u),
+                    static_cast<::std::int_least64_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
+            }
+
+            auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+#   if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#   endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+
+#  else
+
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+#   if defined(__NR_utimensat)
+            auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
+            if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
+            {
+                auto const err{static_cast<int>(-res)};
+                switch(err)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+#    if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#   else
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+#    if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#    endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+#   endif
+#  endif
+        }
+        else
+        {
+            // unknown
+
+            struct timespec timestamp_spec[2];
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+            {
+                auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+                auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+               ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+            }
+            else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                    ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+            {
+                auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+                auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+                if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+                {
+                    if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+            }
+            else
+            {
+                timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+            }
+
+            if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+            {
+                switch(errno)
+                {
+                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
+                    // instead.
+                    case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                    case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                    case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                    case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+#  if defined(ENOTSUP)
+                    case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+                    case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                    case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+        }
+# elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE >= 200809L
+        // POSIX 2008
+
+        auto const& curr_fd_native_file{file_fd};
+        auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
+
+        struct timespec timestamp_spec[2];
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
+        {
+            timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
+        {
+            auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
+            auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
+        }
+        else
+        {
+            timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
+        }
+
+        if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
+           ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
+        {
+            timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
+        }
+        else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
+                ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
+        {
+            auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
+            auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
+
+            if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
+            {
+                if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow; }
+            }
+
+            timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
+        }
+        else
+        {
+            timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
+        }
+
+        if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
+        {
+            switch(errno)
+            {
+                // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
+                case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+                case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+#  if defined(ENOTSUP)
+                case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+#  endif
+                case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+        }
+# else
+        // POSIX.1-2008 formally introduced the ability to modify a file's nanosecond-precision time directly based on the file descriptor.
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+# endif
+#else
+        // unsupported platform
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+#endif
+
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+    }
+
     /// @brief     WasiPreview1.fd_filestat_set_times
     /// @details   __wasi_errno_t fd_filestat_set_times(__wasi_fd_t fd, __wasi_timestamp_t atim, __wasi_timestamp_t mtim, __wasi_fstflags_t fstflags);
     inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_filestat_set_times_base(
@@ -993,736 +1721,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 [[maybe_unused]] auto const& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
-                // Windows
-# if !defined(_WIN32_WINDOWS)
-                // Windows NT
-
-                auto const& curr_fd_native_file{file_fd};
-                auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
-
-                constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
-
-                // Since WASI uses NSS time starting from 1970, while Win32 uses 0.1 microsecond time starting from 1601, the conversion requires no maximum
-                // value checks whatsoever.
-                ::std::uint_least64_t const atim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 100u + gap};
-                ::std::uint_least64_t const mtim_win32time{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 100u + gap};
-
-                ::std::uint_least64_t lpLastAccessTime{};  // omit default
-                ::std::uint_least64_t lpLastWriteTime{};   // omit default
-
-                ::std::uint_least64_t currtime{};  // zero default
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                {
-#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
-                    // Windows 8 or later
-                    currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
-#  else
-                    ::fast_io::win32::filetime ftm;  // no initialize
-                    ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
-                    currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
-#  endif
-
-                    lpLastAccessTime = currtime;
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                {
-                    lpLastAccessTime = atim_win32time;
-                }
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                {
-                    // If not previously obtained, obtain it this time.
-                    if(!currtime) [[unlikely]]
-                    {
-#  if (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0602)
-                        // Windows 8 or later
-                        currtime = static_cast<::std::uint_least64_t>(::fast_io::win32::nt::RtlGetSystemTimePrecise());
-#  else
-                        ::fast_io::win32::filetime ftm;  // no initialize
-                        ::fast_io::win32::GetSystemTimeAsFileTime(::std::addressof(ftm));
-                        currtime = (static_cast<::std::uint_least64_t>(ftm.dwHighDateTime) << 32u) | ftm.dwLowDateTime;
-#  endif
-                    }
-
-                    lpLastWriteTime = currtime;
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                {
-                    lpLastWriteTime = mtim_win32time;
-                }
-
-                // file_basic_information passing 0 indicates no modification to the attribute
-                ::fast_io::win32::nt::file_basic_information fbi{.CreationTime = {},
-                                                                 .LastAccessTime = lpLastAccessTime,
-                                                                 .LastWriteTime = lpLastWriteTime,
-                                                                 .ChangeTime = {},
-                                                                 .FileAttributes = {}};
-                ::fast_io::win32::nt::io_status_block isb;  // no initialize
-                constexpr bool zw{false};
-                auto const status{::fast_io::win32::nt::nt_set_information_file<zw>(curr_fd_native_handle,
-                                                                                    ::std::addressof(isb),
-                                                                                    ::std::addressof(fbi),
-                                                                                    static_cast<::std::uint_least32_t>(sizeof(fbi)),
-                                                                                    ::fast_io::win32::nt::file_information_class::FileBasicInformation)};
-
-                switch(status)
-                {
-                    [[likely]] case 0x00000000uz /*STATUS_SUCCESS*/:
-                        break;
-                    // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
-                    case 0xC0000008uz /*STATUS_INVALID_HANDLE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                    case 0xC0000022uz /*STATUS_ACCESS_DENIED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                    case 0xC0000002uz /*STATUS_NOT_IMPLEMENTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                    case 0xC00000BBuz /*STATUS_NOT_SUPPORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-                    case 0xC00000A2uz /*STATUS_MEDIA_WRITE_PROTECTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-                    case 0xC000000Duz /*STATUS_INVALID_PARAMETER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                    case 0xC0000185uz /*STATUS_IO_DEVICE_ERROR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                    case 0xC0000001uz /*STATUS_UNSUCCESSFUL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                    case 0xC00000E8uz /*STATUS_INVALID_USER_BUFFER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
-                    default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                }
-
-# else
-                // Windows 9x
-                // For Windows 9x, it is impossible to modify a directory's timestamp via the Win32 API and directory name without directly manipulating FAT32
-                // or FAT16.
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-# endif
-
-#elif defined(__MSDOS__) || defined(__DJGPP__)
-                // MSDOS-DJGPP
-                auto const& curr_fd_native_file{file_fd};
-                auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
-
-                // Since MS-DOS can obtain the file descriptor name and then call utime, this can be implemented here.
-                auto const fd_native_handle_pathname_cstr{::fast_io::noexcept_call(::__get_fd_name, curr_fd_native_handle)};
-
-                if(fd_native_handle_pathname_cstr == nullptr) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
-
-                ::fast_io::unix_timestamp omit_atim_unix_timestamp{};
-                ::fast_io::unix_timestamp omit_mtim_unix_timestamp{};
-                ::fast_io::unix_timestamp now_unix_timestamp{};
-
-                // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
-                // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
-                struct utimbuf timestamp_spec;
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                {
-                    if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
-                    {
-# ifdef UWVM_CPP_EXCEPTIONS
-                        try
-# endif
-                        {
-                            now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
-                        }
-# ifdef UWVM_CPP_EXCEPTIONS
-                        catch(::fast_io::error)
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-# endif
-                    }
-
-                    // utime uses time_t seconds; assign seconds (ns truncated).
-                    timestamp_spec.actime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                {
-                    auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
-
-                    if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                    {
-                        if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                        }
-                    }
-
-                    // utime uses time_t seconds; convert ns to seconds.
-                    timestamp_spec.actime = static_cast<::std::time_t>(atim_seconds);
-                }
-                else
-                {
-                    if(omit_atim_unix_timestamp.seconds == 0u && omit_atim_unix_timestamp.subseconds == 0u)
-                    {
-# ifdef UWVM_CPP_EXCEPTIONS
-                        try
-# endif
-                        {
-                            auto const tmp_status{status(curr_fd_native_file)};
-                            omit_atim_unix_timestamp = tmp_status.atim;
-                            omit_mtim_unix_timestamp = tmp_status.mtim;
-                        }
-# ifdef UWVM_CPP_EXCEPTIONS
-                        catch(::fast_io::error)
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-# endif
-                    }
-
-                    // No need to check, because it will never overflow.
-                    // utime uses time_t seconds; assign preserved seconds.
-                    timestamp_spec.actime = static_cast<::std::time_t>(omit_atim_unix_timestamp.seconds);
-                }
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                {
-                    if(now_unix_timestamp.seconds == 0u && now_unix_timestamp.subseconds == 0u)
-                    {
-# ifdef UWVM_CPP_EXCEPTIONS
-                        try
-# endif
-                        {
-                            now_unix_timestamp = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime);
-                        }
-# ifdef UWVM_CPP_EXCEPTIONS
-                        catch(::fast_io::error)
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-# endif
-                    }
-
-                    // utime uses time_t seconds; assign seconds (ns truncated).
-                    timestamp_spec.modtime = static_cast<::std::time_t>(now_unix_timestamp.seconds);
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                {
-                    auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
-
-                    if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                    {
-                        if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                        }
-                    }
-
-                    // utime uses time_t seconds; convert ns to seconds.
-                    timestamp_spec.modtime = static_cast<::std::time_t>(mtim_seconds);
-                }
-                else
-                {
-                    if(omit_mtim_unix_timestamp.seconds == 0u && omit_mtim_unix_timestamp.subseconds == 0u)
-                    {
-# ifdef UWVM_CPP_EXCEPTIONS
-                        try
-# endif
-                        {
-                            auto const tmp_status{status(curr_fd_native_file)};
-                            omit_atim_unix_timestamp = tmp_status.atim;
-                            omit_mtim_unix_timestamp = tmp_status.mtim;
-                        }
-# ifdef UWVM_CPP_EXCEPTIONS
-                        catch(::fast_io::error)
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-# endif
-                    }
-
-                    // No need to check, because it will never overflow.
-                    // utime uses time_t seconds; assign preserved seconds.
-                    timestamp_spec.modtime = static_cast<::std::time_t>(omit_mtim_unix_timestamp.seconds);
-                }
-
-                // Note that, as under DOS a file only has a single timestamp, the actime field of struct utimbuf is ignored by this function, and only modtime
-                // field is used. On filesystems which support long filenames, both fields are used and both access and modification times are set.
-                if(::uwvm2::imported::wasi::wasip1::func::posix::utime(fd_native_handle_pathname_cstr, ::std::addressof(timestamp_spec)) == -1) [[unlikely]]
-                {
-                    switch(errno)
-                    {
-                        // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
-                        case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                        case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                        case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                        case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                        case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-# endif
-# if defined(ENOTSUP)
-                        case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-# endif
-                        case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                        case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                    }
-                }
-
-#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && !defined(__MSDOS__) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
-                // posix
-# if defined(__linux__)
-                // linux
-                auto const& curr_fd_native_file{file_fd};
-                auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
-
-                if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least64_t>::max())
-                {
-                    // 64 bit
-                    // All fields in the 64-bit timespec are 64-bit fields.
-                    struct timespec timestamp_spec[2];
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                    {
-                        auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
-                        auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                    {
-                        auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
-                        auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-#  if defined(__NR_utimensat)
-                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
-                    {
-                        auto const err{static_cast<int>(-res)};
-                        switch(err)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-#   if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-#  else
-                    if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
-                    {
-                        switch(errno)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-#   if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-#  endif
-                }
-                else if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least32_t>::max())
-                {
-                    // 32bit
-
-#  if defined(__NR_utimensat_time64)
-                    ::uwvm2::imported::wasi::wasip1::func::posix::linux_kernel_timespec64 timestamp_spec[2];
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                    {
-                        timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                    {
-                        timestamp_spec[0] = {static_cast<::std::int_least64_t>(
-                                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u),
-                                             static_cast<::std::int_least64_t>(
-                                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u)};
-                    }
-                    else
-                    {
-                        timestamp_spec[0] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
-                    }
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                    {
-                        timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                    {
-                        timestamp_spec[1] = {static_cast<::std::int_least64_t>(
-                                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u),
-                                             static_cast<::std::int_least64_t>(
-                                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u)};
-                    }
-                    else
-                    {
-                        timestamp_spec[1] = {{}, static_cast<::std::int_least64_t>(UTIME_OMIT)};
-                    }
-
-                    auto const res{::fast_io::system_call<__NR_utimensat_time64, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
-                    {
-                        auto const err{static_cast<int>(-res)};
-                        switch(err)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-#   if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#   endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-
-#  else
-
-                    struct timespec timestamp_spec[2];
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                    {
-                        auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
-                        auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                    {
-                        auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
-                        auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-#   if defined(__NR_utimensat)
-                    auto const res{::fast_io::system_call<__NR_utimensat, int>(curr_fd_native_handle, "", timestamp_spec, AT_EMPTY_PATH)};
-                    if(::fast_io::linux_system_call_fails(res)) [[unlikely]]
-                    {
-                        auto const err{static_cast<int>(-res)};
-                        switch(err)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#    endif
-#    if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#    endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-#   else
-                    if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
-                    {
-                        switch(errno)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#    endif
-#    if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#    endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-#   endif
-#  endif
-                }
-                else
-                {
-                    // unknown
-
-                    struct timespec timestamp_spec[2];
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                    {
-                        auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
-                        auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-                    if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
-                    }
-                    else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                            ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                    {
-                        auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
-                        auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
-
-                        if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                        {
-                            if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                            }
-                        }
-
-                        timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
-                    }
-                    else
-                    {
-                        timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
-                    }
-
-                    if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
-                    {
-                        switch(errno)
-                        {
-                            // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used
-                            // instead.
-                            case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                            case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                            case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                            case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                            case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-#  if defined(ENOTSUP)
-                            case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-                            case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                            case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                            default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-                }
-# elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE >= 200809L
-                // POSIX 2008
-
-                auto const& curr_fd_native_file{file_fd};
-                auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
-
-                struct timespec timestamp_spec[2];
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim_now)
-                {
-                    timestamp_spec[0] = {{}, static_cast<long>(UTIME_NOW)};
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_atim)
-                {
-                    auto const atim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) / 1'000'000'000u};
-                    auto const atim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(atim)>>>(atim) % 1'000'000'000u};
-
-                    if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                    {
-                        if(atim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                        }
-                    }
-
-                    timestamp_spec[0] = {static_cast<::std::time_t>(atim_seconds), static_cast<long>(atim_subseconds)};
-                }
-                else
-                {
-                    timestamp_spec[0] = {{}, static_cast<long>(UTIME_OMIT)};
-                }
-
-                if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now) ==
-                   ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim_now)
-                {
-                    timestamp_spec[1] = {{}, static_cast<long>(UTIME_NOW)};
-                }
-                else if((fstflags & ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim) ==
-                        ::uwvm2::imported::wasi::wasip1::abi::fstflags_t::filestat_set_mtim)
-                {
-                    auto const mtim_seconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) / 1'000'000'000u};
-                    auto const mtim_subseconds{static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(mtim)>>>(mtim) % 1'000'000'000u};
-
-                    if constexpr(::std::numeric_limits<::std::uint_least64_t>::max() > ::std::numeric_limits<::std::time_t>::max())
-                    {
-                        if(mtim_seconds > ::std::numeric_limits<::std::time_t>::max()) [[unlikely]]
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                        }
-                    }
-
-                    timestamp_spec[1] = {static_cast<::std::time_t>(mtim_seconds), static_cast<long>(mtim_subseconds)};
-                }
-                else
-                {
-                    timestamp_spec[1] = {{}, static_cast<long>(UTIME_OMIT)};
-                }
-
-                if(::uwvm2::imported::wasi::wasip1::func::posix::futimens(curr_fd_native_handle, timestamp_spec) == -1) [[unlikely]]
-                {
-                    switch(errno)
-                    {
-                        // If “ebadf” appears here, it is caused by a WASI implementation issue. This differs from WASI's ‘ebadf’; here, “eio” is used instead.
-                        case EBADF: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        case EINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                        case EACCES: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                        case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
-                        case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
-                        case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-#  if defined(ENOTSUP)
-                        case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-                        case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                        case ENOSYS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                    }
-                }
-# else
-                // POSIX.1-2008 formally introduced the ability to modify a file's nanosecond-precision time directly based on the file descriptor.
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-# endif
-#else
-                // unsupported platform
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-#endif
+                auto const res{::uwvm2::imported::wasi::wasip1::func::set_dir_time(file_fd, atim, mtim, fstflags)};
+                if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
