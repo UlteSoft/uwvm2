@@ -35,6 +35,9 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     // allow one imported func & table so indices can be in-range
     auto& importsec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
         ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(strg.sections);
+    // Reserve capacity before using push_back_unchecked to avoid writing to null storage
+    importsec.importdesc.index_unchecked(0uz).reserve(1uz);
+    importsec.importdesc.index_unchecked(1uz).reserve(1uz);
     importsec.importdesc.index_unchecked(0uz).push_back_unchecked(nullptr); // func
     importsec.importdesc.index_unchecked(1uz).push_back_unchecked(nullptr); // table
 

@@ -202,6 +202,10 @@ int main()
 
             if(static_cast<unsigned char>(entry[0]) == 0x60u)
             {
+                // Ensure capacity before internal handler uses push_back_unchecked
+                auto& typesec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>(strg.sections);
+                typesec.types.reserve(1uz);
                 (void)::uwvm2::parser::wasm::standard::wasm1::features::handle_type_prefix_functype<Feature>(
                     ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
                         ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
@@ -238,6 +242,8 @@ int main()
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
         auto& typesec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>(strg.sections);
+        // Reserve capacity for two entries before calling internal handlers
+        typesec.types.reserve(2uz);
 
         // Build two identical functypes: 0x60 () -> ()
         std::vector<std::byte> identical;
@@ -283,6 +289,11 @@ int main()
 
         ::uwvm2::parser::wasm::base::error_impl e{};
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
+        
+        // Use valid pointers instead of nullptr
+        std::byte dummy_byte{};
+        auto const* dummy_ptr = &dummy_byte;
+        
         try
         {
             ::uwvm2::parser::wasm::standard::wasm1::features::define_check_duplicate_types<Feature>(
@@ -291,8 +302,8 @@ int main()
                 ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
                     ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Feature>>{},
                 strg,
-                reinterpret_cast<::std::byte const*>(nullptr),
-                reinterpret_cast<::std::byte const*>(nullptr),
+                dummy_ptr,
+                dummy_ptr,
                 e,
                 fs_para);
         }

@@ -252,6 +252,11 @@ int main()
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Feature> strg{};
         auto& importsec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(strg.sections);
+        // Reserve capacity before using push_back_unchecked to avoid writing to null storage
+        importsec.importdesc.index_unchecked(0uz).reserve(1uz);
+        importsec.importdesc.index_unchecked(1uz).reserve(1uz);
+        importsec.importdesc.index_unchecked(2uz).reserve(1uz);
+        importsec.importdesc.index_unchecked(3uz).reserve(1uz);
         importsec.importdesc.index_unchecked(0uz).push_back_unchecked(nullptr); // func
         importsec.importdesc.index_unchecked(1uz).push_back_unchecked(nullptr); // table
         importsec.importdesc.index_unchecked(2uz).push_back_unchecked(nullptr); // mem

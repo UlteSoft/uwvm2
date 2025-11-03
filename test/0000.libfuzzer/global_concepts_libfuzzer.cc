@@ -28,7 +28,14 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     // allow potential global_get 0 by providing one imported global slot
     auto& importsec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
         ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Feature>>(strg.sections);
-    importsec.importdesc.index_unchecked(3uz).push_back_unchecked(nullptr);
+    // Reserve capacity before using push_back_unchecked to avoid writing to null storage
+    importsec.importdesc.index_unchecked(3uz).reserve(1uz);
+    // Provide a non-null imported global for global.get to reference in init expr
+    static ::uwvm2::parser::wasm::standard::wasm1::features::final_import_type<Feature> dummy_global{};
+    dummy_global.imports.type = ::uwvm2::parser::wasm::standard::wasm1::type::external_types::global;
+    dummy_global.imports.storage.global.type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+    dummy_global.imports.storage.global.is_mutable = false;
+    importsec.importdesc.index_unchecked(3uz).push_back_unchecked(&dummy_global);
 
     if(size == 0) { return 0; }
 

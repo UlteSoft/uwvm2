@@ -49,6 +49,10 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     {
         if(b0 == 0x60u && size > 1u)
         {
+            // Reserve capacity before using push_back_unchecked to avoid writing to null storage
+            auto& typesec = ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>(strg.sections);
+            typesec.types.reserve(1uz);
             (void)::uwvm2::parser::wasm::standard::wasm1::features::handle_type_prefix_functype<Feature>(
                 ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
                     ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Feature>>{},
