@@ -73,7 +73,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_file & dirfile,
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_file const& dirfile,
                                                                       ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
                                                                       ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
                                                                       ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
@@ -1719,7 +1719,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
-                auto& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
+                auto const& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
 
                 return ::uwvm2::imported::wasi::wasip1::func::set_dir_time(file_fd, atim, mtim, fstflags);
             }
