@@ -212,6 +212,9 @@ int main()
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
 #endif
+#if defined(__MSDOS__) || defined(__DJGPP__)
+             || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
+#endif
              ))
         {
             ::fast_io::io::perrln("pfst32 Case 5 expected esuccess (or enosys on Win9x) ", static_cast<unsigned>(ret));
@@ -276,6 +279,9 @@ int main()
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
 #endif
+#if defined(__MSDOS__) || defined(__DJGPP__)
+             || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
+#endif
              ))
         {
             ::fast_io::io::perrln("pfst32 Case 7 expected esuccess (or enosys on Win9x) ", static_cast<unsigned>(ret));
@@ -297,6 +303,9 @@ int main()
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
 #endif
+#if defined(__MSDOS__) || defined(__DJGPP__)
+             || ret == ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys
+#endif
              ))
         {
             ::fast_io::io::perrln("pfst32 Case 8 expected esuccess (or enosys on Win9x) ", static_cast<unsigned>(ret));
@@ -314,7 +323,11 @@ int main()
                                         static_cast<timestamp_t>(0u),
                                         static_cast<timestamp_t>(0u),
                                         fstflags_t::filestat_set_atim_now);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent
+#if defined(__MSDOS__) || defined(__DJGPP__)
+           && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval
+#endif
+        )
         {
             ::fast_io::io::perrln("pfst32 Case 9 expected enoent ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
@@ -779,11 +792,15 @@ int main()
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces
 #endif
+#if defined(__MSDOS__) || defined(__DJGPP__)
+             || r1 == ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval
+#endif
              ))
         {
             ::fast_io::io::perrln("pfst32 Case 21a expected esuccess (or eacces) ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
+#if !(defined(__MSDOS__) || defined(__DJGPP__))
 
         auto const r2 = call_set_times(static_cast<wasi_posix_fd_t>(5),
                                        static_cast<lookupflags_t>(0),
@@ -793,14 +810,15 @@ int main()
                                        static_cast<timestamp_t>(0u),
                                        fstflags_t::filestat_set_atim);
         if(!(r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess
-#if defined(_WIN32) && defined(_WIN32_WINDOWS)
+# if defined(_WIN32) && defined(_WIN32_WINDOWS)
              || r2 == ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces
-#endif
+# endif
              ))
         {
             ::fast_io::io::perrln("pfst32 Case 21b expected esuccess (or eacces) ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
+#endif
     }
 
 #if defined(__linux__) && !(defined(__MSDOS__) || defined(__DJGPP__))
