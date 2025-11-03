@@ -1719,12 +1719,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
-                [[maybe_unused]] auto const& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
+                auto& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
 
-                auto const res{::uwvm2::imported::wasi::wasip1::func::set_dir_time(file_fd, atim, mtim, fstflags)};
-                if(res != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return res; }
-
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                return ::uwvm2::imported::wasi::wasip1::func::set_dir_time(file_fd, atim, mtim, fstflags);
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
