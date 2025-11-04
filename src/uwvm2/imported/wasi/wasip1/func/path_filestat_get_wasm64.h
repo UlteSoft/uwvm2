@@ -1014,7 +1014,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                path_stack.push_back(next);
+                                path_stack.push_back(::std::move(next));
                             }
                         }
                         else
@@ -1098,7 +1098,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                path_stack.push_back(next);
+                                path_stack.push_back(::std::move(next));
                             }
                         }
 
@@ -1117,86 +1117,86 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // set
 
-        st_dev = static_cast<::uwvm2::imported::wasi::wasip1::abi::device_t>(open_file_status.dev);
-        st_ino = static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_t>(open_file_status.ino);
+        st_dev = static_cast<::uwvm2::imported::wasi::wasip1::abi::device_wasm64_t>(open_file_status.dev);
+        st_ino = static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_wasm64_t>(open_file_status.ino);
 
         switch(open_file_status.type)
         {
             case ::fast_io::file_type::none:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             case ::fast_io::file_type::not_found:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             case ::fast_io::file_type::regular:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_regular_file;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_regular_file;
                 break;
             }
             case ::fast_io::file_type::directory:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_directory;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_directory;
                 break;
             }
             case ::fast_io::file_type::symlink:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_symbolic_link;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_symbolic_link;
                 break;
             }
             case ::fast_io::file_type::block:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_block_device;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_block_device;
                 break;
             }
             case ::fast_io::file_type::character:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_character_device;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_character_device;
                 break;
             }
             case ::fast_io::file_type::fifo:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             case ::fast_io::file_type::socket:
             {
                 // A socket does not exist as a file.
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             case ::fast_io::file_type::unknown:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             case ::fast_io::file_type::remote:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
             [[unlikely]] default:
             {
-                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_t::filetype_unknown;
+                st_filetype = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                 break;
             }
         }
 
-        st_nlink = static_cast<::uwvm2::imported::wasi::wasip1::abi::linkcount_t>(open_file_status.nlink);
-        st_size = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(open_file_status.size);
+        st_nlink = static_cast<::uwvm2::imported::wasi::wasip1::abi::linkcount_wasm64_t>(open_file_status.nlink);
+        st_size = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t>(open_file_status.size);
 
         constexpr ::std::uint_least64_t mul_factor{::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u};
 
         // Since fast_io directly obtains the clock value via clock_getres, this operation will not overflow and will not produce negative
         // values.
-        st_atim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
+        st_atim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_wasm64_t>(
             static_cast<::std::uint_least64_t>(open_file_status.atim.seconds * 1'000'000'000u + open_file_status.atim.subseconds / mul_factor));
-        st_mtim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
+        st_mtim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_wasm64_t>(
             static_cast<::std::uint_least64_t>(open_file_status.mtim.seconds * 1'000'000'000u + open_file_status.mtim.subseconds / mul_factor));
-        st_ctim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>(
+        st_ctim = static_cast<::uwvm2::imported::wasi::wasip1::abi::timestamp_wasm64_t>(
             static_cast<::std::uint_least64_t>(open_file_status.ctim.seconds * 1'000'000'000u + open_file_status.ctim.subseconds / mul_factor));
 
         // write

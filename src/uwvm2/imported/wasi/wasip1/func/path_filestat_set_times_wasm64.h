@@ -850,7 +850,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                path_stack.push_back(next);
+                                path_stack.push_back(::std::move(next));
                             }
                         }
                         else
@@ -934,7 +934,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                path_stack.push_back(next);
+                                path_stack.push_back(::std::move(next));
                             }
                         }
 
