@@ -480,9 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // The trailing segment that does not follow a symbolic link can retrieve information about the symbolic link itself, such
                                     // as its length.
 
-                                    auto const open_file_name{
-                                        ::uwvm2::utils::container::u8cstring_view{::fast_io::containers::null_terminated, next_name.data(), next_name.size()}
-                                    };
+                                    auto const& open_file_name{next_name};
 
                                     // path_stack is always empty
 
@@ -540,7 +538,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     // file_symlink_iterative_file_name is not symlink
                                     // path_stack maybe empty
-                                    auto const open_file_name{file_symlink_iterative_file_name};
+                                    auto const& open_file_name{file_symlink_iterative_file_name};
 
                                     if(path_stack.empty())
                                     {
@@ -632,9 +630,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             else
                             {
-                                auto const open_file_name{
-                                    ::uwvm2::utils::container::u8cstring_view{::fast_io::containers::null_terminated, next_name.data(), next_name.size()}
-                                };
+                                auto const& open_file_name{next_name};
 
                                 // path_stack is always empty
 
@@ -701,9 +697,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 {
                                     // The trailing segment that does not follow a symbolic link can retrieve information about the symbolic link itself, such
                                     // as its length.
-                                    auto const open_file_name{
-                                        ::uwvm2::utils::container::u8cstring_view{::fast_io::containers::null_terminated, next_name.data(), next_name.size()}
-                                    };
+                                    auto const& open_file_name{next_name};
 
                                     // path_stack is not empty
 
@@ -762,7 +756,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     // file_symlink_iterative_file_name is not symlink
                                     // path_stack maybe empty
-                                    auto const open_file_name{file_symlink_iterative_file_name};
+                                    auto const& open_file_name{file_symlink_iterative_file_name};
 
                                     if(path_stack.empty())
                                     {
@@ -854,9 +848,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             else
                             {
-                                auto const open_file_name{
-                                    ::uwvm2::utils::container::u8cstring_view{::fast_io::containers::null_terminated, next_name.data(), next_name.size()}
-                                };
+                                auto const& open_file_name{next_name};
 
                                 // path_stack is not empty
 
