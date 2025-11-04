@@ -69,6 +69,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         {
             if(device_p) [[likely]] { device_p->lock(); }
         }
+
+        UWVM_ALWAYS_INLINE inline constexpr void unlock() noexcept
+        {
+            if(device_p) [[likely]] { device_p->unlock(); }
+        }
     };
 
     using mutex_merely_release_guard_t = basic_mutex_merely_release_guard<::uwvm2::utils::mutex::mutex_t&>;
