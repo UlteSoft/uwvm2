@@ -79,5 +79,9 @@
 # include "path_create_directory.h"
 # include "path_filestat_get_wasm64.h"
 # include "path_filestat_get.h"
+# include "path_filestat_set_times_wasm64.h"
+# include "path_filestat_set_times.h"
+# include "path_link_wasm64.h"
+# include "path_link.h"
 
 #endif

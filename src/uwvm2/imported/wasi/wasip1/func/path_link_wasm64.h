@@ -74,15 +74,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @details   __wasi_errno_t path_link(__wasi_fd_t old_fd, __wasi_lookupflags_t old_flags, const char *old_path, size_t old_path_len, __wasi_fd_t new_fd,
     /// const char *new_path, size_t new_path_len);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t path_link(
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t path_link_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t old_fd,
-        ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t old_flags,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t old_path_ptrsz,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t old_path_len,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t new_fd,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t new_path_ptrsz,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t new_path_len) noexcept
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t old_fd,
+        ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t old_flags,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t old_path_ptrsz,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t old_path_len,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t new_fd,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t new_path_ptrsz,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t new_path_len) noexcept
     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
@@ -106,7 +106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"path_link",
+                                u8"path_link_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"(",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -142,7 +142,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
             ::fast_io::io::perr(::fast_io::u8err(),
-                                u8"uwvm: [info]  wasip1: path_link(",
+                                u8"uwvm: [info]  wasip1: path_link_wasm64(",
                                 old_fd,
                                 u8", ",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(old_flags)>>>(old_flags),
@@ -161,7 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
-        if(old_fd < 0 || new_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+        if(old_fd < 0 || new_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
 
         auto& wasm_fd_storage{env.fd_storage};
 
@@ -182,7 +182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::mutex::rw_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
             // Negative states have been excluded, so the conversion result will only be positive numbers.
-            using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>;
+            using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t>;
             auto const unsigned_old_fd{static_cast<unsigned_fd_t>(old_fd)};
             auto const unsigned_new_fd{static_cast<unsigned_fd_t>(new_fd)};
 
@@ -190,7 +190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
             if constexpr(::std::numeric_limits<unsigned_fd_t>::max() > size_t_max)
             {
-                if(unsigned_old_fd > size_t_max || unsigned_new_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+                if(unsigned_old_fd > size_t_max || unsigned_new_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
             }
 
             auto const old_fd_opens_pos{static_cast<::std::size_t>(unsigned_old_fd)};
@@ -206,7 +206,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
                 else [[unlikely]]
                 {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
                 }
             }
             else
@@ -224,7 +224,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
                 else [[unlikely]]
                 {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
                 }
             }
             else
@@ -271,14 +271,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // If obtained from the renumber map, it will always be the correct value. If obtained from the open vec, it requires checking whether it is closed.
         // Therefore, a unified check is implemented.
-        if(curr_old_fd.close_pos != SIZE_MAX || curr_new_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+        if(curr_old_fd.close_pos != SIZE_MAX || curr_new_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
 
-        if((curr_old_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_path_link_source) !=
-               ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_path_link_source ||
-           (curr_new_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_path_link_target) !=
-               ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_path_link_target) [[unlikely]]
+        if((curr_old_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_source) !=
+               ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_source ||
+           (curr_new_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_target) !=
+               ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_target) [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable;
         }
 
         // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
@@ -289,18 +289,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
         switch(curr_old_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
             {
@@ -309,7 +309,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
 #endif
             [[unlikely]] default:
@@ -317,7 +317,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
         }
 
@@ -325,11 +325,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
             {
@@ -338,7 +338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
 #endif
             [[unlikely]] default:
@@ -346,13 +346,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
         }
 
         // Retrieve the current directory, which is the top element of the directory stack.
         auto const& curr_old_dir_stack{curr_old_fd.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-        if(curr_old_dir_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+        if(curr_old_dir_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
         auto const& curr_old_dir_stack_entry{curr_old_dir_stack.dir_stack.back_unchecked()};
         if(curr_old_dir_stack_entry.ptr == nullptr) [[unlikely]]
@@ -361,11 +361,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
         auto const& curr_new_dir_stack{curr_new_fd.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-        if(curr_new_dir_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+        if(curr_new_dir_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
         auto const& curr_new_dir_stack_entry{curr_new_dir_stack.dir_stack.back_unchecked()};
         if(curr_new_dir_stack_entry.ptr == nullptr) [[unlikely]]
@@ -374,24 +374,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
         auto const& curr_old_fd_native_file{curr_old_dir_stack_entry.ptr->dir_stack.file};
         auto const& curr_new_fd_native_file{curr_new_dir_stack_entry.ptr->dir_stack.file};
 
-        bool const old_symlink_follow{(old_flags & ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow) ==
-                                      ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow};
+        bool const old_symlink_follow{(old_flags & ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t::lookup_symlink_follow) ==
+                                      ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t::lookup_symlink_follow};
 
         // check path (Copy from WASM memory for use)
         ::uwvm2::utils::container::u8string old_path{};
         ::uwvm2::utils::container::u8string new_path{};
 
-        if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > ::std::numeric_limits<::std::size_t>::max())
+        if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>::max() > ::std::numeric_limits<::std::size_t>::max())
         {
             if(old_path_len > ::std::numeric_limits<::std::size_t>::max() || new_path_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]]
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eoverflow;
             }
         }
 
@@ -399,8 +399,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // Full locking is required during reading.
             [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, old_path_ptrsz, old_path_len);
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, new_path_ptrsz, new_path_len);
+            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(memory, old_path_ptrsz, old_path_len);
+            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(memory, new_path_ptrsz, new_path_len);
 
             using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
 
@@ -413,7 +413,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                      static_cast<::std::size_t>(new_path_len)});
         }
 
-        if(old_path.empty() || new_path.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval; }
+        if(old_path.empty() || new_path.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval; }
 
         // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct one yourself.
         auto const old_path_u8res{
@@ -421,7 +421,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(old_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
         {
             // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
         }
 
         auto const new_path_u8res{
@@ -429,7 +429,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(new_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
         {
             // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
         }
 
         auto const old_path_split_path_res{
@@ -440,11 +440,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // The path series functions in wasip1 reject absolute paths.
         if(old_path_split_path_res.is_absolute || new_path_split_path_res.is_absolute) [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm;
         }
         if(old_path_split_path_res.res.empty() || new_path_split_path_res.res.empty()) [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
         }
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__))
@@ -460,7 +460,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     // Simultaneously eliminate errors at both the path syntax layer and the file system syntax layer.
                     if(::fast_io::char_category::is_dos_file_invalid_character(curr_char)) [[unlikely]]
                     {
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
                     }
                 }
             }
@@ -476,7 +476,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     // Simultaneously eliminate errors at both the path syntax layer and the file system syntax layer.
                     if(::fast_io::char_category::is_dos_file_invalid_character(curr_char)) [[unlikely]]
                     {
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
                     }
                 }
             }
@@ -507,14 +507,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::curr:
                     {
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist;
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
                         auto const new_path_stack_size{new_path_stack.size()};
-                        if(new_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(new_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
 
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist;
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::next:
                     {
@@ -543,7 +543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
                         else
                         {
                             new_path_stack.pop_back_unchecked();
@@ -576,13 +576,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             if(is_symlink)
                             {
-                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
-                                auto const errno_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
                                     curr_new_fd_native_file,
                                     new_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
+                                if(errno_wasm64_t != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return errno_wasm64_t; }
                             }
                             else
                             {
@@ -603,7 +603,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
@@ -631,7 +631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                         }
 #  endif
-                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
 # endif
 
@@ -660,13 +660,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             if(is_symlink)
                             {
-                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
-                                auto const errno_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
                                     curr_new_fd_native_file,
                                     new_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
+                                if(errno_wasm64_t != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return errno_wasm64_t; }
                             }
                             else
                             {
@@ -687,7 +687,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
@@ -715,7 +715,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                         }
 #  endif
-                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
 # endif
 
@@ -750,14 +750,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::curr:
                     {
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir;
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
                         auto const old_path_stack_size{old_path_stack.size()};
-                        if(old_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(old_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
 
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir;
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::next:
                     {
@@ -836,7 +836,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         curr_old_fd_native_file,
                                         old_path_stack,
                                         ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                    if(file_symlink_iterative_err != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
+                                    if(file_symlink_iterative_err != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]]
                                     {
                                         return file_symlink_iterative_err;
                                     }
@@ -1045,7 +1045,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         curr_old_fd_native_file,
                                         old_path_stack,
                                         ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                    if(file_symlink_iterative_err != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
+                                    if(file_symlink_iterative_err != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]]
                                     {
                                         return file_symlink_iterative_err;
                                     }
@@ -1208,7 +1208,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
                         else
                         {
                             old_path_stack.pop_back_unchecked();
@@ -1241,13 +1241,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             if(is_symlink)
                             {
-                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
-                                auto const errno_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
                                     curr_old_fd_native_file,
                                     old_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
+                                if(errno_wasm64_t != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return errno_wasm64_t; }
                             }
                             else
                             {
@@ -1268,7 +1268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
@@ -1296,7 +1296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                         }
 #  endif
-                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
 # endif
 
@@ -1325,13 +1325,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             if(is_symlink)
                             {
-                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                                if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
-                                auto const errno_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
                                     curr_old_fd_native_file,
                                     old_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
-                                if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
+                                if(errno_wasm64_t != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) [[unlikely]] { return errno_wasm64_t; }
                             }
                             else
                             {
@@ -1352,7 +1352,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
                                     ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
-                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                    if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
@@ -1380,7 +1380,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                         }
 #  endif
-                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
+                                        if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
 # endif
 
@@ -1405,7 +1405,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 

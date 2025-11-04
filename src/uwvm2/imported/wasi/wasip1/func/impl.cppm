@@ -79,6 +79,10 @@ export import :path_create_directory_wasm64;
 export import :path_create_directory;
 export import :path_filestat_get_wasm64;
 export import :path_filestat_get;
+export import :path_filestat_set_times_wasm64;
+export import :path_filestat_set_times;
+export import :path_link_wasm64;
+export import :path_link;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
