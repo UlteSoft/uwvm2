@@ -353,9 +353,6 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		if is_mode("debug") and get_config("use-llvm") and is_libfuzzer then
 			add_cxflags("-fsanitize=fuzzer", {force = true})
 			add_ldflags("-fsanitize=fuzzer", {force = true})
-		elseif is_mode("debug") and get_config("use-llvm") then
-			add_cxflags("-fsanitize=address,undefined", {force = true})
-			add_ldflags("-fsanitize=address,undefined", {force = true})
 		end
 
 		if is_libfuzzer then
