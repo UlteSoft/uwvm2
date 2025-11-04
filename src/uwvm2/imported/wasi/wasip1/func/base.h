@@ -290,6 +290,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 183uz /*ERROR_ALREADY_EXISTS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
                     case 206uz /*ERROR_FILENAME_EXCED_RANGE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enametoolong;
                     case 123uz /*ERROR_INVALID_NAME*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case 17uz /*ERROR_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -333,6 +334,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 0xC0000106uz /*STATUS_NAME_TOO_LONG*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enametoolong;
                     case 0xC0000103uz /*STATUS_NOT_A_DIRECTORY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
                     case 0xC0000033uz /*STATUS_OBJECT_NAME_INVALID*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case 0xC00000D4uz /*STATUS_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -407,6 +409,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 # if defined(EMLINK)
             case EMLINK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emlink;
+# endif
+# if defined(EXDEV)
+            case EXDEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
 # endif
             default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
@@ -569,7 +574,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 #endif
 
-                            curr_path_stack.push_back(next);
+                            curr_path_stack.push_back(::std::move(next));
                         }
                     }
                     else
@@ -654,7 +659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 #endif
 
-                            curr_path_stack.push_back(next);
+                            curr_path_stack.push_back(::std::move(next));
                         }
                     }
 
@@ -747,6 +752,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 #endif
+
+        if(split_path_res.res.empty()) [[unlikely]]
+        {
+            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+            return res;
+        }
 
         auto const split_path_res_last_ptr{split_path_res.res.cend() - 1u};
 
@@ -996,7 +1007,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                curr_path_stack.push_back(next);
+                                curr_path_stack.push_back(::std::move(next));
                             }
                         }
                         else
@@ -1098,7 +1109,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 #endif
 
-                                curr_path_stack.push_back(next);
+                                curr_path_stack.push_back(::std::move(next));
                             }
                         }
 
