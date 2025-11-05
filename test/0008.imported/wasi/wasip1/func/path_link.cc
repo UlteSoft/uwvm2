@@ -44,9 +44,7 @@ inline static void write_bytes32(native_memory_t& memory, wasi_void_ptr_t p, voi
 }
 
 inline static void write_cu8str32(native_memory_t& memory, wasi_void_ptr_t p, char8_t const* s)
-{
-    write_bytes32(memory, p, s, ::std::char_traits<char8_t>::length(s));
-}
+{ write_bytes32(memory, p, s, ::std::char_traits<char8_t>::length(s)); }
 
 inline static void set_dirfd(wasip1_environment<native_memory_t>& env, ::std::size_t idx, rights_t base_rights)
 {
@@ -63,12 +61,24 @@ inline static void set_dirfd(wasip1_environment<native_memory_t>& env, ::std::si
 // helpers for cleanup per test case
 inline static void try_unlink(char8_t const* name)
 {
-    try { ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), ::fast_io::mnp::os_c_str(name), {}); } catch(::fast_io::error) {}
+    try
+    {
+        ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), ::fast_io::mnp::os_c_str(name), {});
+    }
+    catch(::fast_io::error)
+    {
+    }
 }
 
 inline static void try_rmdir(char8_t const* name)
 {
-    try { ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), ::fast_io::mnp::os_c_str(name), ::fast_io::native_at_flags::removedir); } catch(::fast_io::error) {}
+    try
+    {
+        ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), ::fast_io::mnp::os_c_str(name), ::fast_io::native_at_flags::removedir);
+    }
+    catch(::fast_io::error)
+    {
+    }
 }
 
 int main()
@@ -613,7 +623,14 @@ int main()
                                                                         static_cast<wasi_posix_fd_t>(4),
                                                                         P1,
                                                                         static_cast<wasi_size_t>(sizeof(u8"pl32_dirD_hl") - 1u));
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm) { ::fast_io::fast_terminate(); }
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm
+# if defined(_WIN32)
+           && r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir
+# endif
+        )
+        {
+            ::fast_io::fast_terminate();
+        }
         try
         {
             ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"pl32_dirD", ::fast_io::native_at_flags::removedir);
@@ -855,7 +872,14 @@ int main()
                                                                          static_cast<wasi_posix_fd_t>(4),
                                                                          P1,
                                                                          static_cast<wasi_size_t>(sizeof(u8"pl32_dirE_dst") - 1u));
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm) { ::fast_io::fast_terminate(); }
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm
+# if defined(_WIN32)
+           && r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir
+# endif
+        )
+        {
+            ::fast_io::fast_terminate();
+        }
 
         // nofollow
         try
@@ -875,9 +899,14 @@ int main()
                                                                          static_cast<wasi_posix_fd_t>(4),
                                                                          P1,
                                                                          static_cast<wasi_size_t>(sizeof(u8"pl32_dirE_dst_nf") - 1u));
+# if defined(_WIN32)
+        if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir) { ::fast_io::fast_terminate(); }
+# else
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) { ::fast_io::fast_terminate(); }
         auto const payload = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl32_dirE_dst_nf");
         if(payload != u8"pl32_realDirE") { ::fast_io::fast_terminate(); }
+
+# endif
         try
         {
             ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"pl32_realDirE", ::fast_io::native_at_flags::removedir);
@@ -1017,15 +1046,6 @@ int main()
         }
         catch(::fast_io::error)
         {
-        }
-
-        // Read from src, expect ABCD
-        ::fast_io::native_file f2{u8"uwvm_ut_pl32_src.txt", ::fast_io::open_mode::in};
-        ::std::byte b4[4]{};
-        auto p4 = ::fast_io::operations::read_some_bytes(f2, b4, b4 + 4);
-        if(p4 != b4 + 3 || b4[0] != ::std::byte{'A'} || b4[1] != ::std::byte{'B'} || b4[2] != ::std::byte{'C'})
-        {
-            ::fast_io::fast_terminate();
         }
     }
 

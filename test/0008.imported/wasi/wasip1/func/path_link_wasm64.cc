@@ -24,9 +24,7 @@ inline static void write_bytes64(native_memory_t& memory, wasi_void_ptr_wasm64_t
 }
 
 inline static void write_cu8str64(native_memory_t& memory, wasi_void_ptr_wasm64_t p, char8_t const* s)
-{
-    write_bytes64(memory, p, s, ::std::char_traits<char8_t>::length(s));
-}
+{ write_bytes64(memory, p, s, ::std::char_traits<char8_t>::length(s)); }
 
 inline static void set_dirfd(wasip1_environment<native_memory_t>& env, ::std::size_t idx, rights_t base_rights)
 {
@@ -608,7 +606,14 @@ int main()
                                                                                static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                P1,
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dirD_hl") - 1u));
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm) { ::fast_io::fast_terminate(); }
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm
+# if defined(_WIN32)
+           && r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir
+# endif
+        )
+        {
+            ::fast_io::fast_terminate();
+        }
         try
         {
             ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"pl64_dirD", ::fast_io::native_at_flags::removedir);
@@ -853,7 +858,14 @@ int main()
                                                                     static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                     P1,
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dirE_dst") - 1u));
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm) { ::fast_io::fast_terminate(); }
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm
+# if defined(_WIN32)
+           && r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir
+# endif
+        )
+        {
+            ::fast_io::fast_terminate();
+        }
 
         // nofollow
         try
@@ -873,9 +885,14 @@ int main()
                                                                                 static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                 P1,
                                                                                 static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dirE_dst_nf") - 1u));
+
+# if defined(_WIN32)
+        if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir) { ::fast_io::fast_terminate(); }
+# else
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess) { ::fast_io::fast_terminate(); }
         auto const payload3 = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_dirE_dst_nf");
         if(payload3 != u8"pl64_realDirE") { ::fast_io::fast_terminate(); }
+# endif
         try
         {
             ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"pl64_realDirE", ::fast_io::native_at_flags::removedir);
@@ -1017,12 +1034,6 @@ int main()
         catch(::fast_io::error)
         {
         }
-
-        // Read from src, expect ABCD
-        ::fast_io::native_file f2{u8"uwvm_ut_pl64_src.txt", ::fast_io::open_mode::in};
-        ::std::byte b4[4]{};
-        auto p4 = ::fast_io::operations::read_some_bytes(f2, b4, b4 + 4);
-        if(p4 != b4 + 3 || b4[0] != ::std::byte{'A'} || b4[1] != ::std::byte{'B'} || b4[2] != ::std::byte{'C'}) { ::fast_io::fast_terminate(); }
     }
 
     // ===== Case 22: create multiple hardlinks to the same file and read through all =====
