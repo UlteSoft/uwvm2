@@ -21,7 +21,7 @@
 * Supported system versions: Windows 9x 4.0 (Windows 95), Windows 9x 4.1 (Windows 98), Windows 9x 4.9 (Windows ME)
 * MinGW: i686-windows-gnu (aka. i686-w64-mingw32)
 
-## CYGWIN
+## Cygwin
 * Supported Windows versions: Windows 7 (NT 6.1) and later
 * Compilers: GCC >= 16 (via Cygwin toolchain), LLVM Clang >= 21 (via Cygwin)
 
@@ -29,8 +29,14 @@
 * MS-DOS, FreeDOS (DJGPP): i586-msdosdjgpp
 
 ## Host C Library Environment
-* newlib: unknown-elf
-* avr: avr-elf
+* This project's Newlib build does not provide executable binaries, offering only linkable object files and libraries for flexible integration within higher-level systems or plugin frameworks. It does not support wasi and only supports plugins using weak symbol extensions.
+* newlib: unknown-none-eabi
+* avr: avr
+
+## Freestanding Environment
+* Freestanding is only partially supported for certain modules, such as the parser and interpreter components.
+* elf: unknown-unknown-elf
+* pe: unknown-windows-gnu + `-ffreestanding`
 
 # C++ Version Required
 - Full ISO C++26
