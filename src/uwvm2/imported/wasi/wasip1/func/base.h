@@ -291,6 +291,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 206uz /*ERROR_FILENAME_EXCED_RANGE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enametoolong;
                     case 123uz /*ERROR_INVALID_NAME*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     case 17uz /*ERROR_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
+                    case 80uz /*ERROR_FILE_EXISTS*/ : return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 

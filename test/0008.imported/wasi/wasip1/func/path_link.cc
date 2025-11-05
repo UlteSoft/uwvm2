@@ -1235,6 +1235,7 @@ int main()
         try_unlink(u8"pl32_old_mid_file");
     }
 
+#if !(defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x600) || defined(__MSDOS__) || defined(__DJGPP__))
     // ===== Case 28: multi-level new parent symlink chain -> esuccess =====
     {
         try
@@ -1283,6 +1284,7 @@ int main()
         try_rmdir(u8"pl32_realN1/realN2");
         try_rmdir(u8"pl32_realN1");
     }
+#endif
 
     // ===== Case 29: new name equals old name (same dir) -> eexist =====
     {
