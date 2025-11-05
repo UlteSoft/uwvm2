@@ -103,7 +103,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(0u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -120,7 +120,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(0u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -154,7 +154,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_a.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -186,7 +186,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_b.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -211,7 +211,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_c.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -236,7 +236,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_d.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -255,7 +255,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -273,7 +273,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(0u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -293,7 +293,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_e.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -314,7 +314,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"dst.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -335,7 +335,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8".") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -354,7 +354,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"not_exist_dir/child.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup (best-effort)
@@ -385,7 +385,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_dst_ok.txt") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -395,7 +395,7 @@ int main()
         auto p = ::fast_io::operations::read_some_bytes(f, buf, buf + 3);
         if(p != buf + 3 || buf[0] != ::std::byte{'A'} || buf[1] != ::std::byte{'B'} || buf[2] != ::std::byte{'C'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -446,7 +446,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlA") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -454,7 +454,7 @@ int main()
         auto const link_payload = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_hlA");
         if(link_payload != u8"pl64_tA.txt")
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -505,7 +505,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlB") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -521,7 +521,7 @@ int main()
         }
         if(is_symlink)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -531,7 +531,7 @@ int main()
         auto p2 = ::fast_io::operations::read_some_bytes(f, &b, &b + 1);
         if(p2 != &b + 1 || b != ::std::byte{'Y'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -570,13 +570,13 @@ int main()
                                                                                 static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlBroken_nf") - 1u));
         if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
         auto const payload = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_hlBroken_nf");
         if(payload != u8"no_such_target")
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -601,7 +601,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlBroken_f") - 1u));
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -639,13 +639,13 @@ int main()
                                                                                 static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlLoop_nf") - 1u));
         if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
         auto const payload = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_hlLoop_nf");
         if(payload != u8"pl64_loop")
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -670,7 +670,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_hlLoop_f") - 1u));
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eloop)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -712,7 +712,7 @@ int main()
 # endif
         )
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         try
@@ -766,7 +766,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_B/x_hl.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         ::fast_io::native_file f{u8"pl64_B/x_hl.txt", ::fast_io::open_mode::in};
@@ -774,7 +774,7 @@ int main()
         auto p2 = ::fast_io::operations::read_some_bytes(f, &b, &b + 1);
         if(p2 != &b + 1 || b != ::std::byte{'Z'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -823,7 +823,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_f_hlC.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -863,7 +863,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_linkN/dst_in_symlink_dir.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -893,7 +893,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_exist.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -924,7 +924,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_abs_follow_dst") - 1u));
         if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -948,13 +948,13 @@ int main()
                                                                                 static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_abs_nof_dst") - 1u));
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
         auto const payload2 = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_abs_nof_dst");
         if(payload2 != u8"/etc")
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -997,7 +997,7 @@ int main()
 # endif
         )
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -1023,19 +1023,19 @@ int main()
 # if defined(_WIN32)
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
 # else
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
         auto const payload3 = ::fast_io::native_readlinkat<char8_t>(::fast_io::at_fdcwd(), u8"pl64_dirE_dst_nf");
         if(payload3 != u8"pl64_realDirE")
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r2));
             ::fast_io::fast_terminate();
         }
 # endif
@@ -1106,7 +1106,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_N_destM") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         ::fast_io::native_file f{u8"pl64_N_destM", ::fast_io::open_mode::in};
@@ -1114,7 +1114,7 @@ int main()
         auto p2 = ::fast_io::operations::read_some_bytes(f, &b, &b + 1);
         if(p2 != &b + 1 || b != ::std::byte{'M'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -1141,7 +1141,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(3u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }
@@ -1164,7 +1164,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dst_inv1") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -1182,7 +1182,7 @@ int main()
                                                                                  static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_star_*") - 1u));
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -1229,7 +1229,7 @@ int main()
                                                                                    static_cast<wasi_size_wasm64_t>(::std::char_traits<char8_t>::length(dst)));
             if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
             {
-                ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+                ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
                 ::fast_io::fast_terminate();
             }
         };
@@ -1247,7 +1247,7 @@ int main()
             auto p = ::fast_io::operations::read_some_bytes(f, buf, buf + 2);
             if(p != buf + 2 || buf[0] != ::std::byte{'K'} || buf[1] != ::std::byte{'1'})
             {
-                ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+                ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(0u));
                 ::fast_io::fast_terminate();
             }
         };
@@ -1275,7 +1275,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"..") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }
@@ -1301,7 +1301,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_np/../pl64_dstN.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         ::fast_io::native_file f{u8"pl64_dstN.txt", ::fast_io::open_mode::in};
@@ -1309,7 +1309,7 @@ int main()
         auto p = ::fast_io::operations::read_some_bytes(f, &b, &b + 1);
         if(p != &b + 1 || b != ::std::byte{'A'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         try
@@ -1353,7 +1353,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dotseg/fileQ_hl") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -1383,7 +1383,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_mid_as_file/dst.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -1412,7 +1412,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_old_mid_file_dst") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -1464,7 +1464,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_ln2/dst_multi_symlink.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
@@ -1490,7 +1490,7 @@ int main()
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"uwvm_ut_pl64_src.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }
@@ -1541,7 +1541,7 @@ int main()
                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_csd/C/../dst_s_mid_dotdot.txt") - 1u));
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         ::fast_io::native_file f{u8"pl64_csd/dst_s_mid_dotdot.txt", ::fast_io::open_mode::in};
@@ -1549,7 +1549,7 @@ int main()
         auto p = ::fast_io::operations::read_some_bytes(f, &b, &b + 1);
         if(p != &b + 1 || b != ::std::byte{'S'})
         {
-            ::fast_io::io::perr("[pl64] L:", static_cast<unsigned>(__LINE__));
+            ::fast_io::io::perrln("[pl64] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
         // cleanup
