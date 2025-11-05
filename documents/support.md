@@ -34,9 +34,12 @@
 * avr: avr
 
 ## Freestanding Environment
-* Freestanding is only partially supported for certain modules, such as the parser and interpreter components.
-* elf: unknown-unknown-elf
-* pe: unknown-windows-gnu + `-ffreestanding`
+* Freestanding support is only partially implemented for specific modules, such as the parser and interpreter components.
+* Platforms where `CHAR_BIT` is not equal to 8 are not currently supported.
+* This platform’s C++ runtime environment requires developers to explicitly define a custom memory allocator concept to fulfill the requirements of the C++ Heap Abstract Machine.
+The system does not provide a default global allocator; instead, it delegates all heap allocation behavior to user-defined implementations through the `fast_io::custom_global_allocator` interface.
+* ELF file-format: unknown-unknown-elf
+* PE file-format: unknown-windows-gnu + `-ffreestanding`
 
 # C++ Version Required
 - Full ISO C++26
