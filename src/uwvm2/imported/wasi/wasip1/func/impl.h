@@ -83,5 +83,7 @@
 # include "path_filestat_set_times.h"
 # include "path_link_wasm64.h"
 # include "path_link.h"
+# include "path_open_wasm64.h"
+# include "path_open.h"
 
 #endif

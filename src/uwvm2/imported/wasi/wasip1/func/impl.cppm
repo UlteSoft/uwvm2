@@ -83,6 +83,8 @@ export import :path_filestat_set_times_wasm64;
 export import :path_filestat_set_times;
 export import :path_link_wasm64;
 export import :path_link;
+export import :path_open_wasm64;
+export import :path_open;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
