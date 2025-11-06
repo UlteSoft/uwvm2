@@ -45,7 +45,7 @@ inline ::fast_io::install_path get_module_install_path()
 
 	if (!resolved) [[unlikely]]
 	{
-		throw_posix_error(resolved);
+		throw_posix_error();
 	}
 
 	::fast_io::install_path ret;
