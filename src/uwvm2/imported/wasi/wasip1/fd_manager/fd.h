@@ -210,6 +210,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 
             // win32 ws2 socket
 #if defined(_WIN32) && !defined(__CYGWIN__)
+            /// @note Before using win32_socket_file, you must first create a ::fast_io::win32_wsa_service.
             ::fast_io::win32_socket_file socket_fd;
 #endif
 
