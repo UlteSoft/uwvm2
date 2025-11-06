@@ -350,6 +350,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::abi
         o_trunc = 0x0008,
     };
 
+    inline constexpr oflags_t operator& (oflags_t x, oflags_t y) noexcept
+    {
+        using utype = typename ::std::underlying_type<oflags_t>::type;
+        return static_cast<oflags_t>(static_cast<utype>(x) & static_cast<utype>(y));
+    }
+
+    inline constexpr oflags_t operator| (oflags_t x, oflags_t y) noexcept
+    {
+        using utype = typename ::std::underlying_type<oflags_t>::type;
+        return static_cast<oflags_t>(static_cast<utype>(x) | static_cast<utype>(y));
+    }
+
+    inline constexpr oflags_t operator^ (oflags_t x, oflags_t y) noexcept
+    {
+        using utype = typename ::std::underlying_type<oflags_t>::type;
+        return static_cast<oflags_t>(static_cast<utype>(x) ^ static_cast<utype>(y));
+    }
+
+    inline constexpr oflags_t operator~(oflags_t x) noexcept
+    {
+        using utype = typename ::std::underlying_type<oflags_t>::type;
+        return static_cast<oflags_t>(~static_cast<utype>(x));
+    }
+
+    inline constexpr oflags_t& operator&= (oflags_t& x, oflags_t y) noexcept { return x = x & y; }
+
+    inline constexpr oflags_t& operator|= (oflags_t& x, oflags_t y) noexcept { return x = x | y; }
+
+    inline constexpr oflags_t& operator^= (oflags_t& x, oflags_t y) noexcept { return x = x ^ y; }
+
     enum class riflags_t : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u16
     {
         sock_recv_peek = 0x0001,
