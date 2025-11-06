@@ -360,7 +360,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(path.cbegin(), path.cend())};
                 if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq; }
             }
-            
+
             auto const split_path_res{
                 ::uwvm2::imported::wasi::wasip1::func::split_posix_path(::uwvm2::utils::container::u8string_view{path.data(), path.size()})};
 
@@ -473,14 +473,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             if(is_read) { fast_io_oflags |= ::fast_io::open_mode::in; }
             if(is_write) { fast_io_oflags |= ::fast_io::open_mode::out; }
 
-            if(!is_read && !is_write && !is_dir)
-            {
-#ifdef O_PATH
-                fast_io_oflags |= ::fast_io::open_mode::path;
-#else
-                fast_io_oflags |= ::fast_io::open_mode::in;
-#endif
-            }
+            if(!is_read && !is_write && !is_dir) { fast_io_oflags |= ::fast_io::open_mode::in; }
 
             // fast_io no fsync and dsync
 

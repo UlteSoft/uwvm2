@@ -482,14 +482,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             if(is_read) { fast_io_oflags |= ::fast_io::open_mode::in; }
             if(is_write) { fast_io_oflags |= ::fast_io::open_mode::out; }
 
-            if(!is_read && !is_write && !is_dir)
-            {
-#ifdef O_PATH
-                fast_io_oflags |= ::fast_io::open_mode::path;
-#else
-                fast_io_oflags |= ::fast_io::open_mode::in;
-#endif
-            }
+            if(!is_read && !is_write && !is_dir) { fast_io_oflags |= ::fast_io::open_mode::in; }
 
             // fast_io no fsync and dsync
 
