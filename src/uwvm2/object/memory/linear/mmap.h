@@ -345,11 +345,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     // // sys_mmap may throw ::fast_io::error
                     // To align with Windows behavior, only reserve addresses; do not reserve swap space.
 
+                    constexpr auto mmap_flags{MAP_PRIVATE |
+                                              MAP_ANONYMOUS
+#  if defined(MAP_NORESERVE)
+                                              // Platforms that do not provide this macro are assumed to use lazy allocation.
+                                              | MAP_NORESERVE
+#  endif
+
+                    };
+
 #  ifdef UWVM_CPP_EXCEPTIONS
                     try
 #  endif
                     {
-                        this->memory_begin = ::fast_io::details::sys_mmap(nullptr, max_space, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0u);
+                        this->memory_begin = ::fast_io::details::sys_mmap(nullptr,
+                                                                          max_space,
+                                                                          PROT_NONE,
+                                                                          mmap_flags,
+                                                                          -1,
+                                                                          0u);
                     }
 #  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error)
