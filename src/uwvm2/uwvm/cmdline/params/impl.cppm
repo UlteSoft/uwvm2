@@ -42,6 +42,7 @@ export import :wasm_set_parser_limit;
 // wasi
 export import :wasip1_set_fd_limit;
 export import :wasi_mount_dir;
+export import :wasi_disable_utf8_check;
 
 // log
 export import :log_output;

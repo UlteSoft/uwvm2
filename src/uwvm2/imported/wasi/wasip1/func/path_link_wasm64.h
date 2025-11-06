@@ -190,7 +190,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
             if constexpr(::std::numeric_limits<unsigned_fd_t>::max() > size_t_max)
             {
-                if(unsigned_old_fd > size_t_max || unsigned_new_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
+                if(unsigned_old_fd > size_t_max || unsigned_new_fd > size_t_max) [[unlikely]]
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
+                }
             }
 
             auto const old_fd_opens_pos{static_cast<::std::size_t>(unsigned_old_fd)};
@@ -271,7 +274,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // If obtained from the renumber map, it will always be the correct value. If obtained from the open vec, it requires checking whether it is closed.
         // Therefore, a unified check is implemented.
-        if(curr_old_fd.close_pos != SIZE_MAX || curr_new_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
+        if(curr_old_fd.close_pos != SIZE_MAX || curr_new_fd.close_pos != SIZE_MAX) [[unlikely]]
+        {
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
+        }
 
         if((curr_old_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_source) !=
                ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_path_link_source ||
@@ -416,20 +422,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(old_path.empty() || new_path.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval; }
 
         // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct one yourself.
-        auto const old_path_u8res{
-            ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(old_path.cbegin(), old_path.cend())};
-        if(old_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        if(!env.disable_utf8_check) [[likely]]
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
-        }
+            auto const old_path_u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(old_path.cbegin(),
+                                                                                                                              old_path.cend())};
+            if(old_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
+            }
 
-        auto const new_path_u8res{
-            ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(new_path.cbegin(), new_path.cend())};
-        if(new_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            auto const new_path_u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(new_path.cbegin(),
+                                                                                                                              new_path.cend())};
+            if(new_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
+            }
+        }
+        else
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
+            auto const old_path_u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(old_path.cbegin(), old_path.cend())};
+            if(old_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
+            }
+
+            auto const new_path_u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(new_path.cbegin(), new_path.cend())};
+            if(new_path_u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq;
+            }
         }
 
         auto const old_path_split_path_res{
@@ -579,6 +606,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
                                 auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                    env.disable_utf8_check,
                                     curr_new_fd_native_file,
                                     new_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
@@ -663,6 +691,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
                                 auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                    env.disable_utf8_check,
                                     curr_new_fd_native_file,
                                     new_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
@@ -833,6 +862,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 {
                                     auto const [file_symlink_iterative_err,
                                                 file_symlink_iterative_file_name]{::uwvm2::imported::wasi::wasip1::func::file_symlink_iterative(
+                                        env.disable_utf8_check,
                                         curr_old_fd_native_file,
                                         old_path_stack,
                                         ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
@@ -1042,6 +1072,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 {
                                     auto const [file_symlink_iterative_err,
                                                 file_symlink_iterative_file_name]{::uwvm2::imported::wasi::wasip1::func::file_symlink_iterative(
+                                        env.disable_utf8_check,
                                         curr_old_fd_native_file,
                                         old_path_stack,
                                         ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
@@ -1244,6 +1275,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
                                 auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                    env.disable_utf8_check,
                                     curr_old_fd_native_file,
                                     old_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
@@ -1328,6 +1360,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio; }
 
                                 auto const errno_wasm64_t{::uwvm2::imported::wasi::wasip1::func::path_symlink_iterative(
+                                    env.disable_utf8_check,
                                     curr_old_fd_native_file,
                                     old_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};

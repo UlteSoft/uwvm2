@@ -568,13 +568,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 ::uwvm2::utils::container::u8cstring_view tmp_filename{u8filename(ent)};
 
-                auto const u8res{
-                    ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(tmp_filename.cbegin(), tmp_filename.cend())};
-                if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+                if(!env.disable_utf8_check) [[likely]]
                 {
-                    // File names are expected to be valid UTF-8. However, the host filesystem might contain entries that are not valid UTF-8.
-                    // Implementations MAY replace invalid sequences with the Unicode replacement character (U+FFFD), or MAY omit such entries.
-                    continue;
+                    auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(tmp_filename.cbegin(),
+                                                                                                                                  tmp_filename.cend())};
+                    if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+                    {
+                        // File names are expected to be valid UTF-8. However, the host filesystem might contain entries that are not valid UTF-8.
+                        // Implementations MAY replace invalid sequences with the Unicode replacement character (U+FFFD), or MAY omit such entries.
+                        continue;
+                    }
+                }
+                else
+                {
+                    auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(tmp_filename.cbegin(), tmp_filename.cend())};
+                    if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]] { continue; }
                 }
 
                 if(dircookie_counter < underlying_dircookie) [[likely]]

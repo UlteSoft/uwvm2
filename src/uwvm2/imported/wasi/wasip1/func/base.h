@@ -432,6 +432,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     inline constexpr ::std::size_t max_symlink_depth{40uz};
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_impl(
+        bool const disable_utf8_check,
         ::std::size_t& symlink_depth,
         ::fast_io::dir_file const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
@@ -443,12 +444,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
         // one yourself.
-        auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
-                                                                                                                                       symlink_symbol.cend())};
-        if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        if(!disable_utf8_check) [[likely]]
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            auto const u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
+                                                                                                                              symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            }
+        }
+        else
+        {
+            auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(symlink_symbol.cbegin(), symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq; }
         }
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
@@ -522,10 +532,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
                             auto const errno_t{
-                                path_symlink_iterative_impl(symlink_depth,
+                                path_symlink_iterative_impl(disable_utf8_check,
+                                                            symlink_depth,
                                                             curr_fd_native_dir_file,
                                                             curr_path_stack,
                                                             ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                             if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
                         }
                         else
@@ -607,10 +619,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
                             auto const errno_t{
-                                path_symlink_iterative_impl(symlink_depth,
+                                path_symlink_iterative_impl(disable_utf8_check,
+                                                            symlink_depth,
                                                             curr_fd_native_dir_file,
                                                             curr_path_stack,
                                                             ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                             if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
                         }
                         else
@@ -688,12 +702,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative(
+        bool const disable_utf8_check,
         ::fast_io::dir_file const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
         ::std::size_t symlink_depth{};
-        return path_symlink_iterative_impl(symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
+        return path_symlink_iterative_impl(disable_utf8_check, symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
     }
 
     struct file_symlink_iterative_res_t
@@ -702,7 +717,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::utils::container::u8string file_name{};
     };
 
-    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_impl(::std::size_t& symlink_depth,
+    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_impl(bool const disable_utf8_check,
+                                                                              ::std::size_t& symlink_depth,
                                                                               ::fast_io::dir_file const& curr_fd_native_dir_file,
                                                                               ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
                                                                               ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
@@ -721,15 +737,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return res;
         }
 
-        // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
-        // one yourself.
-        auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
-                                                                                                                                       symlink_symbol.cend())};
-        if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        if(!disable_utf8_check) [[likely]]
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
-            return res;
+            // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
+            // one yourself.
+            auto const u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
+                                                                                                                              symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+                return res;
+            }
+        }
+        else
+        {
+            auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(symlink_symbol.cbegin(), symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+                return res;
+            }
         }
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
@@ -828,7 +857,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     return res;
                                 }
 
-                                return file_symlink_iterative_impl(symlink_depth,
+                                return file_symlink_iterative_impl(disable_utf8_check,
+                                                                   symlink_depth,
                                                                    curr_fd_native_dir_file,
                                                                    curr_path_stack,
                                                                    ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()});
@@ -864,7 +894,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     return res;
                                 }
 
-                                return file_symlink_iterative_impl(symlink_depth,
+                                return file_symlink_iterative_impl(disable_utf8_check,
+                                                                   symlink_depth,
                                                                    curr_fd_native_dir_file,
                                                                    curr_path_stack,
                                                                    ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()});
@@ -942,10 +973,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 auto const errno_t{
-                                    path_symlink_iterative_impl(symlink_depth,
+                                    path_symlink_iterative_impl(disable_utf8_check,
+                                                                symlink_depth,
                                                                 curr_fd_native_dir_file,
                                                                 curr_path_stack,
                                                                 ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                                 if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                                 {
                                     res.err = errno_t;
@@ -1044,10 +1077,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 auto const errno_t{
-                                    path_symlink_iterative_impl(symlink_depth,
+                                    path_symlink_iterative_impl(disable_utf8_check,
+                                                                symlink_depth,
                                                                 curr_fd_native_dir_file,
                                                                 curr_path_stack,
                                                                 ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                                 if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                                 {
                                     res.err = errno_t;
@@ -1139,12 +1174,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return res;
     }
 
-    inline constexpr file_symlink_iterative_res_t file_symlink_iterative(::fast_io::dir_file const& curr_fd_native_dir_file,
+    inline constexpr file_symlink_iterative_res_t file_symlink_iterative(bool const disable_utf8_check,
+                                                                         ::fast_io::dir_file const& curr_fd_native_dir_file,
                                                                          ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
                                                                          ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
         ::std::size_t symlink_depth{};
-        return file_symlink_iterative_impl(symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
+        return file_symlink_iterative_impl(disable_utf8_check, symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
     }
 
     struct dir_with_name_t
@@ -1154,6 +1190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     };
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_with_name_impl(
+        bool const disable_utf8_check,
         ::std::size_t& symlink_depth,
         ::fast_io::dir_file const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
@@ -1163,14 +1200,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval; }
 
-        // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
-        // one yourself.
-        auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
-                                                                                                                                       symlink_symbol.cend())};
-        if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        if(!disable_utf8_check) [[likely]]
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
+            // one yourself.
+            auto const u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
+                                                                                                                              symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+            }
+        }
+        else
+        {
+            auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(symlink_symbol.cbegin(), symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq; }
         }
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
@@ -1244,10 +1290,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
                             auto const errno_t{
-                                path_symlink_iterative_with_name_impl(symlink_depth,
+                                path_symlink_iterative_with_name_impl(disable_utf8_check,
+                                                                      symlink_depth,
                                                                       curr_fd_native_dir_file,
                                                                       curr_path_stack,
                                                                       ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                             if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
                         }
                         else
@@ -1329,10 +1377,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             if(symlink_symbol.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
                             auto const errno_t{
-                                path_symlink_iterative_with_name_impl(symlink_depth,
+                                path_symlink_iterative_with_name_impl(disable_utf8_check,
+                                                                      symlink_depth,
                                                                       curr_fd_native_dir_file,
                                                                       curr_path_stack,
                                                                       ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                             if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]] { return errno_t; }
                         }
                         else
@@ -1410,15 +1460,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_with_name(
+        bool const disable_utf8_check,
         ::fast_io::dir_file const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
         ::std::size_t symlink_depth{};
-        return path_symlink_iterative_with_name_impl(symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
+        return path_symlink_iterative_with_name_impl(disable_utf8_check, symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
     }
 
-    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name_impl(::std::size_t& symlink_depth,
+    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name_impl(bool const disable_utf8_check,
+                                                                                        ::std::size_t& symlink_depth,
                                                                                         ::fast_io::dir_file const& curr_fd_native_dir_file,
                                                                                         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
                                                                                         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
@@ -1437,15 +1489,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return res;
         }
 
-        // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
-        // one yourself.
-        auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
-                                                                                                                                       symlink_symbol.cend())};
-        if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        if(!disable_utf8_check) [[likely]]
         {
-            // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
-            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
-            return res;
+            // WASI does not guarantee that strings are null-terminated, so you must check for zero characters in the middle and construct
+            // one yourself.
+            auto const u8res{
+                ::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(symlink_symbol.cbegin(),
+                                                                                                                              symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                // If the path string is not valid UTF-8, the function shall fail with ERRNO_ILSEQ.
+                res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+                return res;
+            }
+        }
+        else
+        {
+            auto const u8res{::uwvm2::utils::utf::check_has_zero_illegal_unchecked(symlink_symbol.cbegin(), symlink_symbol.cend())};
+            if(u8res.err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eilseq;
+                return res;
+            }
         }
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
@@ -1545,6 +1610,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 return file_symlink_iterative_with_name_impl(
+                                    disable_utf8_check,
                                     symlink_depth,
                                     curr_fd_native_dir_file,
                                     curr_path_stack,
@@ -1582,6 +1648,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 return file_symlink_iterative_with_name_impl(
+                                    disable_utf8_check,
                                     symlink_depth,
                                     curr_fd_native_dir_file,
                                     curr_path_stack,
@@ -1660,10 +1727,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 auto const errno_t{path_symlink_iterative_with_name_impl(
+                                    disable_utf8_check,
                                     symlink_depth,
                                     curr_fd_native_dir_file,
                                     curr_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                                 if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                                 {
                                     res.err = errno_t;
@@ -1762,10 +1831,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 auto const errno_t{path_symlink_iterative_with_name_impl(
+                                    disable_utf8_check,
                                     symlink_depth,
                                     curr_fd_native_dir_file,
                                     curr_path_stack,
                                     ::uwvm2::utils::container::u8string_view{symlink_symbol.data(), symlink_symbol.size()})};
+
                                 if(errno_t != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                                 {
                                     res.err = errno_t;
@@ -1857,12 +1928,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return res;
     }
 
-    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name(::fast_io::dir_file const& curr_fd_native_dir_file,
+    inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name(bool const disable_utf8_check,
+                                                                                   ::fast_io::dir_file const& curr_fd_native_dir_file,
                                                                                    ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
                                                                                    ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
         ::std::size_t symlink_depth{};
-        return file_symlink_iterative_with_name_impl(symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
+        return file_symlink_iterative_with_name_impl(disable_utf8_check, symlink_depth, curr_fd_native_dir_file, curr_path_stack, symlink_symbol);
     }
 
 }  // namespace uwvm2::imported::wasi::wasip1::func

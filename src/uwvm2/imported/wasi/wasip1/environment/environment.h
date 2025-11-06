@@ -129,6 +129,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         ::uwvm2::utils::container::vector<mount_dir_root_t> mount_dir_roots{};
 
         bool trace_wasip1_call{};
+
+        bool disable_utf8_check{};
     };
 
 }  // namespace uwvm2::imported::wasi::wasip1::environment
