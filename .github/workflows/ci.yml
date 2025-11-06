@@ -13,6 +13,7 @@ on:
 jobs:
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-uwvm-default:
+    if: ${{ !always() }} # Remove it once update to LLVM22
     name: x86_64-linux-gnu (ubuntu-24.04) uwvm
     runs-on: ubuntu-24.04 # noble
     strategy:
