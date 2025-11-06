@@ -835,7 +835,7 @@ int main()
                                                                         PFD);
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval)
         {
-            ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
+            ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }
@@ -853,7 +853,7 @@ int main()
                                                                         PFD);
         if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval)
         {
-            ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
+            ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }
