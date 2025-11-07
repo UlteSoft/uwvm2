@@ -1,0 +1,21 @@
+BasedOnStyle: Microsoft
+
+UseTab: ForContinuationAndIndentation
+ContinuationIndentWidth: 4
+ColumnLimit: 0
+
+AccessModifierOffset: -4
+
+InsertBraces: true
+
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterControlStatement: Always
+  AfterUnion: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+MaxEmptyLinesToKeep: 2
+QualifierAlignment: Right
+SortIncludes: Never
+SortUsingDeclarations: Never
