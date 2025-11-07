@@ -92,26 +92,27 @@ struct tuple<>
 template <typename... Args>
 tuple(Args &&...) -> tuple<Args...>;
 
+// ADL get
 template <::std::size_t I, typename... Args>
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> &self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> &self) noexcept
 {
 	return static_cast<::fast_io::containers::details::tuple_element_impl_<I, ::fast_io::containers::details::pack_indexing_t_<I, Args...>> &>(self).val_;
 }
 
 template <::std::size_t I, typename... Args>
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> const &self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> const &self) noexcept
 {
 	return static_cast<::fast_io::containers::details::tuple_element_impl_<I, ::fast_io::containers::details::pack_indexing_t_<I, Args...>> const &>(self).val_;
 }
 
 template <::std::size_t I, typename... Args>
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> &&self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> &&self) noexcept
 {
 	return ::std::move(
 		static_cast<::fast_io::containers::details::tuple_element_impl_<I, ::fast_io::containers::details::pack_indexing_t_<I, Args...>> &&>(self).val_);
@@ -119,8 +120,8 @@ constexpr auto&& get(::fast_io::containers::tuple<Args...> &&self) noexcept
 
 template <::std::size_t I, typename... Args>
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> const &&self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> const &&self) noexcept
 {
 	return ::std::move(
 		static_cast<::fast_io::containers::details::tuple_element_impl_<I, ::fast_io::containers::details::pack_indexing_t_<I, Args...>> const &&>(self).val_);
@@ -147,8 +148,8 @@ constexpr auto get_tuple_element_by_type_() noexcept
 template <typename T, typename... Args>
 	requires((::std::same_as<T, Args> + ...) == 1)
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> const &self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> const &self) noexcept
 {
 	return static_cast<decltype(::fast_io::containers::details::get_tuple_element_by_type_<T, 0, Args...>())::type const &>(self).val_;
 }
@@ -156,11 +157,56 @@ constexpr auto&& get(::fast_io::containers::tuple<Args...> const &self) noexcept
 template <typename T, typename... Args>
 	requires((::std::same_as<T, Args> + ...) == 1)
 FAST_IO_GNU_ALWAYS_INLINE
-[[nodiscard]]
-constexpr auto&& get(::fast_io::containers::tuple<Args...> const &&self) noexcept
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> const &&self) noexcept
 {
 	return ::std::move(
 		static_cast<decltype(::fast_io::containers::details::get_tuple_element_by_type_<T, 0, Args...>())::type const &&>(self).val_);
+}
+
+template <typename T, typename... Args>
+	requires((::std::same_as<T, Args> + ...) == 1)
+FAST_IO_GNU_ALWAYS_INLINE
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> &self) noexcept
+{
+	return static_cast<decltype(::fast_io::containers::details::get_tuple_element_by_type_<T, 0, Args...>())::type const &>(self).val_;
+}
+
+template <typename T, typename... Args>
+	requires((::std::same_as<T, Args> + ...) == 1)
+FAST_IO_GNU_ALWAYS_INLINE
+	[[nodiscard]]
+	constexpr decltype(auto) get(::fast_io::containers::tuple<Args...> &&self) noexcept
+{
+	return ::std::move(
+		static_cast<decltype(::fast_io::containers::details::get_tuple_element_by_type_<T, 0, Args...>())::type const &&>(self).val_);
+}
+
+namespace details
+{
+template <typename F, typename Tuple, std::size_t... I>
+inline constexpr decltype(auto) apply_impl(F &&f, Tuple &&t, ::std::index_sequence<I...>)
+{
+	return ::std::forward<F>(f)(get<I>(::std::forward<Tuple>(t))...);
+}
+
+template <typename... Args>
+inline consteval ::std::size_t tuple_size(::fast_io::containers::tuple<Args...> const &) noexcept
+{
+	return sizeof...(Args);
+}
+
+} // namespace details
+
+template <typename F, typename Tuple>
+inline constexpr decltype(auto) apply(F &&f, Tuple &&t)
+{
+	constexpr ::std::size_t N{details::tuple_size(t)};
+	return details::apply_impl(
+		::std::forward<F>(f),
+		::std::forward<Tuple>(t),
+		::std::make_index_sequence<N>{});
 }
 
 namespace details
@@ -177,15 +223,15 @@ constexpr bool is_tuple_<tuple<Args...>> = true;
 template <typename T>
 concept is_tuple = ::fast_io::containers::details::is_tuple_<::std::remove_cvref_t<T>>;
 
-template<typename... Args>
+template <typename... Args>
 [[nodiscard]]
-constexpr auto forward_as_tuple(Args&&... args)
+constexpr auto forward_as_tuple(Args &&...args)
 {
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #endif
-	return ::fast_io::containers::tuple<Args&&...>{::std::forward<Args>(args)...};
+	return ::fast_io::containers::tuple<Args &&...>{::std::forward<Args>(args)...};
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
