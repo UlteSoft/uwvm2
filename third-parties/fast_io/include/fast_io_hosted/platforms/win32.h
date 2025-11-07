@@ -115,6 +115,10 @@ inline void *create_win32_temp_file_impl()
 	{
 		throw_win32_error();
 	}
+	if (temp_path_size > maximum_temp_path_size) [[unlikely]]
+	{
+		throw_win32_error(122/*ERROR_INSUFFICIENT_BUFFER*/);
+	}
 	auto arrp{arr + temp_path_size};
 	constexpr bool winver_support_rtl_gen_random{
 #if !defined(_WIN32_WINDOWS) && (!defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x0501)
