@@ -85,5 +85,7 @@
 # include "path_link.h"
 # include "path_open_wasm64.h"
 # include "path_open.h"
+# include "path_readlink_wasm64.h"
+# include "path_readlink.h"
 
 #endif

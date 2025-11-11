@@ -85,6 +85,8 @@ export import :path_link_wasm64;
 export import :path_link;
 export import :path_open_wasm64;
 export import :path_open;
+export import :path_readlink_wasm64;
+export import :path_readlink;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

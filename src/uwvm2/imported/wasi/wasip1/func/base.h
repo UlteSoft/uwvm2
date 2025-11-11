@@ -292,6 +292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 123uz /*ERROR_INVALID_NAME*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     case 17uz /*ERROR_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     case 80uz /*ERROR_FILE_EXISTS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
+                    case 4390uz /*ERROR_NOT_A_REPARSE_POINT*/ : return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -337,6 +338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 0xC0000033uz /*STATUS_OBJECT_NAME_INVALID*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     case 0xC00000D4uz /*STATUS_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     case 0xC000011Fuz /*STATUS_TOO_MANY_OPEN_FILES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile;
+                    case 0xC0000275uz /*STATUS_NOT_A_REPARSE_POINT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
