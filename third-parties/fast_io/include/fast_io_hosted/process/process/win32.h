@@ -40,13 +40,18 @@ inline void win32_wait_and_close_user_process_or_thread(void *handle) noexcept(!
 	{
 		return;
 	}
+	
 	auto status{win32_wait_user_process_or_thread(handle)};
+	auto const last_error{::fast_io::win32::GetLastError()};
+
 	::fast_io::win32::CloseHandle(handle);
+
 	if constexpr (throw_eh)
 	{
-		if (status) [[unlikely]]
+		if (status == 0xFFFFFFFF) [[unlikely]]
 		{
-			throw_win32_error(status);
+			// Preventing errors caused by replacing closehandle
+			throw_win32_error(last_error);
 		}
 	}
 }
@@ -68,8 +73,8 @@ inline void win32_duplicate_object_std(void *parent_process, void *&standard_io_
 		return;
 	}
 	if (!::fast_io::win32::DuplicateHandle(
-			parent_process, standard_io_handle, process_handle, __builtin_addressof(standard_io_handle), 0, 0,
-			0x00000002 | 0x00000004)) [[unlikely]]
+			parent_process, standard_io_handle, process_handle, __builtin_addressof(standard_io_handle), 0, true,
+			0x00000002 /*DUPLICATE_SAME_ACCESS*/)) [[unlikely]]
 	{
 		throw_win32_error();
 	}
@@ -249,8 +254,23 @@ inline win32_user_process_information win32_winnt_process_create_from_handle_imp
 			dwCreationFlags |= 0x00000010; // CREATE_NEW_CONSOLE
 		}
 
+		win32_process_char_type<family> const *actrual_args{args};
+		auto const argv0_no_path_append{(mode & process_mode::argv0_no_path_append) == process_mode::argv0_no_path_append};
+
+		::fast_io::containers::basic_string<win32_process_char_type<family>, ::fast_io::native_thread_local_allocator> tmp_actrual_args{};
+		if (args && !argv0_no_path_append)
+		{
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8'\"', win32_process_char_type<family>>);
+			tmp_actrual_args.append(address_begin, ::fast_io::cstr_len(address_begin));
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8'\"', win32_process_char_type<family>>);
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8' ', win32_process_char_type<family>>);
+			tmp_actrual_args.append(args, ::fast_io::cstr_len(args));
+
+			actrual_args = tmp_actrual_args.data();
+		}
+
 		::fast_io::win32::process_information pi{};
-		if (!::fast_io::win32::CreateProcessW(address_begin, const_cast<char16_t *>(args), nullptr, nullptr, 1,
+		if (!::fast_io::win32::CreateProcessW(address_begin, const_cast<char16_t *>(actrual_args), nullptr, nullptr, 1,
 											  dwCreationFlags, (void *)envs, nullptr, __builtin_addressof(si), __builtin_addressof(pi)))
 		{
 			throw_win32_error();
@@ -423,8 +443,23 @@ inline win32_user_process_information win32_winnt_process_create_from_handle_imp
 			dwCreationFlags |= 0x00000010; // CREATE_NEW_CONSOLE
 		}
 
+		win32_process_char_type<family> const *actrual_args{args};
+		auto const argv0_no_path_append{(mode & process_mode::argv0_no_path_append) == process_mode::argv0_no_path_append};
+
+		::fast_io::containers::basic_string<win32_process_char_type<family>, ::fast_io::native_thread_local_allocator> tmp_actrual_args{};
+		if (args && !argv0_no_path_append)
+		{
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8'\"', win32_process_char_type<family>>);
+			tmp_actrual_args.append(address_begin, ::fast_io::cstr_len(address_begin));
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8'\"', win32_process_char_type<family>>);
+			tmp_actrual_args.push_back(::fast_io::char_literal_v<u8' ', win32_process_char_type<family>>);
+			tmp_actrual_args.append(args, ::fast_io::cstr_len(args));
+
+			actrual_args = tmp_actrual_args.data();
+		}
+
 		::fast_io::win32::process_information pi{};
-		if (!::fast_io::win32::CreateProcessA(reinterpret_cast<char *>(address_begin), const_cast<char *>(args), nullptr, nullptr, 1,
+		if (!::fast_io::win32::CreateProcessA(reinterpret_cast<char *>(address_begin), const_cast<char *>(actrual_args), nullptr, nullptr, 1,
 											  dwCreationFlags, (void *)envs, nullptr, __builtin_addressof(si), __builtin_addressof(pi)))
 		{
 			throw_win32_error();
@@ -533,8 +568,23 @@ inline win32_user_process_information win32_9xa_win9x_process_create_from_filepa
 		dwCreationFlags |= 0x00000010; // CREATE_NEW_CONSOLE
 	}
 
+	char const *actrual_args{args};
+	auto const argv0_no_path_append{(mode & process_mode::argv0_no_path_append) == process_mode::argv0_no_path_append};
+
+	::fast_io::containers::basic_string<char, ::fast_io::native_thread_local_allocator> tmp_actrual_args{};
+	if (args && !argv0_no_path_append)
+	{
+		tmp_actrual_args.push_back('\"');
+		tmp_actrual_args.append(filepath, ::fast_io::cstr_len(filepath));
+		tmp_actrual_args.push_back('\"');
+		tmp_actrual_args.push_back(' ');
+		tmp_actrual_args.append(args, ::fast_io::cstr_len(args));
+
+		actrual_args = tmp_actrual_args.data();
+	}
+
 	::fast_io::win32::process_information pi{};
-	if (!::fast_io::win32::CreateProcessA(filepath, const_cast<char *>(args), nullptr, nullptr, 1,
+	if (!::fast_io::win32::CreateProcessA(filepath, const_cast<char *>(actrual_args), nullptr, nullptr, 1,
 										  dwCreationFlags, (void *)envs, nullptr, __builtin_addressof(si), __builtin_addressof(pi)))
 	{
 		throw_win32_error();
@@ -584,12 +634,19 @@ struct win32_9xa_win9x_create_process_at_fs_dirent
 	}
 };
 
-template <win32_family family, typename path_type>
+template <win32_family family, bool is_first, typename path_type>
 inline win32_user_process_information win32_winnt_create_process_overloads(nt_at_entry entry, path_type const &filename,
-																		   basic_win32_process_args<family> const &args, basic_win32_process_envs<family> const &envs,
+																		   basic_win32_process_args<family, is_first> const &args, basic_win32_process_envs<family> const &envs,
 																		   win32_process_io const &processio, process_mode mode)
 {
-	basic_win32_family_file<family, char> nf(entry, filename, open_mode::in | open_mode::excl);
+	bool const follow{(mode & process_mode::follow) == process_mode::follow};
+	open_mode curr_open_mode{open_mode::in | open_mode::excl};
+	if (follow)
+	{
+		curr_open_mode |= open_mode::follow;
+	}
+
+	basic_win32_family_file<family, char> nf{entry, filename, curr_open_mode};
 	return win32_winnt_process_create_from_handle_impl<family>(nf.handle, args.get(), envs.get(), processio, mode);
 }
 
@@ -599,6 +656,8 @@ inline win32_user_process_information win32_9xa_win9x_create_process_overloads(w
 																			   win32_process_args_9xa const &args, win32_process_envs_9xa const &envs,
 																			   win32_process_io const &processio, process_mode mode)
 {
+	// win9x no symlink
+
 	return win32_api_common_9xa(filename,
 								win32_9xa_win9x_create_process_at_fs_dirent{
 									__builtin_addressof(entry.handle),
@@ -608,12 +667,19 @@ inline win32_user_process_information win32_9xa_win9x_create_process_overloads(w
 									mode});
 }
 
-template <win32_family family, typename path_type>
-inline win32_user_process_information win32_winnt_create_process_overloads(path_type const &filename, basic_win32_process_args<family> const &args,
+template <win32_family family, bool is_first, typename path_type>
+inline win32_user_process_information win32_winnt_create_process_overloads(path_type const &filename, basic_win32_process_args<family, is_first> const &args,
 																		   basic_win32_process_envs<family> const &envs,
 																		   win32_process_io const &processio, process_mode mode)
 {
-	basic_win32_family_file<family, char> nf(filename, open_mode::in | open_mode::excl);
+	bool const follow{(mode & process_mode::follow) == process_mode::follow};
+	open_mode curr_open_mode{open_mode::in | open_mode::excl};
+	if (follow)
+	{
+		curr_open_mode |= open_mode::follow;
+	}
+
+	basic_win32_family_file<family, char> nf{filename, curr_open_mode};
 	return win32_winnt_process_create_from_handle_impl<family>(nf.handle, args.get(), envs.get(), processio, mode);
 }
 
@@ -622,6 +688,8 @@ inline win32_user_process_information win32_9xa_win9x_create_process_overloads(p
 																			   win32_process_envs_9xa const &envs,
 																			   win32_process_io const &processio, process_mode mode)
 {
+	// win9x no symlink
+
 	return win32_api_common_9xa(filename,
 								win32_9xa_win9x_create_process_at_fs_dirent{
 									nullptr,
@@ -631,18 +699,27 @@ inline win32_user_process_information win32_9xa_win9x_create_process_overloads(p
 									mode});
 }
 
-template <win32_family family>
-inline win32_user_process_information win32_winnt_create_process_overloads(::fast_io::nt_fs_dirent const &ent, basic_win32_process_args<family> const &args,
+template <win32_family family, bool is_first>
+inline win32_user_process_information win32_winnt_create_process_overloads(::fast_io::nt_fs_dirent const &ent, basic_win32_process_args<family, is_first> const &args,
 																		   basic_win32_process_envs<family> const &envs,
 																		   win32_process_io const &processio, process_mode mode)
 {
-	basic_win32_family_file<family, char> nf(ent, open_mode::in | open_mode::excl);
+	bool const follow{(mode & process_mode::follow) == process_mode::follow};
+	open_mode curr_open_mode{open_mode::in | open_mode::excl};
+	if (follow)
+	{
+		curr_open_mode |= open_mode::follow;
+	}
+
+	basic_win32_family_file<family, char> nf{ent, curr_open_mode};
 	return win32_winnt_process_create_from_handle_impl<family>(nf.handle, args.get(), envs.get(), processio, mode);
 }
 
 inline win32_user_process_information win32_9xa_win9x_create_process_overloads(::fast_io::win32_9xa_fs_dirent const &ent, win32_process_args_9xa const &args,
 																			   win32_process_envs_9xa const &envs, win32_process_io const &processio, process_mode mode)
 {
+	// win9x no symlink
+
 	return win32_api_common_9xa(ent.filename,
 								win32_9xa_win9x_create_process_at_fs_dirent{
 									__builtin_addressof(ent.handle),
@@ -714,11 +791,11 @@ inline win32_wait_status wait(win32_family_process_observer<family> ppob) noexce
 
 	// wait for process
 	auto const status{win32::details::win32_wait_user_process_or_thread(ppob.hnt_user_process_info.hprocess)};
-	if (status) [[unlikely]]
+	if (status == 0xFFFFFFFF) [[unlikely]]
 	{
 		if constexpr (throw_eh)
 		{
-			throw_win32_error(status);
+			throw_win32_error();
 		}
 		else
 		{
@@ -754,7 +831,7 @@ struct win32_process_id
 template <win32_family family>
 inline win32_process_id get_process_id(win32_family_process_observer<family> ppob) noexcept
 {
-	auto pid{::fast_io::win32::GetProcessId(ppob.native_handle)};
+	auto pid{::fast_io::win32::GetProcessId(ppob.native_handle().hprocess)};
 	if (pid == 0) [[unlikely]]
 	{
 		throw_win32_error();
@@ -776,7 +853,7 @@ public:
 	}
 
 	template <::fast_io::constructible_to_os_c_str path_type>
-	inline explicit win32_family_process(nt_at_entry nate, path_type const &filename, basic_win32_process_args<family> const &args = {},
+	inline explicit win32_family_process(nt_at_entry nate, path_type const &filename, basic_win32_process_args<family, false> const &args = {},
 										 basic_win32_process_envs<family> const &envs = {}, win32_process_io const &processio = {}, process_mode mode = {})
 		: win32_family_process_observer<family>{
 			  win32::details::win32_winnt_create_process_overloads<family>(nate, filename, args, envs, processio, mode)}
@@ -784,7 +861,7 @@ public:
 	}
 
 	template <::fast_io::constructible_to_os_c_str path_type>
-	inline explicit win32_family_process(win32_9xa_at_entry nate, path_type const &filename, basic_win32_process_args<family> const &args = {},
+	inline explicit win32_family_process(win32_9xa_at_entry nate, path_type const &filename, basic_win32_process_args<family, false> const &args = {},
 										 basic_win32_process_envs<family> const &envs = {}, win32_process_io const &processio = {}, process_mode mode = {})
 		: win32_family_process_observer<family>{
 			  win32::details::win32_9xa_win9x_create_process_overloads(nate, filename, args, envs, processio, mode)}
@@ -792,7 +869,7 @@ public:
 	}
 
 	template <::fast_io::constructible_to_os_c_str path_type>
-	inline explicit win32_family_process(path_type const &filename, basic_win32_process_args<family> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+	inline explicit win32_family_process(path_type const &filename, basic_win32_process_args<family, false> const &args = {}, basic_win32_process_envs<family> const &envs = {},
 										 win32_process_io const &processio = {}, process_mode mode = {})
 		: win32_family_process_observer<family>{
 #if defined(_WIN32_WINDOWS)
@@ -804,15 +881,58 @@ public:
 	{
 	}
 
-	inline explicit win32_family_process(::fast_io::nt_fs_dirent ent, basic_win32_process_args<family> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+	inline explicit win32_family_process(::fast_io::nt_fs_dirent ent, basic_win32_process_args<family, false> const &args = {}, basic_win32_process_envs<family> const &envs = {},
 										 win32_process_io const &processio = {}, process_mode mode = {})
 		: win32_family_process_observer<family>{
 			  win32::details::win32_winnt_create_process_overloads<family>(ent, args, envs, processio, mode)}
 	{
 	}
 
-	inline explicit win32_family_process(::fast_io::win32_9xa_fs_dirent ent, basic_win32_process_args<family> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+	inline explicit win32_family_process(::fast_io::win32_9xa_fs_dirent ent, basic_win32_process_args<family, false> const &args = {}, basic_win32_process_envs<family> const &envs = {},
 										 win32_process_io const &processio = {}, process_mode mode = {})
+		: win32_family_process_observer<family>{
+			  win32::details::win32_9xa_win9x_create_process_overloads(ent, args, envs, processio, mode)}
+	{
+	}
+
+	template <::fast_io::constructible_to_os_c_str path_type>
+	inline explicit win32_family_process(nt_at_entry nate, path_type const &filename, ::fast_io::args_with_argv0_t, basic_win32_process_args<family, true> const &args = {},
+										 basic_win32_process_envs<family> const &envs = {}, win32_process_io const &processio = {}, process_mode mode = process_mode::argv0_no_path_append)
+		: win32_family_process_observer<family>{
+			  win32::details::win32_winnt_create_process_overloads<family>(nate, filename, args, envs, processio, mode)}
+	{
+	}
+
+	template <::fast_io::constructible_to_os_c_str path_type>
+	inline explicit win32_family_process(win32_9xa_at_entry nate, path_type const &filename, ::fast_io::args_with_argv0_t, basic_win32_process_args<family, true> const &args = {},
+										 basic_win32_process_envs<family> const &envs = {}, win32_process_io const &processio = {}, process_mode mode = process_mode::argv0_no_path_append)
+		: win32_family_process_observer<family>{
+			  win32::details::win32_9xa_win9x_create_process_overloads(nate, filename, args, envs, processio, mode)}
+	{
+	}
+
+	template <::fast_io::constructible_to_os_c_str path_type>
+	inline explicit win32_family_process(path_type const &filename, ::fast_io::args_with_argv0_t, basic_win32_process_args<family, true> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+										 win32_process_io const &processio = {}, process_mode mode = process_mode::argv0_no_path_append)
+		: win32_family_process_observer<family>{
+#if defined(_WIN32_WINDOWS)
+			  win32::details::win32_9xa_win9x_create_process_overloads(filename, args, envs, processio, mode)
+#else
+			  win32::details::win32_winnt_create_process_overloads<family>(filename, args, envs, processio, mode)
+#endif
+		  }
+	{
+	}
+
+	inline explicit win32_family_process(::fast_io::nt_fs_dirent ent, ::fast_io::args_with_argv0_t, basic_win32_process_args<family, true> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+										 win32_process_io const &processio = {}, process_mode mode = process_mode::argv0_no_path_append)
+		: win32_family_process_observer<family>{
+			  win32::details::win32_winnt_create_process_overloads<family>(ent, args, envs, processio, mode)}
+	{
+	}
+
+	inline explicit win32_family_process(::fast_io::win32_9xa_fs_dirent ent, ::fast_io::args_with_argv0_t, basic_win32_process_args<family, true> const &args = {}, basic_win32_process_envs<family> const &envs = {},
+										 win32_process_io const &processio = {}, process_mode mode = process_mode::argv0_no_path_append)
 		: win32_family_process_observer<family>{
 			  win32::details::win32_9xa_win9x_create_process_overloads(ent, args, envs, processio, mode)}
 	{
