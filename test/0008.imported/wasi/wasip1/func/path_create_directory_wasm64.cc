@@ -969,7 +969,9 @@ int main()
 #endif
 
     // Case 21: permission boundary on parent dir -> eacces/eperm
-#if !defined(_WIN32) && !(defined(__MSDOS__) || defined(__DJGPP__))
+#if !defined(_WIN32) && !(defined(__MSDOS__) || defined(__DJGPP__)) && 0
+    /*This cannot be tested, as implementations vary across platforms, and the test pertains to POSIX functionality rather than WASIs.*/
+
     {
         try
         {
