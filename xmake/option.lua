@@ -309,6 +309,19 @@ option("apple-platform", function()
     )
 end)
 
+-- libfuzzer
+
+option("test-libfuzzer", function()
+    set_description
+    (
+        "Test libfuzzer with fuzzing mode.",
+        "default = false",
+        [[    true: Test libfuzzer with fuzzing mode.]],
+        [[    false: Don't test libfuzzer with fuzzing mode.]]
+    )
+    set_default(false)
+end)
+
 -- uwvm Debug Option
 
 option("debug-timer", function()

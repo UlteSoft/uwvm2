@@ -349,9 +349,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_warnings("all", "extra", "error")
 
 		local is_libfuzzer = (string.find(file, "test/0000.libfuzzer/", 1, true) ~= nil) or (string.find(file, "test\\0000.libfuzzer\\", 1, true) ~= nil)
+		local test_libfuzzer = get_config("test-libfuzzer")
 
 		if is_libfuzzer then
-			if is_mode("debug") and get_config("use-llvm") then
+			if is_mode("debug") and get_config("use-llvm") and test_libfuzzer then
 				add_cxflags("-fsanitize=fuzzer", {force = true})
 				add_ldflags("-fsanitize=fuzzer", {force = true})
 				-- change the env variables in ci to change the default values
