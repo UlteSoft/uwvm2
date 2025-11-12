@@ -153,10 +153,10 @@ int main()
             if(dino != static_cast<wasi_size_wasm64_t>(0u)) { ::fast_io::fast_terminate(); }
         }
 
-        // ensure a/ exists, then descend: stack = [root, a]
+        // ensure a_wasm64/ exists, then descend: stack = [root, a_wasm64]
         try
         {
-            ::fast_io::native_mkdirat(::fast_io::at_fdcwd(), u8"a");
+            ::fast_io::native_mkdirat(::fast_io::at_fdcwd(), u8"a_wasm64");
         }
         catch(...)
         {
@@ -165,7 +165,7 @@ int main()
 
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"a"};
+            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"a_wasm64"};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -192,7 +192,7 @@ int main()
             if(dino_parent == static_cast<wasi_size_wasm64_t>(0u) || dino_parent != root_ino) { ::fast_io::fast_terminate(); }
         }
 
-        // go back to preload (pop 'a'), '..' must be 0 again
+        // go back to preload (pop 'a_wasm64'), '..' must be 0 again
         dir_stack.dir_stack.resize(1uz);
         constexpr wasi_void_ptr_wasm64_t buf_ptr2{14080u};
         constexpr wasi_void_ptr_wasm64_t used_ptr2{14336u};
@@ -212,10 +212,10 @@ int main()
             if(dino != static_cast<wasi_size_wasm64_t>(0u)) { ::fast_io::fast_terminate(); }
         }
 
-        // cleanup a/
+        // cleanup a_wasm64/
         try
         {
-            ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"a", ::fast_io::native_at_flags::removedir);
+            ::fast_io::native_unlinkat(::fast_io::at_fdcwd(), u8"a_wasm64", ::fast_io::native_at_flags::removedir);
         }
         catch(...)
         {
