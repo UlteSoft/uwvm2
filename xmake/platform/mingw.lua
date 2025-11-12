@@ -92,7 +92,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0603")
         add_defines("WINVER=0x0603")
-        add_ldflags("-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=3", {force = true})
+        -- NT 6.3 continues to use the FF from NT 6.2.
+        add_ldflags("-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
