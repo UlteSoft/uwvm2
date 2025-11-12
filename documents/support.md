@@ -7,7 +7,6 @@
 * NetBSD: unknown(50+)-netbsd
 * OpenBSD: unknown-openbsd
 * DragonflyBSD: (x86\_64, i386, aarch64, arm, powerpc64, etc.)-dragonfly
-* WASM-WASI (self-hosting): (wasm32, wasm64)-(wasip1, wasip2)-(none, threads, neoh)
 * SerenityOS: (x86\_64, i686)-serenity
 * SunOS: (sparc, x86)-(sunos, solaris)-gnu
 
@@ -27,6 +26,9 @@
 
 ## DOS
 * MS-DOS, FreeDOS (DJGPP): i586-msdosdjgpp
+
+## WASM-WASI
+* Self‑hosted WASI builds for `wasm32` and `wasm64` (WASI p1–p3). Threads/shared memory are not supported; browser runtimes require an adapter. Build guide: [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
 
 ## Host C Library Environment
 * This project's Newlib build does not provide executable binaries, offering only linkable object files and libraries for flexible integration within higher-level systems or plugin frameworks. It does not support wasi and only supports plugins using weak symbol extensions.
