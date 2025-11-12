@@ -55,8 +55,8 @@ function mingw_target()
         -- same as WIN10
         add_defines("_WIN32_WINNT=0x0A00")
         add_defines("WINVER=0x0A00")
-        -- Do not set --major-subsystem-version=10. During startup program exited with code 0xc000007b (invalid parameters).
-        -- This option may be changed in a future update of the NT kernel major version.
+        -- NT 10.0 continues to use the FF from NT 6.2.
+        add_ldflags("-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -76,8 +76,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0A00")
         add_defines("WINVER=0x0A00")
-        -- Do not set --major-subsystem-version=10. During startup program exited with code 0xc000007b (invalid parameters).
-        -- This option may be changed in a future update of the NT kernel major version.
+        -- NT 10.0 continues to use the FF from NT 6.2.
+        add_ldflags("-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
