@@ -14,7 +14,7 @@
 ## Windows NT (MSVC)
 * The windows-msvc toolchain defines its supported platforms and API levels through the Windows SDK. Currently, it only supports WINNT 10.0 (Windows 10, Windows Server 2016, Windows Server 2019, Windows Server 2022, Windows 11, Windows Server 2025).
 * (x86\_64, i686, aarch64, arm, arm64ec)-windows-msvc
-* Compilers (MSVC Target): LLVM Clang >= 21, MSVC >= 2026
+* Compilers (MSVC Target): LLVM Clang >= 21, ~~MSVC~~ (Not Support Yet)
 
 ## Windows NT (MinGW)
 * Supported system versions: Windows NT 5.0 (Windows 2000, Windows Server 2000), Windows NT 5.1 (Windows XP), Windows NT 5.2 (Windows XP 64bit, Windows Server 2003), Windows NT 6.0 (Windows Vista, Windows Server 2008), Windows NT 6.1 (Windows 7, Windows Server 2008 R2), Windows NT 6.2 (Windows 8, Windows Server 2012), Windows NT 6.3 (Windows Blue, Windows Server 2012 R2), Windows NT 10.0 (Windows 10, Windows Server 2016, Windows Server 2019, Windows Server 2022, Windows 11, Windows Server 2025)
