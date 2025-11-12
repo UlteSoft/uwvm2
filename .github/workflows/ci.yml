@@ -82,7 +82,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-windows-gnu:
-    if: ${{ !always() }} # Remove it once update to LLVM22
     name: x86_64-windows-gnu (MINGW ${{ matrix.env.name }})
     runs-on: windows-latest
     strategy:
@@ -90,8 +89,6 @@ jobs:
         env:
           - name: "CLANG64"
             prefix: mingw-w64-clang-x86_64
-          - name: "CLANGARM64"
-            prefix: mingw-w64-clang-aarch64
         mode: ["debug"]
         policies: ["build.sanitizer.address"]
     defaults:
