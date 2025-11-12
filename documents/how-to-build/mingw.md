@@ -16,7 +16,7 @@ $ xmake i -o <install_path>
 ### Additional Options
 1. `--static` Static links
 2. `--march` The default is native, which uses the cpu designator to control it
-3. `--winmin` Minimum windows compatible version, supported from Win11 all the way to Win95
+3. `--mingw-min` Minimum windows compatible version, supported from Win11 all the way to Win95
 4. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 
 ## Use LLVM
@@ -35,5 +35,5 @@ $ xmake i -o <install_path>
 ### Additional Options
 1. `--static` Static links
 2. `--march` The default is native, which uses the cpu designator to control it
-3. `--winmin` Minimum windows compatible version, supported from Win11 all the way to Win95
+3. `--mingw-min` Minimum windows compatible version, supported from Win11 all the way to Win95
 4. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported

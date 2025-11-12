@@ -50,13 +50,13 @@ function mingw_target()
     -- support all platforms
     add_syslinks("ws2_32")
 
-    local opt_name = get_config("winmin")
+    local opt_name = get_config("mingw-min")
     if opt_name == "default" then	
         -- same as WIN10
         add_defines("_WIN32_WINNT=0x0A00")
         add_defines("WINVER=0x0A00")
-        -- NT 10.0 continues to use the FF from NT 6.2.
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
+        -- MinGW NT 10.0 continues to use the FF from NT 6.0
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -76,8 +76,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0A00")
         add_defines("WINVER=0x0A00")
-        -- NT 10.0 continues to use the FF from NT 6.2.
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
+        -- MinGW NT 10.0 continues to use the FF from NT 6.0
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -92,8 +92,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0603")
         add_defines("WINVER=0x0603")
-        -- NT 6.3 continues to use the FF from NT 6.2.
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
+        -- MinGW NT 6.3 continues to use the FF from NT 6.0.
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -108,7 +108,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0602")
         add_defines("WINVER=0x0602")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=2", {force = true})
+        -- MinGW NT 6.2 continues to use the FF from NT 6.0.
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -123,7 +124,8 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0601")
         add_defines("WINVER=0x0601")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=1", {force = true})
+        -- MinGW NT 6.1 continues to use the FF from NT 6.0.
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -138,7 +140,7 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0600")
         add_defines("WINVER=0x0600")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=6", "-Wl,--minor-subsystem-version=0", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -153,7 +155,7 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0502")
         add_defines("WINVER=0x0502")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=5", "-Wl,--minor-subsystem-version=2", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.02", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -167,7 +169,7 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0501")
         add_defines("WINVER=0x0501")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=5", "-Wl,--minor-subsystem-version=1", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.01", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -182,7 +184,7 @@ function mingw_target()
             then
         add_defines("_WIN32_WINNT=0x0500")
         add_defines("WINVER=0x0500")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=5", "-Wl,--minor-subsystem-version=0", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
         local march = get_config("march")
@@ -198,7 +200,7 @@ function mingw_target()
         add_undefines("_WIN32_WINNT")
         add_defines("_WIN32_WINDOWS=0x0490")
         add_defines("WINVER=0x0490")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=4", "-Wl,--minor-subsystem-version=90", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:4.90", {force = true})
         add_syslinks("msvcrt")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
@@ -211,7 +213,7 @@ function mingw_target()
         add_undefines("_WIN32_WINNT")
         add_defines("_WIN32_WINDOWS=0x0410")
         add_defines("WINVER=0x0410")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=4", "-Wl,--minor-subsystem-version=10", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:4.10", {force = true})
         add_syslinks("msvcrt")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
@@ -224,7 +226,7 @@ function mingw_target()
         add_undefines("_WIN32_WINNT")
         add_defines("_WIN32_WINDOWS=0x0400")
         add_defines("WINVER=0x0400")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=4", "-Wl,--minor-subsystem-version=0", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:4.00", {force = true})
         add_syslinks("msvcrt")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
@@ -239,7 +241,7 @@ function mingw_target()
     elseif opt_name == "NT400" then -- unverified
         add_defines("_WIN32_WINNT=0x0400")
         add_defines("WINVER=0x0400")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=4", "-Wl,--minor-subsystem-version=0", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:4.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("msvcrt")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
@@ -252,7 +254,7 @@ function mingw_target()
     elseif opt_name == "NT351" then -- unverified
         add_defines("_WIN32_WINNT=0x0351")
         add_defines("WINVER=0x0351")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=3", "-Wl,--minor-subsystem-version=51", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.51", {force = true})
         add_syslinks("ntdll")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
@@ -264,7 +266,7 @@ function mingw_target()
     elseif opt_name == "NT350" then -- unverified
         add_defines("_WIN32_WINNT=0x0350")
         add_defines("WINVER=0x0350")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=3", "-Wl,--minor-subsystem-version=50", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.50", {force = true})
         add_syslinks("ntdll")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
@@ -276,7 +278,7 @@ function mingw_target()
     elseif opt_name == "NT310" then -- unverified
         add_defines("_WIN32_WINNT=0x0310")
         add_defines("WINVER=0x0310")
-        add_ldflags("-Wl,--stack,8388608", "-Wl,--major-subsystem-version=3", "-Wl,--minor-subsystem-version=10", {force = true})
+        add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.10", {force = true})
         add_syslinks("ntdll")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")

@@ -121,7 +121,7 @@ jobs:
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
       - name: Configure
-        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --winmin=${{ matrix.min-win }}
+        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.min-win }}
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version

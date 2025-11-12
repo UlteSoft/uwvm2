@@ -170,7 +170,7 @@ end)
 
 -- WINDOWS
 
-option("winmin", function()
+option("mingw-min", function()
     set_description
     (
         "Minimum (x86_64, i686, aarch64, arm) windows system required. Minimum value for _WIN32_WINNT, _WIN32_WINDOWS and WINVER.",
