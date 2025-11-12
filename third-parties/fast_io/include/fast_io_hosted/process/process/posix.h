@@ -184,7 +184,7 @@ inline void portable_fd_path(int fd, char *buf, ::std::size_t bufsz)
 	::fast_io::obuffer_view linkpath_ov{linkpath, linkpath + all_sz};
 	::fast_io::operations::print_freestanding<false>(linkpath_ov, path_str, fd, ::fast_io::mnp::chvw(::fast_io::char_literal_v<u8'\0', char>));
 
-	using my_ssize_t = ::std::make_signed_t<::std::size_t>;
+    using my_ssize_t [[maybe_unused]] = ::std::make_signed_t<::std::size_t>;
 
 #if defined(__linux__) && defined(__NR_readlink)
 	auto resolved{::fast_io::system_call<__NR_readlink, my_ssize_t>(linkpath, buf, bufsz - 1u)};
