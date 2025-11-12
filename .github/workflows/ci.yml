@@ -91,6 +91,23 @@ jobs:
             prefix: mingw-w64-clang-x86_64
         mode: ["debug"]
         policies: ["build.sanitizer.address"]
+        min-win: [
+          "WIN10",   # NT 10.x (Win10/Win11/WS16/WS19/WS22/WS25)
+          "WINBLUE", # NT 6.3 (Win8.1/WS12R2)
+          "WIN8",    # NT 6.2 (Win8/WS12)
+          "WIN7",    # NT 6.1 (Win7/WS08R2)
+          "VISTA",   # NT 6.0 (Vista/WS08)
+          "WINXP64", # NT 5.2 (WS03/WinXP x64)
+          "WINXP",   # NT 5.1 (WinXP)
+          "WIN2K",   # NT 5.0 (Win2000/WS2K)
+          "NT400",   # NT 4.0 (unverified)
+          "NT351",   # NT 3.51 (unverified)
+          "NT350",   # NT 3.50 (unverified)
+          "NT310",   # NT 3.10 (closest to NT 3.0, unverified)
+          "WINME",   # Win9x 4.90
+          "WIN98",   # Win9x 4.10
+          "WIN95"    # Win9x 4.00
+        ]
     defaults:
       run:
         shell: msys2 {0}
@@ -104,7 +121,7 @@ jobs:
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
       - name: Configure
-        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
+        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --winmin=${{ matrix.min-win }}
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
