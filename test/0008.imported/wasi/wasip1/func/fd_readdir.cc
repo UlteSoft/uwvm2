@@ -228,16 +228,19 @@ int main()
                 ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory, buf_ptr1 + second_header_off + 8u);
             auto const dino_hi =
                 ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory, buf_ptr1 + second_header_off + 12u);
-            auto const dino = (static_cast<unsigned long long>(dino_hi) << 32) | static_cast<unsigned long long>(dino_lo);
+            [[maybe_unused]] auto const dino = (static_cast<unsigned long long>(dino_hi) << 32) | static_cast<unsigned long long>(dino_lo);
 
             // compute root ino
             ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.file)};
-            auto const root_ino = static_cast<unsigned long long>(st_root.ino);
+            [[maybe_unused]] auto const root_ino = static_cast<unsigned long long>(st_root.ino);
+
+#if !(defined(_WIN32) && defined(_WIN32_WINDOWS)) // Win9x uses pathname emulation, so you can tell directly.
             if(dino == 0ull || dino != root_ino)
             {
                 ::fast_io::io::perrln(::fast_io::u8err(), u8"fd_readdir: case3 parent inode mismatch: dino=", dino, u8", root_ino=", root_ino);
                 ::fast_io::fast_terminate();
             }
+#endif
         }
 
         // go back to preload (pop 'a'), '..' must be 0 again

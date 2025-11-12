@@ -221,12 +221,13 @@ int main()
                 ::fast_io::io::perrln(::fast_io::u8err(), u8"fd_readdir_wasm64: case3 used1 too small: ", static_cast<unsigned>(used1));
                 ::fast_io::fast_terminate();
             }
-            auto const dino_parent =
+            [[maybe_unused]] auto const dino_parent =
                 ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory, buf_ptr1 + second_header_off + 8u);
 
             // compute root ino
             ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.file)};
-            auto const root_ino = static_cast<wasi_size_wasm64_t>(st_root.ino);
+            [[maybe_unused]] auto const root_ino = static_cast<wasi_size_wasm64_t>(st_root.ino);
+#if !(defined(_WIN32) && defined(_WIN32_WINDOWS))  // Win9x uses pathname emulation, so you can tell directly.
             if(dino_parent == static_cast<wasi_size_wasm64_t>(0u) || dino_parent != root_ino)
             {
                 ::fast_io::io::perrln(::fast_io::u8err(),
@@ -236,6 +237,7 @@ int main()
                                       static_cast<unsigned long long>(root_ino));
                 ::fast_io::fast_terminate();
             }
+#endif
         }
 
         // go back to preload (pop 'a_wasm64'), '..' must be 0 again
