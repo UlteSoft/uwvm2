@@ -361,6 +361,8 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				local maxlen   = os.getenv("FUZZ_MAX_LEN") or "1024"
 				add_tests("fuzz", {group = "libfuzzer",runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen }}) -- xmake test -g libfuzzer
 				add_files(file)
+			elseif not get_config("use-llvm") and test_libfuzzer then
+			    error("Libfuzzer is not supported on this platform, please use llvm toolchain.")
 			end
 		else
 			add_tests("unit", {group = "default"}) -- xmake test -g default
