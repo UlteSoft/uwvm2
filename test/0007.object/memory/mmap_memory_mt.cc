@@ -70,26 +70,26 @@ int main()
     std::atomic<unsigned> mismatch_count{0u};
 
     // Two grow threads to create contention; each performs small grows with delays
-    std::thread grow_a{[&mem]()
-                       {
-                           for(int k = 0; k < 4; ++k)
-                           {
-                               std::this_thread::sleep_for(std::chrono::milliseconds(3));
-                               mem.grow(1u);
-                           }
-                       }};
+    fast_io::native_thread grow_a{[&mem]()
+                                  {
+                                      for(int k = 0; k < 4; ++k)
+                                      {
+                                          std::this_thread::sleep_for(std::chrono::milliseconds(3));
+                                          mem.grow(1u);
+                                      }
+                                  }};
 
-    std::thread grow_b{[&mem]()
-                       {
-                           for(int k = 0; k < 4; ++k)
-                           {
-                               std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                               mem.grow(1u);
-                           }
-                       }};
+    fast_io::native_thread grow_b{[&mem]()
+                                  {
+                                      for(int k = 0; k < 4; ++k)
+                                      {
+                                          std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                                          mem.grow(1u);
+                                      }
+                                  }};
 
     // Concurrent readers repeatedly reading stable cells
-    std::vector<std::thread> readers;
+    std::vector<fast_io::native_thread> readers;
     readers.reserve(reader_threads);
     for(unsigned i = 0; i < reader_threads; ++i)
     {

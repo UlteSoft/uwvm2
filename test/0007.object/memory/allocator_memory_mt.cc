@@ -65,7 +65,7 @@ int main()
     std::atomic<unsigned> mismatch_count{0u};
 
     // grow thread to interleave with reads
-    std::thread grow_thread{[&mem]()
+    fast_io::native_thread grow_thread{[&mem]()
                             {
                                 for(int k = 0; k < 4; ++k)
                                 {
@@ -74,7 +74,7 @@ int main()
                                 }
                             }};
 
-    std::vector<std::thread> threads;
+    std::vector<fast_io::native_thread> threads;
     threads.reserve(thread_count);
 
     for(unsigned i = 0; i < thread_count; ++i)
