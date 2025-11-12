@@ -352,7 +352,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		local test_libfuzzer = get_config("test-libfuzzer")
 
 		if is_libfuzzer then
-			if is_mode("debug") and get_config("use-llvm") and test_libfuzzer then
+			if get_config("use-llvm") and test_libfuzzer then
 				add_cxflags("-fsanitize=fuzzer", {force = true})
 				add_ldflags("-fsanitize=fuzzer", {force = true})
 				-- change the env variables in ci to change the default values
