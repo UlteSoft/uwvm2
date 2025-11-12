@@ -348,7 +348,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
 		set_warnings("all", "extra", "error")
 
-		local is_libfuzzer = (string.find(file, "test/0000.libfuzzer/", 1, true) ~= nil) or (string.find(file, "test\\0000.libfuzzer\\", 1, true) ~= nil)
+		local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or (string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
 		local test_libfuzzer = get_config("test-libfuzzer")
 
 		if is_libfuzzer then
