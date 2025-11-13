@@ -1,4 +1,4 @@
-﻿
+
 
 /*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
@@ -763,6 +763,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
             }
+
+#if CHAR_BIT != 8
+            for(auto curr{scatter_base}; curr != scatter_base + scatter_length; ++curr)
+            {
+                auto const curr_base{reinterpret_cast<::std::byte*>(curr->base)};
+                auto const curr_len{curr->len};
+                for(auto curr{curr_base}; curr != curr_base + curr_len; ++curr) { *curr = ::std::to_integer<unsigned>(*curr) & static_cast<unsigned>(0xFFu); }
+            }
+#endif
 
             // Verified: fposoffadd_scatters cannot produce negative values; it undergoes saturation handling during overflow.
             [[assume(total_bytes_read >= 0)]];

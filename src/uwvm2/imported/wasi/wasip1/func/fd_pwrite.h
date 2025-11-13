@@ -459,6 +459,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 curr_tmp_scatter_base.len = static_cast<::std::size_t>(wasm_len);
+
+#if CHAR_BIT != 8
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                auto const curr_tmp_scatter_base_base{reinterpret_cast<::std::byte const*>(curr_tmp_scatter_base.base)};
+                auto const curr_tmp_scatter_base_end{curr_tmp_scatter_base_base + curr_tmp_scatter_base.len};
+                for(auto curr{curr_tmp_scatter_base_base}; curr != curr_tmp_scatter_base_end; ++curr)
+                {
+                    if(::std::to_integer<unsigned>(*curr) & ~0xFFu != 0u) [[unlikely]]
+                    {
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                    }
+                }
+# endif
+#endif
             }
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
