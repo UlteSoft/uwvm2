@@ -87,13 +87,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
             }
         }
 
-        for(::std::size_t j{}; j <= y_length; j++) { d[j] = j; }
+        for(::std::size_t j{}; j <= y_length; ++j) { d[j] = j; }
 
-        for(::std::size_t i{1}; i <= x_length; i++)
+        for(::std::size_t i{1}; i <= x_length; ++i)
         {
             ::std::size_t old{i - 1uz};
             d[0uz] = i;
-            for(::std::size_t j{1uz}; j <= y_length; j++)
+            for(::std::size_t j{1uz}; j <= y_length; ++j)
             {
                 ::std::size_t const temp{d[j]};
                 if(x_str[i - 1] == y_str[j - 1uz]) { d[j] = old; }

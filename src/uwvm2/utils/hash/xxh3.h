@@ -480,7 +480,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
         }
 
         inline constexpr ::std::uint_least64_t xxh3_mix2_accs(::std::uint_least64_t const* __restrict acc, ::std::byte const* __restrict secret) noexcept
-        { return xxh3_mul128_fold64(acc[0u] ^ xxh_readLE64(secret), acc[1u] ^ xxh_readLE64(secret + 8u)); }
+        {
+            return xxh3_mul128_fold64(acc[0u] ^ xxh_readLE64(secret), acc[1u] ^ xxh_readLE64(secret + 8u));
+        }
 
         inline constexpr ::std::uint_least64_t
             xxh3_merge_accs(::std::uint_least64_t const* __restrict acc, ::std::byte const* __restrict secret, ::std::uint_least64_t start) noexcept
@@ -825,7 +827,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(UWVM_ENABLE_SME_SVE_STREAM_MODE) && defined(__ARM_FEATURE_SME)) && !defined(__ARM_FEATURE_SVE))
 
             // clang-format off
@@ -1088,7 +1090,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 auto xsecret_1{secret + xxh3_neon_lanes * sizeof(::std::uint64_t)};
                 using uint64_t_may_alias_ptr UWVM_GNU_MAY_ALIAS = ::std::uint64_t*;
                 auto xacc_1{reinterpret_cast<uint64_t_may_alias_ptr>(acc_64aligned)};
-                for(::std::size_t i{xxh3_neon_lanes}; i != 8uz; i++)
+                for(::std::size_t i{xxh3_neon_lanes}; i != 8uz; ++i)
                 {
                     auto const data_val{xxh_readLE64(xinput_1)};
                     xinput_1 += 8uz;
@@ -2165,7 +2167,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
     }  // namespace details
 
     inline constexpr ::std::uint_least64_t xxh3_64bits(::std::byte const* __restrict input, ::std::size_t len, ::std::uint_least64_t seed64 = 0u) noexcept
-    { return details::xxh3_64bits_internal(input, len, seed64, details::xxh3_kSecret, sizeof(details::xxh3_kSecret)); }
+    {
+        return details::xxh3_64bits_internal(input, len, seed64, details::xxh3_kSecret, sizeof(details::xxh3_kSecret));
+    }
 
     /// @brief xxh3 context class for incremental hashing
     struct xxh3_64bits_context

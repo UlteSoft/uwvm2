@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -163,10 +163,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
             {
 #if __cpp_contracts >= 202502L
                 contract_assert(counter != ::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>::max());
-                contract_assert(i == counter++);
+                contract_assert(i == counter);
+                ++counter;
 #else
                 if(counter == ::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>::max()) { ::fast_io::fast_terminate(); }
-                if(i != counter++) { ::fast_io::fast_terminate(); }
+                if(i != counter) { ::fast_io::fast_terminate(); }
+                ++counter;
 #endif
             }
         }

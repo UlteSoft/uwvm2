@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -322,7 +322,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     // Therefore, unsigned storage is used here to ensure that UB will never occur during subsequent increments, while also ensuring that all
                     // returns are signed. Converting unsigned to signed also does not cause any UB.
 
-                    index.index_unchecked(frame.v) = low.index_unchecked(frame.v) = static_cast<signed_size_t>(dfs_idx++);
+                    index.index_unchecked(frame.v) = low.index_unchecked(frame.v) = static_cast<signed_size_t>(dfs_idx);
+                    ++dfs_idx;
                     // st size < graph_size, so push_back_unchecked is safe
                     st.push_back_unchecked(frame.v);
                     on_stack.index_unchecked(frame.v) = true;

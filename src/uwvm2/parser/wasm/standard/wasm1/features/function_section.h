@@ -579,7 +579,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             return change_u8_1b_view_to_vec(sec_adl, module_storage, section_leb_begin, section_curr, section_end, err, fs_para, func_counter, func_count);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && (defined(__AVX512BW__) && (UWVM_HAS_BUILTIN(__builtin_ia32_ucmpb512_mask)))
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
+    (defined(__AVX512BW__) && (UWVM_HAS_BUILTIN(__builtin_ia32_ucmpb512_mask)))
         /// (Little Endian)
         /// x86_64-avx512bw
 
@@ -663,7 +664,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(section_curr) + 64u * 8u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__AVX__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz256)) || (defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xbnz_v)))
         /// (Little Endian), [[gnu::vector_size]]
         /// mask: x86_64-avx, loongarch-ASX
@@ -752,7 +753,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(section_curr) + 64u * 8u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)) ||                                                                                    \
      (defined(__ARM_NEON) && (UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32) || UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu))) ||                  \
      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_bnz_v)) ||                                                                                     \
@@ -1010,7 +1011,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             return change_u8_1b_view_to_vec(sec_adl, module_storage, section_leb_begin, section_curr, section_end, err, fs_para, func_counter, func_count);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     (defined(__AVX512BW__) && (UWVM_HAS_BUILTIN(__builtin_ia32_ucmpb512_mask) && UWVM_HAS_BUILTIN(__builtin_ia32_loaddquqi512_mask)))
         // avx512bw
 
@@ -1186,7 +1187,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         return section_curr;
     }
 
-#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                                \
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                             \
     (((defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb256)) && (defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128))) ||            \
      ((defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvmskltz_b)) && (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vshuf_b))) ||    \
      ((defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128) && UWVM_HAS_BUILTIN(__builtin_ia32_palignr128)) &&                                     \
@@ -1271,7 +1272,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
                 auto const shr{ctro + 1u};
 
-                for(unsigned j{}; j != shr; ++j) { ret[i].shuffle_mask[simd_counter * max_leb_size + j] = static_cast<::std::uint8_t>(j_counter++); }
+                for(unsigned j{}; j != shr; ++j)
+                {
+                    ret[i].shuffle_mask[simd_counter * max_leb_size + j] = static_cast<::std::uint8_t>(j_counter);
+                    ++j_counter;
+                }
 
                 bytes_remaining -= shr;
                 temp_i >>= shr;
@@ -1760,7 +1765,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
 # endif
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
     (defined(__AVX512VBMI__) && defined(__AVX512VBMI2__) && defined(__AVX512BW__) && defined(__AVX512F__))
         /// (Little Endian), [[gnu::vector_size]], has mask-u16, can shuffle, simd512
         /// x86_64-avx512vbmi2
@@ -2322,7 +2327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr) + 64u * 8u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
         ((defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb256) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb256)) &&                                  \
          (defined(__AVX__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz256))) ||                                                                                  \
     (defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvmskltz_b) && UWVM_HAS_BUILTIN(__builtin_lasx_xvshuf_b) &&                                   \
@@ -3702,7 +3707,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr) + 64u * 4u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
     (((defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128) && UWVM_HAS_BUILTIN(__builtin_ia32_palignr128)) &&                                     \
       (defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128))) ||                                                                                  \
      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vshuf_b) && UWVM_HAS_BUILTIN(__builtin_lsx_vsrli_b) &&                                         \
@@ -4384,7 +4389,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr) + 64u * 3u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)) ||                                                                                    \
      (defined(__ARM_NEON) && (UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32) || UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu))) ||                  \
      (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16))))
@@ -4947,7 +4952,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         }
 # endif
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
     (defined(__AVX512VBMI__) && defined(__AVX512VBMI2__) && defined(__AVX512BW__) && defined(__AVX512F__))
         /// (Little Endian), [[gnu::vector_size]], has mask-u16, can shuffle, simd512
         /// x86_64-avx512vbmi2
@@ -5647,7 +5652,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u16_vector.imp.curr_ptr) + 64u * (12u + 1u));
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
         ((defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb256) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb256)) &&                                  \
          (defined(__AVX__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz256))) ||                                                                                  \
     (defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvmskltz_b) && UWVM_HAS_BUILTIN(__builtin_lasx_xvshuf_b) &&                                   \
@@ -6961,7 +6966,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u16_vector.imp.curr_ptr) + 64u * 6u);
         }
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) &&                           \
     (((defined(__SSSE3__) && UWVM_HAS_BUILTIN(__builtin_ia32_pshufb128) && UWVM_HAS_BUILTIN(__builtin_ia32_palignr128)) &&                                     \
       (defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128))) ||                                                                                  \
      (defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_vshuf_b) && UWVM_HAS_BUILTIN(__builtin_lsx_vsrli_b) &&                                         \
@@ -7596,7 +7601,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                                             ::uwvm2::utils::intrinsics::universal::ret_policy::keep>(
                 reinterpret_cast<::std::byte const*>(functionsec.funcs.storage.typeidx_u16_vector.imp.curr_ptr) + 64u * 3u);
         }
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)) ||                                                                                    \
      (defined(__ARM_NEON) && (UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32) || UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu))) ||                  \
      (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16))))
