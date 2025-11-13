@@ -80,7 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
                   "double ain't of the IEC 559/IEEE 754 floating-point types");
 #endif
 
-    // not support yet
+    // Not Supported Yet
     /// @TODO: support float16_t, bfloat16_t, float80_t, float128_t
     
 #if 0

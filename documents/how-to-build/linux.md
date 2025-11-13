@@ -1,5 +1,25 @@
 # Linux
 
+## Prerequisites
+- Install toolchains and xmake using your distro's package manager:
+  - Debian/Ubuntu: `sudo apt install build-essential gcc g++ llvm clang xmake`
+  - Fedora/RHEL: `sudo dnf install gcc gcc-c++ llvm clang xmake`
+  - Arch: `sudo pacman -S base-devel gcc llvm clang xmake`
+
+## Examples
+```shell
+# GCC toolchain
+xmake f -m release
+xmake
+
+# LLVM/Clang toolchain
+xmake f -m release --use-llvm=y
+xmake
+
+# Install
+sudo xmake i -o /usr/local
+```
+
 ## Use GCC
 1. Install [[xmake]](https://github.com/xmake-io/xmake/)
 2. Install [[GCC]](git://gcc.gnu.org/git/gcc.git)

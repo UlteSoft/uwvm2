@@ -1,6 +1,28 @@
 # Darwin
 macosx, iphoneos, watchos, tvos
 
+## Prerequisites
+- Ensure Command Line Tools are available:
+  - `xcode-select --install`
+- Optional package manager: Homebrew
+  - Install LLVM: `brew install llvm`
+  - Install GCC: `brew install gcc`
+  - Install xmake: `brew install xmake`
+
+## Examples
+```shell
+# GCC toolchain (default)
+xmake f -m release
+xmake
+
+# LLVM/Clang toolchain
+xmake f -m release --use-llvm=y
+xmake
+
+# Install
+xmake i -o /usr/local
+```
+
 ## Use GCC
 1. Install [[xmake]](https://github.com/xmake-io/xmake/)
 2. Install [[GCC]](git://gcc.gnu.org/git/gcc.git)

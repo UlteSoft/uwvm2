@@ -1,5 +1,24 @@
 # FreeBSD
 
+## Prerequisites
+- Use pkg or ports:
+  - `pkg install xmake gcc llvm`
+  - or via ports: `/usr/ports/*`
+
+## Examples
+```shell
+# GCC toolchain
+xmake f -m release
+xmake
+
+# LLVM/Clang toolchain
+xmake f -m release --use-llvm=y
+xmake
+
+# Install
+xmake i -o /usr/local
+```
+
 ## Use GCC
 1. Install [[xmake]](https://github.com/xmake-io/xmake/)
 2. Install [[GCC]](git://gcc.gnu.org/git/gcc.git)
