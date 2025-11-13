@@ -135,7 +135,7 @@ namespace details
  *   - The returned path may differ from original open() argument due to symlinks or namespaces.
  */
 
-inline void portable_fd_path(int fd, char *buf, ::std::size_t bufsz)
+inline void portable_fd_path([[maybe_unused]] int fd, char *buf, ::std::size_t bufsz)
 {
 	if (buf == nullptr || bufsz == 0u) [[unlikely]]
 	{

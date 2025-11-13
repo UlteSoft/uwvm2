@@ -1,4 +1,4 @@
-if is_plat("wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads") then
+if is_plat("wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3","wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads") then
     -- Limited to i686, extended instruction set via march settings
     set_allowedarchs("wasm32", "wasm64")
 end
