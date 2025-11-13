@@ -30,6 +30,7 @@
 # include <concepts>
 # include <bit>
 // macro
+# include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/parser/wasm/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
@@ -197,4 +198,5 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/parser/wasm/feature/feature_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
 #endif
