@@ -36,8 +36,12 @@
 * Compilers (MSDOS-DJGPP Target): GCC >= 16
 
 ## WASM-WASI
-* Self‑hosted WASI builds for `wasm32` and `wasm64` (WASI p1–p3). Threads/shared memory are not supported; browser runtimes require an adapter. Build guide: [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
+* Self‑hosted WASI builds for `wasm32` and `wasm64` (WASI p1–p3). Threads/shared memory are not supported; browser runtimes require an adapter. Build guide: [wasm-wasi.md](how-to-build/wasm-wasi.md)
 * Compilers (WASM-WASI Target): LLVM Clang >= 21
+
+## WASM-Emscripten
+* Self‑hosted Emscripten builds for `wasm32` and `wasm64`. Build guide: [wasm-emscripten.md](how-to-build/wasm-emscripten.md)
+* Compilers: Emscripten >= 2.0.18 with Emscripten LLVM Clang >= 21
 
 ## Host C Library Environment
 * This project's Newlib build does not provide executable binaries, offering only linkable object files and libraries for flexible integration within higher-level systems or plugin frameworks. It does not support wasi and only supports plugins using weak symbol extensions.
