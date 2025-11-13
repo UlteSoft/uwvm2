@@ -65,6 +65,7 @@
 #pragma pop_macro("UWVM_STDCALL")
 #pragma pop_macro("UWVM_DLL_DLLIMPORT")
 #pragma pop_macro("UWVM_DLLIMPORT")
+#pragma pop_macro("UWVM_HAS_CPP_ATTRIBUTE")
 
 /// @brief      std and windows.h macros
 #pragma pop_macro("refresh")

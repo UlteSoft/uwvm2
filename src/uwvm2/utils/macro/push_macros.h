@@ -61,6 +61,16 @@
 
 /// @brief        uwvm's macros
 
+/// @brief        __has_cpp_attribute
+/// @details      __has_cpp_attribute is not provided by standard cpp, avoid using __has_cpp_attribute on unsupport compiler
+#pragma push_macro("UWVM_HAS_CPP_ATTRIBUTE")
+#undef UWVM_HAS_CPP_ATTRIBUTE
+#ifdef __has_cpp_attribute
+# define UWVM_HAS_CPP_ATTRIBUTE(...) __has_cpp_attribute(__VA_ARGS__)
+#else
+# define UWVM_HAS_CPP_ATTRIBUTE(...) 0
+#endif
+
 /// @brief        import func from dll
 /// @details      on msvc: __declspec(dllimport)
 ///               on gcc, clang [[__gnu__::__dllimport__]]
