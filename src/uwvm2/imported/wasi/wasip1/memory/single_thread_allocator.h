@@ -415,9 +415,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
         check_memory_bounds_unlocked(memory, offset, wasm_bytes);
 
         ::std::memcpy(begin, memory.memory_begin + offset, wasm_bytes);
-
+        
 #if CHAR_BIT != 8
-        for(auto curr{begin}; curr != end; ++curr) { *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu); }
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            auto const v{::std::to_integer<unsigned>(*curr)};
+            if((v & static_cast<unsigned>(~0xFFu)) != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+        }
+# endif
 #endif
     }
 
@@ -934,7 +940,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
         ::std::memcpy(begin, memory.memory_begin + offset, wasm_bytes);
 
 #if CHAR_BIT != 8
-        for(auto curr{begin}; curr != end; ++curr) { *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu); }
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            auto const v{::std::to_integer<unsigned>(*curr)};
+            if((v & static_cast<unsigned>(~0xFFu)) != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+        }
+# endif
 #endif
     }
 

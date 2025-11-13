@@ -1,4 +1,4 @@
-
+﻿
 /*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
@@ -227,7 +227,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         if constexpr(::std::integral<WasmType>)
         {
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{};  // no init required
 
@@ -241,7 +241,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
             }
 
             return static_cast<WasmType>(u);
-#else
+# else
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u;  // no init required
 
@@ -252,7 +252,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
             u = ::fast_io::little_endian(u);
 
             return static_cast<WasmType>(u);
-#endif
+# endif
         }
         else
         {
@@ -378,10 +378,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
         constexpr auto wasm_bytes{sizeof(WasmType)};
 
         check_memory_bounds_unlocked(memory, offset, wasm_bytes);
-        
+
         if constexpr(::std::integral<WasmType>)
         {
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{static_cast<unsigned_wasm_type>(value)};
 
@@ -393,7 +393,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                 ++memory_curr;
                 u >>= 8u;
             }
-#else
+# else
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{static_cast<unsigned_wasm_type>(value)};
 
@@ -401,7 +401,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
             // never overflow
             ::std::memcpy(memory.memory_begin + offset, ::std::addressof(u), sizeof(u));
-#endif
+# endif
         }
         else
         {
@@ -536,9 +536,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         ::std::memcpy(begin, memory.memory_begin + offset, wasm_bytes);
 
-#if CHAR_BIT != 8
-        for(auto curr{begin}; curr != end; ++curr) { *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu); }
-#endif
+# if CHAR_BIT != 8
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            auto const v{::std::to_integer<unsigned>(*curr)};
+            if((v & static_cast<unsigned>(~0xFFu)) != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+        }
+#  endif
+# endif
     }
 
     template <typename Alloc>
@@ -673,14 +679,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         ::std::memcpy(memory.memory_begin + offset, begin, wasm_bytes);
 
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
         auto const memory_write_begin{memory.memory_begin + offset};
         auto const memory_write_end{memory_write_begin + wasm_bytes};
         for(auto curr{memory_write_begin}; curr != memory_write_end; ++curr)
         {
             *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu);
         }
-#endif
+# endif
     }
 
     template <typename Alloc>
@@ -930,7 +936,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         if constexpr(::std::integral<WasmType>)
         {
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{};  // no init required
 
@@ -944,7 +950,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
             }
 
             return static_cast<WasmType>(u);
-#else
+# else
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u;  // no init required
 
@@ -955,7 +961,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
             u = ::fast_io::little_endian(u);
 
             return static_cast<WasmType>(u);
-#endif
+# endif
         }
         else
         {
@@ -1082,7 +1088,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         if constexpr(::std::integral<WasmType>)
         {
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{static_cast<unsigned_wasm_type>(value)};
 
@@ -1094,7 +1100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                 ++memory_curr;
                 u >>= 8u;
             }
-#else
+# else
             using unsigned_wasm_type = ::std::make_unsigned_t<WasmType>;
             unsigned_wasm_type u{static_cast<unsigned_wasm_type>(value)};
 
@@ -1102,7 +1108,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
             // never overflow
             ::std::memcpy(memory.memory_begin + offset, ::std::addressof(u), sizeof(u));
-#endif
+# endif
         }
         else
         {
@@ -1237,9 +1243,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         ::std::memcpy(begin, memory.memory_begin + offset, wasm_bytes);
 
-#if CHAR_BIT != 8
-        for(auto curr{begin}; curr != end; ++curr) { *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu); }
-#endif
+# if CHAR_BIT != 8
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            auto const v{::std::to_integer<unsigned>(*curr)};
+            if((v & static_cast<unsigned>(~0xFFu)) != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+        }
+#  endif
+# endif
     }
 
     template <typename Alloc>
@@ -1372,14 +1384,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
         ::std::memcpy(memory.memory_begin + offset, begin, wasm_bytes);
 
-#if CHAR_BIT != 8
+# if CHAR_BIT != 8
         auto const memory_write_begin{memory.memory_begin + offset};
         auto const memory_write_end{memory_write_begin + wasm_bytes};
         for(auto curr{memory_write_begin}; curr != memory_write_end; ++curr)
         {
             *curr = static_cast<::std::byte>(::std::to_integer<::std::uint_least8_t>(*curr) & 0xFFu);
         }
-#endif
+# endif
     }
 
     template <typename Alloc>
