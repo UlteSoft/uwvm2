@@ -47,10 +47,25 @@
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
 {
 #if CHAR_BIT > 8
-# error                                                                                                                                                        \
-     "Although the design of the uwvm2 component takes into account cases where CHAR_BIT is not equal to 8, " \
-     "gcc llvm currently does not support any platforms where CHAR_BIT is not equal to 8. Therefore, support for this feature is not provided here. " \
-     "If you have a specific need for this functionality, you may remove the error message, test it yourself, and submit a pull request."
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wcpp"
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wcpp"
+# endif
+
+# warning                                                                                                                                                      \
+     "The uwvm2 parser design accommodates platforms with non-8-bit CHAR_BIT values, such as certain DSP architectures. "                                      \
+     "However, during parsing, it is essential to ensure that all non-least-8 bits in the entire WASM file are set to zero. "                                  \
+     "Failure to do so may cause the parser to malfunction."
+
+// Pop warning pragmas
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic pop
+# endif
 #endif
 
     struct empty_t

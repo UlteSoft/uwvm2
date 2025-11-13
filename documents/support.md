@@ -51,7 +51,7 @@
 
 ## Freestanding Environment
 * Freestanding support is only partially implemented for specific modules, such as the parser and interpreter components.
-* Platforms where `CHAR_BIT` is not equal to 8 are not currently supported.
+* Currently supports platforms where `CHAR_BIT` is not equal to 8. However, before using the parser, you must normalize the WASM file by clearing all non-least-8-bit content of its bytes and setting them to zero.
 * This platform’s C++ runtime environment requires developers to explicitly define a custom memory allocator concept to fulfill the requirements of the C++ Heap Abstract Machine.
 The system does not provide a default global allocator; instead, it delegates all heap allocation behavior to user-defined implementations through the `fast_io::custom_global_allocator` interface.
 * ELF file-format: unknown-unknown-elf
