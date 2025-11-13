@@ -665,7 +665,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
         inline constexpr void
             xxh3_accumulate_512(::std::byte* __restrict acc, ::std::byte const* __restrict input, ::std::byte const* __restrict secret) noexcept
         {
-#if __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512F__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512F__)
             using i64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::int64_t;
             using u64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::uint64_t;
             using u32x16simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::uint32_t;
@@ -722,7 +722,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 
             *xacc = ::std::bit_cast<u8x64simd>(::std::bit_cast<u64x8simd>(product) + ::std::bit_cast<u64x8simd>(sum));
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX2__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX2__)
 
             using i64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::int64_t;
             using u64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::uint64_t;
@@ -775,7 +775,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSE2__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSE2__)
             using i64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::int64_t;
             using u64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::uint64_t;
             using u32x4simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::uint32_t;
@@ -825,7 +825,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                           \
     ((defined(UWVM_ENABLE_SME_SVE_STREAM_MODE) && defined(__ARM_FEATURE_SME)) && !defined(__ARM_FEATURE_SVE))
 
             // clang-format off
@@ -914,7 +914,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 
 // clang-format on
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_FEATURE_SVE)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_FEATURE_SVE)
 
             auto const acc_64aligned{::std::assume_aligned<xxh3_max_align_len>(acc)};
             auto xacc{reinterpret_cast<::std::uint64_t*>(acc_64aligned)};
@@ -1005,7 +1005,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ::uwvm2::utils::intrinsics::arm_sve::svst1_u64(mask, xacc + 4u, acc1);
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON)
 
 # if defined(__clang__)
             using uint64x2_t = ::std::uint64_t [[clang::neon_vector_type(2)]];
@@ -1221,7 +1221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 xacc[i] = xacc[i] + sum;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_asx)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_asx)
 
             /// @todo need test
 
@@ -1286,7 +1286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_sx)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_sx)
 
             /// @todo need test
 
@@ -1348,7 +1348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__wasm_simd128__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__wasm_simd128__)
 
             using i64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::int64_t;
             using u64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::uint64_t;
@@ -1460,7 +1460,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 
         inline constexpr void xxh3_scramble_acc(::std::byte* __restrict acc, ::std::byte const* __restrict secret) noexcept
         {
-#if __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512F__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512F__)
 
             using i64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::int64_t;
             using u64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::uint64_t;
@@ -1549,7 +1549,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 # endif
                                                           );
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX2__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX2__)
 
             using i64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::int64_t;
             using u64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::uint64_t;
@@ -1629,7 +1629,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSE2__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__SSE2__)
 
             using i64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::int64_t;
             using u64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::uint64_t;
@@ -1705,7 +1705,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__ARM_NEON)
 
 # if defined(__clang__)
     using uint64x2_t = ::std::uint64_t [[clang::neon_vector_type(2)]];
@@ -1838,7 +1838,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
         ++xacc;
     }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_asx)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_asx)
             /// @todo need test
 
             using i64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::int64_t;
@@ -1910,7 +1910,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_sx)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__loongarch_sx)
 
             /// @todo need test
 
@@ -1983,7 +1983,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 ++xacc;
             }
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__wasm_simd128__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__wasm_simd128__)
 
             using i64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::int64_t;
             using u64x2simd [[__gnu__::__vector_size__(16)]] [[maybe_unused]] = ::std::uint64_t;

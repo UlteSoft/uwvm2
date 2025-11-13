@@ -292,7 +292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
         }
         else
         {
-#if __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512BW__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && defined(__AVX512BW__)
 
             using i64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::int64_t;
             using u64x8simd [[__gnu__::__vector_size__(64)]] [[maybe_unused]] = ::std::uint64_t;
@@ -1125,7 +1125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && (defined(__AVX2__) || defined(__loongarch_asx))
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && (defined(__AVX2__) || defined(__loongarch_asx))
             // Same algorithm as simdutf
 
             using i64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::std::int64_t;
@@ -1908,7 +1908,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) && defined(__LITTLE_ENDIAN__) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) && defined(__LITTLE_ENDIAN__) &&                              \
     (defined(__SSSE3__) || defined(__ARM_NEON) || defined(__loongarch_sx))
 
             // Same algorithm as simdutf
@@ -2652,7 +2652,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
 
-#elif __has_cpp_attribute(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && (defined(__SSE2__) || defined(__wasm_simd128__))
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) && (defined(__SSE2__) || defined(__wasm_simd128__))
 
             // Algorithm author MacroModel
 

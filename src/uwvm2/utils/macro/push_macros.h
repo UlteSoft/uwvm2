@@ -78,7 +78,7 @@
 #undef UWVM_DLLIMPORT
 #if defined(_MSC_VER) && !defined(__clang__)
 # define UWVM_DLLIMPORT __declspec(dllimport)
-#elif __has_cpp_attribute(__gnu__::__dllimport__) && !defined(__WINE__) && !defined(__arm64ec__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__dllimport__) && !defined(__WINE__) && !defined(__arm64ec__)
 # define UWVM_DLLIMPORT [[__gnu__::__dllimport__]]
 #else
 # define UWVM_DLLIMPORT
@@ -102,9 +102,9 @@
 ///               on gcc, clang: __attribute__((__stdcall__))
 #pragma push_macro("UWVM_STDCALL")
 #undef UWVM_STDCALL
-#if defined(_MSC_VER) && (!__has_cpp_attribute(__gnu__::__stdcall__) && !defined(__WINE__))
+#if defined(_MSC_VER) && (!UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__stdcall__) && !defined(__WINE__))
 # define UWVM_STDCALL __stdcall
-#elif (__has_cpp_attribute(__gnu__::__stdcall__) && !defined(__WINE__))
+#elif (UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__stdcall__) && !defined(__WINE__))
 # define UWVM_STDCALL __attribute__((__stdcall__))
 #else
 # define UWVM_STDCALL
@@ -114,9 +114,9 @@
 /// @see          UWVM_STDCALL
 #pragma push_macro("UWVM_WINSTDCALL")
 #undef UWVM_WINSTDCALL
-#if defined(_MSC_VER) && (!__has_cpp_attribute(__gnu__::__stdcall__) && !defined(__WINE__))
+#if defined(_MSC_VER) && (!UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__stdcall__) && !defined(__WINE__))
 # define UWVM_WINSTDCALL __stdcall
-#elif (__has_cpp_attribute(__gnu__::__stdcall__) && !defined(__WINE__))
+#elif (UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__stdcall__) && !defined(__WINE__))
 # define UWVM_WINSTDCALL __attribute__((__stdcall__))
 #else
 # define UWVM_WINSTDCALL
@@ -152,9 +152,9 @@
 ///               on gcc, clang: __attribute__((__cdecl__))
 #pragma push_macro("UWVM_WINCDECL")
 #undef UWVM_WINCDECL
-#if defined(_MSC_VER) && (!__has_cpp_attribute(__gnu__::__cdecl__) && !defined(__WINE__))
+#if defined(_MSC_VER) && (!UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__cdecl__) && !defined(__WINE__))
 # define UWVM_WINCDECL __cdecl
-#elif (__has_cpp_attribute(__gnu__::__cdecl__) && !defined(__WINE__))
+#elif (UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__cdecl__) && !defined(__WINE__))
 # define UWVM_WINCDECL __attribute__((__cdecl__))
 #else
 # define UWVM_WINCDECL
@@ -192,9 +192,9 @@
 ///               on gcc, clang: __attribute__((__fastcall__))
 #pragma push_macro("UWVM_WINFASTCALL")
 #undef UWVM_WINFASTCALL
-#if defined(_MSC_VER) && (!__has_cpp_attribute(__gnu__::__fastcall__) && !defined(__WINE__))
+#if defined(_MSC_VER) && (!UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__) && !defined(__WINE__))
 # define UWVM_WINFASTCALL __fastcall
-#elif (__has_cpp_attribute(__gnu__::__fastcall__) && !defined(__WINE__))
+#elif (UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__) && !defined(__WINE__))
 # define UWVM_WINFASTCALL __attribute__((__fastcall__))
 #else
 # define UWVM_WINFASTCALL
@@ -226,7 +226,7 @@
 /// @details      on gcc, clang: [[__gnu__::__const__]]
 #pragma push_macro("UWVM_GNU_CONST")
 #undef UWVM_GNU_CONST
-#if __has_cpp_attribute(__gnu__::__const__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__const__)
 # define UWVM_GNU_CONST [[__gnu__::__const__]]
 #else
 # define UWVM_GNU_CONST
@@ -237,7 +237,7 @@
 /// @details      on gcc, clang: [[__gnu__::__pure__]]
 #pragma push_macro("UWVM_GNU_PURE")
 #undef UWVM_GNU_PURE
-#if __has_cpp_attribute(__gnu__::__pure__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__pure__)
 # define UWVM_GNU_PURE [[__gnu__::__pure__]]
 #else
 # define UWVM_GNU_PURE
@@ -250,9 +250,9 @@
 ///               on msvc: [[msvc::forceinline]]
 #pragma push_macro("UWVM_ALWAYS_INLINE")
 #undef UWVM_ALWAYS_INLINE
-#if __has_cpp_attribute(__gnu__::__always_inline__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__always_inline__)
 # define UWVM_ALWAYS_INLINE [[__gnu__::__always_inline__]]
-#elif __has_cpp_attribute(msvc::forceinline)
+#elif UWVM_HAS_CPP_ATTRIBUTE(msvc::forceinline)
 # define UWVM_ALWAYS_INLINE [[msvc::forceinline]]
 #else
 # define UWVM_ALWAYS_INLINE
@@ -263,7 +263,7 @@
 /// @details      on gcc, clang: [[__gnu__::__artificial__]]
 #pragma push_macro("UWVM_GNU_ARTIFICIAL")
 #undef UWVM_GNU_ARTIFICIAL
-#if __has_cpp_attribute(__gnu__::__artificial__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__artificial__)
 # define UWVM_GNU_ARTIFICIAL [[__gnu__::__artificial__]]
 #else
 # define UWVM_GNU_ARTIFICIAL
@@ -290,7 +290,7 @@
 /// @details      on gcc, clang: [[__gnu__::__malloc__]]
 #pragma push_macro("UWVM_GNU_MALLOC")
 #undef UWVM_GNU_MALLOC
-#if __has_cpp_attribute(__gnu__::__malloc__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__malloc__)
 # define UWVM_GNU_MALLOC [[__gnu__::__malloc__]]
 #else
 # define UWVM_GNU_MALLOC
@@ -300,7 +300,7 @@
 /// @details      on gcc, clang: [[__gnu__::__returns_nonnull__]]
 #pragma push_macro("UWVM_GNU_RETURNS_NONNULL")
 #undef UWVM_GNU_RETURNS_NONNULL
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__returns_nonnull__)
 # define UWVM_GNU_RETURNS_NONNULL [[__gnu__::__returns_nonnull__]]
 #else
 # define UWVM_GNU_RETURNS_NONNULL
@@ -383,7 +383,7 @@
 /// @details      on gcc, clang: [[__gnu__::__cold__]]
 #pragma push_macro("UWVM_GNU_COLD")
 #undef UWVM_GNU_COLD
-#if __has_cpp_attribute(__gnu__::__cold__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__cold__)
 # define UWVM_GNU_COLD [[__gnu__::__cold__]]
 #else
 # define UWVM_GNU_COLD
@@ -393,7 +393,7 @@
 /// @details      on gcc, clang: [[__gnu__::__hot__]]
 #pragma push_macro("UWVM_GNU_HOT")
 #undef UWVM_GNU_HOT
-#if __has_cpp_attribute(__gnu__::__hot__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__hot__)
 # define UWVM_GNU_HOT [[__gnu__::__hot__]]
 #else
 # define UWVM_GNU_HOT
@@ -435,7 +435,7 @@
 ///               on msvc: MSVC does not enable strict aliasing rules by default, so aliasing between pointers of different types is usually allowed.
 #pragma push_macro("UWVM_GNU_MAY_ALIAS")
 #undef UWVM_GNU_MAY_ALIAS
-#if __has_cpp_attribute(__gnu__::__may_alias__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__may_alias__)
 # define UWVM_GNU_MAY_ALIAS [[__gnu__::__may_alias__]]
 #else
 # define UWVM_GNU_MAY_ALIAS
@@ -476,7 +476,7 @@
 /// @details      __gnu__::__used__
 #pragma push_macro("UWVM_GNU_USED")
 #undef UWVM_GNU_USED
-#if __has_cpp_attribute(__gnu__::__used__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__used__)
 # define UWVM_GNU_USED [[__gnu__::__used__]]
 #else
 # define UWVM_GNU_USED
@@ -486,7 +486,7 @@
 /// @details      on gcc, clang: [[__gnu__::__nodebug__]]
 #pragma push_macro("UWVM_GNU_NODEBUG")
 #undef UWVM_GNU_NODEBUG
-#if __has_cpp_attribute(__gnu__::__nodebug__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__nodebug__)
 # define UWVM_GNU_NODEBUG [[__gnu__::__nodebug__]]
 #else
 # define UWVM_GNU_NODEBUG
@@ -498,9 +498,9 @@
 ///          in advance. Platforms that do not support musttail add a warning to indicate that the optimization must be turned on.
 #pragma push_macro("UWVM_MUSTTAIL")
 #undef UWVM_MUSTTAIL
-#if __has_cpp_attribute(clang::musttail)
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::musttail)
 # define UWVM_MUSTTAIL [[clang::musttail]]
-#elif __has_cpp_attribute(__gnu__::__musttail__)
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__musttail__)
 # define UWVM_MUSTTAIL [[__gnu__::__musttail__]]
 #else
 # define UWVM_MUSTTAIL
@@ -543,7 +543,7 @@
 /// @brief        Suppress All Sanitizers for a function
 #pragma push_macro("UWVM_NO_SANITIZE")
 #undef UWVM_NO_SANITIZE
-#if __has_cpp_attribute(__gnu__::__no_sanitize__)  // Clang, GCC
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__no_sanitize__)  // Clang, GCC
 # define UWVM_NO_SANITIZE [[__gnu__::__no_sanitize__("all")]]
 #else
 # define UWVM_NO_SANITIZE

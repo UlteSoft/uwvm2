@@ -48,7 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     ///             single instruction multiple data).
     ///             This is only used for storage and will be converted to the type used for computation during computation depending on platform support
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 2.3.2
-#if __has_cpp_attribute(__gnu__::__vector_size__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)
     using wasm_v128 [[__gnu__::__vector_size__(16)]] = char;
 #elif CHAR_BIT > 8
     struct alignas(16uz) wasm_v128
