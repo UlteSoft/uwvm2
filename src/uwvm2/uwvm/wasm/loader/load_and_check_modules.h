@@ -510,7 +510,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
-            auto const cycles{detect_cycles(dependency_graph)};
+            auto const cycles{::uwvm2::uwvm::wasm::loader::detect_cycles(dependency_graph)};
 
             // Output cyclic dependency warnings
             if(!cycles.empty()) [[unlikely]]

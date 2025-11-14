@@ -26,6 +26,5 @@
 # include "parser.h"
 # include "params.h"
 # include "winnt_code_cvt.h"
-# include "callback.h"
 #endif
 

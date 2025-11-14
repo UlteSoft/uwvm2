@@ -29,6 +29,7 @@
 #ifndef UWVM_MODULE
 # include <fast_io.h>
 # include <uwvm2/uwvm/wasm/impl.h>
+# include <uwvm2/uwvm/cmdline/callback/impl.h>
 #else
 # error "Module testing is not currently supported"
 #endif

@@ -42,6 +42,8 @@ import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.run;
 import uwvm2.uwvm.crtmain.global;
+// callback
+import uwvm2.uwvm.cmdline.callback;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

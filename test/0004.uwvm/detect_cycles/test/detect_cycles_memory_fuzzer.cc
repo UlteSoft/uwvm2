@@ -18,14 +18,13 @@
  *  \___/    \_/\_/      \_/   |_|  |_| *
  *                                      *
  ****************************************/
-
-#include <uwvm2/utils/container/impl.h>
-#include <uwvm2/uwvm/utils/ansies/impl.h>
-#include <uwvm2/uwvm/wasm/loader/detect_cycle.h>
-#include <uwvm2/uwvm/wasm/loader/load_and_check_modules.h>
 #include <fast_io.h>
 #include <random>
 #include <algorithm>
+#include <uwvm2/utils/container/impl.h>
+#include <uwvm2/uwvm/utils/ansies/impl.h>
+#include <uwvm2/uwvm/wasm/loader/impl.h>
+#include <uwvm2/uwvm/cmdline/callback/impl.h>
 
 // Define color constants if not already defined
 #ifndef UWVM_COLOR_U8_RED

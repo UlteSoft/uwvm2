@@ -26,7 +26,6 @@ export module uwvm2.uwvm.cmdline;
 export import :parser;
 export import :params;
 export import :winnt_code_cvt;
-export import :callback;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

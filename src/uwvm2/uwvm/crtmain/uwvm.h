@@ -42,6 +42,8 @@
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/run/impl.h>
 # include <uwvm2/uwvm/crtmain/global/impl.h>
+// callback
+# include <uwvm2/uwvm/cmdline/callback/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT

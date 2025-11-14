@@ -20,8 +20,8 @@
  ****************************************/
 
 #include <uwvm2/utils/container/impl.h>
-#include <uwvm2/uwvm/wasm/loader/detect_cycle.h>
-#include <uwvm2/uwvm/wasm/loader/load_and_check_modules.h>
+#include <uwvm2/uwvm/wasm/loader/impl.h>
+#include <uwvm2/uwvm/cmdline/callback/impl.h>
 
 using namespace uwvm2::utils::container;
 using uwvm2::uwvm::wasm::loader::detect_cycles;
