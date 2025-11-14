@@ -293,6 +293,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 17uz /*ERROR_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     case 80uz /*ERROR_FILE_EXISTS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
                     case 4390uz /*ERROR_NOT_A_REPARSE_POINT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case 145uz /*ERROR_DIR_NOT_EMPTY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -324,7 +325,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 0xC0000011uz /* STATUS_END_OF_FILE */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                     case 0xC0000013uz /* STATUS_NO_MEDIA_IN_DEVICE */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent;
                     case 0xC000000Euz /* STATUS_NO_SUCH_DEVICE */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent;
-                    case 0xC0000101uz /* STATUS_DIRECTORY_NOT_EMPTY */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty;
                     case 0xC0000281uz /* STATUS_DIRECTORY_IS_A_REPARSE_POINT */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                     case 0xC00000BAuz /* STATUS_FILE_IS_A_DIRECTORY */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                     case 0xC000009Auz /* STATUS_INSUFFICIENT_RESOURCES */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enomem;
@@ -339,6 +339,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 0xC00000D4uz /*STATUS_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     case 0xC000011Fuz /*STATUS_TOO_MANY_OPEN_FILES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile;
                     case 0xC0000275uz /*STATUS_NOT_A_REPARSE_POINT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case 0xC0000101uz /* STATUS_DIRECTORY_NOT_EMPTY */: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -422,6 +423,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 # if defined(ENFILE)
             case ENFILE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enfile;
+# endif
+# if defined(ENOTEMPTY)
+            case ENOTEMPTY: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty;
 # endif
             default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
