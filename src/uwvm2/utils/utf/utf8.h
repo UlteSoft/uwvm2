@@ -1908,7 +1908,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
 
-#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) && defined(__LITTLE_ENDIAN__) &&                              \
+#elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && UWVM_HAS_BUILTIN(__builtin_shufflevector) && defined(__LITTLE_ENDIAN__) &&                           \
     (defined(__SSSE3__) || defined(__ARM_NEON) || defined(__loongarch_sx))
 
             // Same algorithm as simdutf

@@ -358,12 +358,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     try
 #  endif
                     {
-                        this->memory_begin = ::fast_io::details::sys_mmap(nullptr,
-                                                                          max_space,
-                                                                          PROT_NONE,
-                                                                          mmap_flags,
-                                                                          -1,
-                                                                          0u);
+                        this->memory_begin = ::fast_io::details::sys_mmap(nullptr, max_space, PROT_NONE, mmap_flags, -1, 0u);
                     }
 #  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error)

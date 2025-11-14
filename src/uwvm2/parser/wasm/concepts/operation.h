@@ -436,49 +436,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
                 bool is_repeatable{};
                 return [&is_repeatable, &repeating]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
                 {
-                    auto ret {
-                        ((
-                             [&is_repeatable, &repeating]<typename ArgCurr>() constexpr noexcept
-                             {
-                                 static_assert(!::std::same_as<typename ArgCurr::superseded, typename ArgCurr::replacement>);
+                    auto ret{((
+                                  [&is_repeatable, &repeating]<typename ArgCurr>() constexpr noexcept
+                                  {
+                                      static_assert(!::std::same_as<typename ArgCurr::superseded, typename ArgCurr::replacement>);
 
-                                 // check irreplaceable
-                                 if constexpr(::std::same_as<typename ArgCurr::superseded, irreplaceable_t1> ||
-                                              ::std::same_as<typename ArgCurr::superseded, irreplaceable_t2> || ::std::same_as<Superseded, irreplaceable_t1> ||
-                                              ::std::same_as<Superseded, irreplaceable_t2>)
-                                 {
-                                     return type_wrapper<void>{};
-                                 }
+                                      // check irreplaceable
+                                      if constexpr(::std::same_as<typename ArgCurr::superseded, irreplaceable_t1> ||
+                                                   ::std::same_as<typename ArgCurr::superseded, irreplaceable_t2> ||
+                                                   ::std::same_as<Superseded, irreplaceable_t1> || ::std::same_as<Superseded, irreplaceable_t2>)
+                                      {
+                                          return type_wrapper<void>{};
+                                      }
 
-                                 if constexpr(::std::same_as<typename ArgCurr::superseded, Superseded>)
-                                 {
+                                      if constexpr(::std::same_as<typename ArgCurr::superseded, Superseded>)
+                                      {
 #if __cpp_contracts >= 202502L
-                                     contract_assert(!is_repeatable && !repeating[I]);
+                                          contract_assert(!is_repeatable && !repeating[I]);
 #else
-                                     if(is_repeatable)
-                                     {
-                                         // Prohibition of duplicate substitutions
-                                         // a -> b, a -> c X
-                                         ::fast_io::fast_terminate();
-                                     }
-                                     if(repeating[I])
-                                     {
-                                         // Type Loop
-                                         ::fast_io::fast_terminate();
-                                     }
+                                          if(is_repeatable)
+                                          {
+                                              // Prohibition of duplicate substitutions
+                                              // a -> b, a -> c X
+                                              ::fast_io::fast_terminate();
+                                          }
+                                          if(repeating[I])
+                                          {
+                                              // Type Loop
+                                              ::fast_io::fast_terminate();
+                                          }
 #endif
-                                     repeating[I] = true;
-                                     using replacement = typename ArgCurr::replacement;
-                                     is_repeatable = true;
-                                     return replacement_structure_followup_impl<T, replacement, Args...>(repeating);
-                                 }
-                                 else
-                                 {
-                                     return type_wrapper<void>{};
-                                 }
-                             }.template operator()<Args...[I]>()),  // This is an overloaded comma expression
-                         ...)
-                    };
+                                          repeating[I] = true;
+                                          using replacement = typename ArgCurr::replacement;
+                                          is_repeatable = true;
+                                          return replacement_structure_followup_impl<T, replacement, Args...>(repeating);
+                                      }
+                                      else
+                                      {
+                                          return type_wrapper<void>{};
+                                      }
+                                  }.template operator()<Args...[I]>()),  // This is an overloaded comma expression
+                              ...)};
                     using rettype = decltype(ret);
                     if constexpr(::std::same_as<rettype, type_wrapper<void>>)
                     {

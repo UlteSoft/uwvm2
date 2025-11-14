@@ -415,7 +415,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
         check_memory_bounds_unlocked(memory, offset, wasm_bytes);
 
         ::std::memcpy(begin, memory.memory_begin + offset, wasm_bytes);
-        
+
 #if CHAR_BIT != 8
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         for(auto curr{begin}; curr != end; ++curr)

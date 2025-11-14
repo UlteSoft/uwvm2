@@ -82,7 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::precfloat
 
     // Not Supported Yet
     /// @TODO: support float16_t, bfloat16_t, float80_t, float128_t
-    
+
 #if 0
     // =============================
     // float16_t

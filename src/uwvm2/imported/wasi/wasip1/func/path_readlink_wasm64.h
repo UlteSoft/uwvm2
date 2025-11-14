@@ -295,7 +295,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // check memory bounds
         ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64(memory, buf_ptrsz, buf_len);
-        ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64(memory, buf_used_ptrsz, sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t));
+        ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64(memory,
+                                                                            buf_used_ptrsz,
+                                                                            sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t));
 
         // symlink symbol storage
         ::uwvm2::utils::container::u8string symlink_symbol{};

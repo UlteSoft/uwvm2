@@ -161,7 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         if constexpr((::std::same_as<wasm1, Fs> || ...))
         {
             // The code and function share the same limit.
-            
+
             auto const& wasm1_feapara_r{::uwvm2::parser::wasm::concepts::get_curr_feature_parameter<wasm1>(fs_para)};
             auto const& parser_limit{wasm1_feapara_r.parser_limit};
             if(static_cast<::std::size_t>(code_count) > parser_limit.max_code_sec_codes) [[unlikely]]

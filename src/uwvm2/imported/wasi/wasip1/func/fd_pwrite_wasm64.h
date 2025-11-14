@@ -412,10 +412,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 auto const curr_tmp_scatter_base_end{curr_tmp_scatter_base_base + curr_tmp_scatter_base.len};
                 for(auto curr{curr_tmp_scatter_base_base}; curr != curr_tmp_scatter_base_end; ++curr)
                 {
-                    if(::std::to_integer<unsigned>(*curr) & ~0xFFu != 0u) [[unlikely]]
-                    {
-                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-                    }
+                    if(::std::to_integer<unsigned>(*curr) & ~0xFFu != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                 }
 # endif
 #endif

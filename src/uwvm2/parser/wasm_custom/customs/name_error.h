@@ -93,7 +93,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
     union name_err_storage_t
     {
         exceed_the_max_name_parser_limit_t exceed_the_max_name_parser_limit;
-        static_assert(::std::is_trivially_copyable_v<exceed_the_max_name_parser_limit_t> && ::std::is_trivially_destructible_v<exceed_the_max_name_parser_limit_t>);
+        static_assert(::std::is_trivially_copyable_v<exceed_the_max_name_parser_limit_t> &&
+                      ::std::is_trivially_destructible_v<exceed_the_max_name_parser_limit_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

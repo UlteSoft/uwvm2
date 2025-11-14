@@ -292,7 +292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case 123uz /*ERROR_INVALID_NAME*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     case 17uz /*ERROR_NOT_SAME_DEVICE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::exdev;
                     case 80uz /*ERROR_FILE_EXISTS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
-                    case 4390uz /*ERROR_NOT_A_REPARSE_POINT*/ : return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    case 4390uz /*ERROR_NOT_A_REPARSE_POINT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 

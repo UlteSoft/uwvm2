@@ -44,8 +44,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool debug_test_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::cmdline::parameter_return_type debug_test_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
