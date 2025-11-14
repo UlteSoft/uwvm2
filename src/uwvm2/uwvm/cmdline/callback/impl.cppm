@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -19,10 +20,38 @@
  *                                      *
  ****************************************/
 
-import fast_io;
-import uwvm2.utils.cmdline;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.cmdline;
-import uwvm2.uwvm.cmdline.params;
+module;
 
-#include "debug_test.default.cpp"
+export module uwvm2.uwvm.cmdline.callback;
+// global
+export import :version;
+export import :help;
+export import :mode;
+
+// debug
+export import :debug_test;
+
+// wasm
+export import :wasm_set_main_module_name;
+export import :wasm_preload_library;
+export import :wasm_register_dl;
+export import :wasm_depend_recursion_limit;
+export import :wasm_set_parser_limit;
+
+// wasi
+export import :wasip1_set_fd_limit;
+export import :wasi_mount_dir;
+
+// log
+export import :log_output;
+export import :log_disable_warning;
+export import :log_convert_warn_to_fatal;
+
+#ifndef UWVM_MODULE
+# define UWVM_MODULE
+#endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "impl.h"

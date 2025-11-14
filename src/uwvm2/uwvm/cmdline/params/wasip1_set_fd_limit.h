@@ -43,9 +43,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool wasip1_set_fd_limit_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view wasip1_set_fd_limit_alias{u8"-Ifdlim"};
-        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type wasip1_set_fd_limit_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+            wasip1_set_fd_limit_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

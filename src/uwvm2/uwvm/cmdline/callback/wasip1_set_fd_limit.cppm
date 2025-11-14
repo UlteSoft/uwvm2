@@ -19,16 +19,36 @@
  *                                      *
  ****************************************/
 
+module;
+
+// std
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <cstdlib>
+#include <limits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.callback:wasip1_set_fd_limit;
+
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.utils.depend;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.cmdline.params;
-import uwvm2.uwvm.wasm.base;
-import uwvm2.uwvm.wasm.storage;
-import uwvm2.uwvm.wasm.loader;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
 
-#include "wasm_register_dl.default.cpp"
+#ifndef UWVM_MODULE
+# define UWVM_MODULE
+#endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "wasip1_set_fd_limit.h"

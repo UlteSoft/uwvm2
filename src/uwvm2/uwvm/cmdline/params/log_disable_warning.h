@@ -45,9 +45,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view log_disable_warning_alias{u8"-log-dw"};
-        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type log_disable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+            log_disable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

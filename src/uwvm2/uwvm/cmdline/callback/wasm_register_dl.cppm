@@ -19,6 +19,16 @@
  *                                      *
  ****************************************/
 
+module;
+
+// std
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.callback:wasm_register_dl;
+
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
@@ -27,5 +37,15 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.wasm.base;
+import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.wasm.loader;
 
-#include "log_disable_warning.default.cpp"
+#ifndef UWVM_MODULE
+# define UWVM_MODULE
+#endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "wasm_register_dl.h"

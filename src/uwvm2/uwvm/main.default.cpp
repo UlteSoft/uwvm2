@@ -28,6 +28,7 @@
 #ifndef UWVM_MODULE
 // import
 # include <uwvm2/uwvm/crtmain/impl.h>
+# include <uwvm2/uwvm/cmdline/callback/impl.h>
 #endif
 
 /// @brief      (crt) main func. The main function is a special function, but there are still meaningless [[gnu::used]].

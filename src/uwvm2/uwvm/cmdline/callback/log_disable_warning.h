@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-30
  * @copyright   APL-2.0 License
  */
 
@@ -20,15 +19,17 @@
  *                                      *
  ****************************************/
 
-// std
-#include <cstddef>
-#include <memory>
-#include <utility>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-// import
+#pragma once
+
 #ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <memory>
+# include <utility>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+// import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -39,12 +40,16 @@
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 #endif
 
-namespace uwvm2::uwvm::cmdline::params::details
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-    UWVM_GNU_COLD extern ::uwvm2::utils::cmdline::parameter_return_type
-        log_convert_warn_to_fatal_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type log_disable_warning_callback(
+        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)
@@ -76,7 +81,7 @@ namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_disable_warning),
                                 // print_usage comes with UWVM_COLOR_U8_RST_ALL
                                 u8"\n\n");
 
@@ -92,28 +97,28 @@ namespace uwvm2::uwvm::cmdline::params::details
 
         if(auto currp1_str{currp1->str}; currp1_str == u8"all")
         {
-            ::uwvm2::uwvm::io::vm_warning_fatal = true;
-            ::uwvm2::uwvm::io::parser_warning_fatal = true;
-            ::uwvm2::uwvm::io::untrusted_dl_warning_fatal = true;
-            ::uwvm2::uwvm::io::dl_warning_fatal = true;
-            ::uwvm2::uwvm::io::depend_warning_fatal = true;
+            ::uwvm2::uwvm::io::show_vm_warning = false;
+            ::uwvm2::uwvm::io::show_parser_warning = false;
+            ::uwvm2::uwvm::io::show_untrusted_dl_warning = false;
+            ::uwvm2::uwvm::io::show_dl_warning = false;
+            ::uwvm2::uwvm::io::show_depend_warning = false;
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
-            ::uwvm2::uwvm::io::nt_path_warning_fatal = true;
+            ::uwvm2::uwvm::io::show_nt_path_warning = false;
 #endif
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
-            ::uwvm2::uwvm::io::toctou_warning_fatal = true;
+            ::uwvm2::uwvm::io::show_toctou_warning = false;
 #endif
         }
-        else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::vm_warning_fatal = true; }
-        else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::parser_warning_fatal = true; }
-        else if(currp1_str == u8"untrusted-dl") { ::uwvm2::uwvm::io::untrusted_dl_warning_fatal = true; }
-        else if(currp1_str == u8"dl") { ::uwvm2::uwvm::io::dl_warning_fatal = true; }
-        else if(currp1_str == u8"depend") { ::uwvm2::uwvm::io::depend_warning_fatal = true; }
+        else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::show_vm_warning = false; }
+        else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::show_parser_warning = false; }
+        else if(currp1_str == u8"untrusted-dl") { ::uwvm2::uwvm::io::show_untrusted_dl_warning = false; }
+        else if(currp1_str == u8"dl") { ::uwvm2::uwvm::io::show_dl_warning = false; }
+        else if(currp1_str == u8"depend") { ::uwvm2::uwvm::io::show_depend_warning = false; }
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
-        else if(currp1_str == u8"nt-path") { ::uwvm2::uwvm::io::nt_path_warning_fatal = true; }
+        else if(currp1_str == u8"nt-path") { ::uwvm2::uwvm::io::show_nt_path_warning = false; }
 #endif
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
-        else if(currp1_str == u8"toctou") { ::uwvm2::uwvm::io::toctou_warning_fatal = true; }
+        else if(currp1_str == u8"toctou") { ::uwvm2::uwvm::io::show_toctou_warning = false; }
 #endif
         else
         {
@@ -124,7 +129,7 @@ namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::log_disable_warning),
                                 // print_usage comes with UWVM_COLOR_U8_RST_ALL
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
@@ -135,7 +140,8 @@ namespace uwvm2::uwvm::cmdline::params::details
 
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
-// This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
-// macro
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#include <uwvm2/utils/macro/pop_macros.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+

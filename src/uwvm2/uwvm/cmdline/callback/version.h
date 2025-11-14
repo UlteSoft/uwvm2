@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-30
  * @copyright   APL-2.0 License
  */
 
@@ -20,6 +19,9 @@
  *                                      *
  ****************************************/
 
+#pragma once
+
+#ifndef UWVM_MODULE
 // std
 #include <memory>
 #include <utility>
@@ -38,7 +40,6 @@
 # include <sgidefs.h>
 #endif
 // std
-#ifndef UWVM_MODULE
 # include <fast_io.h>
 # include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
@@ -53,7 +54,11 @@
 # include <uwvm2/uwvm/utils/install_path/impl.h>
 #endif
 
-namespace uwvm2::uwvm::cmdline::params::details
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
     template <typename Stm>
     inline constexpr void logo_u8print_not_rst_impl(Stm&& stm) noexcept
@@ -144,7 +149,7 @@ namespace uwvm2::uwvm::cmdline::params::details
         version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm));
     }
 
-    UWVM_GNU_COLD extern ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
@@ -950,9 +955,11 @@ namespace uwvm2::uwvm::cmdline::params::details
         return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
     }
 
+  
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
-// This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
-// macro
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#include <uwvm2/utils/macro/pop_macros.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-30
+ * @date        2025-04-07
  * @copyright   APL-2.0 License
  */
 
@@ -20,15 +20,17 @@
  *                                      *
  ****************************************/
 
-// std
-#include <cstddef>
-#include <memory>
-#include <utility>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-// import
+#pragma once
+
 #ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <memory>
+# include <utility>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+// import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -39,7 +41,11 @@
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 #endif
 
-namespace uwvm2::uwvm::cmdline::params::details
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
     template <::std::size_t N>
     inline constexpr ::uwvm2::utils::container::array<char8_t, N + 1> u8nspace() noexcept
@@ -57,7 +63,7 @@ namespace uwvm2::uwvm::cmdline::params::details
     inline constexpr auto parameter_max_principal_name_size_u8nspace{u8nspace<::uwvm2::uwvm::cmdline::parameter_max_principal_name_size + 4>()};
 
     template <typename Stm>
-    inline void help_output_singal_cate(Stm&& stm, ::uwvm2::utils::cmdline::categorization cate) noexcept
+    inline constexpr void help_output_singal_cate(Stm && stm, ::uwvm2::utils::cmdline::categorization cate) noexcept
     {
         for(auto const p: ::uwvm2::uwvm::cmdline::parameters)
         {
@@ -82,7 +88,7 @@ namespace uwvm2::uwvm::cmdline::params::details
     }
 
     template <typename Stm>
-    inline void help_output_all(Stm&& stm) noexcept
+    inline constexpr void help_output_all(Stm && stm) noexcept
     {
         for(auto const p: ::uwvm2::uwvm::cmdline::parameters)
         {
@@ -105,10 +111,10 @@ namespace uwvm2::uwvm::cmdline::params::details
         }
     }
 
-    UWVM_GNU_COLD extern ::uwvm2::utils::cmdline::parameter_return_type
-        help_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                      ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                      ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type help_callback(
+        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         // No copies will be made here.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
@@ -314,7 +320,8 @@ namespace uwvm2::uwvm::cmdline::params::details
 
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
-// This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
-// macro
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#include <uwvm2/utils/macro/pop_macros.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+

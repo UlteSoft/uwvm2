@@ -30,9 +30,7 @@
 # include "mode.h"
 
 // debug
-# ifdef _DEBUG
-#  include "debug_test.h"
-# endif
+# include "debug_test.h"
 
 // wasm
 # include "wasm_set_main_module_name.h"

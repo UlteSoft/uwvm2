@@ -19,19 +19,26 @@
  *                                      *
  ****************************************/
 
-// std
-#include <memory>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-// import
+#pragma once
+
 #ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <cstdint>
+# include <cstring>
+# include <cstdlib>
+# include <limits>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+// import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
+# include <uwvm2/uwvm/utils/depend/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
@@ -39,12 +46,16 @@
 # include <uwvm2/uwvm/wasm/loader/impl.h>
 #endif
 
-namespace uwvm2::uwvm::cmdline::params::details
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-    UWVM_GNU_COLD extern ::uwvm2::utils::cmdline::parameter_return_type
-        wasm_preload_library_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                                      ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                      ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasm_depend_recursion_limit_callback(
+        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)
@@ -60,13 +71,13 @@ namespace uwvm2::uwvm::cmdline::params::details
         if(currp1 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
         {
             // (currp1 == para_end):
-            // [... curr] ...
+            // [... curr] (end) ...
             // [  safe  ] unsafe (could be the module_end)
             //            ^^ currp1
 
             // (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg):
             // [... curr para] ...
-            // [    safe     ] unsafe (could be the module_end)
+            // [     safe    ] unsafe (could be the module_end)
             //           ^^ currp1
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -76,65 +87,54 @@ namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasm_preload_library),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasm_depend_recursion_limit),
                                 // print_usage comes with UWVM_COLOR_U8_RST_ALL
                                 u8"\n\n");
+
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        // [... curr arg] ...
-        // [    safe    ] unsafe (could be the module_end)
+        // [... curr arg1] ...
+        // [     safe     ] unsafe (could be the module_end)
         //           ^^ currp1
 
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        // file name
+        // name
         auto const currp1_str{currp1->str};
 
-        ::uwvm2::utils::container::u8cstring_view const file_name{currp1_str};
+        ::std::size_t limit;  // No initialization necessary
+        auto const [next, err]{::fast_io::parse_by_scan(currp1_str.cbegin(), currp1_str.cend(), limit)};
 
-        ::uwvm2::utils::container::u8string_view rename_module_name{};
-
-        // Check for out-of-bounds and not-argument
-        if(auto currp2{para_curr + 2u}; !(currp2 == para_end || currp2->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg)) [[unlikely]]
+        // parse u32 error
+        if(err != ::fast_io::parse_code::ok || next != currp1_str.cend()) [[unlikely]]
         {
-            // [... curr arg arg] ...
-            // [    safe        ] unsafe (could be the module_end)
-            //               ^^ currp2
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Invalid recursion depth (size_t): \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                currp1_str,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". Usage: ",
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasm_depend_recursion_limit),
+                                u8"\n\n");
 
-            // Setting the argument is already taken
-            currp2->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
-
-            // rename
-            auto const currp2_str{currp2->str};
-
-            rename_module_name = ::uwvm2::utils::container::u8string_view{currp2_str};
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        auto& new_preloaded_wasm{::uwvm2::uwvm::wasm::storage::preloaded_wasm.emplace_back()};
-
-        auto const load_wasm_file_rtl{
-            ::uwvm2::uwvm::wasm::loader::load_wasm_file(new_preloaded_wasm, file_name, rename_module_name, ::uwvm2::uwvm::wasm::storage::wasm_parameter)};
-
-        switch(load_wasm_file_rtl)
-        {
-            [[likely]] case ::uwvm2::uwvm::wasm::loader::load_wasm_file_rtl::ok:
-            {
-                break;
-            }
-            [[unlikely]] default:
-            {
-                return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
-            }
-        }
+        ::uwvm2::uwvm::utils::depend::recursion_depth_limit = limit;
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
-
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
-// This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
-// macro
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#include <uwvm2/utils/macro/pop_macros.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+

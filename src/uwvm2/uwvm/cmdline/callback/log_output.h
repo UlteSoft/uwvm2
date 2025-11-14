@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-30
  * @copyright   APL-2.0 License
  */
 
@@ -20,13 +19,15 @@
  *                                      *
  ****************************************/
 
-// std
-#include <memory>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-// import
+#pragma once
+
 #ifndef UWVM_MODULE
+// std
+# include <memory>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+// import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -37,12 +38,16 @@
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 #endif
 
-namespace uwvm2::uwvm::cmdline::params::details
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-    UWVM_GNU_COLD extern ::uwvm2::utils::cmdline::parameter_return_type
-        log_output_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type log_output_callback(
+        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)
@@ -339,10 +344,10 @@ namespace uwvm2::uwvm::cmdline::params::details
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
-
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
-// This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
-// macro
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
-#include <uwvm2/utils/macro/pop_macros.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+
