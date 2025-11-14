@@ -29,7 +29,7 @@
 # include "mode.h"
 
 // debug
-#  include "debug_test.h"
+# include "debug_test.h"
 
 // wasm
 # include "wasm_set_main_module_name.h"
