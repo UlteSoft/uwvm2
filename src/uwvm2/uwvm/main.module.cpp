@@ -20,6 +20,5 @@
  ****************************************/
 
 import uwvm2.uwvm.crtmain;
-import uwvm2.uwvm.cmdline.callback;
 
 #include "main.default.cpp"

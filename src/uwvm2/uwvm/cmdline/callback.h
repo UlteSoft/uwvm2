@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-25
+ * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -20,19 +20,15 @@
  *                                      *
  ****************************************/
 
-module;
-
-export module uwvm2.uwvm.cmdline;
-export import :parser;
-export import :params;
-export import :winnt_code_cvt;
-export import :callback;
+#pragma once
 
 #ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
+// import
+# include <uwvm2/uwvm/cmdline/callback/impl.h>
 #endif
 
-#include "impl.h"
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+// UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline{}
