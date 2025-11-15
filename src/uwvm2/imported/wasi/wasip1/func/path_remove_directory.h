@@ -403,11 +403,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // posix 1988 no enotempty
                                 if(e.code == EACCES)
                                 {
-
 #  ifdef UWVM_CPP_EXCEPTIONS
                                     try
 #  endif
                                     {
+                                        // dir_file default nofollow
                                         ::fast_io::dir_file const new_dir_file{at(curr_fd_native_file), open_file_name};
 
                                         unsigned counter{};
@@ -425,6 +425,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  endif
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
                                 }
+                                else
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                                }
+
+# elif !(defined(_WIN32) && !defined(__CYGWIN__)) && defined(EEXIST)
+                                // Note: Modern POSIX systems never return EEXIST for directory removal.
+                                // Historically, some early UNIX/Linux systems used EEXIST to indicate
+                                // "directory not empty", but this was replaced by ENOTEMPTY after POSIX
+                                // standardized the error code. Therefore, any EEXIST returned here should
+                                // be treated as legacy behavior equivalent to ENOTEMPTY.
+
+                                if(e.code == EEXIST) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty; }
                                 else
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
@@ -466,11 +479,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // posix 1988 no enotempty
                                 if(e.code == EACCES)
                                 {
-
 #  ifdef UWVM_CPP_EXCEPTIONS
                                     try
 #  endif
                                     {
+                                        // dir_file default nofollow
                                         ::fast_io::dir_file const new_dir_file{at(path_stack.back_unchecked()), open_file_name};
 
                                         unsigned counter{};
@@ -488,6 +501,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  endif
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
                                 }
+                                else
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                                }
+
+# elif !(defined(_WIN32) && !defined(__CYGWIN__)) && defined(EEXIST)
+                                // Note: Modern POSIX systems never return EEXIST for directory removal.
+                                // Historically, some early UNIX/Linux systems used EEXIST to indicate
+                                // "directory not empty", but this was replaced by ENOTEMPTY after POSIX
+                                // standardized the error code. Therefore, any EEXIST returned here should
+                                // be treated as legacy behavior equivalent to ENOTEMPTY.
+
+                                if(e.code == EACCES) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty; }
                                 else
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
