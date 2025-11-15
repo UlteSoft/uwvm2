@@ -279,7 +279,11 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"prd64_no_such") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent
+#if defined(_WIN32) && defined(_WIN32_WINDOWS)
+           && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
+#endif
+        )
         {
             ::fast_io::io::perrln("error: prd64 Case 8 expected enoent. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
