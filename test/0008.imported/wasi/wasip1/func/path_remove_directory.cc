@@ -232,7 +232,12 @@ int main()
                                                                                       static_cast<wasi_posix_fd_t>(3),
                                                                                       p,
                                                                                       static_cast<wasi_size_t>(sizeof(u8"prd32_nonempty") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty
+#if defined(__MSDOS__) || defined(__DJGPP__)
+           // posix 1988 no enotempty
+           && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces
+#endif
+        )
         {
             ::fast_io::io::perrln("error: prd32 Case 7 expected enotempty. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
