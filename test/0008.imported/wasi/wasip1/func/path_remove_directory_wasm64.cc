@@ -237,12 +237,7 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"prd64_nonempty") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotempty
-#if defined(__MSDOS__) || defined(__DJGPP__)
-           // posix 1988 no enotempty
-           && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces
-#endif
-        )
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotempty)
         {
             ::fast_io::io::perrln("error: prd64 Case 7 expected enotempty. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();

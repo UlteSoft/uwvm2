@@ -399,7 +399,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
+# if defined(__MSDOS__) || defined(__DJGPP__)
+                                // posix 1988 no enotempty
+                                if(e.code == EACCES)
+                                {
+
+#  ifdef UWVM_CPP_EXCEPTIONS
+                                    try
+#  endif
+                                    {
+                                        ::fast_io::dir_file const new_dir_file{at(curr_fd_native_file), open_file_name};
+
+                                        unsigned counter{};
+                                        for([[maybe_unused]] auto const& curr_dir: current(at(new_dir_file)))
+                                        {
+                                            ++counter;
+                                            if(counter > 2u) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotempty; }
+                                        }
+                                    }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                                    catch(::fast_io::error e)
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                                    }
+#  endif
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                                }
+                                else
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                                }
+# else
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+# endif
                             }
 #endif
                         }
@@ -418,7 +450,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // The directory file defaults to nofollow, but DOS doesn't support symlinks.
                                 {
                                     // dir_file default nofollow
-                                    ::fast_io::dir_file const new_dir_file{at(curr_fd_native_file), open_file_name};
+                                    ::fast_io::dir_file const new_dir_file{at(path_stack.back_unchecked()), open_file_name};
                                     ::fast_io::details::check_dos_fd_is_dir(new_dir_file.native_handle());
                                 }
 #endif
@@ -431,7 +463,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
+# if defined(__MSDOS__) || defined(__DJGPP__)
+                                // posix 1988 no enotempty
+                                if(e.code == EACCES)
+                                {
+
+#  ifdef UWVM_CPP_EXCEPTIONS
+                                    try
+#  endif
+                                    {
+                                        ::fast_io::dir_file const new_dir_file{at(path_stack.back_unchecked()), open_file_name};
+
+                                        unsigned counter{};
+                                        for([[maybe_unused]] auto const& curr_dir: current(at(new_dir_file)))
+                                        {
+                                            ++counter;
+                                            if(counter > 2u) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotempty; }
+                                        }
+                                    }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                                    catch(::fast_io::error e)
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                                    }
+#  endif
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                                }
+                                else
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                                }
+# else
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+# endif
                             }
 #endif
                         }
