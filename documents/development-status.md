@@ -22,7 +22,9 @@ Ultimate WebAssembly Virtual Machine 2 (uwvm2) is a ground-up rearchitecture of 
 
 The following components are planned for implementation in the upcoming development cycles:
 
-- **Local Function Module Handling**: Implementing the processing of locally defined functions within modules to facilitate modular and maintainable code structures.
+- **Local Function Module Handling**: Implementing the processing of locally defined functions within modules to facilitate modular and maintainable code structures, with dedicated support for:
+  - **Local Imported Modules**: Handling `uwvm2`-defined imported modules as first-class local function modules, enabling explicit modeling of intra-runtime dependencies, capability-scoped interfaces, and clear separation between host-provided and guest-defined functionality.
+  - **Weakly Symbolic Static Import**: Providing a static-library-based import mechanism in which `wasmlib` entry points are exposed through weak symbols and resolved at link time. This allows function modules to be imported directly from platform-provided static libraries in a cross-platform manner, while primarily targeting constrained and embedded environments where dynamic loading (`dl`) is unavailable, yet remaining compatible with fully dynamic deployments.
 
 - **WebAssembly Module Initialization and Validation**: Developing mechanisms for module initialization and validation to ensure compliance with the WebAssembly specification and security requirements.
 
