@@ -399,9 +399,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
-# if defined(__MSDOS__) || defined(__DJGPP__)
+# if (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(_WIN32) && defined(_WIN32_WINDOWS))
                                 // posix 1988 no enotempty
-                                if(e.code == EACCES)
+                                if(e.code ==
+#  if defined(__MSDOS__) || defined(__DJGPP__)
+                                   EACCES
+#  elif defined(_WIN32) && defined(_WIN32_WINDOWS)
+                                   5uz /*ERROR_ACCESS_DENIED*/
+#  endif
+                                )
                                 {
 #  ifdef UWVM_CPP_EXCEPTIONS
                                     try
@@ -476,9 +482,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
-# if defined(__MSDOS__) || defined(__DJGPP__)
+# if (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(_WIN32) && defined(_WIN32_WINDOWS))
                                 // posix 1988 no enotempty
-                                if(e.code == EACCES)
+                                if(
+#  if defined(__MSDOS__) || defined(__DJGPP__)
+                                    EACCES
+#  elif defined(_WIN32) && defined(_WIN32_WINDOWS)
+                                    5uz /*ERROR_ACCESS_DENIED*/
+#  endif
+                                )
                                 {
 #  ifdef UWVM_CPP_EXCEPTIONS
                                     try
