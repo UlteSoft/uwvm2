@@ -400,12 +400,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             catch(::fast_io::error e)
                             {
 # if (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(_WIN32) && defined(_WIN32_WINDOWS))
-                                // posix 1988 no enotempty
-                                if(
+                                // dos/win9x no enotempty, when notempty, it returns EACCES. You must open the directory yourself to determine the status.
+                                if(e.code ==
 #  if defined(__MSDOS__) || defined(__DJGPP__)
-                                    EACCES
+                                   EACCES
 #  elif defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                    5uz /*ERROR_ACCESS_DENIED*/
+                                   5uz /*ERROR_ACCESS_DENIED*/
 #  endif
                                 )
                                 {
@@ -482,12 +482,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             catch(::fast_io::error e)
                             {
 # if (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(_WIN32) && defined(_WIN32_WINDOWS))
-                                // posix 1988 no enotempty
-                                if(
+                                // dos/win9x no enotempty, when notempty, it returns EACCES. You must open the directory yourself to determine the status.
+                                if(e.code ==
 #  if defined(__MSDOS__) || defined(__DJGPP__)
-                                    EACCES
+                                   EACCES
 #  elif defined(_WIN32) && defined(_WIN32_WINDOWS)
-                                    5uz /*ERROR_ACCESS_DENIED*/
+                                   5uz /*ERROR_ACCESS_DENIED*/
 #  endif
                                 )
                                 {
@@ -525,7 +525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // standardized the error code. Therefore, any EEXIST returned here should
                                 // be treated as legacy behavior equivalent to ENOTEMPTY.
 
-                                if(e.code == EACCES) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty; }
+                                if(e.code == EEXIST) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty; }
                                 else
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
