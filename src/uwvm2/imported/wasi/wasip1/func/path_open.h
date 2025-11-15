@@ -628,6 +628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // dir_file default nofollow
                                                     new_dir_file = ::fast_io::dir_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -655,6 +656,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                         try
 #  endif
                                                         {
+                                                            // native_file default nofollow
                                                             ::fast_io::native_file{at(curr_fd_native_file), open_file_name, ::fast_io::open_mode::in};
                                                             is_file = true;
                                                         }
@@ -681,6 +683,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // native_file default nofollow
                                                     new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                         .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -717,6 +720,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // dir_file default nofollow
                                                     new_dir_file = ::fast_io::dir_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -744,6 +748,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                         try
 #  endif
                                                         {
+                                                            // native_file default nofollow
                                                             ::fast_io::native_file{at(path_stack.back_unchecked().file),
                                                                                    open_file_name,
                                                                                    ::fast_io::open_mode::in};
@@ -772,6 +777,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // native_file default nofollow
                                                     new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                         .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -812,6 +818,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // dir_file default nofollow
                                             new_dir_file = ::fast_io::dir_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -839,6 +846,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #  endif
                                                 {
+                                                    // native_file default nofollow
                                                     ::fast_io::native_file{at(curr_fd_native_file), open_file_name, ::fast_io::open_mode::in};
                                                     is_file = true;
                                                 }
@@ -865,6 +873,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_file default nofollow
                                             new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                 .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -945,6 +954,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // dir_file default nofollow
                                                     new_dir_file = ::fast_io::dir_file{at(curr_fd_native_file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -972,6 +982,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                         try
 #  endif
                                                         {
+                                                            // native_file default nofollow
                                                             ::fast_io::native_file{at(curr_fd_native_file), open_file_name, ::fast_io::open_mode::in};
                                                             is_file = true;
                                                         }
@@ -998,6 +1009,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // native_file default nofollow
                                                     new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                         .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -1034,6 +1046,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // dir_file default nofollow
                                                     new_dir_file = ::fast_io::dir_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -1061,6 +1074,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                         try
 #  endif
                                                         {
+                                                            // native_file default nofollow
                                                             ::fast_io::native_file{at(path_stack.back_unchecked().file),
                                                                                    open_file_name,
                                                                                    ::fast_io::open_mode::in};
@@ -1089,6 +1103,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #endif
                                                 {
+                                                    // native_file default nofollow
                                                     new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                         .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -1129,6 +1144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // dir_file default nofollow
                                             new_dir_file = ::fast_io::dir_file{at(path_stack.back_unchecked().file), open_file_name, fast_io_oflags};
 
 #if defined(__CYGWIN__)
@@ -1156,6 +1172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 try
 #  endif
                                                 {
+                                                    // native_file default nofollow
                                                     ::fast_io::native_file{at(path_stack.back_unchecked().file), open_file_name, ::fast_io::open_mode::in};
                                                     is_file = true;
                                                 }
@@ -1182,6 +1199,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_file default nofollow
                                             new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage
                                                 .file_fd
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -1303,6 +1321,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #  endif
                                             {
+                                                // native_file default nofollow
                                                 ::fast_io::native_file{at(curr_fd_native_file), next_name, ::fast_io::open_mode::in};
                                                 is_file = true;
                                             }
@@ -1388,6 +1407,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #  endif
                                             {
+                                                // native_file default nofollow
                                                 ::fast_io::native_file{at(path_stack.back_unchecked().file), next_name, ::fast_io::open_mode::in};
                                                 is_file = true;
                                             }

@@ -651,6 +651,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(curr_new_fd_native_file), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
@@ -736,6 +737,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(new_path_stack.back_unchecked()), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
@@ -825,6 +827,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_linkat default follow, need symlink_nofollow flag
                                             ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                      old_file_name,
                                                                      at(curr_new_fd_native_file),
@@ -844,6 +847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_linkat default follow, need symlink_nofollow flag
                                             ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                      old_file_name,
                                                                      at(new_path_stack.back_unchecked()),
@@ -883,6 +887,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                          old_file_name,
                                                                          at(curr_new_fd_native_file),
@@ -902,6 +907,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                          old_file_name,
                                                                          at(new_path_stack.back_unchecked()),
@@ -924,6 +930,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                          old_file_name,
                                                                          at(curr_new_fd_native_file),
@@ -943,6 +950,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                          old_file_name,
                                                                          at(new_path_stack.back_unchecked()),
@@ -971,6 +979,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
+                                        // native_linkat default follow, need symlink_nofollow flag
                                         ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                  old_file_name,
                                                                  at(curr_new_fd_native_file),
@@ -990,6 +999,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
+                                        // native_linkat default follow, need symlink_nofollow flag
                                         ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                  old_file_name,
                                                                  at(new_path_stack.back_unchecked()),
@@ -1035,6 +1045,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_linkat default follow, need symlink_nofollow flag
                                             ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                      old_file_name,
                                                                      at(curr_new_fd_native_file),
@@ -1054,6 +1065,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #endif
                                         {
+                                            // native_linkat default follow, need symlink_nofollow flag
                                             ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                      old_file_name,
                                                                      at(new_path_stack.back_unchecked()),
@@ -1093,6 +1105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                          old_file_name,
                                                                          at(curr_new_fd_native_file),
@@ -1112,6 +1125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(curr_old_fd_native_file),
                                                                          old_file_name,
                                                                          at(new_path_stack.back_unchecked()),
@@ -1134,6 +1148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                          old_file_name,
                                                                          at(curr_new_fd_native_file),
@@ -1153,6 +1168,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             try
 #endif
                                             {
+                                                // native_linkat default follow, need symlink_nofollow flag
                                                 ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                          old_file_name,
                                                                          at(new_path_stack.back_unchecked()),
@@ -1181,6 +1197,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
+                                        // native_linkat default follow, need symlink_nofollow flag
                                         ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                  old_file_name,
                                                                  at(curr_new_fd_native_file),
@@ -1200,6 +1217,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     try
 #endif
                                     {
+                                        // native_linkat default follow, need symlink_nofollow flag
                                         ::fast_io::native_linkat(at(old_path_stack.back_unchecked()),
                                                                  old_file_name,
                                                                  at(new_path_stack.back_unchecked()),
@@ -1320,6 +1338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(curr_old_fd_native_file), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
@@ -1405,6 +1424,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(old_path_stack.back_unchecked()), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }

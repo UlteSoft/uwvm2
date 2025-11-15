@@ -385,12 +385,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // required.
                                 // The directory file defaults to nofollow, but DOS doesn't support symlinks.
                                 {
+                                    // dir_file default nofollow
                                     ::fast_io::dir_file const new_dir_file{at(curr_fd_native_file), open_file_name};
                                     ::fast_io::details::check_dos_fd_is_dir(new_dir_file.native_handle());
                                 }
 #endif
 
-                                ::fast_io::native_unlinkat(at(curr_fd_native_file), open_file_name, fast_io::native_at_flags::removedir);
+                                // native_unlinkat default follow, need symlink_nofollow flag
+                                ::fast_io::native_unlinkat(at(curr_fd_native_file),
+                                                           open_file_name,
+                                                           ::fast_io::native_at_flags::removedir | ::fast_io::native_at_flags::symlink_nofollow);
                             }
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
@@ -413,11 +417,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // required.
                                 // The directory file defaults to nofollow, but DOS doesn't support symlinks.
                                 {
+                                    // dir_file default nofollow
                                     ::fast_io::dir_file const new_dir_file{at(curr_fd_native_file), open_file_name};
                                     ::fast_io::details::check_dos_fd_is_dir(new_dir_file.native_handle());
                                 }
 #endif
-                                ::fast_io::native_unlinkat(at(path_stack.back_unchecked()), open_file_name, ::fast_io::native_at_flags::removedir);
+                                // native_unlinkat default follow, need symlink_nofollow flag
+                                ::fast_io::native_unlinkat(at(path_stack.back_unchecked()),
+                                                           open_file_name,
+                                                           ::fast_io::native_at_flags::removedir | ::fast_io::native_at_flags::symlink_nofollow);
                             }
 #ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
@@ -531,6 +539,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(curr_fd_native_file), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
@@ -616,6 +625,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         try
 #  endif
                                         {
+                                            // native_file default nofollow
                                             ::fast_io::native_file{at(path_stack.back_unchecked()), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
