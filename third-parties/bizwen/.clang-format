@@ -1,0 +1,4 @@
+﻿---
+# Language:        Cpp
+BasedOnStyle:  Microsoft
+BreakTemplateDeclarations: Yes
