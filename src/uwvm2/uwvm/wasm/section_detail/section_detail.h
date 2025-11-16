@@ -171,7 +171,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     default:
                     {
                         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
-                        /// @todo Maybe I forgot to realize it.
+                        /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
@@ -267,7 +267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     default:
                     {
                         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
-                        /// @todo Maybe I forgot to realize it.
+                        /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
@@ -517,6 +517,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         curr_value_type curr_value_type_storage;  // no initialize
                         ::std::memcpy(::std::addressof(curr_value_type_storage), func_curr->res_type_vec_begin, sizeof(curr_value_type_storage));
 
+                        // print_freestanding<true> includes a newline
                         ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream), section_details_adl_caller(curr_value_type_storage));
                     }
                     else
@@ -689,6 +690,417 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     }
                 }
 
+                // print_freestanding<true> includes a newline
+                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream));
+
+                break;
+            }
+#endif
+
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+            case ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol:
+            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(module_storage.module_storage_ptr.wws == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+# endif
+                auto const& wws{*module_storage.module_storage_ptr.wws};
+
+                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                constexpr auto get_final_value_type_from_tuple{
+                    []<::uwvm2::parser::wasm::concepts::wasm_feature... Fs>(::uwvm2::utils::container::tuple<Fs...>) consteval noexcept
+                    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>{}; }};
+
+                using curr_value_type = ::std::remove_cvref_t<decltype(get_final_value_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features))>;
+                static_assert(sizeof(curr_value_type) == 1uz, "curr_value_type is not 1 byte");
+
+                // module information + func size
+
+                auto const func_begin{wws.wasm_wws_storage.capi_function_vec.function_begin};
+                auto const func_size{wws.wasm_wws_storage.capi_function_vec.function_size};
+
+                if(func_begin == nullptr && func_size != 0uz) [[unlikely]]
+                {
+                    // If the function is not defined, it should be nullptr and 0uz, which is permissible. However, if it is nullptr plus a non-zero uz, a
+                    // memory safety issue will arise.
+                    ::fast_io::fast_terminate();
+                }
+
+                if constexpr(::std::same_as<char_type, char>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     "======================\nWeak Symbol Module Name: ",
+                                                                     ::fast_io::mnp::code_cvt(wws.module_name),
+                                                                     "\nFunction[",
+                                                                     func_size,
+                                                                     "]:\n");
+                }
+                if constexpr(::std::same_as<char_type, wchar_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     L"======================\nWeak Symbol Module Name: ",
+                                                                     ::fast_io::mnp::code_cvt(wws.module_name),
+                                                                     L"\nFunction[",
+                                                                     func_size,
+                                                                     L"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char8_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     u8"======================\nWeak Symbol Module Name: ",
+                                                                     wws.module_name,
+                                                                     u8"\nFunction[",
+                                                                     func_size,
+                                                                     u8"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char16_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     u"======================\nWeak Symbol Module Name: ",
+                                                                     ::fast_io::mnp::code_cvt(wws.module_name),
+                                                                     u"\nFunction[",
+                                                                     func_size,
+                                                                     u"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char32_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                     U"======================\nWeak Symbol Module Name: ",
+                                                                     ::fast_io::mnp::code_cvt(wws.module_name),
+                                                                     U"\nFunction[",
+                                                                     func_size,
+                                                                     U"]:\n");
+                }
+
+                // function
+
+                ::std::size_t func_counter{};
+
+                auto const func_end{func_begin + func_size};
+                for(auto func_curr{func_begin}; func_curr != func_end; ++func_curr)
+                {
+                    ::uwvm2::utils::container::u8string_view const func_name{reinterpret_cast<char8_t_const_may_alias_ptr>(func_curr->func_name_ptr),
+                                                                             func_curr->func_name_length};
+
+                    if constexpr(::std::same_as<char_type, char>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         " - func[",
+                                                                         func_counter++,
+                                                                         "] <",
+                                                                         ::fast_io::mnp::code_cvt(func_name),
+                                                                         "> sig: (");
+                    }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         L" - func[",
+                                                                         func_counter++,
+                                                                         L"] <",
+                                                                         ::fast_io::mnp::code_cvt(func_name),
+                                                                         L"> sig: (");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         u8" - func[",
+                                                                         func_counter++,
+                                                                         u8"] <",
+                                                                         func_name,
+                                                                         u8"> sig: (");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         u" - func[",
+                                                                         func_counter++,
+                                                                         u"] <",
+                                                                         ::fast_io::mnp::code_cvt(func_name),
+                                                                         u"> sig: (");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         U" - func[",
+                                                                         func_counter++,
+                                                                         U"] <",
+                                                                         ::fast_io::mnp::code_cvt(func_name),
+                                                                         U"> sig: (");
+                    }
+
+                    if(func_curr->para_type_vec_begin == nullptr && func_curr->para_type_vec_size != 0uz) [[unlikely]]
+                    {
+                        // If the parameter type vector is not defined, it should be nullptr and 0uz, which is permissible. However, if it is nullptr plus a
+                        // non-zero uz, a memory safety issue will arise.
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const para_type_vec_end{func_curr->para_type_vec_begin + func_curr->para_type_vec_size};
+                    for(auto para_curr{func_curr->para_type_vec_begin}; para_curr != para_type_vec_end; ++para_curr)
+                    {
+                        if(para_curr != func_curr->para_type_vec_begin) [[likely]]
+                        {
+                            if constexpr(::std::same_as<char_type, char>)
+                            {
+                                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
+                            }
+                            if constexpr(::std::same_as<char_type, wchar_t>)
+                            {
+                                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
+                            }
+                            if constexpr(::std::same_as<char_type, char8_t>)
+                            {
+                                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
+                            }
+                            if constexpr(::std::same_as<char_type, char16_t>)
+                            {
+                                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
+                            }
+                            if constexpr(::std::same_as<char_type, char32_t>)
+                            {
+                                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
+                            }
+                        }
+
+                        curr_value_type curr_value_type_storage;  // no initialize
+                        ::std::memcpy(::std::addressof(curr_value_type_storage), para_curr, sizeof(curr_value_type_storage));
+
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), section_details_adl_caller(curr_value_type_storage));
+                    }
+
+                    if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ") -> "); }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L") -> ");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8") -> ");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u") -> ");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U") -> ");
+                    }
+
+                    if(func_curr->res_type_vec_size == 0uz)
+                    {
+                        // output "nil"
+
+                        // When `res_type_vec_size` is 0, `begin_ptr` may be `nullptr` or any valid pointer.
+
+                        if constexpr(::std::same_as<char_type, char>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "nil\n");
+                        }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"nil\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"nil\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"nil\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"nil\n");
+                        }
+                    }
+                    else if(func_curr->res_type_vec_size == 1uz)
+                    {
+                        if(func_curr->res_type_vec_begin == nullptr) [[unlikely]]
+                        {
+                            // If the result type vector is not defined, it should be nullptr and 0uz, which is permissible. However, if it is nullptr plus a
+                            // non-zero uz, a memory safety issue will arise.
+                            ::fast_io::fast_terminate();
+                        }
+
+                        // output "i32"
+
+                        curr_value_type curr_value_type_storage;  // no initialize
+                        ::std::memcpy(::std::addressof(curr_value_type_storage), func_curr->res_type_vec_begin, sizeof(curr_value_type_storage));
+
+                        // print_freestanding<true> includes a newline
+                        ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream), section_details_adl_caller(curr_value_type_storage));
+                    }
+                    else
+                    {
+                        // output "(i32, i32)"
+
+                        if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "("); }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"(");
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"(");
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"(");
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"(");
+                        }
+
+                        if(func_curr->res_type_vec_begin == nullptr) [[unlikely]]
+                        {
+                            // If the result type vector is not defined, it should be nullptr and 0uz, which is permissible. However, if it is nullptr plus a
+                            // non-zero uz, a memory safety issue will arise.
+                            ::fast_io::fast_terminate();
+                        }
+
+                        auto const res_type_vec_end{func_curr->res_type_vec_begin + func_curr->res_type_vec_size};
+                        for(auto res_curr{func_curr->res_type_vec_begin}; res_curr != res_type_vec_end; ++res_curr)
+                        {
+                            if(res_curr != func_curr->res_type_vec_begin) [[likely]]
+                            {
+                                if constexpr(::std::same_as<char_type, char>)
+                                {
+                                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
+                                }
+                                if constexpr(::std::same_as<char_type, wchar_t>)
+                                {
+                                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
+                                }
+                                if constexpr(::std::same_as<char_type, char8_t>)
+                                {
+                                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
+                                }
+                                if constexpr(::std::same_as<char_type, char16_t>)
+                                {
+                                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
+                                }
+                                if constexpr(::std::same_as<char_type, char32_t>)
+                                {
+                                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
+                                }
+                            }
+
+                            curr_value_type curr_value_type_storage;  // no initialize
+                            ::std::memcpy(::std::addressof(curr_value_type_storage), res_curr, sizeof(curr_value_type_storage));
+
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), section_details_adl_caller(curr_value_type_storage));
+                        }
+
+                        if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ")\n"); }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L")\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8")\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u")\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U")\n");
+                        }
+                    }
+                }
+
+                // custom handler
+
+                auto const handler_begin{wws.wasm_wws_storage.capi_custom_handler_vec.custom_handler_begin};
+                auto const handler_size{wws.wasm_wws_storage.capi_custom_handler_vec.custom_handler_size};
+
+                if(handler_begin == nullptr && handler_size != 0uz) [[unlikely]]
+                {
+                    // If the custom handler vector is not defined, it should be nullptr and 0uz, which is permissible. However, if it is nullptr plus a
+                    // non-zero uz, a memory safety issue will arise.
+                    ::fast_io::fast_terminate();
+                }
+
+                if constexpr(::std::same_as<char_type, char>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Custom Handler[", handler_size, "]:\n");
+                }
+                if constexpr(::std::same_as<char_type, wchar_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Custom Handler[", handler_size, L"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char8_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Custom Handler[", handler_size, u8"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char16_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Custom Handler[", handler_size, u"]:\n");
+                }
+                if constexpr(::std::same_as<char_type, char32_t>)
+                {
+                    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Custom Handler[", handler_size, U"]:\n");
+                }
+
+                ::std::size_t handler_counter{};
+
+                auto const handler_end{handler_begin + handler_size};
+                for(auto handler_curr{handler_begin}; handler_curr != handler_end; ++handler_curr)
+                {
+                    ::uwvm2::utils::container::u8string_view const custom_name{reinterpret_cast<char8_t_const_may_alias_ptr>(handler_curr->custom_name_ptr),
+                                                                               handler_curr->custom_name_length};
+
+                    if constexpr(::std::same_as<char_type, char>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         " - custom[",
+                                                                         handler_counter++,
+                                                                         "] <",
+                                                                         ::fast_io::mnp::code_cvt(custom_name),
+                                                                         ">\n");
+                    }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         L" - custom[",
+                                                                         handler_counter++,
+                                                                         L"] <",
+                                                                         ::fast_io::mnp::code_cvt(custom_name),
+                                                                         L">\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         u8" - custom[",
+                                                                         handler_counter++,
+                                                                         u8"] <",
+                                                                         custom_name,
+                                                                         u8">\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         u" - custom[",
+                                                                         handler_counter++,
+                                                                         u"] <",
+                                                                         ::fast_io::mnp::code_cvt(custom_name),
+                                                                         u">\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                         U" - custom[",
+                                                                         handler_counter++,
+                                                                         U"] <",
+                                                                         ::fast_io::mnp::code_cvt(custom_name),
+                                                                         U">\n");
+                    }
+                }
+
+                // print_freestanding<true> includes a newline
                 ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream));
 
                 break;
@@ -701,7 +1113,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
             }
             [[unlikely]] default:
             {
-                /// @todo Maybe I forgot to realize it.
+                /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif

@@ -139,7 +139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     template <typename Stm, ::uwvm2::parser::wasm::concepts::has_feature_name F0, ::uwvm2::parser::wasm::concepts::has_feature_name... Fs>
     inline constexpr void version_u8print_wasm_feature_impl(Stm && stm) noexcept
     {
-        ::fast_io::io::perrln(::std::forward<Stm>(stm), u8"        ", F0::feature_name);
+        ::fast_io::io::perrln(::std::forward<Stm>(stm), u8"      - ", F0::feature_name);
         if constexpr(sizeof...(Fs) != 0) { version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm)); }
     }
 
@@ -948,8 +948,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             );
         // wasm feature
         version_u8print_wasm_feature_from_tuple(u8log_output_ul, ::uwvm2::uwvm::wasm::feature::all_features);
-        // end ln
-        ::fast_io::io::perrln(u8log_output_ul);
+
+        // other features
+        ::fast_io::io::perr(u8log_output_ul,                                 
+            u8"\n"
+            u8"    Other Features: "
+            u8"\n"
+#ifdef UWVM_SUPPORT_PRELOAD_DL
+            u8"      - Preload Dynamic Linking Module\n"
+#endif
+#ifdef UWVM_SUPPORT_WEAK_SYMBOL
+            u8"      - Weak Symbol Module\n"
+#endif
+            u8"\n\n"
+        );
 
         // Here, guard will perform destructors.
         return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;

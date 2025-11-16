@@ -130,7 +130,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             /// @todo
             [[unlikely]] default:
             {
-                /// @todo Maybe I forgot to realize it.
+                /// @warning Maybe I forgot to realize it.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
