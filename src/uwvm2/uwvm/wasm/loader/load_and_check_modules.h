@@ -133,7 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 #endif
 
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-        // week symbol
+        // weak symbol
         for(auto const& lwws: ::uwvm2::uwvm::wasm::storage::weak_symbol)
         {
             if(!::uwvm2::uwvm::wasm::storage::all_module

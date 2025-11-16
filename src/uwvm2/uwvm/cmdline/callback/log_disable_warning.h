@@ -121,7 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else if(currp1_str == u8"dl") { ::uwvm2::uwvm::io::show_dl_warning = false; }
 #endif
 #ifdef UWVM_SUPPORT_WEAK_SYMBOL
-        else if(currp1_str == u8"week-symbol") { ::uwvm2::uwvm::io::show_weak_symbol_warning = false; }
+        else if(currp1_str == u8"weak-symbol") { ::uwvm2::uwvm::io::show_weak_symbol_warning = false; }
 #endif
         else if(currp1_str == u8"depend") { ::uwvm2::uwvm::io::show_depend_warning = false; }
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)

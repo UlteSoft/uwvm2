@@ -64,7 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
                u8"|dl"
 #endif
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-               u8"|week-symbol"
+               u8"|weak-symbol"
 #endif
                u8"|depend"
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)

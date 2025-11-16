@@ -67,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // load local modules
         if(auto const ret{::uwvm2::uwvm::run::load_local_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
-        // load week symbol modules
+        // load weak symbol modules
         if(auto const ret{::uwvm2::uwvm::run::load_weak_symbol_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
         // check duplicate module and construct ::uwvm2::uwvm::wasm::storage::all_module
