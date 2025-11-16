@@ -624,7 +624,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         return all_cycles;
     }
 
-}  // namespace uwvm2::uwvm::run
+}  // namespace uwvm2::uwvm::wasm::loader
 
 #ifndef UWVM_MODULE
 // macro
