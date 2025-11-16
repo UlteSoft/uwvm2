@@ -274,7 +274,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             {
                 wd.wasm_dl_storage.get_module_name = reinterpret_cast<::uwvm2::uwvm::wasm::type::capi_get_module_name_t>(
                     ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_get_module_name"));
-                can_get_module_name = true;
+                can_get_module_name = (wd.wasm_dl_storage.get_module_name != nullptr);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -311,7 +311,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
             if(rename_module_name.empty())
             {
-                if(wd.wasm_dl_storage.capi_module_name.name_length)
+                if(wd.wasm_dl_storage.capi_module_name.name_length && wd.wasm_dl_storage.capi_module_name.name != nullptr)
                 {
                     wd.module_name =
                         ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(wd.wasm_dl_storage.capi_module_name.name),
@@ -319,6 +319,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 }
                 else
                 {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                    if(::uwvm2::uwvm::io::show_dl_warning && wd.wasm_dl_storage.capi_module_name.name_length &&
+                       wd.wasm_dl_storage.capi_module_name.name == nullptr)
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            u8"[warn]  ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"Module Name pointer is null while length != 0.",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8" (dl)\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                        if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Convert warnings to fatal errors. ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8"(dl)\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+# endif
                     wd.module_name = ::uwvm2::utils::container::u8string_view{load_file_name};
                 }
             }
@@ -437,7 +468,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             {
                 wd.wasm_dl_storage.get_custom_handler_vec = reinterpret_cast<::uwvm2::uwvm::wasm::type::capi_get_custom_handler_vec_t>(
                     ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_get_custom_handler"));
-                can_get_custom_handler_vec = true;
+                can_get_custom_handler_vec = (wd.wasm_dl_storage.get_custom_handler_vec != nullptr);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -467,14 +498,99 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                 wd.wasm_dl_storage.capi_custom_handler_vec = (wd.wasm_dl_storage.get_custom_handler_vec)();
 
-                auto const handler_begin{wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_begin};
-                auto const handler_end{handler_begin + wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_size};
-
-                for(auto handler_curr{handler_begin}; handler_curr != handler_end; ++handler_curr)
+                if(wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_begin == nullptr &&
+                   wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_size != 0)
                 {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                    if(::uwvm2::uwvm::io::show_dl_warning)
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            u8"[warn]  ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"Custom handler vector size is non-zero but pointer is null.",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8" (dl)\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                        if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Convert warnings to fatal errors. ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8"(dl)\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+# endif
+                }
+
+                auto const handler_begin{wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_begin};
+                auto const handler_count{wd.wasm_dl_storage.capi_custom_handler_vec.custom_handler_size};
+
+                for(::std::size_t i{}; handler_begin != nullptr && i < handler_count; ++i)
+                {
+                    auto const handler_curr{handler_begin + i};
                     // check utf-8
-                    ::uwvm2::utils::container::u8string_view const custom_name{reinterpret_cast<char8_t_const_may_alias_ptr>(handler_curr->custom_name_ptr),
+                    ::uwvm2::utils::container::u8string_view custom_name{};
+                    if(handler_curr->custom_name_length != 0 && handler_curr->custom_name_ptr == nullptr) [[unlikely]]
+                    {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                        if(::uwvm2::uwvm::io::show_dl_warning)
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Parsing error in DL \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                load_file_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8" (dl)\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"The Custom Name Pointer Cannot Be nullptr When Length > 0.\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                            if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                            {
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    u8"[fatal] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"Convert warnings to fatal errors. ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    u8"(dl)\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+# endif
+                        continue;
+                    }
+
+                    if(handler_curr->custom_name_ptr != nullptr)
+                    {
+                        custom_name = ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(handler_curr->custom_name_ptr),
                                                                                handler_curr->custom_name_length};
+                    }
 
                     if(custom_name.empty()) [[unlikely]]
                     {
@@ -603,6 +719,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                     // There is no need to perform duplicate checks here, as checks will be performed globally.
 
+                    if(handler_curr->custom_handle_func == nullptr) [[unlikely]]
+                    {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                        if(::uwvm2::uwvm::io::show_dl_warning)
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Parsing error in DL \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                load_file_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8" (dl)\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Custom section handler function cannot be nullptr.\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                            if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                            {
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    u8"[fatal] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"Convert warnings to fatal errors. ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    u8"(dl)\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+# endif
+                        continue;
+                    }
+
                     // Use try_emplace to combine lookup and insertion operations, avoiding two hash lookups
                     if(!::uwvm2::uwvm::wasm::custom::custom_handle_funcs
                             .try_emplace(custom_name,
@@ -673,7 +834,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             {
                 wd.wasm_dl_storage.get_function_vec =
                     reinterpret_cast<::uwvm2::uwvm::wasm::type::capi_get_function_vec_t>(::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_function"));
-                can_get_function_vec = true;
+                can_get_function_vec = (wd.wasm_dl_storage.get_function_vec != nullptr);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -703,18 +864,102 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                 wd.wasm_dl_storage.capi_function_vec = (wd.wasm_dl_storage.get_function_vec)();
 
+                if(wd.wasm_dl_storage.capi_function_vec.function_begin == nullptr && wd.wasm_dl_storage.capi_function_vec.function_size != 0)
+                {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                    if(::uwvm2::uwvm::io::show_dl_warning)
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            u8"[warn]  ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"Function vector size is non-zero but pointer is null.",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8" (dl)\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                        if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Convert warnings to fatal errors. ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8"(dl)\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+# endif
+                }
+
                 auto const func_begin{wd.wasm_dl_storage.capi_function_vec.function_begin};
-                auto const func_end{func_begin + wd.wasm_dl_storage.capi_function_vec.function_size};
+                auto const func_count{wd.wasm_dl_storage.capi_function_vec.function_size};
 
                 // Ensure that no function names are duplicated in dl.
 
                 ::uwvm2::utils::container::unordered_flat_set<::uwvm2::utils::container::u8string_view> duplicate_name_checker{};
                 duplicate_name_checker.reserve(wd.wasm_dl_storage.capi_function_vec.function_size);
 
-                for(auto func_curr{func_begin}; func_curr != func_end; ++func_curr)
+                for(::std::size_t i{}; func_begin != nullptr && i < func_count; ++i)
                 {
-                    ::uwvm2::utils::container::u8string_view const func_name{reinterpret_cast<char8_t_const_may_alias_ptr>(func_curr->func_name_ptr),
+                    auto const func_curr{func_begin + i};
+                    ::uwvm2::utils::container::u8string_view func_name{};
+                    if(func_curr->func_name_length != 0 && func_curr->func_name_ptr == nullptr) [[unlikely]]
+                    {
+# ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
+                        if(::uwvm2::uwvm::io::show_dl_warning)
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Parsing error in DL \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                load_file_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8" (dl)\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"The Function Name Pointer Cannot Be nullptr When Length > 0.\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                            if(::uwvm2::uwvm::io::dl_warning_fatal) [[unlikely]]
+                            {
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    u8"[fatal] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"Convert warnings to fatal errors. ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    u8"(dl)\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::fast_io::fast_terminate();
+                            }
+                        }
+# endif
+                        continue;
+                    }
+
+                    if(func_curr->func_name_ptr != nullptr)
+                    {
+                        func_name = ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(func_curr->func_name_ptr),
                                                                              func_curr->func_name_length};
+                    }
 
                     if(func_name.empty()) [[unlikely]]
                     {
