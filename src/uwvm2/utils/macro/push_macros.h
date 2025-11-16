@@ -441,16 +441,6 @@
 # define UWVM_GNU_MAY_ALIAS
 #endif
 
-/// @details      Allow or disallow loading dynamic libraries,
-///               this macro is affected by the system environment,
-///               some older systems do not support loading dynamic libraries
-#pragma push_macro("UWVM_CAN_LOAD_DL")
-#undef UWVM_CAN_LOAD_DL
-#if (defined(_WIN32) || defined(__CYGWIN__)) ||                                                                                                                \
-    ((!defined(_WIN32) || defined(__WINE__)) && (defined(__CYGWIN__) || (!defined(__NEWLIB__) && !defined(__wasi__))))
-# define UWVM_CAN_LOAD_DL
-#endif
-
 /// @details      Determine whether the operating system supports getting the path to the program binary itself.
 #pragma push_macro("UWVM_SUPPORT_INSTALL_PATH")
 #undef UWVM_SUPPORT_INSTALL_PATH
@@ -587,4 +577,10 @@
 #if (defined(_WIN32) || defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&                                        \
                                                  (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) && __has_include(<sys/mman.h>))
 # define UWVM_SUPPORT_MMAP
+#endif
+
+#pragma push_macro("UWVM_SUPPORT_WEEK_SYMBOL")
+#undef UWVM_SUPPORT_WEEK_SYMBOL
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__)
+# define UWVM_SUPPORT_WEEK_SYMBOL
 #endif

@@ -27,5 +27,6 @@
 # include "para.h"
 # include "file.h"
 # include "dl.h"
+# include "week_symbol.h"
 # include "all_module.h"
 #endif

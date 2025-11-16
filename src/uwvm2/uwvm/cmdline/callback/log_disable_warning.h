@@ -100,7 +100,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::io::show_vm_warning = false;
             ::uwvm2::uwvm::io::show_parser_warning = false;
             ::uwvm2::uwvm::io::show_untrusted_dl_warning = false;
+#ifdef UWVM_SUPPORT_PRELOAD_DL
             ::uwvm2::uwvm::io::show_dl_warning = false;
+#endif
+#ifdef UWVM_SUPPORT_WEEK_SYMBOL
+            ::uwvm2::uwvm::io::show_week_symbol_warning = false;
+#endif
             ::uwvm2::uwvm::io::show_depend_warning = false;
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
             ::uwvm2::uwvm::io::show_nt_path_warning = false;
@@ -112,7 +117,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::show_vm_warning = false; }
         else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::show_parser_warning = false; }
         else if(currp1_str == u8"untrusted-dl") { ::uwvm2::uwvm::io::show_untrusted_dl_warning = false; }
+#ifdef UWVM_SUPPORT_PRELOAD_DL
         else if(currp1_str == u8"dl") { ::uwvm2::uwvm::io::show_dl_warning = false; }
+#endif
+#ifdef UWVM_SUPPORT_WEEK_SYMBOL
+        else if(currp1_str == u8"week-symbol") { ::uwvm2::uwvm::io::show_week_symbol_warning = false; }
+#endif
         else if(currp1_str == u8"depend") { ::uwvm2::uwvm::io::show_depend_warning = false; }
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
         else if(currp1_str == u8"nt-path") { ::uwvm2::uwvm::io::show_nt_path_warning = false; }

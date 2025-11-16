@@ -25,6 +25,8 @@
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -38,8 +40,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool show_vm_warning{true};            // [global]
     inline bool show_parser_warning{true};        // [global]
     inline bool show_untrusted_dl_warning{true};  // [global]
-    inline bool show_dl_warning{true};            // [global]
-    inline bool show_depend_warning{true};        // [global]
+# ifdef UWVM_SUPPORT_PRELOAD_DL
+    inline bool show_dl_warning{true};  // [global]
+# endif
+# ifdef UWVM_SUPPORT_WEEK_SYMBOL
+    inline bool show_week_symbol_warning{true};  // [global]
+# endif
+    inline bool show_depend_warning{true};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
     inline bool show_nt_path_warning{true};  // [global]
 # endif
@@ -51,8 +58,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool vm_warning_fatal{};            // [global]
     inline bool parser_warning_fatal{};        // [global]
     inline bool untrusted_dl_warning_fatal{};  // [global]
-    inline bool dl_warning_fatal{};            // [global]
-    inline bool depend_warning_fatal{};        // [global]
+# ifdef UWVM_SUPPORT_PRELOAD_DL
+    inline bool dl_warning_fatal{};  // [global]
+# endif
+# ifdef UWVM_SUPPORT_WEEK_SYMBOL
+    inline bool week_symbol_warning_fatal{};  // [global]
+# endif
+    inline bool depend_warning_fatal{};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
     inline bool nt_path_warning_fatal{};  // [global]
 # endif
@@ -61,4 +73,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 # endif
 
 }  // namespace uwvm2::uwvm::io
+#endif
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/utils/macro/pop_macros.h>
 #endif

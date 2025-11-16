@@ -59,7 +59,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter log_disable_warning{
         .name{u8"--log-disable-warning"},
         .describe{u8"Turn off the warning output of the uwvm."},
-        .usage{u8"[all|vm|parser|untrusted-dl|dl|depend"
+        .usage{u8"[all|vm|parser|untrusted-dl"
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+               u8"|dl"
+#endif
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+               u8"|week-symbol"
+#endif
+               u8"|depend"
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
                u8"|nt-path"
 #endif

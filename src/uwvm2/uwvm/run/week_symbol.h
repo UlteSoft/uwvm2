@@ -1,0 +1,114 @@
+/*************************************************************
+ * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * Copyright (c) 2025-present UlteSoft. All rights reserved. *
+ * Licensed under the APL-2.0 License (see LICENSE file).    *
+ *************************************************************/
+
+/**
+ * @author      MacroModel
+ * @version     2.0.0
+ * @date        2025-03-27
+ * @copyright   APL-2.0 License
+ */
+
+/****************************************
+ *  _   _ __        ____     __ __  __  *
+ * | | | |\ \      / /\ \   / /|  \/  | *
+ * | | | | \ \ /\ / /  \ \ / / | |\/| | *
+ * | |_| |  \ V  V /    \ V /  | |  | | *
+ *  \___/    \_/\_/      \_/   |_|  |_| *
+ *                                      *
+ ****************************************/
+
+#pragma once
+
+#ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <cstdint>
+# include <type_traits>
+# include <utility>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+// import
+# include <fast_io.h>
+# include <uwvm2/utils/ansies/impl.h>
+# include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/madvise/impl.h>
+# include <uwvm2/parser/wasm/base/impl.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm/standard/impl.h>
+# include <uwvm2/parser/wasm/binfmt/base/impl.h>
+# include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/ansies/impl.h>
+# include <uwvm2/uwvm/utils/memory/impl.h>
+# include <uwvm2/uwvm/cmdline/impl.h>
+# include <uwvm2/uwvm/wasm/impl.h>
+# include "retval.h"
+#endif
+
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEEK_SYMBOL)
+// msvc not support __weak__
+UWVM_MODULE_EXPORT extern "C"
+{
+    struct uwvm_week_symbol_module_c
+    {
+        char const* module_name_ptr;
+        ::std::size_t module_name_length;
+        ::uwvm2::uwvm::wasm::type::capi_custom_handler_vec_t custom_handler_vec;
+        ::uwvm2::uwvm::wasm::type::capi_function_vec_t function_vec;
+    };
+
+    struct uwvm_week_symbol_module_vector_c
+    {
+        uwvm_week_symbol_module_c const* module_ptr;
+        ::std::size_t module_count;
+    };
+
+    [[__gnu__::__weak__]] inline uwvm_week_symbol_module_vector_c uwvm_week_symbol() { return {}; }
+}
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
+{
+    inline constexpr int load_week_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
+    {
+#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEEK_SYMBOL)
+        auto const vec{uwvm_week_symbol()};
+        if(vec.module_ptr == nullptr || vec.module_count == 0uz) { return static_cast<int>(::uwvm2::uwvm::run::retval::ok); }
+
+        // Consume each provided weak module like preloaded dl modules.
+        auto const modules_begin{vec.module_ptr};
+        auto const modules_end{modules_begin + vec.module_count};
+
+        ::uwvm2::uwvm::wasm::storage::week_symbol.reserve(::uwvm2::uwvm::wasm::storage::week_symbol.size() + vec.module_count);
+
+        for(auto mod_curr{modules_begin}; mod_curr != modules_end; ++mod_curr)
+        {
+            ::uwvm2::uwvm::wasm::type::wasm_week_symbol_t tmp{};
+
+            using uwvm_week_symbol_module_c_may_alias_t UWVM_GNU_MAY_ALIAS = ::uwvm2::uwvm::wasm::type::uwvm_week_symbol_module_t const*;
+
+            ::uwvm2::uwvm::wasm::loader::load_week_symbol(tmp, *reinterpret_cast<uwvm_week_symbol_module_c_may_alias_t>(mod_curr), para);
+
+            ::uwvm2::uwvm::wasm::storage::week_symbol.push_back_unchecked(::std::move(tmp));
+        }
+
+        return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
+#else
+        return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
+#endif
+    }
+
+}  // namespace uwvm2::uwvm::run
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif

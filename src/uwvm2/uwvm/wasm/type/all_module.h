@@ -43,6 +43,7 @@
 # include "para.h"
 # include "file.h"
 # include "dl.h"
+# include "week_symbol.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -53,27 +54,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
     enum class module_type_t : unsigned
     {
-        exec_wasm,       // wasm_file
+        // The running WASM module, initialization begins from this module.
+        exec_wasm,  // wasm_file
+
+        // Pre-initialized WASM modules, similar to system DLLs.
         preloaded_wasm,  // wasm_file
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
-
+        // Dynamically loaded WASM binary import API, suitable for use as a plugin system, only supports platforms capable of dynamically loading DLLs.
+        // Currently, only the module import function is available.
         preloaded_dl,  // wasm_dl
 #endif
 
-        local_import  /// @todo wasip1, wasip2
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+        // Static WASM modules implemented with weak symbols, available across all platforms, specified during linking, primarily for embedded environments.
+        // Currently, only the module import function is available.
+        week_symbol,  // wasm_week_symbol
+#endif
+
+        /// @todo local_import
+        // Local import, uwvm2 is a custom-built module that supports full WASM module functionality through conceptual implementation.
+        // Enables custom functionality for complete WASM modules through the parser concept.
+        local_import  // wasip1, wasip2, ...
     };
 
     // all module
 
     union module_storage_ptr_u
     {
+        // exec_wasm
+        // preloaded_wasm
         ::uwvm2::uwvm::wasm::type::wasm_file_t const* wf;
-        /// @todo local_import
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
+        // preloaded_dl
         ::uwvm2::uwvm::wasm::type::wasm_dl_t const* wd;
 #endif
+
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+        // week_symbol
+        ::uwvm2::uwvm::wasm::type::wasm_week_symbol_t const* wws;
+#endif
+
+        /// @todo local_import
     };
 
     struct all_module_t
@@ -90,6 +113,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         return ::uwvm2::parser::wasm::standard::wasm1::features::final_export_type_t<Fs...>{};
     }
 
+    // exec_wasm
+    // preloaded_wasm
     struct wasm_file_export_t
     {
         using wasm_binfmt_ver1_export_storage_t = decltype(get_binfmt_ver1_final_export_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
@@ -107,6 +132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
+    // preloaded_dl
     struct wasm_dl_export_t
     {
         using wasm_dl_export_storage_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
@@ -114,23 +140,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 #endif
 
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+    // week_symbol
+    struct wasm_week_symbol_export_t
+    {
+        using wasm_week_symbol_export_storage_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
+        wasm_week_symbol_export_storage_t const* storage{};
+    };
+#endif
+
+    /// @todo local_import
+
     struct all_module_export_t
     {
+        // exec_wasm
+        // preloaded_wasm
         using wasm_file_export_storage_t = wasm_file_export_t;
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
+        // preloaded_dl
         using wasm_dl_export_storage_t = wasm_dl_export_t;
 #endif
 
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+        // week_symbol
+        using wasm_week_symbol_export_storage_t = wasm_week_symbol_export_t;
+#endif
+
+        /// @todo local_import
+
         union all_module_export_storage_u
         {
+            // exec_wasm
+            // preloaded_wasm
             wasm_file_export_storage_t wasm_file_export_storage_ptr;
             static_assert(::std::is_trivially_copyable_v<wasm_file_export_storage_t> && ::std::is_trivially_destructible_v<wasm_file_export_storage_t>);
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
+            // preloaded_dl
             wasm_dl_export_storage_t wasm_dl_export_storage_ptr;
             static_assert(::std::is_trivially_copyable_v<wasm_dl_export_storage_t> && ::std::is_trivially_destructible_v<wasm_dl_export_storage_t>);
 #endif
+
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+            // week_symbol
+            wasm_week_symbol_export_storage_t wasm_week_symbol_export_storage_ptr;
+            static_assert(::std::is_trivially_copyable_v<wasm_week_symbol_export_storage_t> && ::std::is_trivially_destructible_v<wasm_week_symbol_export_storage_t>);
+#endif
+
+            /// @todo local_import
         };
 
         all_module_export_storage_u storage{};

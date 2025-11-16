@@ -132,6 +132,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 #endif
 
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+        // week symbol
+        for(auto const& lwws: ::uwvm2::uwvm::wasm::storage::week_symbol)
+        {
+            if(!::uwvm2::uwvm::wasm::storage::all_module
+                    .try_emplace(lwws.module_name,
+                                 ::uwvm2::uwvm::wasm::type::all_module_t{.module_storage_ptr = {.wws = ::std::addressof(lwws)},
+                                                                         .type = ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol})
+                    .second) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    u8"[error] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Duplicate WASM module names: \"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    lwws.module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\".\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                return load_and_check_modules_rtl::duplicate_module_name;
+            }
+        }
+#endif
+
         /// @todo local modules
 
         // exec wasm
@@ -389,6 +416,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                         break;
                                     }
 #endif
+
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+                                    case ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol:
+                                    {
+                                        auto const week_symbol_ptr{imported_module.second.module_storage_ptr.wws};
+
+                                        // Check if there is an exported map. If not, build one.
+                                        auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                        if(inserted) [[unlikely]]
+                                        {
+                                            auto const wws_func{week_symbol_ptr->wasm_wws_storage.capi_function_vec};
+                                            auto const wws_func_ptr{wws_func.function_begin};
+                                            auto const wws_func_sz{wws_func.function_size};
+                                            curr_exported_module->second.reserve(wws_func_sz);  // Reserve space for dl functions
+                                            for(auto wws_func_curr{wws_func_ptr}; wws_func_curr != wws_func_ptr + wws_func_sz; ++wws_func_curr)
+                                            {
+                                                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                auto const wws_func_curr_name{
+                                                    ::uwvm2::utils::container::u8string_view{
+                                                                                             reinterpret_cast<char8_t_const_may_alias_ptr>(wws_func_curr->func_name_ptr),
+                                                                                             wws_func_curr->func_name_length}
+                                                };
+                                                ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol;
+                                                export_record.storage.wasm_week_symbol_export_storage_ptr.storage = wws_func_curr;
+                                                static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                                // No duplication, because a check was performed during loading.
+                                                curr_exported_module->second.emplace(wws_func_curr_name, export_record);
+                                            }
+                                        }
+
+                                        curr_exported = curr_exported_module;
+
+                                        break;
+                                    }
+#endif
+
+                                        /// @todo local_import
+
                                     [[unlikely]] default:
                                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -457,6 +523,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     break;
                 }
 #endif
+#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+                case ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol:
+                {
+                    // Since week_symbol only allows importing functions, there is no possibility of cyclic dependencies or similar issues, so no check is
+                    // needed
+                    break;
+                }
+#endif
+
+                    /// @todo local_import
+
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

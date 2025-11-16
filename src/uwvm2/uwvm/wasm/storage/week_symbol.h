@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -43,9 +43,9 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
-# if defined(UWVM_SUPPORT_PRELOAD_DL)
-    inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::wasm_dl_t>
-        preloaded_dl{};  // [global] No global variable dependencies from other translation units
+# if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+    inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::wasm_week_symbol_t>
+        week_symbol{};  // [global] No global variable dependencies from other translation units
 # endif
 }  // namespace uwvm2::uwvm::wasm::storage
 

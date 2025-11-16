@@ -22,6 +22,9 @@
 
 module;
 
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+
 export module uwvm2.uwvm_predefine.io:warn_control;
 
 import fast_io;

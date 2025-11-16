@@ -45,7 +45,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
+
+    // There is no need to add the UWVM_SUPPORT_PRELOAD_DL macro here, as it will be reused by the week symbol module.
 
     extern "C"
     {
@@ -149,8 +150,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         // wasm_parameter_u
         ::uwvm2::uwvm::wasm::type::wasm_parameter_u wasm_parameter{};
     };
-
-#endif
 }  // namespace uwvm2::uwvm::wasm::storage
 
 #ifndef UWVM_MODULE

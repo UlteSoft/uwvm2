@@ -351,6 +351,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     u8"The Overall WebAssembly Module Name Length Cannot Be 0.\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 # endif
+
+                return load_dl_rtl::parse_error;
             }
 
             // check module_name is utf8
@@ -519,6 +521,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             }
                         }
 # endif
+
+                        // Just skip here, no need to disable
+                        continue;
                     }
 
                     // check custom_name is utf8
@@ -651,6 +656,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             }
                         }
 # endif
+
+                        // Just skip here, no need to disable
+                        continue;
                     }
                 }
             }
@@ -718,8 +726,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 // 1
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                 u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                                u8"[error] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                 u8"Parsing error in DL \"",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
@@ -731,8 +739,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                 // 2
                                                 u8"uwvm: ",
-                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                                u8"[error] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                u8"[warn]  ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                 u8"The Function Name Length Cannot Be 0.\n\n",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -753,6 +761,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             }
                         }
 # endif
+
+                        // Just skip here, no need to disable
+                        continue;
                     }
 
                     // check custom_name is utf8
@@ -877,6 +888,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             }
                         }
 # endif
+
+                        // Just skip here, no need to disable
                         continue;
                     }
 
@@ -927,6 +940,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             }
                         }
 # endif
+
                         // Just skip here, no need to disable
                         continue;
                     }

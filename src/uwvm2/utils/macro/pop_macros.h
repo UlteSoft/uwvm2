@@ -26,6 +26,7 @@
 // #pragma once
 
 /// @brief      uwvm's macros
+#pragma pop_macro("UWVM_SUPPORT_WEEK_SYMBOL")
 #pragma pop_macro("UWVM_SUPPORT_MMAP")
 #pragma pop_macro("UWVM_SUPPORT_PRELOAD_DL")
 #pragma pop_macro("UWVM_CPP_EXCEPTIONS")
@@ -37,7 +38,6 @@
 #pragma pop_macro("UWVM_GNU_USED")
 #pragma pop_macro("UWVM_NOT_SUPPORT_SPECIAL_CHAR")
 #pragma pop_macro("UWVM_SUPPORT_INSTALL_PATH")
-#pragma pop_macro("UWVM_CAN_LOAD_DL")
 #pragma pop_macro("UWVM_GNU_MAY_ALIAS")
 #pragma pop_macro("UWVM_IF_NOT_CONSTEVAL")
 #pragma pop_macro("UWVM_IF_CONSTEVAL")
