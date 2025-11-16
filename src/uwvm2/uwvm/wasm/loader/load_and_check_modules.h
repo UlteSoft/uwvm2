@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -271,6 +271,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             auto const& exec_wasm_module_storage_importsec{
                                 get_exec_wasm_module_storage_importsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
 
+                            // Deduplicate dependency edges per current module to avoid repeated edges to the same import module
+                            ::uwvm2::utils::container::unordered_flat_set<module_name_t> seen_import_modules{};
+                            seen_import_modules.reserve(exec_wasm_module_storage_importsec.imports.size());
+
                             for(auto const& imports: exec_wasm_module_storage_importsec.imports)
                             {
                                 auto const import_module_name{imports.module_name};
@@ -279,13 +283,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 // Add dependency edge
                                 if(adjacency_list.contains(import_module_name))
                                 {
-                                    auto& deps{adjacency_list[curr_module_name]};
-                                    if(deps.empty())
+                                    // Only insert one edge per unique import module for the current module
+                                    if(seen_import_modules.insert(import_module_name).second)
                                     {
-                                        deps.reserve(exec_wasm_module_storage_importsec.imports.size());  // Reserve space for all imports
+                                        auto& deps{adjacency_list[curr_module_name]};
+                                        if(deps.empty())
+                                        {
+                                            deps.reserve(exec_wasm_module_storage_importsec.imports.size());  // Reserve space for all imports
+                                        }
+                                        // Safe: we just reserved space for all imports
+                                        deps.push_back_unchecked(import_module_name);
                                     }
-                                    // Safe: we just reserved space for all imports
-                                    deps.push_back_unchecked(import_module_name);
                                 }
 
                                 // Check dependencies
