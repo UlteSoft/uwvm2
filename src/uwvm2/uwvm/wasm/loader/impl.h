@@ -24,7 +24,7 @@
 #ifndef UWVM_MODULE
 # include "wasm_file.h"
 # include "dl.h"
-# include "week_symbol.h"
+# include "weak_symbol.h"
 # include "detect_cycle.h"
 # include "load_and_check_modules.h"
 #endif

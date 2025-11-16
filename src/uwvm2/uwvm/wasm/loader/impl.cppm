@@ -25,7 +25,7 @@ module;
 export module uwvm2.uwvm.wasm.loader;
 export import :wasm_file;
 export import :dl;
-export import :week_symbol;
+export import :weak_symbol;
 export import :detect_cycle;
 export import :load_and_check_modules;
 

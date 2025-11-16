@@ -44,7 +44,7 @@ import uwvm2.uwvm.wasm.feature;
 import :para;
 import :file;
 import :dl;
-import :week_symbol;
+import :weak_symbol;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

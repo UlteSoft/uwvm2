@@ -22,34 +22,26 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+
+export module uwvm2.uwvm.wasm.storage:weak_symbol;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.concepts;
+import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.uwvm.wasm.base;
+import uwvm2.uwvm.wasm.feature;
+import uwvm2.uwvm.wasm.type;
 
 #ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include <uwvm2/parser/wasm/concepts/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
-# include <uwvm2/uwvm/wasm/base/impl.h>
-# include <uwvm2/uwvm/wasm/feature/impl.h>
-# include <uwvm2/uwvm/wasm/type/impl.h>
+# define UWVM_MODULE
 #endif
-
 #ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
-{
-# if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-    inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::wasm_week_symbol_t>
-        week_symbol{};  // [global] No global variable dependencies from other translation units
-# endif
-}  // namespace uwvm2::uwvm::wasm::storage
-
-#ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/pop_macros.h>
-#endif
+#include "weak_symbol.h"

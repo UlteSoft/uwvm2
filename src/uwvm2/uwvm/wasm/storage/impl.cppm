@@ -28,7 +28,7 @@ export import :execute_wasm;
 export import :preloaded_wasm;
 export import :local_preload;
 export import :preloaded_dl;
-export import :week_symbol;
+export import :weak_symbol;
 export import :all_module;
 export import :wasi;
 

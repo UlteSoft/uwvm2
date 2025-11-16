@@ -58,7 +58,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 {
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
     enum class load_wws_rtl
     {
         ok,
@@ -66,8 +66,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         parse_error
     };
 
-    inline constexpr load_wws_rtl load_week_symbol(::uwvm2::uwvm::wasm::type::wasm_week_symbol_t & wws,
-                                                   ::uwvm2::uwvm::wasm::type::uwvm_week_symbol_module_t const& ws_module,
+    inline constexpr load_wws_rtl load_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws,
+                                                   ::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t const& ws_module,
                                                    ::uwvm2::uwvm::wasm::type::wasm_parameter_u para) noexcept
     {
         wws.module_name = ::uwvm2::utils::container::u8string_view{ws_module.module_name_ptr, ws_module.module_name_length};
@@ -209,7 +209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(custom_name.empty()) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // Output the main information and memory indication
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -235,7 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             u8"The Custom Name Length Cannot Be 0.\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -265,7 +265,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(utf8err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // default print_memory
                         ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{reinterpret_cast<::std::byte const*>(custom_name.cbegin()),
@@ -310,7 +310,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                             u8"\n");
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -339,7 +339,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         .second) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // Output the main information and memory indication
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -369,7 +369,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             u8"\".\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -430,7 +430,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(func_name.empty()) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // Output the main information and memory indication
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -456,7 +456,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             u8"The Function Name Length Cannot Be 0.\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -486,7 +486,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(utf8err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // default print_memory
                         ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{reinterpret_cast<::std::byte const*>(func_name.cbegin()),
@@ -531,7 +531,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                             u8"\n");
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -556,7 +556,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(!duplicate_name_checker.emplace(func_name).second) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -583,7 +583,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             u8"\".\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -609,7 +609,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 if(func_curr->func_ptr == nullptr) [[unlikely]]
                 {
 # ifndef UWVM_DISABLE_OUTPUT_WHEN_PARSE
-                    if(::uwvm2::uwvm::io::show_week_symbol_warning)
+                    if(::uwvm2::uwvm::io::show_weak_symbol_warning)
                     {
                         // Output the main information and memory indication
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -635,7 +635,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             u8"Functions cannot be nullptr.\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-                        if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
+                        if(::uwvm2::uwvm::io::weak_symbol_warning_fatal) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),

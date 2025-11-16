@@ -27,7 +27,7 @@ export import :cwrapper;
 export import :para;
 export import :file;
 export import :dl;
-export import :week_symbol;
+export import :weak_symbol;
 export import :all_module;
 
 #ifndef UWVM_MODULE

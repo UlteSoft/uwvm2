@@ -43,8 +43,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 # ifdef UWVM_SUPPORT_PRELOAD_DL
     inline bool show_dl_warning{true};  // [global]
 # endif
-# ifdef UWVM_SUPPORT_WEEK_SYMBOL
-    inline bool show_week_symbol_warning{true};  // [global]
+# ifdef UWVM_SUPPORT_WEAK_SYMBOL
+    inline bool show_weak_symbol_warning{true};  // [global]
 # endif
     inline bool show_depend_warning{true};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
@@ -61,8 +61,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 # ifdef UWVM_SUPPORT_PRELOAD_DL
     inline bool dl_warning_fatal{};  // [global]
 # endif
-# ifdef UWVM_SUPPORT_WEEK_SYMBOL
-    inline bool week_symbol_warning_fatal{};  // [global]
+# ifdef UWVM_SUPPORT_WEAK_SYMBOL
+    inline bool weak_symbol_warning_fatal{};  // [global]
 # endif
     inline bool depend_warning_fatal{};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)

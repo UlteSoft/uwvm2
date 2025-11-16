@@ -73,7 +73,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         duplicate_module_name
     };
 
-    inline load_and_check_modules_rtl contruct_all_module_and_check_duplicate_module() noexcept
+    inline load_and_check_modules_rtl construct_all_module_and_check_duplicate_module() noexcept
     {
 #ifdef UWVM_TIMER
         ::uwvm2::utils::debug::timer parsing_timer{u8"contruct all module and check duplicate module"};
@@ -132,14 +132,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
         // week symbol
-        for(auto const& lwws: ::uwvm2::uwvm::wasm::storage::week_symbol)
+        for(auto const& lwws: ::uwvm2::uwvm::wasm::storage::weak_symbol)
         {
             if(!::uwvm2::uwvm::wasm::storage::all_module
                     .try_emplace(lwws.module_name,
                                  ::uwvm2::uwvm::wasm::type::all_module_t{.module_storage_ptr = {.wws = ::std::addressof(lwws)},
-                                                                         .type = ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol})
+                                                                         .type = ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol})
                     .second) [[unlikely]]
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -417,16 +417,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     }
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-                                    case ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol:
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                                    case ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol:
                                     {
-                                        auto const week_symbol_ptr{imported_module.second.module_storage_ptr.wws};
+                                        auto const weak_symbol_ptr{imported_module.second.module_storage_ptr.wws};
 
                                         // Check if there is an exported map. If not, build one.
                                         auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
                                         if(inserted) [[unlikely]]
                                         {
-                                            auto const wws_func{week_symbol_ptr->wasm_wws_storage.capi_function_vec};
+                                            auto const wws_func{weak_symbol_ptr->wasm_wws_storage.capi_function_vec};
                                             auto const wws_func_ptr{wws_func.function_begin};
                                             auto const wws_func_sz{wws_func.function_size};
                                             curr_exported_module->second.reserve(wws_func_sz);  // Reserve space for dl functions
@@ -439,8 +439,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                                                              wws_func_curr->func_name_length}
                                                 };
                                                 ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
-                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol;
-                                                export_record.storage.wasm_week_symbol_export_storage_ptr.storage = wws_func_curr;
+                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol;
+                                                export_record.storage.wasm_weak_symbol_export_storage_ptr.storage = wws_func_curr;
                                                 static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
                                                 // No duplication, because a check was performed during loading.
                                                 curr_exported_module->second.emplace(wws_func_curr_name, export_record);
@@ -523,10 +523,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     break;
                 }
 #endif
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-                case ::uwvm2::uwvm::wasm::type::module_type_t::week_symbol:
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                case ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol:
                 {
-                    // Since week_symbol only allows importing functions, there is no possibility of cyclic dependencies or similar issues, so no check is
+                    // Since weak_symbol only allows importing functions, there is no possibility of cyclic dependencies or similar issues, so no check is
                     // needed
                     break;
                 }
@@ -559,7 +559,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Start checking whether the import exists and the type matches. ",
+                                u8"Start checking whether the import exists. ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));

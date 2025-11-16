@@ -28,7 +28,7 @@
 # include "preloaded_wasm.h"
 # include "local_preload.h"
 # include "preloaded_dl.h"
-# include "week_symbol.h"
+# include "weak_symbol.h"
 # include "all_module.h"
 # include "wasi.h"
 #endif

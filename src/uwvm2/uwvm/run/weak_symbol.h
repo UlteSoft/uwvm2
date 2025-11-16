@@ -52,11 +52,11 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEEK_SYMBOL)
+#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEAK_SYMBOL)
 // msvc not support __weak__
 UWVM_MODULE_EXPORT extern "C"
 {
-    struct uwvm_week_symbol_module_c
+    struct uwvm_weak_symbol_module_c
     {
         char const* module_name_ptr;
         ::std::size_t module_name_length;
@@ -64,39 +64,50 @@ UWVM_MODULE_EXPORT extern "C"
         ::uwvm2::uwvm::wasm::type::capi_function_vec_t function_vec;
     };
 
-    struct uwvm_week_symbol_module_vector_c
+    static_assert(sizeof(uwvm_weak_symbol_module_c) == sizeof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t));
+    static_assert(alignof(uwvm_weak_symbol_module_c) == alignof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, module_name_ptr) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, module_name_ptr));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, module_name_length) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, module_name_length));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, custom_handler_vec) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, custom_handler_vec));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, function_vec) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, function_vec));
+
+    struct uwvm_weak_symbol_module_vector_c
     {
-        uwvm_week_symbol_module_c const* module_ptr;
+        uwvm_weak_symbol_module_c const* module_ptr;
         ::std::size_t module_count;
     };
 
-    [[__gnu__::__weak__]] inline uwvm_week_symbol_module_vector_c uwvm_week_symbol() { return {}; }
+    [[__gnu__::__weak__]] inline uwvm_weak_symbol_module_vector_c uwvm_weak_symbol() { return {}; }
 }
 #endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
-    inline constexpr int load_week_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
+    inline constexpr int load_weak_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
     {
-#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEEK_SYMBOL)
-        auto const vec{uwvm_week_symbol()};
+#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEAK_SYMBOL)
+        auto const vec{uwvm_weak_symbol()};
         if(vec.module_ptr == nullptr || vec.module_count == 0uz) { return static_cast<int>(::uwvm2::uwvm::run::retval::ok); }
 
         // Consume each provided weak module like preloaded dl modules.
         auto const modules_begin{vec.module_ptr};
         auto const modules_end{modules_begin + vec.module_count};
 
-        ::uwvm2::uwvm::wasm::storage::week_symbol.reserve(::uwvm2::uwvm::wasm::storage::week_symbol.size() + vec.module_count);
+        ::uwvm2::uwvm::wasm::storage::weak_symbol.reserve(::uwvm2::uwvm::wasm::storage::weak_symbol.size() + vec.module_count);
 
         for(auto mod_curr{modules_begin}; mod_curr != modules_end; ++mod_curr)
         {
-            ::uwvm2::uwvm::wasm::type::wasm_week_symbol_t tmp{};
+            ::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t tmp{};
 
-            using uwvm_week_symbol_module_c_may_alias_t UWVM_GNU_MAY_ALIAS = ::uwvm2::uwvm::wasm::type::uwvm_week_symbol_module_t const*;
+            using uwvm_weak_symbol_module_c_may_alias_t UWVM_GNU_MAY_ALIAS = ::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t const*;
 
-            ::uwvm2::uwvm::wasm::loader::load_week_symbol(tmp, *reinterpret_cast<uwvm_week_symbol_module_c_may_alias_t>(mod_curr), para);
+            ::uwvm2::uwvm::wasm::loader::load_weak_symbol(tmp, *reinterpret_cast<uwvm_weak_symbol_module_c_may_alias_t>(mod_curr), para);
 
-            ::uwvm2::uwvm::wasm::storage::week_symbol.push_back_unchecked(::std::move(tmp));
+            ::uwvm2::uwvm::wasm::storage::weak_symbol.push_back_unchecked(::std::move(tmp));
         }
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);

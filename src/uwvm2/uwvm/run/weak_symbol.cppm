@@ -31,7 +31,7 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.run:week_symbol;
+export module uwvm2.uwvm.run:weak_symbol;
 
 import fast_io;
 import uwvm2.utils.ansies;
@@ -55,4 +55,4 @@ import :retval;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "week_symbol.h"
+#include "weak_symbol.h"

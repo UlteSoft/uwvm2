@@ -43,7 +43,7 @@
 # include "para.h"
 # include "file.h"
 # include "dl.h"
-# include "week_symbol.h"
+# include "weak_symbol.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -66,10 +66,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         preloaded_dl,  // wasm_dl
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
         // Static WASM modules implemented with weak symbols, available across all platforms, specified during linking, primarily for embedded environments.
         // Currently, only the module import function is available.
-        week_symbol,  // wasm_week_symbol
+        weak_symbol,  // wasm_weak_symbol
 #endif
 
         /// @todo local_import
@@ -91,9 +91,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::uwvm::wasm::type::wasm_dl_t const* wd;
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-        // week_symbol
-        ::uwvm2::uwvm::wasm::type::wasm_week_symbol_t const* wws;
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+        // weak_symbol
+        ::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t const* wws;
 #endif
 
         /// @todo local_import
@@ -140,12 +140,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-    // week_symbol
-    struct wasm_week_symbol_export_t
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+    // weak_symbol
+    struct wasm_weak_symbol_export_t
     {
-        using wasm_week_symbol_export_storage_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
-        wasm_week_symbol_export_storage_t const* storage{};
+        using wasm_weak_symbol_export_storage_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
+        wasm_weak_symbol_export_storage_t const* storage{};
     };
 #endif
 
@@ -162,9 +162,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         using wasm_dl_export_storage_t = wasm_dl_export_t;
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-        // week_symbol
-        using wasm_week_symbol_export_storage_t = wasm_week_symbol_export_t;
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+        // weak_symbol
+        using wasm_weak_symbol_export_storage_t = wasm_weak_symbol_export_t;
 #endif
 
         /// @todo local_import
@@ -182,10 +182,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             static_assert(::std::is_trivially_copyable_v<wasm_dl_export_storage_t> && ::std::is_trivially_destructible_v<wasm_dl_export_storage_t>);
 #endif
 
-#if defined(UWVM_SUPPORT_WEEK_SYMBOL)
-            // week_symbol
-            wasm_week_symbol_export_storage_t wasm_week_symbol_export_storage_ptr;
-            static_assert(::std::is_trivially_copyable_v<wasm_week_symbol_export_storage_t> && ::std::is_trivially_destructible_v<wasm_week_symbol_export_storage_t>);
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+            // weak_symbol
+            wasm_weak_symbol_export_storage_t wasm_weak_symbol_export_storage_ptr;
+            static_assert(::std::is_trivially_copyable_v<wasm_weak_symbol_export_storage_t> && ::std::is_trivially_destructible_v<wasm_weak_symbol_export_storage_t>);
 #endif
 
             /// @todo local_import

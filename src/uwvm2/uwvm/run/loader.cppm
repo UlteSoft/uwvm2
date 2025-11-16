@@ -47,7 +47,7 @@ import uwvm2.uwvm.utils.memory;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm;
 import :retval;
-import :week_symbol;
+import :weak_symbol;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -579,8 +579,8 @@
 # define UWVM_SUPPORT_MMAP
 #endif
 
-#pragma push_macro("UWVM_SUPPORT_WEEK_SYMBOL")
-#undef UWVM_SUPPORT_WEEK_SYMBOL
+#pragma push_macro("UWVM_SUPPORT_WEAK_SYMBOL")
+#undef UWVM_SUPPORT_WEAK_SYMBOL
 #if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__)
-# define UWVM_SUPPORT_WEEK_SYMBOL
+# define UWVM_SUPPORT_WEAK_SYMBOL
 #endif

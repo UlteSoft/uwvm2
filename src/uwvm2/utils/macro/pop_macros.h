@@ -26,7 +26,7 @@
 // #pragma once
 
 /// @brief      uwvm's macros
-#pragma pop_macro("UWVM_SUPPORT_WEEK_SYMBOL")
+#pragma pop_macro("UWVM_SUPPORT_WEAK_SYMBOL")
 #pragma pop_macro("UWVM_SUPPORT_MMAP")
 #pragma pop_macro("UWVM_SUPPORT_PRELOAD_DL")
 #pragma pop_macro("UWVM_CPP_EXCEPTIONS")

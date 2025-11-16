@@ -68,10 +68,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         if(auto const ret{::uwvm2::uwvm::run::load_local_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
         // load week symbol modules
-        if(auto const ret{::uwvm2::uwvm::run::load_week_symbol_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
+        if(auto const ret{::uwvm2::uwvm::run::load_weak_symbol_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]] { return ret; }
 
         // check duplicate module and construct ::uwvm2::uwvm::wasm::storage::all_module
-        if(auto const ret{::uwvm2::uwvm::wasm::loader::contruct_all_module_and_check_duplicate_module()};
+        if(auto const ret{::uwvm2::uwvm::wasm::loader::construct_all_module_and_check_duplicate_module()};
            ret != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) [[unlikely]]
         {
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
