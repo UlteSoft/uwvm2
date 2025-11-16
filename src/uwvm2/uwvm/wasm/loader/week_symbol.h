@@ -453,7 +453,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                             u8"[warn]  ",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"The Function Name Length Cannot Be 0.\n\n",
+                                            u8"The Function Name Length Cannot Be 0.\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
                         if(::uwvm2::uwvm::io::week_symbol_warning_fatal) [[unlikely]]
