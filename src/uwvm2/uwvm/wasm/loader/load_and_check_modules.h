@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -76,7 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
     inline load_and_check_modules_rtl construct_all_module_and_check_duplicate_module() noexcept
     {
 #ifdef UWVM_TIMER
-        ::uwvm2::utils::debug::timer parsing_timer{u8"contruct all module and check duplicate module"};
+        ::uwvm2::utils::debug::timer parsing_timer{u8"construct all module and check duplicate module"};
 #endif
 
         // preloaded wasm
@@ -676,7 +676,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
         return load_and_check_modules_rtl::ok;
     }
-}  // namespace uwvm2::uwvm::run
+}  // namespace uwvm2::uwvm::wasm::loader
 
 #ifndef UWVM_MODULE
 // macro

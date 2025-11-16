@@ -66,7 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::uwvm::wasm::type::capi_custom_handler_vec_t custom_handler_vec;
         ::uwvm2::uwvm::wasm::type::capi_function_vec_t function_vec;
     };
-}  // namespace uwvm2::uwvm::wasm::storage
+}  // namespace uwvm2::uwvm::wasm::type
 
 #ifndef UWVM_MODULE
 // macro
