@@ -151,9 +151,41 @@ uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module(void)
     return &vec;
 }
 
-// clang -c weak_symbol.c --sysroot="$SYSROOT"
-// g++ -c weak_symbol.c
+// Currently, weak symbols only support the ELF file format.
 
-// ar rcs libweak_symbol.a weak_symbol.o
+// clang -c weak_symbol.c --sysroot="$SYSROOT" # or: g++ -c weak_symbol.c
+// xmake f ... --ldflags="examples/0003.weak_symbol/weak_symbol.o"
 
-// xmake f ... --links=weak_symbol
+// IMPORTANT:
+// Do NOT archive the weak fallback object into a static library via 
+//     ar rcs libweak_symbol.a weak_symbol.o
+//
+// Reason:
+//   ELF static libraries use "lazy extraction" semantics. When a static
+//   library is passed to the linker, individual .o members are only pulled
+//   in on-demand when a symbol is first referenced. If the weak definition
+//   of uwvm_weak_symbol_module() resides inside a .a archive, and the linker
+//   resolves that symbol from the archive before seeing a strong override
+//   definition, the weak .o will be extracted and permanently selected.
+//   The linker will NOT backtrack and replace it later when the strong
+//   definition appears. As a result, the strong override is effectively
+//   ignored.
+//
+// Recommended usage:
+//   • Link the weak fallback implementation directly as an object file:
+//         ... weak_symbol.o ...
+//     This guarantees that strong symbols always override weak ones.
+//
+// If a static library must be used:
+//   • Maintain strict ordering in the final link command.
+//   • The strong definition (.o) must appear BEFORE the library containing
+//     the weak one (.a).
+//   • Example:
+//         clang++ main.o strong_impl.o -lweak_symbol
+//     (Strong override first, weak library last.)
+//
+// Summary:
+//   Avoid placing weak definitions inside .a archives unless you have full
+//   control of symbol resolution order. Prefer linking .o directly or place
+//   strong definitions before the weak library to ensure correct override
+//   semantics.
