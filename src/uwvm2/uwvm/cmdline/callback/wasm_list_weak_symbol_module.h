@@ -74,12 +74,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::fast_io::io::perrln(u8log_output_ul,
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                   u8"             - ",
-                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                   module.module_name);
         }
 
         // add endl
-        ::fast_io::io::perrln(u8log_output_ul);
+        ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
         return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
     }
