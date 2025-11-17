@@ -38,6 +38,7 @@ export import :wasm_preload_library;
 export import :wasm_register_dl;
 export import :wasm_depend_recursion_limit;
 export import :wasm_set_parser_limit;
+export import :wasm_list_weak_symbol_module;
 
 // wasi
 export import :wasip1_set_fd_limit;

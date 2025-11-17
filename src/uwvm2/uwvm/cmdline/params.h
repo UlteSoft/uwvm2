@@ -60,6 +60,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_register_dl),
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
+#endif
 
             // wasi
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
