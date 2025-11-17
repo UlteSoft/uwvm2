@@ -49,9 +49,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
     UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(
-        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
-        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_parsing_results*,
+        ::uwvm2::utils::cmdline::parameter_parsing_results*,
+        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
         // No copies will be made here.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
