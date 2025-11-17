@@ -39,6 +39,7 @@
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/wasm/loader/impl.h>
+# include <uwvm2/uwvm/run/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -60,6 +61,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8log_output_osr)};
         // No copies will be made here.
         auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
+
+        // This is executed in a command-line environment without encountering any WASM parsing environment, so it is parsed directly here. Afterward, the
+        // program terminates immediately and does not affect subsequent usage.
+
+        if(auto const ret{::uwvm2::uwvm::run::load_weak_symbol_modules()}; ret != static_cast<int>(::uwvm2::uwvm::run::retval::ok)) [[unlikely]]
+        {
+            ::fast_io::io::perr(u8log_output_ul,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Cannot load wasm weak symbol modules.\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
 
         ::fast_io::io::perr(u8log_output_ul,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
