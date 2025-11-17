@@ -81,7 +81,7 @@ UWVM_MODULE_EXPORT extern "C"
         ::std::size_t module_count;
     };
 
-    [[__gnu__::__weak__]] inline uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module() { return nullptr; }
+    [[__gnu__::__weak__]] [[__gnu__::__used__]] inline uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module() { return nullptr; }
 }
 #endif
 
