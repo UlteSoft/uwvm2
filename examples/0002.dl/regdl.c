@@ -186,6 +186,5 @@ capi_function_vec_t uwvm_function(void)
     return vec;
 }
 
-
-// clang -shared -o regdl regdl.c  --sysroot=$SYSROOT -fuse-ld=lld   
+// clang -shared -o regdl regdl.c  --sysroot=$SYSROOT -fuse-ld=lld
 // gcc -shared -o regdl regdl.c
