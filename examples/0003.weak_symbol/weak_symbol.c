@@ -150,3 +150,10 @@ uwvm_weak_symbol_module_vector_c uwvm_weak_symbol(void)
     v.module_count = (size_t)(sizeof(mods) / sizeof(mods[0]));
     return v;
 }
+
+// clang -c weak_symbol.c --sysroot="$SYSROOT"
+// g++ -c weak_symbol.c
+
+// ar rcs libweak_symbol.a weak_symbol.o
+
+// xmake f ... --links=weak_symbol
