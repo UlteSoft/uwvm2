@@ -67,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                             u8"[info]  ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8"Wasm List Weak Symbol Module:\n");
+                            u8"Wasm Weak Symbol Module:\n");
 
         for(auto const& module: ::uwvm2::uwvm::wasm::storage::weak_symbol)
         {
