@@ -81,7 +81,7 @@ UWVM_MODULE_EXPORT extern "C"
         ::std::size_t module_count;
     };
 
-    [[__gnu__::__weak__]] inline uwvm_weak_symbol_module_vector_c uwvm_weak_symbol() { return {}; }
+    [[__gnu__::__weak__]] inline uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module() { return nullptr; }
 }
 #endif
 
@@ -90,7 +90,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     inline constexpr int load_weak_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
     {
 #if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEAK_SYMBOL)
-        auto const vec{uwvm_weak_symbol()};
+        auto const vec_ptr{uwvm_weak_symbol_module()};
+        if(vec_ptr == nullptr) { return static_cast<int>(::uwvm2::uwvm::run::retval::ok); }
+
+        auto const& vec{*vec_ptr};
+
+        if(vec.module_ptr == nullptr && vec.module_count != 0uz) { return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error); }
         if(vec.module_ptr == nullptr || vec.module_count == 0uz) { return static_cast<int>(::uwvm2::uwvm::run::retval::ok); }
 
         // Consume each provided weak module like preloaded dl modules.

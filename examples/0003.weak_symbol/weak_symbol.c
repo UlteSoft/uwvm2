@@ -136,7 +136,7 @@ static capi_function_t const functions[] = {
 };
 
 // Strong definition to override weak fallback in header
-uwvm_weak_symbol_module_vector_c uwvm_weak_symbol(void)
+uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module(void)
 {
     static uwvm_weak_symbol_module_c const mods[] = {
         {module_name_str,
@@ -144,11 +144,11 @@ uwvm_weak_symbol_module_vector_c uwvm_weak_symbol(void)
          (capi_custom_handler_vec_t){handlers, (size_t)(sizeof(handlers) / sizeof(handlers[0]))},
          (capi_function_vec_t){functions, (size_t)(sizeof(functions) / sizeof(functions[0]))}},
     };
-
-    uwvm_weak_symbol_module_vector_c v;
-    v.module_ptr = mods;
-    v.module_count = (size_t)(sizeof(mods) / sizeof(mods[0]));
-    return v;
+    static uwvm_weak_symbol_module_vector_c const vec = {
+        mods,
+        (size_t)(sizeof(mods) / sizeof(mods[0]))
+    };
+    return &vec;
 }
 
 // clang -c weak_symbol.c --sysroot="$SYSROOT"

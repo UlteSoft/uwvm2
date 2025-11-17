@@ -127,7 +127,7 @@ static capi_function_t const functions[] = {
      (capi_wasm_function)&do_nothing_impl},
 };
 
-extern "C" uwvm_weak_symbol_module_vector_c uwvm_weak_symbol(void)
+extern "C" uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module(void)
 {
     static uwvm_weak_symbol_module_c const mods[] = {
         {module_name_str,
@@ -135,9 +135,9 @@ extern "C" uwvm_weak_symbol_module_vector_c uwvm_weak_symbol(void)
          capi_custom_handler_vec_t{handlers, (std::size_t)(sizeof(handlers) / sizeof(handlers[0]))},
          capi_function_vec_t{functions, (std::size_t)(sizeof(functions) / sizeof(functions[0]))}},
     };
-
-    uwvm_weak_symbol_module_vector_c v;
-    v.module_ptr = mods;
-    v.module_count = (std::size_t)(sizeof(mods) / sizeof(mods[0]));
-    return v;
+    static uwvm_weak_symbol_module_vector_c const vec = {
+        mods,
+        (std::size_t)(sizeof(mods) / sizeof(mods[0]))
+    };
+    return &vec;
 }
