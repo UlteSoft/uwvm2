@@ -81,7 +81,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // add endl
         ::fast_io::io::perrln(u8log_output_ul);
 
-        return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
     }
 
 #endif
