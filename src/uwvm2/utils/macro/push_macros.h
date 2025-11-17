@@ -582,6 +582,6 @@
 #pragma push_macro("UWVM_SUPPORT_WEAK_SYMBOL")
 #undef UWVM_SUPPORT_WEAK_SYMBOL
 // Currently only supports ELF weak symbols.
-#if defined(__ELF__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__)
+#if defined(__ELF__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__used__)
 # define UWVM_SUPPORT_WEAK_SYMBOL
 #endif

@@ -52,7 +52,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEAK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
 // msvc not support __weak__
 UWVM_MODULE_EXPORT extern "C"
 {
@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
     inline constexpr int load_weak_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
     {
-#if !(defined(_MSC_VER) && !defined(__clang__)) && defined(UWVM_SUPPORT_WEAK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
         auto const vec_ptr{uwvm_weak_symbol_module()};
         if(vec_ptr == nullptr) { return static_cast<int>(::uwvm2::uwvm::run::retval::ok); }
 
