@@ -909,14 +909,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"Feature:\n"
         // detailed checker
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                u8"    Detailed Debug Check Mode \n"
+                                // Perform additional checks during debugging
+                                u8"  * Detailed Debug Check Mode\n"
 #endif
         // fno-exceptions
 #if !(defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE))
-                                u8"    Error Direct Crash Mode (fno-exceptions)\n"
+                                // Error Direct Crash Mode
+                                u8"  * Error Direct Crash Mode (fno-exceptions)\n"
 #endif
                                 // command line hash
-                                u8"    CMDLHash: "
+                                u8"  * CMDLHash: "
                                 u8"HT=",
                                 ::uwvm2::uwvm::cmdline::hash_table_size.hash_table_size,
                                 u8", EX=",
@@ -943,24 +945,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
                                 // wasm feature
                                 u8"\n"
-                                u8"    WebAssembly Features Supported: "
+                                u8"  * WebAssembly Features Supported: "
                                 u8"\n"
             );
         // wasm feature
         version_u8print_wasm_feature_from_tuple(u8log_output_ul, ::uwvm2::uwvm::wasm::feature::all_features);
 
         // other features
-        ::fast_io::io::perr(u8log_output_ul,                                 
-            u8"\n"
-            u8"    Other Features: "
-            u8"\n"
+        ::fast_io::io::perr(u8log_output_ul,       
+            // version_u8print_wasm_feature_from_tuple already print '\n'                          
 #ifdef UWVM_SUPPORT_PRELOAD_DL
-            u8"      - Preload Dynamic Linking Module\n"
+            // Support Preload Dynamic Linking Module (--wasm-register-dl)
+            u8"  * Support Preload Dynamic Linking Module\n"
 #endif
 #ifdef UWVM_SUPPORT_WEAK_SYMBOL
-            u8"      - Weak Symbol Module\n"
+            // Support Weak Symbol Module (via link)
+            u8"  * Support Weak Symbol Module\n"
 #endif
-            u8"\n\n"
+            u8"\n"
         );
 
         // Here, guard will perform destructors.
