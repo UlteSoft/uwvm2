@@ -532,8 +532,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        auto const new_path_stack_size{new_path_stack.size()};
-                        if(new_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
 
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eexist;
                     }
@@ -779,8 +778,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        auto const old_path_stack_size{old_path_stack.size()};
-                        if(old_path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
 
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                     }
