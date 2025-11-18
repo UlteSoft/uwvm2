@@ -566,7 +566,7 @@ public:
 	}
 	[[nodiscard]] inline constexpr const_iterator end() const noexcept
 	{
-		return {__builtin_addressof(imp)};
+		return {const_cast<::fast_io::containers::details::list_node_common*>(__builtin_addressof(imp))};
 	}
 
 	[[nodiscard]] inline constexpr const_iterator cbegin() const noexcept
@@ -575,16 +575,17 @@ public:
 	}
 	[[nodiscard]] inline constexpr const_iterator cend() const noexcept
 	{
-		return {__builtin_addressof(imp)};
+		return {const_cast<::fast_io::containers::details::list_node_common*>(__builtin_addressof(imp))};
+	}
+
+	[[nodiscard]] inline constexpr reverse_iterator rbegin() noexcept
+	{
+		return reverse_iterator({__builtin_addressof(imp)});
 	}
 
 	[[nodiscard]] inline constexpr reverse_iterator rend() noexcept
 	{
 		return reverse_iterator({imp.next});
-	}
-	[[nodiscard]] inline constexpr reverse_iterator rbegin() noexcept
-	{
-		return reverse_iterator({__builtin_addressof(imp)});
 	}
 
 	[[nodiscard]] inline constexpr const_reverse_iterator rend() const noexcept
@@ -593,7 +594,7 @@ public:
 	}
 	[[nodiscard]] inline constexpr const_reverse_iterator rbegin() const noexcept
 	{
-		return const_reverse_iterator({__builtin_addressof(imp)});
+		return const_reverse_iterator({const_cast<::fast_io::containers::details::list_node_common*>(__builtin_addressof(imp))});
 	}
 
 	[[nodiscard]] inline constexpr const_reverse_iterator crend() const noexcept
@@ -602,7 +603,7 @@ public:
 	}
 	[[nodiscard]] inline constexpr const_reverse_iterator crbegin() const noexcept
 	{
-		return const_reverse_iterator({__builtin_addressof(imp)});
+		return const_reverse_iterator({const_cast<::fast_io::containers::details::list_node_common*>(__builtin_addressof(imp))});
 	}
 
 	[[nodiscard]] inline constexpr bool empty() const noexcept
@@ -613,6 +614,24 @@ public:
 	[[nodiscard]] inline constexpr bool is_empty() const noexcept
 	{
 		return imp.next == __builtin_addressof(imp);
+	}
+
+	/**
+	 * @brief Checks if the list contains only one element.
+	 * @return true if the list contains only one element, false otherwise.
+	 */
+	[[nodiscard]] inline constexpr bool is_single() const noexcept
+	{
+		return imp.next == imp.prev && imp.next != __builtin_addressof(imp);
+	}
+
+	/**
+	 * @brief Checks if the list contains multiple elements (>= 2).
+	 * @return true if the list contains multiple elements, false otherwise.
+	 */
+	[[nodiscard]] inline constexpr bool has_multiple() const noexcept
+	{
+		return imp.next != imp.prev;
 	}
 
 	[[nodiscard]] static inline constexpr size_type max_size() noexcept
@@ -907,15 +926,19 @@ public:
 	}
 
 	inline constexpr list(list &&other) noexcept
-		: imp(other.imp)
 		  #if 0
-		  , allochdl(std::move(other.allochdl))
+		  : allochdl(std::move(other.allochdl))
 		  #endif
 	{
-		auto prev = static_cast<::fast_io::containers::details::list_node_common *>(imp.prev);
-		auto next = static_cast<::fast_io::containers::details::list_node_common *>(imp.next);
-		next->prev = prev->next = __builtin_addressof(imp);
-		other.imp = {__builtin_addressof(other.imp), __builtin_addressof(other.imp)};
+		if (other.is_empty()) {
+			imp = {__builtin_addressof(imp), __builtin_addressof(imp)};
+		} else {
+			imp = other.imp;
+			auto prev = static_cast<::fast_io::containers::details::list_node_common *>(imp.prev);
+			auto next = static_cast<::fast_io::containers::details::list_node_common *>(imp.next);
+			next->prev = prev->next = __builtin_addressof(imp);
+			other.imp = {__builtin_addressof(other.imp), __builtin_addressof(other.imp)};
+		}
 	}
 
 	inline constexpr list &operator=(list &&other) noexcept
