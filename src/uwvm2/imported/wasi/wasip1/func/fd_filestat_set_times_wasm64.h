@@ -1,4 +1,4 @@
-
+﻿
 
 /*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *

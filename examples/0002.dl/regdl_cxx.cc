@@ -1,4 +1,4 @@
-#include <cstddef>
+﻿#include <cstddef>
 #include <cstdint>
 
 using capi_wasm_function = void (*)(unsigned char*, unsigned char*);
