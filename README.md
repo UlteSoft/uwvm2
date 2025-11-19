@@ -30,6 +30,12 @@ Most wasm standards are supported. See [feature.md](documents/features.md). For 
 ### Supports multiple platforms
 Supports over 100 triplet platforms, including DOS series, POSIX series, Windows 9x series, Windows NT series, and the Host C Library Series. Supports interpretation execution (INT), just-in-time compilation (JIT), and tiered compilation (TC). See [support.md](documents/support.md) for details.
 
+### High-performance, secure, and highly scalable standard parser
+High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
+
+### WASI host extensions
+WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. See [imported/readme.md](src/uwvm2/imported/readme.md) for details.
+
 ## Commandline interface
 * Get version information
 ```bash
@@ -55,3 +61,4 @@ $ uwvm --wasi-mount-dir <wasi dir> <system dir> ... --run ...
 * Darwin (aka. unknown-apple-darwin). See [darwin.md](documents/how-to-build/darwin.md)
 * FreeBSD (aka. unknown-freebsd(Version)). See [freebsd.md](documents/how-to-build/freebsd.md)
 * WASM-WASI (self-hosting) (aka. [wasm32|wasm64]-[wasip1|wasip2]-(threads)). See [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
+* Other platforms: See [how-to-build](documents/how-to-build)
