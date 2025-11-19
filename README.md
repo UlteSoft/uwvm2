@@ -37,7 +37,7 @@ High-performance, spec-compliant WebAssembly binary parser built on concept-orie
 WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. See [imported/readme.md](src/uwvm2/imported/readme.md) for details.
 
 ### Flexible linear memory models
-uwvm2 provides three host-side models for implementing WebAssembly linear memory (mmap-based, multi-threaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual memory support. See [readme.h](src/uwvm2/object/memory/readme.h) for a detailed description.
+uwvm2 provides three host-side models for implementing WebAssembly linear memory (mmap-based, multi-threaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual memory support. See [readme.h](src/uwvm2/object/memory/readme.md) for a detailed description.
 
 ## Commandline interface
 * Get version information
