@@ -623,7 +623,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
-                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st)) < 0) [[unlikely]]
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                    }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
@@ -709,7 +712,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
-                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st)) < 0) [[unlikely]]
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                    }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
@@ -1309,7 +1315,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
-                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st)) < 0) [[unlikely]]
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                    }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
@@ -1395,7 +1404,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
-                                    ::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st));
+                                    if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(next.native_handle(), ::std::addressof(st)) < 0) [[unlikely]]
+                                    {
+                                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                    }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir; }
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
