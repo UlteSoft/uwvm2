@@ -37,20 +37,38 @@
  
  Security and correctness are treated as first-class concerns.
  
- - **Spec-driven invariants.** The implementation is annotated with comments that restate the relevant parts of the WebAssembly specification, together with the corresponding checks performed by the code.
- - **Fine-grained error reporting.** All parse errors are reported through a structured error object, allowing callers to distinguish between malformed binaries, unsupported features, and configuration issues.
- - **Systematic fuzzing.** The repository contains multiple fuzzers that target both individual sections and entire modules. These harnesses continuously exercise the parser against randomly generated and mutated binaries to detect crashes, assertion failures, and logic bugs.
- - **Defensive parsing.** Inputs are never trusted: bounds are checked rigorously, index spaces are validated, and invalid combinations of sections or feature flags are rejected early.
+- **Spec-driven invariants.** The implementation is annotated with comments that restate the relevant parts of the WebAssembly specification, together with the corresponding checks performed by the code.
+- **Fine-grained error reporting.** All parse errors are reported through a structured error object, allowing callers to distinguish between malformed binaries, unsupported features, and configuration issues.
+- **Systematic fuzzing.** The repository contains multiple fuzzers that target both individual sections and entire modules. These harnesses continuously exercise the parser against randomly generated and mutated binaries to detect crashes, assertion failures, and logic bugs.
+- **Defensive parsing.** Inputs are never trusted: bounds are checked rigorously, index spaces are validated, and invalid combinations of sections or feature flags are rejected early.
  
- Together, the manual cross-checking against the spec and the automated fuzzing campaigns provide a strong level of assurance for real-world workloads.
+Together, the manual cross-checking against the spec and the automated fuzzing campaigns provide a strong level of assurance for real-world workloads.
  
- ## Standards compliance and scalability
+## Standards compliance and scalability
+  
+The parser aims to be both **faithful to the WebAssembly specifications** and **scalable across versions and proposals**.
+  
+- **Versioned binary format.** The core of the parser targets the WebAssembly binary format version 1 and its standard section layout. Feature types encode which binary-format version they belong to.
+- **Per-section correctness.** Each standard section is responsible for its own well-formedness rules (for example, type indices in the function section, limits in the table and memory sections, and element/data segment encodings). These rules are captured by the corresponding concepts and ADL handlers.
+- **Controlled feature growth.** New proposals (such as relaxed SIMD and multi-table/multi-memory configurations) can be expressed as independent features, without modifying existing ones. Compile-time checks prevent inconsistent combinations and duplicate handlers.
+- **Repository-wide tracking.** The set of supported features and the mapping to official WebAssembly releases are tracked in the top-level documentation files (`documents/features.md` and `documents/wasm-release.md`).
  
- The parser aims to be both **faithful to the WebAssembly specifications** and **scalable across versions and proposals**.
+## Platform and environment requirements
  
- - **Versioned binary format.** The core of the parser targets the WebAssembly binary format version 1 and its standard section layout. Feature types encode which binary-format version they belong to.
- - **Per-section correctness.** Each standard section is responsible for its own well-formedness rules (for example, type indices in the function section, limits in the table and memory sections, and element/data segment encodings). These rules are captured by the corresponding concepts and ADL handlers.
- - **Controlled feature growth.** New proposals (such as relaxed SIMD and multi-table/multi-memory configurations) can be expressed as independent features, without modifying existing ones. Compile-time checks prevent inconsistent combinations and duplicate handlers.
- - **Repository-wide tracking.** The set of supported features and the mapping to official WebAssembly releases are tracked in the top-level documentation files (`documents/features.md` and `documents/wasm-release.md`).
+The parser is designed to run on the same broad set of platforms as the rest of UWVM2, ranging from legacy DOS-style environments to modern POSIX
+systems and contemporary Windows versions. A few environment assumptions are worth calling out explicitly:
  
- Because the parser is assembled from small, well-specified building blocks, it can scale from a minimal, standards-only configuration to a feature-rich configuration that includes multiple proposals, without sacrificing performance or safety.
+- **C++ exceptions.** The recommended configuration enables C++ exceptions. In this mode, non-fatal parsing failures and invariant violations can be
+  reported in a controlled way (for example via structured error objects or exception-handling code paths). When exceptions are globally disabled,
+  the same conditions are typically handled via hard-fail code paths that terminate the process rather than propagating recoverable errors.
+- **Hosted vs. freestanding builds.** The core parser can be built as a standalone library in a freestanding C++26 environment, as long as the required
+  UWVM2 utility headers, `fast_io`, and allocator integration are available. It does not require the full virtual machine to be present, but it does
+  assume that a working heap and basic low-level runtime are provided by the embedding application.
+- **Non-8-bit `CHAR_BIT` platforms.** The implementation uses `std::byte` and explicit 8-bit integer types for the WebAssembly byte stream. On
+  platforms where `CHAR_BIT` is greater than 8, only the lowest 8 bits of each addressable byte are interpreted as part of the WebAssembly encoding;
+  any higher bits must remain zero. Violating this assumption results in undefined behavior.
+- **Heap and allocator requirements.** Dynamic allocations performed by the parser go through `fast_io`'s allocator abstraction. On hosted platforms,
+  this is usually satisfied by `fast_io`'s native global allocator. On more restricted or freestanding targets, you must provide a global allocator
+  that models the `::fast_io::custom_global_allocator` concept so that all parser allocations have a well-defined backing heap.
+ 
+Because the parser is assembled from small, well-specified building blocks, it can scale from a minimal, standards-only configuration to a feature-rich configuration that includes multiple proposals, without sacrificing performance or safety.
