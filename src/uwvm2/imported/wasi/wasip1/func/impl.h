@@ -93,4 +93,6 @@
 # include "path_rename.h"
 # include "path_symlink_wasm64.h"
 # include "path_symlink.h"
+# include "path_unlink_file_wasm64.h"
+# include "path_unlink_file.h"
 #endif
