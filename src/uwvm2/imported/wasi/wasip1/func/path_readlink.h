@@ -58,7 +58,6 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
-# include "fd_filestat_get.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
