@@ -87,5 +87,10 @@
 # include "path_open.h"
 # include "path_readlink_wasm64.h"
 # include "path_readlink.h"
-
+# include "path_remove_directory_wasm64.h"
+# include "path_remove_directory.h"
+# include "path_rename_wasm64.h"
+# include "path_rename.h"
+# include "path_symlink_wasm64.h"
+# include "path_symlink.h"
 #endif

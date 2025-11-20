@@ -87,6 +87,12 @@ export import :path_open_wasm64;
 export import :path_open;
 export import :path_readlink_wasm64;
 export import :path_readlink;
+export import :path_remove_directory_wasm64
+export import :path_remove_directory
+export import :path_rename_wasm64
+export import :path_rename
+export import :path_symlink_wasm64
+export import :path_symlink
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
