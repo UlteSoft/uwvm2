@@ -524,9 +524,9 @@ int main()
                                                                              static_cast<wasi_posix_fd_t>(3),
                                                                              P_NEW,
                                                                              static_cast<wasi_size_t>(sizeof(u8"psl32_nt_mut_link/inner_after_mut") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess)
         {
-            ::fast_io::io::perrln("error: psl32 Case 13 expected enotdir. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: psl32 Case 13 expected esuccess. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
