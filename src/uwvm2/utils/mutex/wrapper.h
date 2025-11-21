@@ -51,12 +51,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     /// @brief Write-Priority RW Lock (Turnstile + RoomEmpty + Atomic Readers Count)
     struct rwlock_t
     {
-        ::std::atomic_size_t readers{};          // Active readers count
-        ::std::atomic_size_t writers_waiting{};  // Writers waiting for the lock
-        ::std::atomic_bool writer_active{};      // A writer currently holds the lock
+        // Bit layout (similar to folly::RWSpinLock):
+        // bit0: WRITER, bit1: reserved/UPGRADED, bits[2..]: READER count (each reader adds READER).
+        ::std::atomic_uint bits{};
     };
 
     inline constexpr void rwlock_pause() noexcept { ::std::atomic_signal_fence(::std::memory_order_seq_cst); }
+
+    inline consteval unsigned rwlock_reader_mask() noexcept { return 4u; }  // READER
+    inline consteval unsigned rwlock_writer_mask() noexcept { return 1u; }  // WRITER
 
     /// @brief Shared guard for read operations
     struct rw_shared_guard_t
@@ -65,24 +68,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 
         inline explicit constexpr rw_shared_guard_t(rwlock_t& lock) : lock_ptr(::std::addressof(lock))
         {
-            auto& lk{*this->lock_ptr};
+            auto& bits{this->lock_ptr->bits};
+            constexpr auto reader_mask{rwlock_reader_mask()};
+            constexpr auto writer_mask{rwlock_writer_mask()};
 
             for(;;)
             {
-                while(lk.writer_active.load(::std::memory_order_acquire) || lk.writers_waiting.load(::std::memory_order_acquire) != 0uz) { rwlock_pause(); }
+                auto const old{bits.fetch_add(reader_mask, ::std::memory_order_acquire)};
+                if((old & writer_mask) == 0u) { break; }
 
-                auto curr{lk.readers.load(::std::memory_order_acquire)};
-
-                if(lk.writer_active.load(::std::memory_order_acquire) || lk.writers_waiting.load(::std::memory_order_acquire) != 0uz) { continue; }
-
-                if(lk.readers.compare_exchange_weak(curr, curr + 1uz, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
+                bits.fetch_sub(reader_mask, ::std::memory_order_release);
+                rwlock_pause();
             }
         }
 
         inline constexpr ~rw_shared_guard_t()
         {
             if(!this->lock_ptr) [[unlikely]] { return; }
-            this->lock_ptr->readers.fetch_sub(1uz, ::std::memory_order_release);
+            constexpr auto reader_mask{rwlock_reader_mask()};
+            this->lock_ptr->bits.fetch_sub(reader_mask, ::std::memory_order_release);
         }
 
         rw_shared_guard_t(rw_shared_guard_t const&) = delete;
@@ -96,28 +100,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 
         inline explicit constexpr rw_unique_guard_t(rwlock_t& lock) : lock_ptr(::std::addressof(lock))
         {
-            auto& lk{*this->lock_ptr};
-
-            lk.writers_waiting.fetch_add(1uz, ::std::memory_order_acq_rel);
+            auto& bits{this->lock_ptr->bits};
+            constexpr auto writer_mask{rwlock_writer_mask()};
 
             for(;;)
             {
-                if(!lk.writer_active.load(::std::memory_order_acquire) && lk.readers.load(::std::memory_order_acquire) == 0uz)
-                {
-                    bool expected{false};
-                    if(lk.writer_active.compare_exchange_weak(expected, true, ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { break; }
-                }
+                unsigned expected{};
+                if(bits.compare_exchange_weak(expected, writer_mask, ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { break; }
 
                 rwlock_pause();
             }
-
-            lk.writers_waiting.fetch_sub(1uz, ::std::memory_order_release);
         }
 
         inline constexpr ~rw_unique_guard_t()
         {
             if(!this->lock_ptr) [[unlikely]] { return; }
-            this->lock_ptr->writer_active.store(false, ::std::memory_order_release);
+            constexpr auto writer_mask{rwlock_writer_mask()};
+            this->lock_ptr->bits.fetch_and(~writer_mask, ::std::memory_order_release);
         }
 
         rw_unique_guard_t(rw_unique_guard_t const&) = delete;
