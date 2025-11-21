@@ -483,6 +483,7 @@ int main()
     // Case 13: file symlink whose target turned into directory, still treated as file parent -> enotdir
     {
         try_unlink(u8"psl64_nt_mut_node");
+        try_unlink(u8"psl64_nt_mut_link/inner_after_mut");
         try_unlink(u8"psl64_nt_mut_link");
         try_rmdir(u8"psl64_nt_mut_node");
 
