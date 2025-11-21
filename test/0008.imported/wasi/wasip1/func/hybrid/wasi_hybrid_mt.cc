@@ -337,7 +337,7 @@ inline static void wasi_scenario_dir(native_memory_t& memory,
     }
 }
 
-// S5: path_open_wasm64 -> fd_read_wasm64 -> fd_close_wasm64
+// S5: path_open_wasm64 -> fd_read_wasm64
 inline static void wasi_scenario_open_read_close(native_memory_t& memory,
                                                  wasip1_environment<native_memory_t>& env,
                                                  wasi_posix_fd_wasm64_t dirfd,
@@ -388,8 +388,7 @@ inline static void wasi_scenario_open_read_close(native_memory_t& memory,
         nread_ptr);
     if(ret_rd != errno_wasm64_t::esuccess) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-    auto const ret_close = ::uwvm2::imported::wasi::wasip1::func::fd_close_wasm64(env, opened_fd);
-    if(ret_close != errno_wasm64_t::esuccess) [[unlikely]] { ::fast_io::fast_terminate(); }
+    // Do not close here in the hybrid test to avoid cross-thread fd slot reuse races.
 }
 
 // S6: clock_res_get_wasm64 -> clock_time_get_wasm64
@@ -454,7 +453,7 @@ int main()
     wasip1_environment<native_memory_t> env{.wasip1_memory = ::std::addressof(memory),
                                             .argv = args,
                                             .envs = envs,
-                                            .fd_storage = {.fd_limit = 128uz},
+                                            .fd_storage = {.fd_limit = 8192uz},
                                             .mount_dir_roots = {},
                                             .trace_wasip1_call = false,
                                             .disable_utf8_check = false};
