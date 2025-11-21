@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2025-06-30
  * @copyright   APL-2.0 License
  */
 
@@ -21,11 +22,20 @@
 
 module;
 
-export module uwvm2.utils.mutex;
-export import :wrapper;
-export import :rw_spin_lock;
-export import :mere_release;
-export import :lock_all;
+// std
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <climits>
+#include <concepts>
+#include <memory>
+#include <utility>
+#include <type_traits>
+#include <atomic>
+
+export module uwvm2.utils.mutex:rw_spin_lock;
+
+import fast_io;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -34,4 +44,4 @@ export import :lock_all;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "rw_spin_lock.h"
