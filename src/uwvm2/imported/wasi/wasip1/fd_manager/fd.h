@@ -598,11 +598,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
         wasi_fd_storage_t wasi_fd_storage{};
     };
 
+    /// @brief Used to prevent default construction.
+    struct wasi_no_construct_t
+    {
+        inline explicit constexpr wasi_no_construct_t() noexcept = default;
+    };
+
+    inline constexpr wasi_no_construct_t wasi_no_construct{};
+
     struct wasi_fd_ref_t
     {
         using allocator_t = ::fast_io::native_typed_global_allocator<wasi_fd_rc_t>;
 
         wasi_fd_rc_t* ptr{};
+
+        inline constexpr wasi_fd_ref_t(wasi_no_construct_t) noexcept {}
 
         inline constexpr wasi_fd_ref_t() noexcept
         {
@@ -726,6 +736,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
         using wasi_fd_t_fast_io_type_allocator = ::fast_io::native_typed_global_allocator<wasi_fd_t>;
 
         wasi_fd_t* fd_p{};
+
+        inline constexpr wasi_fd_unique_ptr_t(wasi_no_construct_t) noexcept {}
 
         inline constexpr wasi_fd_unique_ptr_t() noexcept
         {

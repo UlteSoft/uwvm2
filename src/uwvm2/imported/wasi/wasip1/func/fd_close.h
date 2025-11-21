@@ -74,6 +74,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto& wasm_fd_storage{env.fd_storage};
 
+        ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_ref_t old_wasi_fd{::uwvm2::imported::wasi::wasip1::fd_manager::wasi_no_construct};
+
         // Prevent operations to obtain the size or perform resizing at this time.
         // Only a lock is required when acquiring the unique pointer for the file descriptor. The lock can be released once the acquisition is complete.
         // Since the file descriptor's location is fixed and accessed via the unique pointer,
@@ -91,14 +93,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const fd_opens_pos{static_cast<::std::size_t>(unsigned_fd)};
 
-        // not nullprt -> File descriptors in the open list require additional handling.
-        // nullptr -> File descriptors in the renumber map, simply erase it.
-        ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t* curr_fd_p;  // no initialize
-        // If curr_fd_p is not nullptr, this thread-safety guarantee is required.
-        ::uwvm2::utils::mutex::mutex_merely_release_guard_t curr_fd_release_guard{};
-
+        // Manipulating fd_manager requires a unique_lock.
         {
-            // Manipulating fd_manager requires a unique_lock.
             ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
             // The minimum value in rename_map is greater than opensize.
@@ -129,6 +125,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
             else
             {
+                // not nullprt -> File descriptors in the open list require additional handling.
+                // nullptr -> File descriptors in the renumber map, simply erase it.
+                ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t* curr_fd_p;  // no initialize
+                // If curr_fd_p is not nullptr, this thread-safety guarantee is required.
+                ::uwvm2::utils::mutex::mutex_merely_release_guard_t curr_fd_release_guard{};
+
                 // The addition here is safe.
                 curr_fd_p = wasm_fd_storage.opens.index_unchecked(fd_opens_pos).fd_p;
 
@@ -158,50 +160,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 // Add the position where it closes itself to facilitate subsequent renumbering.
                 // Since it is a vector, its internal iterators are contiguous, allowing direct access to adjacent elements.
                 curr_fd_p->close_pos = static_cast<::std::size_t>(new_close_pos - wasm_fd_storage.closes.cbegin());
-            }
 
-            // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
-        }
+                // The write lock here must remain locked until the entire file is closed, to prevent subsequent open_at operations from acquiring the actual
+                // closing position and causing a use-after-free condition.
+                auto& curr_fd{*curr_fd_p};
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        if(curr_fd_p == nullptr) [[unlikely]]
-        {
-            // Security issues inherent to virtual machines
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-        }
-#endif
+                // Modify `right` in advance to prevent subsequent exceptions from causing the modification to fail.
+                curr_fd.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_t{};
+                curr_fd.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t{};
 
-        auto& curr_fd{*curr_fd_p};
+                // The "close" operation always succeeds. Even if an exception is thrown, it will be reset to the initial value.
 
-        // Modify `right` in advance to prevent subsequent exceptions from causing the modification to fail.
-        curr_fd.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_t{};
-        curr_fd.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t{};
-
-        // The "close" operation always succeeds. Even if an exception is thrown, it will be reset to the initial value.
-
-        // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
-        // being processed, making this a virtual machine implementation error.
-        if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
-        {
+                // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files
+                // from being processed, making this a virtual machine implementation error.
+                if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
+                {
 // This will be checked at runtime.
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+
+                // In `sys_close_throw_error`, `fast_io` first sets the file descriptor to -1 regardless of whether `close` succeeds or fails, then throws an
+                // exception based on the return value. This means that once `curr_fd.close()` throws an exception, the underlying handle is highly likely
+                // already unusable (especially on Linux, where `EINTR` and many error scenarios have effectively closed it). If an exception is thrown here and
+                // `eio` is returned directly without marking the fd in `wasm_fd_storage.closes`, updating `close_pos`, or resetting rights, the VM will
+                // mistakenly believe the fd remains usable despite its actual unavailability. This creates a state inconsistency. It is neither exception-safe
+                // (no fallback possible) nor prevents subsequent operations on the fd from failing. Therefore, no action is taken here.
+
+                // The `reset_type` function does not throw exceptions, and the destructor of `fast_io` also does not throw exceptions. It will not close due to
+                // a failed close operation. Use `reset` directly. When creating from the vector of closed positions later, use `create_new`.
+                old_wasi_fd.ptr = curr_fd.wasi_fd.ptr;
+                curr_fd.wasi_fd.ptr = nullptr;
+
+                // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
+            }
         }
 
-        // In `sys_close_throw_error`, `fast_io` first sets the file descriptor to -1 regardless of whether `close` succeeds or fails, then throws an
-        // exception based on the return value. This means that once `curr_fd.close()` throws an exception, the underlying handle is highly likely
-        // already unusable (especially on Linux, where `EINTR` and many error scenarios have effectively closed it). If an exception is thrown here and
-        // `eio` is returned directly without marking the fd in `wasm_fd_storage.closes`, updating `close_pos`, or resetting rights, the VM will
-        // mistakenly believe the fd remains usable despite its actual unavailability. This creates a state inconsistency. It is neither exception-safe
-        // (no fallback possible) nor prevents subsequent operations on the fd from failing. Therefore, no action is taken here.
-
-        // The `reset_type` function does not throw exceptions, and the destructor of `fast_io` also does not throw exceptions. It will not close due to a
-        // failed close operation. Use `reset` directly. When creating from the vector of closed positions later, use `create_new`.
-        curr_fd.wasi_fd.reset();
-
-        // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
+        if(old_wasi_fd.ptr != nullptr) { old_wasi_fd.reset(); }
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
     }

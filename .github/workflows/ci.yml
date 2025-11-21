@@ -52,6 +52,34 @@ jobs:
       - name: Unit tests
         run: xmake test -v
 
+  x86_64-linux-gnu-uwvm-tsan:
+    name: x86_64-linux-gnu (ubuntu-24.04) uwvm (tsan)
+    runs-on: ubuntu-24.04 # noble
+    strategy:
+      matrix:
+        mode: ["debug"]
+        policies:
+          [
+            "build.sanitizer.thread",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository ppa:xmake-io/xmake
+          sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble main"
+          sudo apt-get install clang-22 clang-tools-22 lld-22 xmake
+
+      - name: Configure
+        run: xmake f -m debug --use-llvm=y --sdk=/usr/lib/llvm-22 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --test-libfuzzer=y
+      - name: Build
+        run: xmake b -rv
+      - name: Check UWVM version
+        run: xmake run uwvm --version
+      - name: Unit tests
+        run: xmake test -v
+
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-uwvm-cxxmodule:
     if: ${{ !always() }}
