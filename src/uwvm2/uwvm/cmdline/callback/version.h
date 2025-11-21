@@ -930,7 +930,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // sanitizer
 #if UWVM_HAS_FEATURE(address_sanitizer) || UWVM_HAS_FEATURE(thread_sanitizer) || UWVM_HAS_FEATURE(memory_sanitizer) || UWVM_HAS_FEATURE(leak_sanitizer) ||     \
     UWVM_HAS_FEATURE(undefined_sanitizer)
-                                u8"\n    Sanitizer: "
+                                u8"\n  * Sanitizer: "
 # if UWVM_HAS_FEATURE(address_sanitizer)
                                 u8"Address "
 # elif UWVM_HAS_FEATURE(thread_sanitizer)
