@@ -51,30 +51,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     /// @brief Write-Priority RW Lock (Turnstile + RoomEmpty + Atomic Readers Count)
     struct rwlock_t
     {
-        mutex_t turnstile{};             // Writers retain access upon entry, preventing new readers from crossing through (write-first priority).
-        mutex_t room_empty{};            // Room lock: The writer requires exclusive access; the first reader locks it, and the last reader unlocks it.
-        ::std::atomic_size_t readers{};  // Atomic reader count
+        ::std::atomic_size_t readers{};          // Active readers count
+        ::std::atomic_size_t writers_waiting{};  // Writers waiting for the lock
+        ::std::atomic_bool writer_active{};      // A writer currently holds the lock
     };
+
+    inline constexpr void rwlock_pause() noexcept { ::std::atomic_signal_fence(::std::memory_order_seq_cst); }
 
     /// @brief Shared guard for read operations
     struct rw_shared_guard_t
     {
         rwlock_t* lock_ptr{};
 
-        inline explicit rw_shared_guard_t(rwlock_t& lock) : lock_ptr(std::addressof(lock))
+        inline explicit constexpr rw_shared_guard_t(rwlock_t& lock) : lock_ptr(::std::addressof(lock))
         {
-            // Write-first priority: readers first pass through the turnstile, and if there are waiting/ongoing writers, they are blocked here.
-            mutex_guard_t t{this->lock_ptr->turnstile};
-            // Atomic increments require obtaining room_empty only for transitions from 0 to 1.
-            if(this->lock_ptr->readers.fetch_add(1uz, ::std::memory_order_acquire) == 0uz) { this->lock_ptr->room_empty.lock(); }
-            // Release the turnstile to allow other readers to enter concurrently.
+            auto& lk{*this->lock_ptr};
+
+            for(;;)
+            {
+                while(lk.writer_active.load(::std::memory_order_acquire) || lk.writers_waiting.load(::std::memory_order_acquire) != 0uz) { rwlock_pause(); }
+
+                auto curr{lk.readers.load(::std::memory_order_acquire)};
+
+                if(lk.writer_active.load(::std::memory_order_acquire) || lk.writers_waiting.load(::std::memory_order_acquire) != 0uz) { continue; }
+
+                if(lk.readers.compare_exchange_weak(curr, curr + 1uz, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
+            }
         }
 
-        inline ~rw_shared_guard_t()
+        inline constexpr ~rw_shared_guard_t()
         {
             if(!this->lock_ptr) [[unlikely]] { return; }
-            // Atoms decrease, and only transitions from 1 to 0 require releasing room_empty.
-            if(this->lock_ptr->readers.fetch_sub(1uz, ::std::memory_order_release) == 1uz) { this->lock_ptr->room_empty.unlock(); }
+            this->lock_ptr->readers.fetch_sub(1uz, ::std::memory_order_release);
         }
 
         rw_shared_guard_t(rw_shared_guard_t const&) = delete;
@@ -86,18 +94,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     {
         rwlock_t* lock_ptr{};
 
-        inline explicit rw_unique_guard_t(rwlock_t& lock) : lock_ptr(std::addressof(lock))
+        inline explicit constexpr rw_unique_guard_t(rwlock_t& lock) : lock_ptr(::std::addressof(lock))
         {
-            // The writer first occupies the turnstile, blocking new readers; then exclusively holds room_empty.
-            this->lock_ptr->turnstile.lock();
-            this->lock_ptr->room_empty.lock();
+            auto& lk{*this->lock_ptr};
+
+            lk.writers_waiting.fetch_add(1uz, ::std::memory_order_acq_rel);
+
+            for(;;)
+            {
+                if(!lk.writer_active.load(::std::memory_order_acquire) && lk.readers.load(::std::memory_order_acquire) == 0uz)
+                {
+                    bool expected{false};
+                    if(lk.writer_active.compare_exchange_weak(expected, true, ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { break; }
+                }
+
+                rwlock_pause();
+            }
+
+            lk.writers_waiting.fetch_sub(1uz, ::std::memory_order_release);
         }
 
-        inline ~rw_unique_guard_t()
+        inline constexpr ~rw_unique_guard_t()
         {
             if(!this->lock_ptr) [[unlikely]] { return; }
-            this->lock_ptr->room_empty.unlock();
-            this->lock_ptr->turnstile.unlock();
+            this->lock_ptr->writer_active.store(false, ::std::memory_order_release);
         }
 
         rw_unique_guard_t(rw_unique_guard_t const&) = delete;
