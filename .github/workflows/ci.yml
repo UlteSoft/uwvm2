@@ -158,31 +158,59 @@ jobs:
         run: xmake test -v
 
   # ---------------------------------------------------------------------------
-  x86_64-freebsd14:
-    if: ${{ !always() }}
-    name: x86_64-freebsd14
+  x86_64-freebsd:
+    name: FreeBSD (x86_64) ${{ matrix.compiler }}
     runs-on: ubuntu-latest
+    env:
+      version: "14.3"
     strategy:
       matrix:
+        compiler: ["GCC"]
         mode: ["debug"]
-        policies: ["build.sanitizer.address"]
+        policies: ["build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined"]
     steps:
       - uses: actions/checkout@v4
-      - uses: cross-platform-actions/action@v0.27.0
+      - name: Prepare
+        uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
-          version: "14.2"
-      - name: Setup
-        run: |
-          clang -v
-          which clang-22
-          which lld-22
-          which xmake
+          version: ${{ env.version }}
+          run: |
+            sudo mkdir -p /usr/local/etc/repos
+            sudo tee /usr/local/etc/repos/FreeBSD.conf << EOF
+              FreeBSD: { enabled: false }
+              FreeBSD-latest: {
+                url: "pkg+https://pkg.freebsd.org/${ABI}/latest",
+                mirror_type: "srv",
+                signature: "fingerprints",
+                fingerprints: "/usr/share/keys/pkg",
+                enabled: yes
+              }
+            EOF
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --sdk=/usr/local/lib/llvm-22 -m ${{ matrix.mode }} --policies=${{ matrix.policies }}
-      - name: Build
-        run: xmake b -rv
-      - name: Check UWVM version
-        run: xmake run uwvm --version
-      - name: Unit tests
-        run: xmake test -v
+        if: matrix.compiler == 'CLANG'
+        uses: cross-platform-actions/action@v0.30.0
+        with:
+          operating_system: freebsd
+          version: ${{ env.version }}
+          run: |
+            sudo pkg install -y llvm-devel-lite xmake-io
+            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config-devel --prefix)"
+      - name: Configure
+        if: matrix.compiler == 'GCC'
+        uses: cross-platform-actions/action@v0.30.0
+        with:
+          operating_system: freebsd
+          version: ${{ env.version }}
+          run: |
+            sudo pkg install -y gcc16-devel xmake-io
+            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16
+      - name: Build and check
+        uses: cross-platform-actions/action@v0.30.0
+        with:
+          operating_system: freebsd
+          version: ${{ env.version }}
+          run: |
+            xmake b -rv
+            xmake run uwvm --version
+            xmake test -v
