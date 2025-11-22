@@ -199,9 +199,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 // To prevent the system close operation from taking too much time, the close operation is performed outside the fdmanager lock here.
                 old_wasi_fd.ptr = curr_fd.wasi_fd.ptr;
                 curr_fd.wasi_fd.ptr = nullptr;
-
-                // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
             }
+
+            // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
         }
 
         if(old_wasi_fd.ptr != nullptr) { old_wasi_fd.reset(); }
