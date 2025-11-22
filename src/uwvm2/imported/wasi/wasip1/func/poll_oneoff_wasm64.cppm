@@ -35,7 +35,7 @@ module;
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/utils/macro/push_macros.h>
 
-export module uwvm2.imported.wasi.wasip1.func:poll_oneoff;
+export module uwvm2.imported.wasi.wasip1.func:poll_oneoff_wasm64;
 
 import fast_io;
 import uwvm2.uwvm_predefine.utils.ansies;
@@ -57,5 +57,5 @@ import :posix;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "poll_oneoff.h"
+#include "poll_oneoff_wasm64.h"
 
