@@ -159,13 +159,14 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-freebsd:
+    if: ${{ !always() }}
     name: FreeBSD (x86_64) ${{ matrix.compiler }}
     runs-on: ubuntu-latest
     env:
       version: "14.3"
     strategy:
       matrix:
-        compiler: ["CLANG"]
+        compiler: ["GCC", "CLANG"]
         mode: ["debug"]
         policies: ["build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined"]
     steps:
