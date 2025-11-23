@@ -111,6 +111,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         ::fast_io::dir_file entry{};
     };
 
+    using wasip1_proc_exit_ptr_t = void (*)(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32) noexcept;
+
     /// @brief [singleton]
     template <wasip1_memory memory_type>
     struct wasip1_environment
@@ -127,6 +129,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         /// @note  After preloading, the directory in `mount_dir_root_t` becomes invalid. Because its contents were moved to the file manager.
         ///        Each use will clear it.
         ::uwvm2::utils::container::vector<mount_dir_root_t> mount_dir_roots{};
+
+        /// @brief Custom process exit function pointer for WASI exit handling (No no-return operation is required, as plugin systems typically cannot operate without returning.)
+        ///        If not set, the default exit behavior will be used. (exit(3))
+        wasip1_proc_exit_ptr_t wasip1_proc_exit_func_ptr{};
 
         bool trace_wasip1_call{};
 
