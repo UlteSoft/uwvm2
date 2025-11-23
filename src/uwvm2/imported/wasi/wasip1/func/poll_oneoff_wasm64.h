@@ -321,10 +321,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     using timestamp_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
                     auto const timeout_integral{static_cast<timestamp_integral_t>(timeout)};
 
-                    using subclockflags_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::subclockflags_t>;
-                    auto const flags_integral{static_cast<subclockflags_integral_t>(flags)};
-                    bool const is_abstime{(flags_integral & static_cast<subclockflags_integral_t>(
-                                                                ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime)) != 0};
+                    bool const is_abstime{(flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                          ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
 
                     if(!is_abstime)
                     {
@@ -579,10 +577,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         using timestamp_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
                         auto const timeout_integral{static_cast<timestamp_integral_t>(timeout)};
 
-                        using subclockflags_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::subclockflags_t>;
-                        auto const flags_integral{static_cast<subclockflags_integral_t>(flags)};
-                        bool const is_abstime{(flags_integral & static_cast<subclockflags_integral_t>(
-                                                                    ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime)) != 0};
+                        bool const is_abstime{(flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
 
                         // For the general multi-subscription case we do not honour non-zero
                         // relative timeouts here; callers can re-invoke poll_oneoff after
