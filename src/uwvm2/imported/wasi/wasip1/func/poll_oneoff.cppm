@@ -41,6 +41,14 @@ module;
 #  include <poll.h>
 # endif
 #endif
+#if defined(__linux__)
+# if __has_include(<sys/epoll.h>)
+#  include <sys/epoll.h>
+# endif
+# if __has_include(<sys/timerfd.h>)
+#  include <sys/timerfd.h>
+# endif
+#endif
 
 export module uwvm2.imported.wasi.wasip1.func:poll_oneoff;
 
