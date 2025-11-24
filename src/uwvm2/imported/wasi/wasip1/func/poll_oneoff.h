@@ -664,7 +664,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }};
 
 #if defined(__linux__)
-# if defined(__NR_epoll_wait)
+# if defined(__NR_epoll_create1) && defined(__NR_epoll_ctl) && defined(__NR_timerfd_create) && defined(__NR_timerfd_settime) && defined(__NR_epoll_wait)
             ::uwvm2::utils::container::vector<::fast_io::posix_file> timerfds{};  // RAII Close
 
             int const epfd{::fast_io::system_call<__NR_epoll_create1, int>(EPOLL_CLOEXEC)};
@@ -688,7 +688,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read: [[fallthrough]];
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write:
                     {
-                        if(auto const ret{get_fd_from_wasm_fd(sub.u.u.fd_readwrite.file_descriptor)};
+                        if(auto const ret{
+                               get_fd_from_wasm_fd(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(sub.u.u.fd_readwrite.file_descriptor))};
                            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                         {
                             return ret;
@@ -764,16 +765,90 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         using timestamp_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
 
                         auto const timeout_integral{static_cast<timestamp_integral_t>(sub.u.u.clock.timeout)};
+                        auto const clock_flags{sub.u.u.clock.flags};
+                        auto const clock_id{sub.u.u.clock.id};
+                        bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
+
+                        timestamp_integral_t effective_timeout{};
+
+                        if(!is_abstime) { effective_timeout = timeout_integral; }
+                        else
+                        {
+                            ::fast_io::posix_clock_id posix_id;  // no initialize
+
+                            switch(clock_id)
+                            {
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::realtime;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::monotonic;
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                                }
+                            }
+
+                            ::fast_io::unix_timestamp ts;
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            try
+#  endif
+                            {
+                                ts = ::fast_io::posix_clock_gettime(posix_id);
+                            }
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            catch(::fast_io::error)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+#  endif
+
+                            constexpr timestamp_integral_t mul_factor{
+                                static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
+
+                            auto const now_integral{static_cast<timestamp_integral_t>(ts.seconds * 1'000'000'000u + ts.subseconds / mul_factor)};
+
+                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+                            else
+                            {
+                                effective_timeout = timeout_integral - now_integral;
+                            }
+                        }
 
                         constexpr timestamp_integral_t one_billion{1'000'000'000u};
 
-                        auto effective_timeout{timeout_integral};
                         if(effective_timeout == 0) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
 
                         auto const seconds_part{effective_timeout / one_billion};
                         auto const ns_rem{effective_timeout % one_billion};
 
-                        int const tfd{::fast_io::system_call<__NR_timerfd_create, int>(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)};
+                        int linux_clock_id;  // no initialize
+
+                        switch(clock_id)
+                        {
+                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                            {
+                                linux_clock_id = CLOCK_REALTIME;
+                                break;
+                            }
+                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                            {
+                                linux_clock_id = CLOCK_MONOTONIC;
+                                break;
+                            }
+                            [[unlikely]] default:
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                            }
+                        }
+
+                        int const tfd{::fast_io::system_call<__NR_timerfd_create, int>(linux_clock_id, TFD_NONBLOCK | TFD_CLOEXEC)};
                         if(::fast_io::linux_system_call_fails(tfd)) [[unlikely]]
                         {
                             ::fast_io::error fe{};
@@ -824,6 +899,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             ep_events.resize(subscriptions.size());
+
+            if(subscriptions.size() > static_cast<::std::size_t>(::std::numeric_limits<int>::max()))
+            {
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+            }
 
             int const ready{::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1)};
             if(::fast_io::linux_system_call_fails(ready)) [[unlikely]]
