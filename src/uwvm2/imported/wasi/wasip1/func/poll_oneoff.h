@@ -257,11 +257,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         // Early exit: zero subscriptions -> zero events.
-        if(nsubscriptions == 0u)
-        {
-
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-        }
+        if(nsubscriptions == 0u) { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval; }
 
         // Check memory bounds for the input and output arrays.
         // This protects against overflow when multiplying by the element size.
@@ -674,16 +670,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             int const epfd{::fast_io::system_call<__NR_epoll_create1, int>(EPOLL_CLOEXEC)};
             if(::fast_io::linux_system_call_fails(epfd)) [[unlikely]]
             {
-                int const err{static_cast<int>(-epfd)};
-                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
+                ::fast_io::error fe{};
+                fe.domain = ::fast_io::posix_domain_value;
+                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-epfd));
+
+                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
             }
 
             // add to raii close
             timerfds.push_back(epfd);
 
             ::uwvm2::utils::container::vector<::epoll_event> ep_events{};
-            ep_events.resize(subscriptions.size());
-
             for(auto const& sub: subscriptions)
             {
                 switch(sub.u.tag)
@@ -747,17 +744,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         ev.data.ptr = const_cast<void*>(static_cast<void const*>(::std::addressof(sub)));
 
-                        ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
-                                                                          EPOLL_CTL_ADD,
-                                                                          curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
-                                                                          ::std::addressof(ev));
+                        int ret{::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
+                                                                            EPOLL_CTL_ADD,
+                                                                            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
+                                                                            ::std::addressof(ev))};
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
-                            int const err{static_cast<int>(-ret)};
-                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
-                        }
+                            ::fast_io::error fe{};
+                            fe.domain = ::fast_io::posix_domain_value;
+                            fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ret));
 
-                        ep_events.push_back_unchecked(ev);
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                        }
 
                         break;
                     }
@@ -769,14 +767,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         constexpr timestamp_integral_t one_billion{1'000'000'000u};
 
-                        auto const seconds_part{timeout_integral / one_billion};
-                        auto const ns_rem{timeout_integral % one_billion};
+                        auto effective_timeout{timeout_integral};
+                        if(effective_timeout == 0) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+
+                        auto const seconds_part{effective_timeout / one_billion};
+                        auto const ns_rem{effective_timeout % one_billion};
 
                         int const tfd{::fast_io::system_call<__NR_timerfd_create, int>(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)};
                         if(::fast_io::linux_system_call_fails(tfd)) [[unlikely]]
                         {
-                            int const err{static_cast<int>(-tfd)};
-                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
+                            ::fast_io::error fe{};
+                            fe.domain = ::fast_io::posix_domain_value;
+                            fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-tfd));
+
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
                         }
 
                         // add to raii close
@@ -789,8 +793,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         int ret{::fast_io::system_call<__NR_timerfd_settime, int>(tfd, 0, ::std::addressof(ts), nullptr)};
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
-                            int const err{static_cast<int>(-ret)};
-                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
+                            ::fast_io::error fe{};
+                            fe.domain = ::fast_io::posix_domain_value;
+                            fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ret));
+
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
                         }
 
                         ::epoll_event ev{};
@@ -800,11 +807,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_ADD, tfd, ::std::addressof(ev));
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
-                            int const err{static_cast<int>(-ret)};
-                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
-                        }
+                            ::fast_io::error fe{};
+                            fe.domain = ::fast_io::posix_domain_value;
+                            fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ret));
 
-                        ep_events.emplace_back_unchecked(ev);
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                        }
 
                         break;
                     }
@@ -815,11 +823,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
             }
 
+            ep_events.resize(subscriptions.size());
+
             int const ready{::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1)};
             if(::fast_io::linux_system_call_fails(ready)) [[unlikely]]
             {
-                int const err{static_cast<int>(-ready)};
-                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(err);
+                ::fast_io::error fe{};
+                fe.domain = ::fast_io::posix_domain_value;
+                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ready));
+
+                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
             }
 
             ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced{};
@@ -836,15 +849,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     auto const& e{*ep_events_curr};
 
-                    auto const* sub_p{
-                        static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const*>(e.data.ptr)};
+                    auto const* sub_p{static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const*>(e.data.ptr)};
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(sub_p == nullptr) [[unlikely]]
-                    {
-                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-                    }
-#endif
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
 
                     ++ep_events_curr;
 
@@ -860,11 +869,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if((e.events & (EPOLLHUP | EPOLLRDHUP)) != 0u)
                         {
-                            using eventrwflags_underlying_t2 =
-                                ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
+                            using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
                             evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                static_cast<eventrwflags_underlying_t2>(
-                                    ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
+                                static_cast<eventrwflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
                         }
                     }
 
