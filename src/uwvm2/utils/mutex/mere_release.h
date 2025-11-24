@@ -55,22 +55,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 
         inline constexpr basic_mutex_merely_release_guard() noexcept = default;
 
-        UWVM_ALWAYS_INLINE inline explicit constexpr basic_mutex_merely_release_guard(mutex_type* d) : device_p(d) {}
+        inline explicit constexpr basic_mutex_merely_release_guard(mutex_type* d) : device_p(d) {}
 
-        inline basic_mutex_merely_release_guard(basic_mutex_merely_release_guard const&) = delete;
-        inline basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard const&) = delete;
+        inline constexpr basic_mutex_merely_release_guard(basic_mutex_merely_release_guard const&) = delete;
+        inline constexpr basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard const&) = delete;
 
-        UWVM_ALWAYS_INLINE inline constexpr ~basic_mutex_merely_release_guard()
+        inline constexpr basic_mutex_merely_release_guard(basic_mutex_merely_release_guard&& other) noexcept : device_p{other.device_p}
+        {
+            other.device_p = nullptr;
+        }
+
+        inline constexpr basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard && other) noexcept
+        {
+            if(this != ::std::addressof(other)) [[likely]]
+            {
+                if(device_p) [[likely]] { device_p->unlock(); }
+
+                device_p = other.device_p;
+                other.device_p = nullptr;
+            }
+
+            return *this;
+        }
+
+        inline constexpr ~basic_mutex_merely_release_guard()
         {
             if(device_p) [[likely]] { device_p->unlock(); }
         }
 
-        UWVM_ALWAYS_INLINE inline constexpr void lock() noexcept
+        inline constexpr void lock() noexcept
         {
             if(device_p) [[likely]] { device_p->lock(); }
         }
 
-        UWVM_ALWAYS_INLINE inline constexpr void unlock() noexcept
+        inline constexpr void unlock() noexcept
         {
             if(device_p) [[likely]] { device_p->unlock(); }
         }
