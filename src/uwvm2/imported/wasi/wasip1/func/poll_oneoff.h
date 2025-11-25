@@ -1482,8 +1482,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // old linux
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
 # endif
-#elif defined(__MSDOS__) || defined(__DJGPP__)
-            // MSDOS-DJGPP
+#elif (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(BSD) || defined(_SYSTYPE_BSD))
+            // MSDOS-DJGPP and old BSD
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
 #elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             // BSD
@@ -1971,7 +1971,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
 #else
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+            // posix
 #endif
         }
 

@@ -171,9 +171,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
         extern int kqueue() noexcept
 #  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
-            __asm__("getsockopt")
+            __asm__("kqueue")
 #  else
-            __asm__("_getsockopt")
+            __asm__("_kqueue")
 #  endif
                 ;
 
