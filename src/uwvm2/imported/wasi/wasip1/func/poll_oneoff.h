@@ -1336,6 +1336,69 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 
+                        auto const clock_flags{sub_p->u.u.clock.flags};
+                        bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
+
+                        if(is_abstime)
+                        {
+                            using timestamp_integral_t_local = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
+
+                            auto const timeout_integral{static_cast<timestamp_integral_t_local>(sub_p->u.u.clock.timeout)};
+                            auto const clock_id{sub_p->u.u.clock.id};
+
+                            ::fast_io::posix_clock_id posix_id;  // no init
+
+                            switch(clock_id)
+                            {
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::realtime;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::monotonic;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                                }
+                            }
+
+                            ::fast_io::unix_timestamp ts2;
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            try
+#  endif
+                            {
+                                ts2 = ::fast_io::posix_clock_gettime(posix_id);
+                            }
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            catch(::fast_io::error)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+#  endif
+
+                            constexpr timestamp_integral_t_local mul_factor2{
+                                static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
+
+                            auto const now_integral{static_cast<timestamp_integral_t_local>(ts2.seconds * 1'000'000'000u + ts2.subseconds / mul_factor2)};
+
+                            if(now_integral < timeout_integral) { continue; }
+                        }
+
                         evt.userdata = sub_p->userdata;
                         evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
                         evt.type = sub_p->u.tag;
