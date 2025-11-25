@@ -789,6 +789,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     posix_id = ::fast_io::posix_clock_id::monotonic;
                                     break;
                                 }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
                                 [[unlikely]] default:
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
@@ -837,7 +847,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 linux_clock_id = CLOCK_REALTIME;
                                 break;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
                             {
                                 linux_clock_id = CLOCK_MONOTONIC;
                                 break;
@@ -1122,6 +1134,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     posix_id = ::fast_io::posix_clock_id::monotonic;
                                     break;
                                 }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
                                 [[unlikely]] default:
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
@@ -1302,7 +1324,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 // Then handle clock events: only trigger those with effective_timeout_ns == min_clock_timeout_ns
-                if(have_clock_timeout)
+                if(have_clock_timeout && ready == 0)
                 {
                     for(auto const& ce: clock_subs)
                     {
