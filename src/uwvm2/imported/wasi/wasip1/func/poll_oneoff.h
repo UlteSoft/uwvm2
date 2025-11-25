@@ -1971,7 +1971,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
 #else
-// posix poll
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
 #endif
         }
 
