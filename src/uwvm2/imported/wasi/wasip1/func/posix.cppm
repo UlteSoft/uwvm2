@@ -45,6 +45,15 @@ module;
 # else
 #  include <utime.h>
 # endif
+# if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||          \
+     (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if __has_include(<sys/event.h>)
+#   include <sys/event.h>
+#  endif
+#  if __has_include(<sys/time.h>)
+#   include <sys/time.h>
+#  endif
+# endif
 #endif
 
 export module uwvm2.imported.wasi.wasip1.func:posix;

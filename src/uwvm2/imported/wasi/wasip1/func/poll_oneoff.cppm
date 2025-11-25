@@ -40,13 +40,22 @@ module;
 # if __has_include(<poll.h>)
 #  include <poll.h>
 # endif
-#endif
-#if defined(__linux__)
-# if __has_include(<sys/epoll.h>)
-#  include <sys/epoll.h>
+# if defined(__linux__)
+#  if __has_include(<sys/epoll.h>)
+#   include <sys/epoll.h>
+#  endif
+#  if __has_include(<sys/timerfd.h>)
+#   include <sys/timerfd.h>
+#  endif
 # endif
-# if __has_include(<sys/timerfd.h>)
-#  include <sys/timerfd.h>
+# if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||          \
+     (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if __has_include(<sys/event.h>)
+#   include <sys/event.h>
+#  endif
+#  if __has_include(<sys/time.h>)
+#   include <sys/time.h>
+#  endif
 # endif
 #endif
 

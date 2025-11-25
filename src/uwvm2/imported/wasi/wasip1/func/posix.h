@@ -46,6 +46,15 @@
 #  else
 #   include <utime.h>
 #  endif
+#  if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||         \
+      (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#   if __has_include(<sys/event.h>)
+#    include <sys/event.h>
+#   endif
+#   if __has_include(<sys/time.h>)
+#    include <sys/time.h>
+#   endif
+#  endif
 # endif
 
 // import
@@ -164,6 +173,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  endif
                 ;
 # endif
+
+# if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+        extern int kqueue() noexcept
+#  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("getsockopt")
+#  else
+            __asm__("_getsockopt")
+#  endif
+                ;
+
+        extern int kevent(int kq, const struct kevent* changelist, int nchanges, struct kevent* eventlist, int nevents, const struct timespec* timeout) noexcept
+#  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("kevent")
+#  else
+            __asm__("_kevent")
+#  endif
+                ;
+# endif
+
     }  // namespace posix
 #endif
 
