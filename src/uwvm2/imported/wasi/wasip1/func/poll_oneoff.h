@@ -1554,7 +1554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(ce.effective_timeout_ns != min_clock_timeout_ns) { continue; }
 
-                        auto const* sub_p{ce.sub};
+                        auto const sub_p{ce.sub};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -2260,7 +2260,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
                             if(index_nt < wait_subs.size())
                             {
-                                auto const* sub_p{wait_subs.index_unchecked(index_nt)};
+                                auto const sub_p{wait_subs.index_unchecked(index_nt)};
 
                                 wasi_event_t evt{};
 
@@ -2658,7 +2658,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(ce.effective_timeout_ns != min_clock_timeout_ns) { continue; }
 
-                        auto const* sub_p{ce.sub};
+                        auto const sub_p{ce.sub};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -3181,7 +3181,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(ce.effective_timeout_ns != min_clock_timeout_ns) { continue; }
 
-                        auto const* sub_p{ce.sub};
+                        auto const sub_p{ce.sub};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
