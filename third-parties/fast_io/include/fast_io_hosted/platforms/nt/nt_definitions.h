@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include "../../../fast_io_core_impl/allocation/common.h"
 
 namespace fast_io::win32::nt
@@ -48,6 +49,12 @@ struct io_status_block
 		void *Pointer;
 	};
 	::std::size_t Information;
+};
+
+enum class wait_type
+{
+	WaitAll,
+	WaitAny
 };
 
 using pio_apc_routine = void (*)(void *, io_status_block *, ::std::uint_least32_t) noexcept;

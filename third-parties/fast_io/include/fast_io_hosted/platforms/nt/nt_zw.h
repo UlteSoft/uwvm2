@@ -185,6 +185,20 @@ inline ::std::uint_least32_t nt_wait_for_single_object(Args... args) noexcept
 }
 
 template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 5)
+inline ::std::uint_least32_t nt_wait_for_multiple_objects(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwWaitForMultipleObjects(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtWaitForMultipleObjects(args...);
+	}
+}
+
+template <bool zw, typename... Args>
 	requires(sizeof...(Args) == 2)
 inline ::std::uint_least32_t nt_set_system_time(Args... args) noexcept
 {
