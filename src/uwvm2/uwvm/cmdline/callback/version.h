@@ -790,7 +790,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"NetBSD"
 #elif defined(__OpenBSD__)
                                 u8"OpenBSD"
-#elif defined(BSD) || defined(_SYSTYPE_BSD)
+#elif defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE)
                                 u8"BSD"
 #elif defined(__VMS)
                                 u8"VMS"
@@ -818,7 +818,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"OS/2"
 #elif defined(__MVS__) || defined(__HOS_MVS__)
                                 u8"z/OS"
-#elif defined(__unix) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE)
+#elif defined(__unix) || defined(_XOPEN_SOURCE) || defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE)
                                 u8"Unix Environment"
 #else
                                 u8"Unknown OS"
