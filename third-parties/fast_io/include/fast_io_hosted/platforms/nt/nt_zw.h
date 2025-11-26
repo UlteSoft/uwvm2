@@ -744,4 +744,46 @@ inline ::std::uint_least32_t nt_set_timer_resolution(Args... args) noexcept
 	}
 }
 
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 5)
+inline ::std::uint_least32_t nt_create_event(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwCreateEvent(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtCreateEvent(args...);
+	}
+}
+
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 2)
+inline ::std::uint_least32_t nt_set_event(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwSetEvent(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtSetEvent(args...);
+	}
+}
+
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 2)
+inline ::std::uint_least32_t nt_reset_event(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwResetEvent(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtResetEvent(args...);
+	}
+}
+
 } // namespace fast_io::win32::nt

@@ -57,6 +57,12 @@ enum class wait_type
 	WaitAny
 };
 
+enum class event_type
+{
+	NotificationEvent,
+	SynchronizationEvent
+};
+
 using pio_apc_routine = void (*)(void *, io_status_block *, ::std::uint_least32_t) noexcept;
 
 struct rtlp_curdir_def
