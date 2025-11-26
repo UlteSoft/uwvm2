@@ -2446,7 +2446,480 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // POSIX.1-1988/1990
             // select()
 
-            /// @todo
+            ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const*> fd_subs{};
+            ::uwvm2::utils::container::vector<int> native_fds{};
+
+            using timestamp_integral_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
+
+            struct clock_sub_entry
+            {
+                ::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const* sub{};
+                timestamp_integral_t effective_timeout_ns{};
+            };
+
+            ::uwvm2::utils::container::vector<clock_sub_entry> clock_subs{};
+            bool have_clock_timeout{};
+            timestamp_integral_t min_clock_timeout_ns{};
+
+            struct ::fd_set readfds;
+            struct ::fd_set writefds;
+
+#  if UWVM_HAS_BUILTIN(__builtin_bzero)
+            __builtin_bzero(::std::addressof(readfds));
+            __builtin_bzero(::std::addressof(writefds));
+#  else
+            FD_ZERO(::std::addressof(readfds));
+            FD_ZERO(::std::addressof(writefds));
+#  endif
+
+            int max_fd{-1};
+
+            for(auto const& sub: subscriptions)
+            {
+                switch(sub.u.tag)
+                {
+                    case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read: [[fallthrough]];
+                    case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write:
+                    {
+                        if(auto const ret{
+                               get_fd_from_wasm_fd(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(sub.u.u.fd_readwrite.file_descriptor))};
+                           ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
+                        {
+                            return ret;
+                        }
+
+                        auto& curr_fd{*fd_p_vector.back_unchecked()};
+
+                        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+
+                        if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) !=
+                           ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) [[unlikely]]
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+                        }
+
+                        if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
+                        {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        }
+
+                        switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+                        {
+                            [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            {
+                                break;
+                            }
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
+                            {
+                                // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
+                                continue;
+                            }
+                        }
+
+                        int const native_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle()};
+
+                        bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
+
+                        if(is_write) { FD_SET(native_fd, ::std::addressof(writefds)); }
+                        else
+                        {
+                            FD_SET(native_fd, ::std::addressof(readfds));
+                        }
+
+                        if(native_fd > max_fd) { max_fd = native_fd; }
+
+                        fd_subs.push_back(::std::addressof(sub));
+                        native_fds.push_back(native_fd);
+
+                        break;
+                    }
+                    case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock:
+                    {
+                        auto const timeout_integral{static_cast<timestamp_integral_t>(sub.u.u.clock.timeout)};
+                        auto const clock_flags{sub.u.u.clock.flags};
+                        auto const clock_id{sub.u.u.clock.id};
+
+                        bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
+
+                        timestamp_integral_t effective_timeout{};
+
+                        if(!is_abstime) { effective_timeout = timeout_integral; }
+                        else
+                        {
+                            ::fast_io::posix_clock_id posix_id;  // no init
+
+                            switch(clock_id)
+                            {
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::realtime;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::monotonic;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                                }
+                            }
+
+                            ::fast_io::unix_timestamp ts;
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            try
+#  endif
+                            {
+                                ts = ::fast_io::posix_clock_gettime(posix_id);
+                            }
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            catch(::fast_io::error)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+#  endif
+
+                            constexpr timestamp_integral_t mul_factor{
+                                static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
+
+                            auto const now_integral{static_cast<timestamp_integral_t>(ts.seconds * 1'000'000'000u + ts.subseconds / mul_factor)};
+
+                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+                            else
+                            {
+                                effective_timeout = timeout_integral - now_integral;
+                            }
+                        }
+
+                        constexpr timestamp_integral_t one_billion{1'000'000'000u};
+
+                        if(effective_timeout == 0u) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+
+                        clock_sub_entry ce{};
+                        ce.sub = ::std::addressof(sub);
+                        ce.effective_timeout_ns = effective_timeout;
+                        clock_subs.push_back(ce);
+
+                        if(!have_clock_timeout)
+                        {
+                            min_clock_timeout_ns = effective_timeout;
+                            have_clock_timeout = true;
+                        }
+                        else if(effective_timeout < min_clock_timeout_ns) { min_clock_timeout_ns = effective_timeout; }
+
+                        break;
+                    }
+                    [[unlikely]] default:
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    }
+                }
+            }
+
+            struct ::timeval tv_timeout{};
+            struct ::timeval* timeout_ptr{};
+
+            if(have_clock_timeout)
+            {
+                constexpr timestamp_integral_t ns_per_us{1'000u};
+                constexpr timestamp_integral_t us_per_s{1'000'000u};
+
+                auto const total_us{(min_clock_timeout_ns + (ns_per_us - static_cast<timestamp_integral_t>(1u))) / ns_per_us};
+                auto const seconds_part{total_us / us_per_s};
+                auto const usec_rem{total_us % us_per_s};
+
+                using tv_sec_type = decltype(tv_timeout.tv_sec);
+                using tv_usec_type = decltype(tv_timeout.tv_usec);
+                constexpr tv_sec_type tv_sec_max{::std::numeric_limits<tv_sec_type>::max()};
+
+                if(seconds_part > static_cast<timestamp_integral_t>(tv_sec_max))
+                {
+                    tv_timeout.tv_sec = tv_sec_max;
+                    tv_timeout.tv_usec = static_cast<tv_usec_type>(us_per_s - static_cast<timestamp_integral_t>(1u));
+                }
+                else
+                {
+                    tv_timeout.tv_sec = static_cast<tv_sec_type>(seconds_part);
+                    tv_timeout.tv_usec = static_cast<tv_usec_type>(usec_rem);
+                }
+
+                timeout_ptr = ::std::addressof(tv_timeout);
+            }
+            else
+            {
+                timeout_ptr = nullptr;
+            }
+
+            int nfds{max_fd + 1};
+
+            int const ready{
+                ::uwvm2::imported::wasi::wasip1::func::posix::select(nfds, ::std::addressof(readfds), ::std::addressof(writefds), nullptr, timeout_ptr)};
+
+            if(ready == -1) [[unlikely]]
+            {
+                ::fast_io::error fe{};
+                fe.domain = ::fast_io::posix_domain_value;
+                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(errno));
+
+                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+            }
+
+            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced{};
+
+            {
+                [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
+
+                ::uwvm2::imported::wasi::wasip1::func::wasi_event_t evt{};
+                auto out_curr{out};
+
+                // First handle FD events
+                for(::std::size_t i{}; i < fd_subs.size(); ++i)
+                {
+                    auto const* sub_p{fd_subs.index_unchecked(i)};
+                    int const native_fd{native_fds.index_unchecked(i)};
+
+                    bool const is_write{sub_p->u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
+
+                    bool ready_fd{};
+
+                    if(is_write)
+                    {
+                        if(FD_ISSET(native_fd, ::std::addressof(writefds))) { ready_fd = true; }
+                    }
+                    else
+                    {
+                        if(FD_ISSET(native_fd, ::std::addressof(readfds))) { ready_fd = true; }
+                    }
+
+                    if(!ready_fd) { continue; }
+
+                    evt.userdata = sub_p->userdata;
+                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                    evt.type = sub_p->u.tag;
+
+                    evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                    if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_data_layout())
+                    {
+                        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
+                            memory,
+                            out_curr,
+                            reinterpret_cast<::std::byte const*>(::std::addressof(evt)),
+                            reinterpret_cast<::std::byte const*>(::std::addressof(evt)) + sizeof(evt));
+                    }
+                    else
+                    {
+                        using userdata_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::userdata_t>;
+                        using errno_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::errno_t>;
+                        using eventtype_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventtype_t>;
+
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<userdata_underlying_t2>(
+                            memory,
+                            out_curr + 0u,
+                            static_cast<userdata_underlying_t2>(evt.userdata));
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<errno_underlying_t2>(
+                            memory,
+                            out_curr + 8u,
+                            static_cast<errno_underlying_t2>(evt.error));
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventtype_underlying_t2>(
+                            memory,
+                            out_curr + 10u,
+                            static_cast<eventtype_underlying_t2>(evt.type));
+
+                        if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_fd_readwrite_data_layout())
+                        {
+                            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
+                                memory,
+                                out_curr + 16u,
+                                reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)),
+                                reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)) + sizeof(evt.u.fd_readwrite));
+                        }
+                        else
+                        {
+                            using filesize_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filesize_t>;
+                            using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
+
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<filesize_underlying_t2>(
+                                memory,
+                                out_curr + 16u + 0u,
+                                static_cast<filesize_underlying_t2>(evt.u.fd_readwrite.nbytes));
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventrwflags_underlying_t2>(
+                                memory,
+                                out_curr + 16u + 8u,
+                                static_cast<eventrwflags_underlying_t2>(evt.u.fd_readwrite.flags));
+                        }
+                    }
+
+                    out_curr += static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(::uwvm2::imported::wasi::wasip1::func::size_of_wasi_event_t);
+                    ++produced;
+                }
+
+                // Then handle clock events: only trigger those with effective_timeout_ns == min_clock_timeout_ns
+                if(have_clock_timeout && ready == 0)
+                {
+                    for(auto const& ce: clock_subs)
+                    {
+                        if(ce.effective_timeout_ns != min_clock_timeout_ns) { continue; }
+
+                        auto const* sub_p{ce.sub};
+
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
+
+                        auto const clock_flags{sub_p->u.u.clock.flags};
+                        bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
+
+                        if(is_abstime)
+                        {
+                            using timestamp_integral_t_local = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
+
+                            auto const timeout_integral{static_cast<timestamp_integral_t_local>(sub_p->u.u.clock.timeout)};
+                            auto const clock_id{sub_p->u.u.clock.id};
+
+                            ::fast_io::posix_clock_id posix_id;  // no init
+
+                            switch(clock_id)
+                            {
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::realtime;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::monotonic;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                                }
+                            }
+
+                            ::fast_io::unix_timestamp ts2;
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            try
+#  endif
+                            {
+                                ts2 = ::fast_io::posix_clock_gettime(posix_id);
+                            }
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            catch(::fast_io::error)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+#  endif
+
+                            constexpr timestamp_integral_t_local mul_factor2{
+                                static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
+
+                            auto const now_integral{static_cast<timestamp_integral_t_local>(ts2.seconds * 1'000'000'000u + ts2.subseconds / mul_factor2)};
+
+                            if(now_integral < timeout_integral) { continue; }
+                        }
+
+                        evt.userdata = sub_p->userdata;
+                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        evt.type = sub_p->u.tag;
+
+                        evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                        evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                        if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_data_layout())
+                        {
+                            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
+                                memory,
+                                out_curr,
+                                reinterpret_cast<::std::byte const*>(::std::addressof(evt)),
+                                reinterpret_cast<::std::byte const*>(::std::addressof(evt)) + sizeof(evt));
+                        }
+                        else
+                        {
+                            using userdata_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::userdata_t>;
+                            using errno_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::errno_t>;
+                            using eventtype_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventtype_t>;
+
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<userdata_underlying_t2>(
+                                memory,
+                                out_curr + 0u,
+                                static_cast<userdata_underlying_t2>(evt.userdata));
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<errno_underlying_t2>(
+                                memory,
+                                out_curr + 8u,
+                                static_cast<errno_underlying_t2>(evt.error));
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventtype_underlying_t2>(
+                                memory,
+                                out_curr + 10u,
+                                static_cast<eventtype_underlying_t2>(evt.type));
+
+                            // For clock events, the u region is actually unused in the current ABI, but for compatibility,
+                            // this code reuses the encoding path of fd_readwrite (nbytes/flags are already 0).
+                            if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_fd_readwrite_data_layout())
+                            {
+                                ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
+                                    memory,
+                                    out_curr + 16u,
+                                    reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)),
+                                    reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)) + sizeof(evt.u.fd_readwrite));
+                            }
+                            else
+                            {
+                                using filesize_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filesize_t>;
+                                using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
+
+                                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<filesize_underlying_t2>(
+                                    memory,
+                                    out_curr + 16u + 0u,
+                                    static_cast<filesize_underlying_t2>(evt.u.fd_readwrite.nbytes));
+                                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventrwflags_underlying_t2>(
+                                    memory,
+                                    out_curr + 16u + 8u,
+                                    static_cast<eventrwflags_underlying_t2>(evt.u.fd_readwrite.flags));
+                            }
+                        }
+
+                        out_curr +=
+                            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(::uwvm2::imported::wasi::wasip1::func::size_of_wasi_event_t);
+                        ++produced;
+                    }
+                }
+
+                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, nevents, produced);
+            }
+
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 # else
             // old unix
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;

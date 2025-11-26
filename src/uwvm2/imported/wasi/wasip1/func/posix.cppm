@@ -40,6 +40,9 @@ module;
 # include <fcntl.h>
 # include <sys/stat.h>
 # include <sys/time.h>
+# if __has_include(<poll.h>)
+#  include <poll.h>
+# endif
 # if __has_include(<sys/select.h>)
 #  include <sys/select.h>
 # endif
