@@ -2013,7 +2013,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-            
+
 #elif defined(_WIN32) && !defined(__CYGWIN__)
             // Windows
 # if defined(_WIN32_WINDOWS)
@@ -2211,10 +2211,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto out_curr{out};
 
-                    for(auto const& evt: immediate_events)
-                    {
-                        write_one_event_to_memory(evt, out_curr, produced_nt);
-                    }
+                    for(auto const& evt: immediate_events) { write_one_event_to_memory(evt, out_curr, produced_nt); }
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, nevents, produced_nt);
                 }
@@ -2229,10 +2226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 auto out_curr{out};
 
-                for(auto const& evt: immediate_events)
-                {
-                    write_one_event_to_memory(evt, out_curr, produced_nt);
-                }
+                for(auto const& evt: immediate_events) { write_one_event_to_memory(evt, out_curr, produced_nt); }
 
                 if(!wait_handles.empty() || have_timeout_nt)
                 {
@@ -2376,17 +2370,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                get_fd_from_wasm_fd(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(sub.u.u.fd_readwrite.file_descriptor))};
                            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                         {
-                            return ret;
+                            push_immediate_event(sub, ret);
+                            continue;
                         }
 
                         auto& curr_fd{*fd_p_vector.back_unchecked()};
 
-                        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+                        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]]
+                        {
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf);
+                            continue;
+                        }
 
                         if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) !=
                            ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) [[unlikely]]
                         {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable);
+                            continue;
                         }
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
@@ -2394,14 +2394,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #  endif
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                            continue;
                         }
 
                         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
                         {
                             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
                             {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                                continue;
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
                             {
@@ -2410,6 +2412,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
+                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -2562,13 +2565,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ::uwvm2::imported::wasi::wasip1::func::wasi_event_t evt{};
                 auto out_curr{out};
 
-                // First handle FD events
-                for(::std::size_t i{}; i < poll_fds.size(); ++i)
+                // First flush immediate error events
+                for(auto const& imm_evt: immediate_events) { write_one_event_to_memory(imm_evt, out_curr, produced); }
+
+                // Then handle FD events
+
+                auto sub_p_curr{poll_subs.cbegin()};
+                for(auto const& pfd: poll_fds)
                 {
-                    auto const& pfd{poll_fds.index_unchecked(i)};
                     if(pfd.revents == 0) { continue; }
 
-                    auto const* sub_p{poll_subs.index_unchecked(i)};
+                    auto const sub_p{*sub_p_curr};
+                    ++sub_p_curr;
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -2832,17 +2840,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                get_fd_from_wasm_fd(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(sub.u.u.fd_readwrite.file_descriptor))};
                            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess) [[unlikely]]
                         {
-                            return ret;
+                            push_immediate_event(sub, ret);
+                            continue;
                         }
 
                         auto& curr_fd{*fd_p_vector.back_unchecked()};
 
-                        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+                        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]]
+                        {
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf);
+                            continue;
+                        }
 
                         if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) !=
                            ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_poll_fd_readwrite) [[unlikely]]
                         {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable);
+                            continue;
                         }
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
@@ -2850,14 +2864,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #  endif
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                            continue;
                         }
 
                         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
                         {
                             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
                             {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                                continue;
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
                             {
@@ -2866,6 +2882,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
+                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -2874,9 +2891,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         // Ensure native_fd is within the representable range of fd_set/FD_* macros.
 #  ifdef FD_SETSIZE
-                        if(native_fd < 0 || native_fd >= FD_SETSIZE) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
+                        if(native_fd < 0 || native_fd >= FD_SETSIZE) [[unlikely]]
+                        {
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup);
+                            continue;
+                        }
 #  else
-                        if(native_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+                        if(native_fd < 0) [[unlikely]]
+                        {
+                            push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf);
+                            continue;
+                        }
 #  endif
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
@@ -2989,6 +3014,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
             }
 
+            if(fd_subs.empty() && !have_clock_timeout)
+            {
+                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced{};
+
+                {
+                    [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
+
+                    auto out_curr{out};
+
+                    for(auto const& evt: immediate_events) { write_one_event_to_memory(evt, out_curr, produced); }
+
+                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, nevents, produced);
+                }
+
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+            }
+
             struct ::timeval tv_timeout{};
             struct ::timeval* timeout_ptr{};
 
@@ -3045,11 +3087,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ::uwvm2::imported::wasi::wasip1::func::wasi_event_t evt{};
                 auto out_curr{out};
 
-                // First handle FD events
-                for(::std::size_t i{}; i < fd_subs.size(); ++i)
+                // First flush immediate error events
+                for(auto const& imm_evt: immediate_events) { write_one_event_to_memory(imm_evt, out_curr, produced); }
+
+                // Then handle FD events
+                auto native_fds_curr{native_fds.cbegin()};
+                for(auto const sub_p: fd_subs)
                 {
-                    auto const* sub_p{fd_subs.index_unchecked(i)};
-                    int const native_fd{native_fds.index_unchecked(i)};
+                    int const native_fd{*native_fds_curr};
+                    ++native_fds_curr;
 
                     bool const is_write{sub_p->u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
 
