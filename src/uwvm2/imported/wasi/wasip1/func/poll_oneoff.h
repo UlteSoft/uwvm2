@@ -2465,8 +2465,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             struct ::fd_set writefds;
 
 #  if UWVM_HAS_BUILTIN(__builtin_bzero)
-            __builtin_bzero(::std::addressof(readfds));
-            __builtin_bzero(::std::addressof(writefds));
+            __builtin_bzero(::std::addressof(readfds), sizeof(readfds));
+            __builtin_bzero(::std::addressof(writefds), sizeof(writefds));
 #  else
             FD_ZERO(::std::addressof(readfds));
             FD_ZERO(::std::addressof(writefds));
@@ -2524,6 +2524,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         }
 
                         int const native_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle()};
+
+                        // Ensure native_fd is within the representable range of fd_set/FD_* macros.
+#  ifdef FD_SETSIZE
+                        if(native_fd < 0 || native_fd >= FD_SETSIZE) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
+#  else
+                        if(native_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+#  endif
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
 
