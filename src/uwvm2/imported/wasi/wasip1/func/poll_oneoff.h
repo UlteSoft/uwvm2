@@ -444,9 +444,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::fast_io::this_thread::sleep_for(sleep_duration);
                 }
             }
-
-            // If there are immediate events to report, avoid blocking in poll().
-            if(!immediate_events.empty()) { timeout_ms = 0; }
             else
             {
                 // Absolute timeout: compute the remaining time and sleep at most
