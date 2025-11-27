@@ -1150,7 +1150,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         auto const fd{sub_p->u.u.fd_readwrite.file_descriptor};
 
-                        if((e.events & (EPOLLIN | EPOLLHUP | EPOLLRDHUP)) != 0u)
+                        if((e.events & (EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLERR)) != 0u)
                         {
                             for(auto const& sub: subscriptions)
                             {
@@ -1177,7 +1177,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                         }
 
-                        if((e.events & (EPOLLOUT | EPOLLHUP | EPOLLRDHUP)) != 0u)
+                        if((e.events & (EPOLLOUT | EPOLLHUP | EPOLLRDHUP | EPOLLERR)) != 0u)
                         {
                             for(auto const& sub: subscriptions)
                             {
