@@ -1447,14 +1447,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-                ::uwvm2::imported::wasi::wasip1::func::wasi_event_t evt{};
                 auto out_curr{out};
 
                 // First flush immediate error events
-                for(auto const& imm_evt: immediate_events)
+                for(auto const& evt: immediate_events)
                 {
-                    evt = imm_evt;
-
                     if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_data_layout())
                     {
                         ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
