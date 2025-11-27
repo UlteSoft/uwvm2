@@ -1047,12 +1047,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
 
-            ep_events.resize(subscriptions.size());
-
             if(subscriptions.size() > static_cast<::std::size_t>(::std::numeric_limits<int>::max()))
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
             }
+
+            ep_events.resize(subscriptions.size());
 
             int const ready{::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1)};
             if(::fast_io::linux_system_call_fails(ready)) [[unlikely]]
@@ -1063,6 +1063,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
             }
+
+            if(static_cast<::std::size_t>(ready) > ep_events.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
             ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced{};
 
@@ -1075,8 +1077,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 for(auto const& imm_evt: immediate_events) { write_one_event_to_memory(imm_evt, out_curr, produced); }
 
-                for(auto const& e: ep_events)
+                auto const ep_events_begin{ep_events.cbegin()};
+                auto const ep_events_end{ep_events_begin + ready};
+                for(auto ep_events_curr{ep_events_begin}; ep_events_curr != ep_events_end; ++ep_events_curr)
                 {
+                    auto const& e{*ep_events_curr};
+
                     auto const sub_p{static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const*>(e.data.ptr)};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
