@@ -47,6 +47,9 @@ module;
 #  if __has_include(<sys/timerfd.h>)
 #   include <sys/timerfd.h>
 #  endif
+#  if __has_include(<sys/ioctl.h>)
+#   include <sys/ioctl.h>
+#  endif
 # endif
 # if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||          \
      (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))

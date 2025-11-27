@@ -43,6 +43,9 @@ module;
 # if __has_include(<poll.h>)
 #  include <poll.h>
 # endif
+# if __has_include(<sys/ioctl.h>)
+#  include <sys/ioctl.h>
+# endif
 # if __has_include(<sys/select.h>)
 #  include <sys/select.h>
 # endif

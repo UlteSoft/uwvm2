@@ -48,6 +48,9 @@
 #   if __has_include(<sys/timerfd.h>)
 #    include <sys/timerfd.h>
 #   endif
+#  if __has_include(<sys/ioctl.h>)
+#   include <sys/ioctl.h>
+#  endif
 #  endif
 #  if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||         \
       (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
@@ -1561,6 +1564,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
                         evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
                             static_cast<eventrwflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
+                    }
+
+                    if(sub_p->u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read && (pfd.revents & POLLIN) != 0)
+                    {
+                        bool have_nbytes{};
+
+#  if defined(__NR_ioctl)
+                        int avail{};
+
+                        if(::fast_io::system_call<__NR_ioctl, int>(pfd.fd, FIONREAD, ::std::addressof(avail)) == 0 && avail > 0)
+                        {
+                            using unsigned_int_t = ::std::make_unsigned_t<int>;
+
+                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(static_cast<unsigned_int_t>(avail));
+                            have_nbytes = true;
+                        }
+#  endif
+
+                        if(!have_nbytes)
+                        {
+                            struct ::stat st;
+
+                            if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(pfd.fd, ::std::addressof(st)) == 0 && st.st_blksize > 0)
+                            {
+                                using unsigned_blksize_t = ::std::make_unsigned_t<decltype(st.st_blksize)>;
+
+                                evt.u.fd_readwrite.nbytes =
+                                    static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(static_cast<unsigned_blksize_t>(st.st_blksize));
+                            }
+                        }
                     }
 
                     if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_data_layout())
