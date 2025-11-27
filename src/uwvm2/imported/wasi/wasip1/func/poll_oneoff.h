@@ -2365,7 +2365,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
                             {
-                                /// @todo
+                                auto const socket_native_handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd.native_handle()};
+
+                                // Convert SOCKET (uintptr_t) to HANDLE for WaitForMultipleObjects.
+                                auto const socket_handle{reinterpret_cast<void*>(static_cast<::std::uintptr_t>(socket_native_handle))};
+
+                                wait_handles.push_back(socket_handle);
+                                wait_subs.push_back(::std::addressof(sub));
+
                                 break;
                             }
                             [[unlikely]] default:
@@ -2381,8 +2388,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock:
                     {
-                        // Clock events are handled via timeout
-                        /// @todo
+                        // Already translated into min_timeout_ms_nt above; nothing else to enqueue.
                         break;
                     }
                     [[unlikely]] default:
@@ -3211,16 +3217,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             auto const now_integral{static_cast<timestamp_integral_t>(ts.seconds * 1'000'000'000u + ts.subseconds / mul_factor)};
 
-                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(0u); }
                             else
                             {
                                 effective_timeout = timeout_integral - now_integral;
                             }
                         }
-
-                        constexpr timestamp_integral_t one_billion{1'000'000'000u};
-
-                        if(effective_timeout == 0u) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
 
                         clock_sub_entry ce{};
                         ce.sub = ::std::addressof(sub);
