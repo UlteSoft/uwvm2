@@ -1019,6 +1019,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
                         }
 
+                        has_epoll_interest = true;
+
                         break;
                     }
                     [[unlikely]] default:
@@ -1073,11 +1075,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 for(auto const& imm_evt: immediate_events) { write_one_event_to_memory(imm_evt, out_curr, produced); }
 
-                auto const ep_events_end{ep_events.cbegin() + static_cast<int>(ready)};
-
-                for(auto ep_events_curr{ep_events.cbegin()}; ep_events_curr != ep_events_end; ++ep_events_curr)
+                for(auto const& e: ep_events)
                 {
-                    auto const& e{*ep_events_curr};
                     auto const sub_p{static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t const*>(e.data.ptr)};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1466,13 +1465,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 // First handle FD events
-                auto poll_subs_curr{poll_subs.cbegin()};
-                for(auto const& pfd: poll_fds)
+                auto pfd_curr{poll_fds.cbegin()};
+                auto const pfd_end{pfd_curr + poll_fds.size()};
+                auto sub_curr{poll_subs.cbegin()};
+
+                if(poll_subs.size() < poll_fds.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+                for(; pfd_curr != pfd_end; ++pfd_curr, ++sub_curr)
                 {
+                    auto const& pfd{*pfd_curr};
+
                     if(pfd.revents == 0) { continue; }
 
-                    auto const sub_p{poll_subs_curr};
-                    ++poll_subs_curr;
+                    auto const sub_p{*sub_curr};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -2570,13 +2575,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // Then handle FD events
 
-                auto sub_p_curr{poll_subs.cbegin()};
-                for(auto const& pfd: poll_fds)
+                auto pfd_curr{poll_fds.cbegin()};
+                auto const pfd_end{pfd_curr + poll_fds.size()};
+                auto sub_curr{poll_subs.cbegin()};
+
+                if(poll_subs.size() < poll_fds.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+                for(; pfd_curr != pfd_end; ++pfd_curr, ++sub_curr)
                 {
+                    auto const& pfd{*pfd_curr};
+
                     if(pfd.revents == 0) { continue; }
 
-                    auto const sub_p{*sub_p_curr};
-                    ++sub_p_curr;
+                    auto const sub_p{*sub_curr};
 
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -3092,6 +3103,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // Then handle FD events
                 auto native_fds_curr{native_fds.cbegin()};
+
+                if(native_fds.size() < fd_subs.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
                 for(auto const sub_p: fd_subs)
                 {
                     int const native_fd{*native_fds_curr};
