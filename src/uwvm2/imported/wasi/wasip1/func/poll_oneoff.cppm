@@ -66,6 +66,7 @@ import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.uwvm_predefine.io;
 import uwvm2.utils.mutex;
 import uwvm2.utils.debug;
+import uwvm2.utils.container;
 import uwvm2.object.memory.linear;
 import uwvm2.imported.wasi.wasip1.abi;
 import uwvm2.imported.wasi.wasip1.fd_manager;

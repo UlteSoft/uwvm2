@@ -66,6 +66,7 @@
 # include <uwvm2/uwvm_predefine/io/impl.h>
 # include <uwvm2/utils/mutex/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/container/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>
 # include <uwvm2/imported/wasi/wasip1/abi/impl.h>
 # include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
@@ -597,9 +598,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // For those who use their own FD
             ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t*> fd_p_vector{};
             ::uwvm2::utils::container::vector<::uwvm2::utils::mutex::mutex_merely_release_guard_t> fd_release_guards_vector{};
+            ::uwvm2::utils::container::unordered_flat_set<::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t*> fd_unique_set{};
 
             [[maybe_unused]] auto get_fd_from_wasm_fd{
-                [&env, &fd_p_vector, &fd_release_guards_vector](
+                [&env, &fd_p_vector, &fd_release_guards_vector, &fd_unique_set](
                     ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd) constexpr noexcept -> ::uwvm2::imported::wasi::wasip1::abi::errno_t
                 {
                     ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t* curr_wasi_fd_t_p{};
@@ -661,8 +663,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     // the problem arises when, immediately after acquiring the lock and before releasing the manager lock and beginning fd
                     // operations, another thread executes a deletion that removes this fd. Subsequent operations by the current thread
                     // would then encounter issues. Thus, locking must occur before releasing fds_rwlock.
-                    curr_fd_release_guard.device_p = ::std::addressof(curr_wasi_fd_t_p->fd_mutex);
-                    curr_fd_release_guard.lock();
+
+                    auto const [iter, inserted]{fd_unique_set.insert(curr_wasi_fd_t_p)};
+
+                    if(inserted)
+                    {
+                        curr_fd_release_guard.device_p = ::std::addressof(curr_wasi_fd_t_p->fd_mutex);
+                        curr_fd_release_guard.lock();
+                    }
+                    else
+                    {
+                        curr_fd_release_guard.device_p = nullptr;
+                    }
 
                     // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
 
@@ -2050,6 +2062,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
                         evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                        if((e.flags & EV_ERROR) != 0)
+                        {
+                            auto const ev_err_no{static_cast<int>(e.data)};
+                            if(ev_err_no != 0)
+                            {
+                                ::fast_io::error fe{};
+                                fe.domain = ::fast_io::posix_domain_value;
+                                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(ev_err_no));
+
+                                evt.error = ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                            }
+                        }
 
                         if(evt.type == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read ||
                            evt.type == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write)
