@@ -864,8 +864,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         {
                             auto int err{-ret};
 
-                            // Prevent repeated waiting from causing all returns
-                            if(err != EEXIST)
+                            if(err == EEXIST)
+                            {
+                                // The same underlying fd already exists in the epoll instance.
+                                // Upgrade the interest set to monitor both read and write events,
+                                // so that multiple subscriptions (read and write) on the same fd
+                                // will not lose notifications.
+                                ev.events = EPOLLIN | EPOLLOUT;
+
+                                ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
+                                                                                   EPOLL_CTL_MOD,
+                                                                                   curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
+                                                                                   ::std::addressof(ev));
+                                if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
+                                {
+                                    ::fast_io::error fe{};
+                                    fe.domain = ::fast_io::posix_domain_value;
+                                    fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ret));
+
+                                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                                }
+                            }
+                            else
                             {
                                 ::fast_io::error fe{};
                                 fe.domain = ::fast_io::posix_domain_value;
@@ -1063,12 +1083,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             ep_events.resize(subscriptions.size());
 
-            int const ready{::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1)};
-            if(::fast_io::linux_system_call_fails(ready)) [[unlikely]]
+            int ready{};
+
+            for(;;)
             {
+                ready = ::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1);
+                if(!::fast_io::linux_system_call_fails(ready)) { break; }
+
+                auto int err{-ready};
+
+                if(err == EINTR) { continue; }
+
                 ::fast_io::error fe{};
                 fe.domain = ::fast_io::posix_domain_value;
-                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ready));
+                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(err));
 
                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
             }
@@ -1100,6 +1128,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto const sub_tag{sub_p->u.tag};
 
+                    bool const has_error{(e.events & EPOLLERR) != 0u};
+                    auto const event_error{has_error ? ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio
+                                                     : ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess};
+
                     if(sub_tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read ||
                        sub_tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write)
                     {
@@ -1113,7 +1145,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                    sub.u.u.fd_readwrite.file_descriptor == fd)
                                 {
                                     evt.userdata = sub.userdata;
-                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                                    evt.error = event_error;
                                     evt.type = ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read;
 
                                     evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
@@ -1140,7 +1172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                    sub.u.u.fd_readwrite.file_descriptor == fd)
                                 {
                                     evt.userdata = sub.userdata;
-                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                                    evt.error = event_error;
                                     evt.type = ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write;
 
                                     evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
@@ -1162,7 +1194,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     else
                     {
                         evt.userdata = sub_p->userdata;
-                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        evt.error = event_error;
                         evt.type = sub_tag;
 
                         evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
