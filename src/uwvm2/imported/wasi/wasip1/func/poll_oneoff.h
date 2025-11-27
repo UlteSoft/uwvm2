@@ -1318,16 +1318,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             auto const now_integral{static_cast<timestamp_integral_t>(ts.seconds * 1'000'000'000u + ts.subseconds / mul_factor)};
 
-                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
+                            if(now_integral >= timeout_integral) { effective_timeout = static_cast<timestamp_integral_t>(0u); }
                             else
                             {
                                 effective_timeout = timeout_integral - now_integral;
                             }
                         }
-
-                        constexpr timestamp_integral_t one_billion{1'000'000'000u};
-
-                        if(effective_timeout == 0) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
 
                         clock_sub_entry ce{};
                         ce.sub = ::std::addressof(sub);
@@ -1383,6 +1379,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     timeout_ms = static_cast<int>(ms);
                 }
             }
+
+            // If there are immediate events to report, avoid blocking in poll().
+            if(!immediate_events.empty()) { timeout_ms = 0; }
 
             if(poll_fds.size() > static_cast<::std::size_t>(::std::numeric_limits<::nfds_t>::max()))
             {
