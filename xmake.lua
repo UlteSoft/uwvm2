@@ -44,6 +44,13 @@ function def_build()
 		-- set_policy("build.c++.modules.std", true)
 	end 
 
+	local use_stdlib = get_config("stdlib")
+	if use_stdlib ~= "default" and use_stdlib then
+		local flags = "-stdlib=" .. use_stdlib
+		add_cxflags(flags)
+		add_ldflags(flags)
+	end 
+
 	local disable_cpp_exceptions = get_config("fno-exceptions")
 	if disable_cpp_exceptions then
 		set_exceptions("no-cxx")

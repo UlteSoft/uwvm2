@@ -85,6 +85,19 @@ option("unwindlib", function()
     end)
 end)
 
+option("stdlib", function()
+    set_description
+    (
+        "Select the C++ standard library implementation.",
+        "The option is automatically added if using our toolchain option.",
+        [[    default: Use the toolchain's default C++ standard library.]],
+        [[    libstdc++: Prefer GNU libstdc++.]],
+        [[    libc++: Prefer LLVM libc++.]]
+    )
+    set_default("default")
+    set_values("default", "libstdc++", "libc++")
+end)
+
 option("debug-strip", function()
     set_description
     (
