@@ -985,6 +985,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         constexpr timestamp_integral_t one_billion{1'000'000'000u};
 
+                        // timerfd cannot set 0ns
                         if(effective_timeout == 0u) { effective_timeout = static_cast<timestamp_integral_t>(1u); }
 
                         auto const seconds_part{effective_timeout / one_billion};
