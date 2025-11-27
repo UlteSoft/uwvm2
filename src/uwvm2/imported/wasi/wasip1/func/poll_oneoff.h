@@ -48,9 +48,9 @@
 #   if __has_include(<sys/timerfd.h>)
 #    include <sys/timerfd.h>
 #   endif
-#  if __has_include(<sys/ioctl.h>)
-#   include <sys/ioctl.h>
-#  endif
+#   if __has_include(<sys/ioctl.h>)
+#    include <sys/ioctl.h>
+#   endif
 #  endif
 #  if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) ||         \
       (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
@@ -2390,7 +2390,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
 # else
             // Windows NT
+            constexpr bool zw_flag_nt{false};
+
             ::uwvm2::utils::container::vector<void*> wait_handles{};
+            ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{}; // RAII
             ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
@@ -2569,7 +2572,104 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock:
                     {
-                        /// @todo Convert to timer (NtSetTimer)
+                        // Convert clock subscription to NT waitable timer handle.
+
+                        auto const timeout_integral{static_cast<timestamp_integral_t_nt>(sub.u.u.clock.timeout)};
+                        auto const clock_flags{sub.u.u.clock.flags};
+                        auto const clock_id{sub.u.u.clock.id};
+
+                        bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime) ==
+                                              ::uwvm2::imported::wasi::wasip1::abi::subclockflags_t::subscription_clock_abstime};
+
+                        timestamp_integral_t_nt effective_timeout_ns{};
+
+                        if(!is_abstime) { effective_timeout_ns = timeout_integral; }
+                        else
+                        {
+                            ::fast_io::posix_clock_id posix_id;  // no init
+
+                            switch(clock_id)
+                            {
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_realtime:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::realtime;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_monotonic:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::monotonic;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_process_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::process_cputime_id;
+                                    break;
+                                }
+                                case ::uwvm2::imported::wasi::wasip1::abi::clockid_t::clock_thread_cputime_id:
+                                {
+                                    posix_id = ::fast_io::posix_clock_id::thread_cputime_id;
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                                }
+                            }
+
+                            ::fast_io::unix_timestamp ts_nt;
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            try
+#  endif
+                            {
+                                ts_nt = ::fast_io::posix_clock_gettime(posix_id);
+                            }
+#  if defined(UWVM_CPP_EXCEPTIONS)
+                            catch(::fast_io::error)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+#  endif
+
+                            constexpr timestamp_integral_t_nt mul_factor_nt_local{
+                                static_cast<timestamp_integral_t_nt>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
+
+                            auto const now_integral{
+                                static_cast<timestamp_integral_t_nt>(ts_nt.seconds * 1'000'000'000u + ts_nt.subseconds / mul_factor_nt_local)};
+
+                            if(now_integral >= timeout_integral) { effective_timeout_ns = static_cast<timestamp_integral_t_nt>(0u); }
+                            else
+                            {
+                                effective_timeout_ns = static_cast<timestamp_integral_t_nt>(timeout_integral - now_integral);
+                            }
+                        }
+
+                        ::std::uint_least64_t due_time_100ns_nt{static_cast<::std::uint_least64_t>(-static_cast<::std::int_least64_t>(effective_timeout_ns))};
+
+                        void* timer_handle_nt{};
+                        constexpr ::std::uint_least32_t timer_all_access_nt{0x001F0003u};  // TIMER_ALL_ACCESS
+
+                        auto const status_create_timer_nt{
+                            ::fast_io::win32::nt::nt_create_timer<zw_flag_nt>(::std::addressof(timer_handle_nt),
+                                                                              timer_all_access_nt,
+                                                                              nullptr,
+                                                                              ::fast_io::win32::nt::timer_type::NotificationTimer)};
+
+                        if(status_create_timer_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+                        auto const status_set_timer_nt{::fast_io::win32::nt::nt_set_timer<false>(timer_handle_nt,
+                                                                                                 ::std::addressof(due_time_100ns_nt),
+                                                                                                 nullptr,
+                                                                                                 nullptr,
+                                                                                                 static_cast<::std::uint_least8_t>(0u),
+                                                                                                 static_cast<::std::int_least32_t>(0),
+                                                                                                 nullptr)};
+
+                        if(status_set_timer_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+                        wait_handles.push_back(timer_handle_nt);
+                        wait_subs.push_back(::std::addressof(sub));
+                        wait_timer_handles.push_back(::fast_io::nt_file{timer_handle_nt});
+
                         break;
                     }
                     [[unlikely]] default:
@@ -2601,114 +2701,89 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced_nt{};
+            ::uwvm2::utils::container::vector<wasi_event_t> ready_events_nt{};
+
+            for(auto const& evt: immediate_events) { ready_events_nt.push_back(evt); }
+
+            if(!wait_handles.empty() || have_timeout_nt)
+            {
+                if(!wait_handles.empty())
+                {
+                    auto const wait_result_nt{
+                        ::fast_io::win32::nt::nt_wait_for_multiple_objects<zw_flag_nt>(static_cast<::std::uint_least32_t>(wait_handles.size()),
+                                                                                       wait_handles.data(),
+                                                                                       ::fast_io::win32::nt::wait_type::WaitAny,
+                                                                                       false,
+                                                                                       nullptr)};
+
+                    // STATUS_WAIT_0 .. STATUS_WAIT_63, STATUS_TIMEOUT
+                    constexpr ::std::uint_least32_t status_wait_0_nt{0x00000000u};
+                    constexpr ::std::uint_least32_t status_timeout_nt{0x00000102u};
+                    constexpr ::std::uint_least32_t status_wait_63_nt{0x0000003Fu};
+
+                    if(wait_result_nt >= status_wait_0_nt && wait_result_nt <= status_wait_63_nt)
+                    {
+                        ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
+                        if(index_nt < wait_subs.size())
+                        {
+                            auto const sub_p{wait_subs.index_unchecked(index_nt)};
+
+                            wasi_event_t evt{};
+
+                            evt.userdata = sub_p->userdata;
+                            evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                            evt.type = sub_p->u.tag;
+                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                            ready_events_nt.push_back(evt);
+                        }
+                    }
+                    else if(wait_result_nt == status_timeout_nt)
+                    {
+                        // With explicit NT timers, a timeout here should not normally occur.
+                        if(!have_timeout_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                    }
+                    else
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    }
+                }
+                else if(have_timeout_nt)
+                {
+                    // Only timeout, no FDs to wait for
+                    ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000u)};
+
+                    constexpr bool alertable_nt{false};
+                    auto const delay_status_nt{::fast_io::win32::nt::nt_delay_execution<zw_flag_nt>(alertable_nt, ::std::addressof(timeout_100ns_nt))};
+
+                    if(delay_status_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+
+                    for(auto const& sub: subscriptions)
+                    {
+                        if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock)
+                        {
+                            wasi_event_t evt{};
+
+                            evt.userdata = sub.userdata;
+                            evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                            evt.type = sub.u.tag;
+                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                            ready_events_nt.push_back(evt);
+                            break;
+                        }
+                    }
+                }
+            }
 
             {
                 [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                 auto out_curr{out};
 
-                for(auto const& evt: immediate_events) { write_one_event_to_memory(evt, out_curr, produced_nt); }
-
-                if(!wait_handles.empty() || have_timeout_nt)
-                {
-                    constexpr bool zw_flag_nt{false};
-
-                    if(!wait_handles.empty())
-                    {
-                        ::std::uint_least64_t timeout_100ns_nt{};
-                        ::std::uint_least64_t* timeout_ptr_nt{};
-
-                        if(have_timeout_nt)
-                        {
-                            timeout_100ns_nt = static_cast<::std::uint_least64_t>(-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000LL));
-                            timeout_ptr_nt = ::std::addressof(timeout_100ns_nt);
-                        }
-
-                        auto const wait_result_nt{
-                            ::fast_io::win32::nt::nt_wait_for_multiple_objects<zw_flag_nt>(static_cast<::std::uint_least32_t>(wait_handles.size()),
-                                                                                           wait_handles.data(),
-                                                                                           ::fast_io::win32::nt::wait_type::WaitAny,
-                                                                                           false,
-                                                                                           timeout_ptr_nt)};
-
-                        // STATUS_WAIT_0 .. STATUS_WAIT_63, STATUS_TIMEOUT
-                        constexpr ::std::uint_least32_t status_wait_0_nt{0x00000000u};
-                        constexpr ::std::uint_least32_t status_timeout_nt{0x00000102u};
-                        constexpr ::std::uint_least32_t status_wait_63_nt{0x0000003Fu};
-
-                        if(wait_result_nt >= status_wait_0_nt && wait_result_nt <= status_wait_63_nt)
-                        {
-                            ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
-                            if(index_nt < wait_subs.size())
-                            {
-                                auto const sub_p{wait_subs.index_unchecked(index_nt)};
-
-                                wasi_event_t evt{};
-
-                                evt.userdata = sub_p->userdata;
-                                evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                                evt.type = sub_p->u.tag;
-                                evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                                evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
-
-                                write_one_event_to_memory(evt, out_curr, produced_nt);
-                            }
-                        }
-                        else if(wait_result_nt == status_timeout_nt)
-                        {
-                            if(!have_timeout_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
-
-                            // Timeout: report first clock subscription
-                            for(auto const& sub: subscriptions)
-                            {
-                                if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock)
-                                {
-                                    wasi_event_t evt{};
-
-                                    evt.userdata = sub.userdata;
-                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                                    evt.type = sub.u.tag;
-                                    evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
-
-                                    write_one_event_to_memory(evt, out_curr, produced_nt);
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        }
-                    }
-                    else if(have_timeout_nt)
-                    {
-                        // Only timeout, no FDs to wait for
-                        ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000u)};
-
-                        constexpr bool alertable_nt{false};
-                        auto const delay_status_nt{::fast_io::win32::nt::nt_delay_execution<zw_flag_nt>(alertable_nt, ::std::addressof(timeout_100ns_nt))};
-
-                        if(delay_status_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
-
-                        for(auto const& sub: subscriptions)
-                        {
-                            if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock)
-                            {
-                                wasi_event_t evt{};
-
-                                evt.userdata = sub.userdata;
-                                evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                                evt.type = sub.u.tag;
-                                evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                                evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
-
-                                write_one_event_to_memory(evt, out_curr, produced_nt);
-                                break;
-                            }
-                        }
-                    }
-                }
+                for(auto const& evt: ready_events_nt) { write_one_event_to_memory(evt, out_curr, produced_nt); }
 
                 ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, nevents, produced_nt);
             }
