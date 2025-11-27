@@ -2393,7 +2393,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             constexpr bool zw_flag_nt{false};
 
             ::uwvm2::utils::container::vector<void*> wait_handles{};
-            ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{}; // RAII
+            ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{};  // RAII
             ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
@@ -2468,11 +2468,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         auto const now_integral{static_cast<timestamp_integral_t_nt>(ts.seconds * 1'000'000'000u + ts.subseconds / mul_factor_nt)};
 
-                        if(now_integral >= timeout_integral)
-                        {
-                            // Ensure a minimal non-zero timeout so the event is considered due
-                            effective_timeout_ns = static_cast<timestamp_integral_t_nt>(1u);
-                        }
+                        if(now_integral >= timeout_integral) { effective_timeout_ns = static_cast<timestamp_integral_t_nt>(0u); }
                         else
                         {
                             effective_timeout_ns = static_cast<timestamp_integral_t_nt>(timeout_integral - now_integral);
@@ -2681,7 +2677,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             constexpr ::std::size_t max_wait_handles_nt{64uz};
 
-            if(wait_handles.size() > max_wait_handles_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
+            if(wait_handles.size() > max_wait_handles_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
             if(wait_handles.empty() && !have_timeout_nt)
             {
@@ -2705,75 +2701,71 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             for(auto const& evt: immediate_events) { ready_events_nt.push_back(evt); }
 
-            if(!wait_handles.empty() || have_timeout_nt)
+            if(!wait_handles.empty())
             {
-                if(!wait_handles.empty())
+                auto const wait_result_nt{
+                    ::fast_io::win32::nt::nt_wait_for_multiple_objects<zw_flag_nt>(static_cast<::std::uint_least32_t>(wait_handles.size()),
+                                                                                   wait_handles.data(),
+                                                                                   ::fast_io::win32::nt::wait_type::WaitAny,
+                                                                                   false,
+                                                                                   nullptr)};
+
+                // STATUS_WAIT_0 .. STATUS_WAIT_63, STATUS_TIMEOUT
+                constexpr ::std::uint_least32_t status_wait_0_nt{0x00000000u};
+                constexpr ::std::uint_least32_t status_wait_63_nt{0x0000003Fu};
+
+                if(wait_result_nt >= status_wait_0_nt && wait_result_nt <= status_wait_63_nt)
                 {
-                    auto const wait_result_nt{
-                        ::fast_io::win32::nt::nt_wait_for_multiple_objects<zw_flag_nt>(static_cast<::std::uint_least32_t>(wait_handles.size()),
-                                                                                       wait_handles.data(),
-                                                                                       ::fast_io::win32::nt::wait_type::WaitAny,
-                                                                                       false,
-                                                                                       nullptr)};
-
-                    // STATUS_WAIT_0 .. STATUS_WAIT_63, STATUS_TIMEOUT
-                    constexpr ::std::uint_least32_t status_wait_0_nt{0x00000000u};
-                    constexpr ::std::uint_least32_t status_timeout_nt{0x00000102u};
-                    constexpr ::std::uint_least32_t status_wait_63_nt{0x0000003Fu};
-
-                    if(wait_result_nt >= status_wait_0_nt && wait_result_nt <= status_wait_63_nt)
+                    ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
+                    if(index_nt < wait_subs.size())
                     {
-                        ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
-                        if(index_nt < wait_subs.size())
-                        {
-                            auto const sub_p{wait_subs.index_unchecked(index_nt)};
+                        auto const sub_p{wait_subs.index_unchecked(index_nt)};
 
-                            wasi_event_t evt{};
+                        wasi_event_t evt{};
 
-                            evt.userdata = sub_p->userdata;
-                            evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                            evt.type = sub_p->u.tag;
-                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+                        evt.userdata = sub_p->userdata;
+                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        evt.type = sub_p->u.tag;
+                        evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                        evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
 
-                            ready_events_nt.push_back(evt);
-                        }
-                    }
-                    else if(wait_result_nt == status_timeout_nt)
-                    {
-                        // With explicit NT timers, a timeout here should not normally occur.
-                        if(!have_timeout_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
-                    }
-                    else
-                    {
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        ready_events_nt.push_back(evt);
                     }
                 }
-                else if(have_timeout_nt)
+                else if(wait_result_nt == 0x00000102u /*STATUS_TIMEOUT*/)
                 {
-                    // Only timeout, no FDs to wait for
-                    ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000u)};
+                    // With explicit NT timers, a timeout here should not normally occur.
+                    if(!have_timeout_nt) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
+                else
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+            }
+            else if(have_timeout_nt)
+            {
+                // Only timeout, no FDs to wait for
+                ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000u)};
 
-                    constexpr bool alertable_nt{false};
-                    auto const delay_status_nt{::fast_io::win32::nt::nt_delay_execution<zw_flag_nt>(alertable_nt, ::std::addressof(timeout_100ns_nt))};
+                constexpr bool alertable_nt{false};
+                auto const delay_status_nt{::fast_io::win32::nt::nt_delay_execution<zw_flag_nt>(alertable_nt, ::std::addressof(timeout_100ns_nt))};
 
-                    if(delay_status_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                if(delay_status_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
-                    for(auto const& sub: subscriptions)
+                for(auto const& sub: subscriptions)
+                {
+                    if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock)
                     {
-                        if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock)
-                        {
-                            wasi_event_t evt{};
+                        wasi_event_t evt{};
 
-                            evt.userdata = sub.userdata;
-                            evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                            evt.type = sub.u.tag;
-                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+                        evt.userdata = sub.userdata;
+                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        evt.type = sub.u.tag;
+                        evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                        evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
 
-                            ready_events_nt.push_back(evt);
-                            break;
-                        }
+                        ready_events_nt.push_back(evt);
+                        break;
                     }
                 }
             }
