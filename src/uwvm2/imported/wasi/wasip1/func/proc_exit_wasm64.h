@@ -51,6 +51,7 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
+# include "proc_exit.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
@@ -66,28 +67,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.proc_exit
     /// @details   void proc_exit(__wasi_exitcode_t code);
 
-    inline void proc_exit_impl(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-                               ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
-    {
-        if(env.wasip1_proc_exit_func_ptr != nullptr)
-        {
-            env.wasip1_proc_exit_func_ptr(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(code));
-        }
-        else
-        {
-#if defined(__linux__)
-            ::fast_io::fast_exit(static_cast<int>(code));
-#elif defined(_WIN32)
-            // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
-            ::fast_io::win32::ExitProcess(static_cast<::std::uint_least32_t>(code));
-#else
-            ::uwvm2::imported::wasi::wasip1::func::posix::exit(static_cast<int>(code));
-#endif
-        }
-    }
-
-    inline void proc_exit(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-                          ::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
+    inline void proc_exit_wasm64(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
+                                 ::uwvm2::imported::wasi::wasip1::abi::exitcode_wasm64_t code) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
@@ -102,7 +83,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"proc_exit",
+                                u8"proc_exit_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"(",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -114,13 +95,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
             ::fast_io::io::perr(::fast_io::u8err(),
-                                u8"uwvm: [info]  wasip1: proc_exit(",
+                                u8"uwvm: [info]  wasip1: proc_exit_wasm64(",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(code)>>>(code),
                                 u8") (wasi-trace)\n");
 #endif
         }
 
-        proc_exit_impl(env, code);
+        ::uwvm2::imported::wasi::wasip1::func::proc_exit_impl(env, code);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
