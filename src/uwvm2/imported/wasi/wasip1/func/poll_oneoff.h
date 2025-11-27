@@ -853,6 +853,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // The directory FD can be passed to poll as a valid FD, but it will never become “ready”.
                                 continue;
                             }
+                            [[unlikely]] default:
+                            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                ::fast_io::fast_terminate();
+                            }
                         }
 
                         struct ::epoll_event ev{};
@@ -879,9 +886,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ev.events = EPOLLIN | EPOLLOUT;
 
                                 ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
-                                                                                   EPOLL_CTL_MOD,
-                                                                                   curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
-                                                                                   ::std::addressof(ev));
+                                                                                  EPOLL_CTL_MOD,
+                                                                                  curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
+                                                                                  ::std::addressof(ev));
                                 if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                                 {
                                     ::fast_io::error fe{};
@@ -1289,6 +1296,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
                                 continue;
+                            }
+                            [[unlikely]] default:
+                            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                ::fast_io::fast_terminate();
                             }
                         }
 
@@ -1837,6 +1851,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // The directory FD can be passed to poll as a valid FD, but it will never become “ready”.
                                 continue;
                             }
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                ::fast_io::fast_terminate();
+                            }
                         }
 
                         struct ::kevent kev{};
@@ -2022,10 +2043,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
             }
 
-            if(static_cast<::std::size_t>(ready) > events.size()) [[unlikely]]
-            {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-            }
+            if(static_cast<::std::size_t>(ready) > events.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
             ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t produced{};
 
@@ -2080,8 +2098,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
                                 evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                    static_cast<eventrwflags_underlying_t2>(
-                                        ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
+                                    static_cast<eventrwflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
                             }
                         }
 
@@ -2106,8 +2123,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(is_abstime)
                         {
-                            using timestamp_integral_t_local =
-                                ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
+                            using timestamp_integral_t_local = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::timestamp_t>;
 
                             auto const timeout_integral{static_cast<timestamp_integral_t_local>(sub_p->u.u.clock.timeout)};
                             auto const clock_id{sub_p->u.u.clock.id};
@@ -2159,8 +2175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             constexpr timestamp_integral_t_local mul_factor2{
                                 static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
 
-                            auto const now_integral{
-                                static_cast<timestamp_integral_t_local>(ts2.seconds * 1'000'000'000u + ts2.subseconds / mul_factor2)};
+                            auto const now_integral{static_cast<timestamp_integral_t_local>(ts2.seconds * 1'000'000'000u + ts2.subseconds / mul_factor2)};
 
                             if(now_integral < timeout_integral) { continue; }
                         }
@@ -2336,6 +2351,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
                             {
+                                // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
+                                void* handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.handle};
+                                wait_handles.push_back(handle);
+                                wait_subs.push_back(::std::addressof(sub));
+
                                 break;
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
@@ -2343,18 +2363,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
                                 continue;
                             }
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+                            {
+                                /// @todo
+                                break;
+                            }
+                            [[unlikely]] default:
+                            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                ::fast_io::fast_terminate();
+                            }
                         }
-
-                        // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
-                        void* handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.handle};
-                        wait_handles.push_back(handle);
-                        wait_subs.push_back(::std::addressof(sub));
 
                         break;
                     }
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock:
                     {
                         // Clock events are handled via timeout
+                        /// @todo
                         break;
                     }
                     [[unlikely]] default:
@@ -2579,6 +2607,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
                                 continue;
+                            }
+                            [[unlikely]] default:
+                            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                ::fast_io::fast_terminate();
                             }
                         }
 
@@ -3071,6 +3106,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
                                 continue;
+                            }
+                            [[unlikely]] default:
+                            {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                ::fast_io::fast_terminate();
                             }
                         }
 
