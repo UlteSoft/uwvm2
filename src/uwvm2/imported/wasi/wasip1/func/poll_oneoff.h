@@ -841,7 +841,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // The directory FD can be passed to poll as a valid FD, but it will never become “ready”.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -1240,7 +1239,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -1792,7 +1790,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // The directory FD can be passed to poll as a valid FD, but it will never become “ready”.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -2185,7 +2182,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -2423,7 +2419,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
@@ -2899,7 +2894,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
                             {
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
-                                push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess);
                                 continue;
                             }
                         }
