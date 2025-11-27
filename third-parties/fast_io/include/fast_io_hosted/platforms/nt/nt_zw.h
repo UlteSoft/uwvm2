@@ -786,4 +786,32 @@ inline ::std::uint_least32_t nt_reset_event(Args... args) noexcept
 	}
 }
 
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 7)
+inline ::std::uint_least32_t nt_set_timer(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwSetTimer(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtSetTimer(args...);
+	}
+}
+
+template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 2)
+inline ::std::uint_least32_t nt_cancel_timer(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwCancelTimer(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtCancelTimer(args...);
+	}
+}
+
 } // namespace fast_io::win32::nt

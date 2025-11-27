@@ -151,5 +151,11 @@ FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL NtDelayExecution(bool
 FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL ZwDelayExecution(bool, ::std::int_least64_t *) noexcept FAST_IO_WINSTDCALL_RENAME(ZwDelayExecution, 8);
 FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL NtSetTimerResolution(::std::uint_least32_t, bool, ::std::uint_least32_t *) noexcept FAST_IO_WINSTDCALL_RENAME(NtSetTimerResolution, 12);
 FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL ZwSetTimerResolution(::std::uint_least32_t, bool, ::std::uint_least32_t *) noexcept FAST_IO_WINSTDCALL_RENAME(ZwSetTimerResolution, 12);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL NtCreateTimer(void **, ::std::uint_least32_t, ::fast_io::win32::nt::object_attributes *, ::fast_io::win32::nt::timer_type) noexcept FAST_IO_WINSTDCALL_RENAME(NtCreateTimer, 16);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL ZwCreateTimer(void **, ::std::uint_least32_t, ::fast_io::win32::nt::object_attributes *, ::fast_io::win32::nt::timer_type) noexcept FAST_IO_WINSTDCALL_RENAME(ZwCreateTimer, 16);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL NtSetTimer(void *, ::std::uint_least64_t const *, ::fast_io::win32::nt::ptimer_apc_routine, void *, ::std::uint_least8_t, ::std::int_least32_t, ::std::uint_least8_t *) noexcept FAST_IO_WINSTDCALL_RENAME(NtSetTimer, 28);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL ZwSetTimer(void *, ::std::uint_least64_t const *, ::fast_io::win32::nt::ptimer_apc_routine, void *, ::std::uint_least8_t, ::std::int_least32_t, ::std::uint_least8_t *) noexcept FAST_IO_WINSTDCALL_RENAME(ZwSetTimer, 28);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL NtCancelTimer(void *, ::std::uint_least8_t *) noexcept FAST_IO_WINSTDCALL_RENAME(NtCancelTimer, 8);
+FAST_IO_DLLIMPORT ::std::uint_least32_t FAST_IO_WINSTDCALL ZwCancelTimer(void *, ::std::uint_least8_t *) noexcept FAST_IO_WINSTDCALL_RENAME(ZwCancelTimer, 8);
 
 } // namespace fast_io::win32::nt

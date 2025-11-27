@@ -63,7 +63,15 @@ enum class event_type
 	SynchronizationEvent
 };
 
+enum class timer_type
+{
+	NotificationTimer,
+	SynchronizationTimer
+};
+
 using pio_apc_routine = void (*)(void *, io_status_block *, ::std::uint_least32_t) noexcept;
+
+using ptimer_apc_routine = void (*)(void *, ::std::uint_least32_t, ::std::int_least32_t) noexcept;
 
 struct rtlp_curdir_def
 {
