@@ -2535,7 +2535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
                             {
                                 // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
-                                void* handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.native_handle()};
+                                auto handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.native_handle()};
                                 wait_handles.push_back(handle);
                                 wait_subs.push_back(::std::addressof(sub));
 
