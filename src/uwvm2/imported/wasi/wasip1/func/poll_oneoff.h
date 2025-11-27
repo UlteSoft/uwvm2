@@ -2395,6 +2395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::container::vector<void*> wait_handles{};
             ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{};  // RAII
             ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
+            ::uwvm2::utils::container::vector<::std::size_t> wait_socket_events{}; /// @todo change RAII
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
             // Process clock subscriptions to determine minimum timeout (ms)
@@ -2550,7 +2551,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             {
                                 // Windows sockets (ws2) and handles cannot share a single waitformultipleobject function.
                                 auto const socket_native_handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd.native_handle()};
+                                auto const ev{::fast_io::win32::WSACreateEvent()};
+
+                                if(ev == 0u)
+                                {
+                                    push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                                    continue;
+                                }
+
+                                ::std::uint_least32_t network_events{};
+
+                                if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read)
+                                {
+                                    network_events |= 0x00000001u;  // FD_READ
+                                    network_events |= 0x00000008u;  // FD_ACCEPT
+                                    network_events |= 0x00000020u;  // FD_CLOSE
+                                }
+
+                                if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write)
+                                {
+                                    network_events |= 0x00000002u;  // FD_WRITE
+                                    network_events |= 0x00000010u;  // FD_CONNECT
+                                    network_events |= 0x00000020u;  // FD_CLOSE
+                                }
+
+                                if(::fast_io::win32::WSAEventSelect(socket_native_handle, ev, network_events) != 0)
+                                {
+                                    ::fast_io::win32::WSACloseEvent(ev);
+                                    push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
+                                    continue;
+                                }
+
+                                wait_handles.push_back(reinterpret_cast<void*>(ev));
                                 wait_socket_handles.push_back(socket_native_handle);
+                                wait_socket_events.push_back(ev);
                                 wait_subs.push_back(::std::addressof(sub));
 
                                 break;
@@ -2728,6 +2762,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         evt.type = sub_p->u.tag;
                         evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
                         evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                        if(index_nt < wait_socket_events.size() && wait_handles.index_unchecked(index_nt) == reinterpret_cast<void const*>(wait_socket_events.index_unchecked(index_nt)))
+                        {
+                            ::fast_io::win32::wsanetworkevents ne{};
+
+                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(index_nt), wait_socket_events.index_unchecked(index_nt), ::std::addressof(ne)) != 0)
+                            {
+                                evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            }
+                            else
+                            {
+                                if((ne.lNetworkEvents & 0x00000001L) != 0)  // FD_READ
+                                {
+                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
+                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
+                                            ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_read));
+                                }
+
+                                if((ne.lNetworkEvents & 0x00000002L) != 0)  // FD_WRITE
+                                {
+                                    auto const old_flags_underlying{
+                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(evt.u.fd_readwrite.flags)};
+                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
+                                        old_flags_underlying |
+                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
+                                            ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_write));
+                                }
+
+                                if((ne.lNetworkEvents & 0x00000020L) != 0)  // FD_CLOSE
+                                {
+                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eof;
+                                }
+                            }
+                        }
 
                         ready_events_nt.push_back(evt);
                     }
