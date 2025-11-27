@@ -194,7 +194,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 
         extern int poll(struct ::pollfd*, ::nfds_t, int) noexcept
-# if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("poll")
 # else
             __asm__("_poll")
@@ -202,10 +202,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ;
 
         extern int select(int, struct ::fd_set*, struct ::fd_set*, struct ::fd_set*, struct ::timeval*) noexcept
-# if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("select")
 # else
             __asm__("_select")
+# endif
+                ;
+
+        [[noreturn]] extern void exit(int) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("exit")
+# else
+            __asm__("_exit")
 # endif
                 ;
 
