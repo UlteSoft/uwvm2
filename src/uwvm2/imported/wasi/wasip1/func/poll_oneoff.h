@@ -767,6 +767,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ::fast_io::system_call<__NR_epoll_create, int>(1)
 #  endif
             };
+
             if(::fast_io::linux_system_call_fails(epfd)) [[unlikely]]
             {
                 ::fast_io::error fe{};
@@ -858,11 +859,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                             ::std::addressof(ev))};
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
-                            ::fast_io::error fe{};
-                            fe.domain = ::fast_io::posix_domain_value;
-                            fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(-ret));
+                            auto int err{-ret};
 
-                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                            // Prevent repeated waiting from causing all returns
+                            if(err != EEXIST)
+                            {
+                                ::fast_io::error fe{};
+                                fe.domain = ::fast_io::posix_domain_value;
+                                fe.code = static_cast<::fast_io::error::value_type>(static_cast<unsigned int>(err));
+
+                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(fe);
+                            }
                         }
 
                         has_epoll_interest = true;
@@ -1088,77 +1095,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 
-                    evt.userdata = sub_p->userdata;
-                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                    evt.type = sub_p->u.tag;
+                    auto const sub_tag{sub_p->u.tag};
 
-                    evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
-
-                    if(evt.type == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read ||
-                       evt.type == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write)
+                    if(sub_tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read ||
+                       sub_tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write)
                     {
-                        if((e.events & (EPOLLHUP | EPOLLRDHUP)) != 0u)
+                        auto const fd{sub_p->u.u.fd_readwrite.file_descriptor};
+
+                        if((e.events & (EPOLLIN | EPOLLHUP | EPOLLRDHUP)) != 0u)
                         {
-                            using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
-                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                static_cast<eventrwflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
-                        }
-                    }
+                            for(auto const& sub: subscriptions)
+                            {
+                                if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read &&
+                                   sub.u.u.fd_readwrite.file_descriptor == fd)
+                                {
+                                    evt.userdata = sub.userdata;
+                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                                    evt.type = ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_read;
 
-                    if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_data_layout())
-                    {
-                        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
-                            memory,
-                            out_curr,
-                            reinterpret_cast<::std::byte const*>(::std::addressof(evt)),
-                            reinterpret_cast<::std::byte const*>(::std::addressof(evt)) + sizeof(evt));
+                                    evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                                    if((e.events & (EPOLLHUP | EPOLLRDHUP)) != 0u)
+                                    {
+                                        using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
+                                        evt.u.fd_readwrite.flags =
+                                            static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(static_cast<eventrwflags_underlying_t2>(
+                                                ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
+                                    }
+
+                                    write_one_event_to_memory(evt, out_curr, produced);
+                                }
+                            }
+                        }
+
+                        if((e.events & (EPOLLOUT | EPOLLHUP | EPOLLRDHUP)) != 0u)
+                        {
+                            for(auto const& sub: subscriptions)
+                            {
+                                if(sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write &&
+                                   sub.u.u.fd_readwrite.file_descriptor == fd)
+                                {
+                                    evt.userdata = sub.userdata;
+                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                                    evt.type = ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write;
+
+                                    evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                                    if((e.events & (EPOLLHUP | EPOLLRDHUP)) != 0u)
+                                    {
+                                        using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
+                                        evt.u.fd_readwrite.flags =
+                                            static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(static_cast<eventrwflags_underlying_t2>(
+                                                ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup));
+                                    }
+
+                                    write_one_event_to_memory(evt, out_curr, produced);
+                                }
+                            }
+                        }
                     }
                     else
                     {
-                        using userdata_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::userdata_t>;
-                        using errno_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::errno_t>;
-                        using eventtype_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventtype_t>;
+                        evt.userdata = sub_p->userdata;
+                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        evt.type = sub_tag;
 
-                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<userdata_underlying_t2>(
-                            memory,
-                            out_curr + 0u,
-                            static_cast<userdata_underlying_t2>(evt.userdata));
-                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<errno_underlying_t2>(
-                            memory,
-                            out_curr + 8u,
-                            static_cast<errno_underlying_t2>(evt.error));
-                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventtype_underlying_t2>(
-                            memory,
-                            out_curr + 10u,
-                            static_cast<eventtype_underlying_t2>(evt.type));
+                        evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                        evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
 
-                        if constexpr(::uwvm2::imported::wasi::wasip1::func::is_default_wasi_event_fd_readwrite_data_layout())
-                        {
-                            ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(
-                                memory,
-                                out_curr + 16u,
-                                reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)),
-                                reinterpret_cast<::std::byte const*>(::std::addressof(evt.u.fd_readwrite)) + sizeof(evt.u.fd_readwrite));
-                        }
-                        else
-                        {
-                            using filesize_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filesize_t>;
-                            using eventrwflags_underlying_t2 = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>;
-
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<filesize_underlying_t2>(
-                                memory,
-                                out_curr + 16u + 0u,
-                                static_cast<filesize_underlying_t2>(evt.u.fd_readwrite.nbytes));
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<eventrwflags_underlying_t2>(
-                                memory,
-                                out_curr + 16u + 8u,
-                                static_cast<eventrwflags_underlying_t2>(evt.u.fd_readwrite.flags));
-                        }
+                        write_one_event_to_memory(evt, out_curr, produced);
                     }
-
-                    out_curr += static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(::uwvm2::imported::wasi::wasip1::func::size_of_wasi_event_t);
-                    ++produced;
                 }
 
                 ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, nevents, produced);
