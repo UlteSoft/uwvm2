@@ -671,10 +671,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         curr_fd_release_guard.device_p = ::std::addressof(curr_wasi_fd_t_p->fd_mutex);
                         curr_fd_release_guard.lock();
                     }
-                    else
-                    {
-                        curr_fd_release_guard.device_p = nullptr;
-                    }
+                    // else: curr_fd_release_guard.device_p = nullptr;
 
                     // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
 
