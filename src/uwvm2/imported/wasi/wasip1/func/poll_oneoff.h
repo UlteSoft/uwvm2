@@ -2391,6 +2391,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # else
             // Windows NT
             ::uwvm2::utils::container::vector<void*> wait_handles{};
+            ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
             // Process clock subscriptions to determine minimum timeout (ms)
@@ -2535,7 +2536,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
                             {
                                 // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
-                                void* handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.handle};
+                                void* handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.native_handle()};
                                 wait_handles.push_back(handle);
                                 wait_subs.push_back(::std::addressof(sub));
 
@@ -2548,12 +2549,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
                             {
+                                // Windows sockets (ws2) and handles cannot share a single waitformultipleobject function.
                                 auto const socket_native_handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd.native_handle()};
-
-                                // Convert SOCKET (uintptr_t) to HANDLE for WaitForMultipleObjects.
-                                auto const socket_handle{reinterpret_cast<void*>(static_cast<::std::uintptr_t>(socket_native_handle))};
-
-                                wait_handles.push_back(socket_handle);
+                                wait_socket_handles.push_back(socket_native_handle);
                                 wait_subs.push_back(::std::addressof(sub));
 
                                 break;
@@ -2571,7 +2569,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_clock:
                     {
-                        // Already translated into min_timeout_ms_nt above; nothing else to enqueue.
+                        /// @todo Convert to timer (NtSetTimer)
                         break;
                     }
                     [[unlikely]] default:
