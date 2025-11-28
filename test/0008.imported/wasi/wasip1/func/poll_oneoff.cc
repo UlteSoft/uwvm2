@@ -21,7 +21,7 @@ using ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment;
 using ::uwvm2::imported::wasi::wasip1::func::wasi_event_t;
 using ::uwvm2::imported::wasi::wasip1::func::wasi_subscription_t;
 using ::uwvm2::object::memory::linear::native_memory_t;
-
+#if !(defined(_WIN32) && defined(_WIN32_WINDOWS))
 int main()
 {
     native_memory_t memory{};
@@ -318,3 +318,8 @@ int main()
         }
     }
 }
+
+#else
+
+int main() { return 0; }
+#endif
