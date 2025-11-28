@@ -878,7 +878,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                             ::std::addressof(ev))};
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
-                            auto int err{-ret};
+                            auto err{-ret};
 
                             if(err == EEXIST)
                             {
@@ -1107,7 +1107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ready = ::fast_io::system_call<__NR_epoll_wait, int>(epfd, ep_events.data(), static_cast<int>(ep_events.size()), -1);
                 if(!::fast_io::linux_system_call_fails(ready)) { break; }
 
-                auto int err{-ready};
+                auto err{-ready};
 
                 if(err == EINTR) { continue; }
 
