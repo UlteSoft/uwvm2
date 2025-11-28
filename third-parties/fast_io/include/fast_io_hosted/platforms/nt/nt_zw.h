@@ -787,6 +787,20 @@ inline ::std::uint_least32_t nt_reset_event(Args... args) noexcept
 }
 
 template <bool zw, typename... Args>
+	requires(sizeof...(Args) == 4)
+inline ::std::uint_least32_t nt_create_timer(Args... args) noexcept
+{
+	if constexpr (zw)
+	{
+		return ::fast_io::win32::nt::ZwCreateTimer(args...);
+	}
+	else
+	{
+		return ::fast_io::win32::nt::NtCreateTimer(args...);
+	}
+}
+
+template <bool zw, typename... Args>
 	requires(sizeof...(Args) == 7)
 inline ::std::uint_least32_t nt_set_timer(Args... args) noexcept
 {

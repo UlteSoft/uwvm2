@@ -2676,12 +2676,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         timestamp_integral_t_nt effective_timeout_ns_clamped{effective_timeout_ns};
                         constexpr auto int64_max_nt{::std::numeric_limits<::std::int_least64_t>::max()};
 
-                        if(effective_timeout_ns_clamped > static_cast<timestamp_integral_t_nt>(int64_max_nt))
+                        // Convert from ns to 100ns units with clamping to the representable range of NT relative timers.
+                        auto timeout_100ns_nt{static_cast<::std::uint_least64_t>(effective_timeout_ns_clamped / 100u)};
+
+                        if(timeout_100ns_nt > static_cast<::std::uint_least64_t>(int64_max_nt))
                         {
-                            effective_timeout_ns_clamped = static_cast<timestamp_integral_t_nt>(int64_max_nt);
+                            timeout_100ns_nt = static_cast<::std::uint_least64_t>(int64_max_nt);
                         }
 
-                        auto const due_time_100ns_nt_signed{-static_cast<::std::int_least64_t>(effective_timeout_ns_clamped)};
+                        auto const due_time_100ns_nt_signed{-static_cast<::std::int_least64_t>(timeout_100ns_nt)};
                         ::std::uint_least64_t due_time_100ns_nt{static_cast<::std::uint_least64_t>(due_time_100ns_nt_signed)};
 
                         void* timer_handle_nt{};
@@ -2695,13 +2698,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(status_create_timer_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
-                        auto const status_set_timer_nt{::fast_io::win32::nt::nt_set_timer<false>(timer_handle_nt,
-                                                                                                 ::std::addressof(due_time_100ns_nt),
-                                                                                                 nullptr,
-                                                                                                 nullptr,
-                                                                                                 static_cast<::std::uint_least8_t>(0u),
-                                                                                                 static_cast<::std::int_least32_t>(0),
-                                                                                                 nullptr)};
+                        auto const status_set_timer_nt{::fast_io::win32::nt::nt_set_timer<zw_flag_nt>(timer_handle_nt,
+                                                                                                      ::std::addressof(due_time_100ns_nt),
+                                                                                                      nullptr,
+                                                                                                      nullptr,
+                                                                                                      static_cast<::std::uint_least8_t>(0u),
+                                                                                                      static_cast<::std::int_least32_t>(0),
+                                                                                                      nullptr)};
 
                         if(status_set_timer_nt != 0u) [[unlikely]]
                         {
@@ -2781,7 +2784,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ::std::size_t socket_vec_index_nt{};
                         bool is_socket_handle_nt{};
 
-                        for(auto const& e: wait_socket_events)
+                        for(::std::size_t i_nt{}; auto const& e: wait_socket_events)
                         {
                             if(ready_handle_nt == reinterpret_cast<void const*>(e.native_handle()))
                             {
@@ -2789,6 +2792,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 is_socket_handle_nt = true;
                                 break;
                             }
+                            ++i_nt;
                         }
 
                         if(is_socket_handle_nt)
@@ -2803,25 +2807,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             else
                             {
-                                if((ne.lNetworkEvents & 0x00000001) != 0)  // FD_READ
-                                {
-                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
-                                            ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_read));
-                                }
-
-                                if((ne.lNetworkEvents & 0x00000002) != 0)  // FD_WRITE
-                                {
-                                    auto const old_flags_underlying{
-                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(evt.u.fd_readwrite.flags)};
-                                    evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                        old_flags_underlying | static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
-                                                                   ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_write));
-                                }
-
                                 if((ne.lNetworkEvents & 0x00000020) != 0)  // FD_CLOSE
                                 {
-                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eof;
+                                    // Signal hangup using the standard WASI eventrwflags_t hangup bit.
+                                    evt.u.fd_readwrite.flags = ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup;
                                 }
                             }
                         }
