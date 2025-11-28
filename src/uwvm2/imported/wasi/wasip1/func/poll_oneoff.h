@@ -2395,7 +2395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::container::vector<void*> wait_handles{};
             ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{};  // RAII
             ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
-            ::uwvm2::utils::container::vector<::std::size_t> wait_socket_events{}; /// @todo change RAII
+            ::uwvm2::utils::container::vector<::fast_io::win32_socket_event_raii_t> wait_socket_events{};  /// RAII
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
             // Process clock subscriptions to determine minimum timeout (ms)
@@ -2584,7 +2584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 wait_handles.push_back(reinterpret_cast<void*>(ev));
                                 wait_socket_handles.push_back(socket_native_handle);
-                                wait_socket_events.push_back(ev);
+                                wait_socket_events.push_back(::fast_io::win32_socket_event_raii_t{ev});
                                 wait_subs.push_back(::std::addressof(sub));
 
                                 break;
@@ -2763,11 +2763,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
                         evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
 
-                        if(index_nt < wait_socket_events.size() && wait_handles.index_unchecked(index_nt) == reinterpret_cast<void const*>(wait_socket_events.index_unchecked(index_nt)))
+                        if(index_nt < wait_socket_events.size() &&
+                           wait_handles.index_unchecked(index_nt) ==
+                               reinterpret_cast<void const*>(wait_socket_events.index_unchecked(index_nt).native_handle()))
                         {
                             ::fast_io::win32::wsanetworkevents ne{};
 
-                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(index_nt), wait_socket_events.index_unchecked(index_nt), ::std::addressof(ne)) != 0)
+                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(index_nt),
+                                                                      wait_socket_events.index_unchecked(index_nt).native_handle(),
+                                                                      ::std::addressof(ne)) != 0)
                             {
                                 evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             }
@@ -2785,9 +2789,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     auto const old_flags_underlying{
                                         static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(evt.u.fd_readwrite.flags)};
                                     evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
-                                        old_flags_underlying |
-                                        static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
-                                            ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_write));
+                                        old_flags_underlying | static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
+                                                                   ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_write));
                                 }
 
                                 if((ne.lNetworkEvents & 0x00000020L) != 0)  // FD_CLOSE
