@@ -2766,56 +2766,83 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 if(wait_result_nt >= status_wait_0_nt && wait_result_nt <= status_wait_63_nt)
                 {
-                    ::std::size_t const index_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
-                    if(index_nt < wait_subs.size())
-                    {
-                        auto const sub_p{wait_subs.index_unchecked(index_nt)};
+                    auto const handle_signaled_nt{static_cast<::std::size_t>(wait_result_nt - status_wait_0_nt)};
 
-                        wasi_event_t evt{};
-
-                        evt.userdata = sub_p->userdata;
-                        evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                        evt.type = sub_p->u.tag;
-                        evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
-                        evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
-
-                        void const* const ready_handle_nt{wait_handles.index_unchecked(index_nt)};
-
-                        ::std::size_t socket_vec_index_nt{};
-                        bool is_socket_handle_nt{};
-
-                        for(::std::size_t i_nt{}; auto const& e: wait_socket_events)
+                    auto process_one_ready_handle_nt{
+                        [&](::std::size_t const index_nt) constexpr noexcept
                         {
-                            if(ready_handle_nt == reinterpret_cast<void const*>(e.native_handle()))
-                            {
-                                socket_vec_index_nt = i_nt;
-                                is_socket_handle_nt = true;
-                                break;
-                            }
-                            ++i_nt;
-                        }
+                            if(index_nt >= wait_subs.size()) [[unlikely]] { return; }
 
-                        if(is_socket_handle_nt)
-                        {
-                            ::fast_io::win32::wsanetworkevents ne{};
+                            auto const sub_p{wait_subs.index_unchecked(index_nt)};
 
-                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(socket_vec_index_nt),
-                                                                      wait_socket_events.index_unchecked(socket_vec_index_nt).native_handle(),
-                                                                      ::std::addressof(ne)) != 0)
+                            wasi_event_t evt{};
+
+                            evt.userdata = sub_p->userdata;
+                            evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                            evt.type = sub_p->u.tag;
+                            evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
+                            evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
+
+                            void const* const ready_handle_nt{wait_handles.index_unchecked(index_nt)};
+
+                            ::std::size_t socket_vec_index_nt{};
+                            bool is_socket_handle_nt{};
+
+                            for(::std::size_t i_nt{}; auto const& e: wait_socket_events)
                             {
-                                evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                            }
-                            else
-                            {
-                                if((ne.lNetworkEvents & 0x00000020) != 0)  // FD_CLOSE
+                                if(ready_handle_nt == reinterpret_cast<void const*>(e.native_handle()))
                                 {
-                                    // Signal hangup using the standard WASI eventrwflags_t hangup bit.
-                                    evt.u.fd_readwrite.flags = ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup;
+                                    socket_vec_index_nt = i_nt;
+                                    is_socket_handle_nt = true;
+                                    break;
+                                }
+                                ++i_nt;
+                            }
+
+                            if(is_socket_handle_nt)
+                            {
+                                ::fast_io::win32::wsanetworkevents ne{};
+
+                                if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(socket_vec_index_nt),
+                                                                          wait_socket_events.index_unchecked(socket_vec_index_nt).native_handle(),
+                                                                          ::std::addressof(ne)) != 0)
+                                {
+                                    evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                                }
+                                else
+                                {
+                                    if((ne.lNetworkEvents & 0x00000020) != 0)  // FD_CLOSE
+                                    {
+                                        // Signal hangup using the standard WASI eventrwflags_t hangup bit.
+                                        evt.u.fd_readwrite.flags = ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::event_fd_readwrite_hangup;
+                                    }
                                 }
                             }
-                        }
 
-                        ready_events_nt.push_back(evt);
+                            ready_events_nt.push_back(evt);
+                        }};
+
+                    // First, process the handle that satisfied NtWaitForMultipleObjects.
+                    process_one_ready_handle_nt(handle_signaled_nt);
+
+                    // Then, with a zero timeout, probe all other handles to collect any additional
+                    // ready events (including other clock subscriptions that have already expired).
+                    ::std::uint_least64_t timeout_zero_nt{};
+
+                    for(::std::size_t index_nt{}; index_nt < wait_handles.size(); ++index_nt)
+                    {
+                        if(index_nt == handle_signaled_nt) { continue; }
+
+                        auto const status_single_nt{::fast_io::win32::nt::nt_wait_for_single_object<zw_flag_nt>(wait_handles.index_unchecked(index_nt),
+                                                                                                                false,
+                                                                                                                ::std::addressof(timeout_zero_nt))};
+
+                        if(status_single_nt >= status_wait_0_nt && status_single_nt <= status_wait_0_nt) { process_one_ready_handle_nt(index_nt); }
+                        else if(status_single_nt == 0x00000102u /*STATUS_TIMEOUT*/) { continue; }
+                        else
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        }
                     }
                 }
                 else if(wait_result_nt == 0x00000102u /*STATUS_TIMEOUT*/)
