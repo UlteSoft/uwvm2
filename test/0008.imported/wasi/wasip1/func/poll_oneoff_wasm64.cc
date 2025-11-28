@@ -7,7 +7,6 @@
 
 #include <uwvm2/imported/wasi/wasip1/func/poll_oneoff_wasm64.h>
 
-using ::uwvm2::imported::wasi::wasip1::abi::clockid_wasm64_t;
 using ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_wasm64_t;
 using ::uwvm2::imported::wasi::wasip1::abi::eventtype_wasm64_t;
 using ::uwvm2::imported::wasi::wasip1::abi::fd_wasm64_t;
@@ -46,7 +45,7 @@ int main()
 
         sub.userdata = static_cast<userdata_wasm64_t>(static_cast<::std::uint64_t>(0x1122334455667788ull));
         sub.u.tag = eventtype_wasm64_t::eventtype_clock;
-        sub.u.u.clock.id = clockid_wasm64_t::clock_monotonic;
+        sub.u.u.clock.id = ::uwvm2::imported::wasi::wasip1::abi::clockid_wasm64_t::clock_monotonic;
         sub.u.u.clock.timeout = static_cast<timestamp_wasm64_t>(timeout_ns);
         sub.u.u.clock.precision = static_cast<timestamp_wasm64_t>(static_cast<::std::uint64_t>(0u));
         sub.u.u.clock.flags = static_cast<subclockflags_wasm64_t>(0u);
