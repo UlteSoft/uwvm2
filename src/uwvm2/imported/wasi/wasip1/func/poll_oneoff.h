@@ -2395,7 +2395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::container::vector<void*> wait_handles{};
             ::uwvm2::utils::container::vector<::fast_io::nt_file> wait_timer_handles{};  // RAII
             ::uwvm2::utils::container::vector<::std::size_t> wait_socket_handles{};
-            ::uwvm2::utils::container::vector<::fast_io::win32_socket_event_raii_t> wait_socket_events{};  /// RAII
+            ::uwvm2::utils::container::vector<::fast_io::win32_socket_event_guard_t> wait_socket_events{};  /// RAII
             ::uwvm2::utils::container::vector<wasi_subscription_t const*> wait_subs{};
 
             // Process clock subscriptions to determine minimum timeout (ms)
@@ -2584,7 +2584,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 wait_handles.push_back(reinterpret_cast<void*>(ev));
                                 wait_socket_handles.push_back(socket_native_handle);
-                                wait_socket_events.push_back(::fast_io::win32_socket_event_raii_t{ev});
+                                wait_socket_events.push_back(::fast_io::win32_socket_event_guard_t{ev});
                                 wait_subs.push_back(::std::addressof(sub));
 
                                 break;
