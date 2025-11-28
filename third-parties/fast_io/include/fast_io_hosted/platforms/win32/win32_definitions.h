@@ -288,7 +288,7 @@ inline constexpr ::std::size_t fd_max_events{10u};
 
 struct wsanetworkevents
 {
-	long lNetworkEvents;
+	::std::int_least32_t lNetworkEvents;
 	int iErrorCode[fd_max_events];
 };
 

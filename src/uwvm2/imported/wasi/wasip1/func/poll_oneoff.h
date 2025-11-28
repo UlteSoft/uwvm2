@@ -2673,7 +2673,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                         }
 
-                        ::std::uint_least64_t due_time_100ns_nt{static_cast<::std::uint_least64_t>(-static_cast<::std::int_least64_t>(effective_timeout_ns))};
+                        timestamp_integral_t_nt effective_timeout_ns_clamped{effective_timeout_ns};
+                        constexpr auto int64_max_nt{::std::numeric_limits<::std::int_least64_t>::max()};
+
+                        if(effective_timeout_ns_clamped > static_cast<timestamp_integral_t_nt>(int64_max_nt))
+                        {
+                            effective_timeout_ns_clamped = static_cast<timestamp_integral_t_nt>(int64_max_nt);
+                        }
+
+                        auto const due_time_100ns_nt_signed{-static_cast<::std::int_least64_t>(effective_timeout_ns_clamped)};
+                        ::std::uint_least64_t due_time_100ns_nt{static_cast<::std::uint_least64_t>(due_time_100ns_nt_signed)};
 
                         void* timer_handle_nt{};
                         constexpr ::std::uint_least32_t timer_all_access_nt{0x001F0003u};  // TIMER_ALL_ACCESS
@@ -2694,7 +2703,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                                                  static_cast<::std::int_least32_t>(0),
                                                                                                  nullptr)};
 
-                        if(status_set_timer_nt != 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                        if(status_set_timer_nt != 0u) [[unlikely]]
+                        {
+                            ::fast_io::win32::nt::nt_close<zw_flag_nt>(timer_handle_nt);
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        }
 
                         wait_handles.push_back(timer_handle_nt);
                         wait_subs.push_back(::std::addressof(sub));
@@ -2763,28 +2776,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         evt.u.fd_readwrite.nbytes = static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_t>(0u);
                         evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(0u);
 
-                        if(index_nt < wait_socket_events.size() &&
-                           wait_handles.index_unchecked(index_nt) ==
-                               reinterpret_cast<void const*>(wait_socket_events.index_unchecked(index_nt).native_handle()))
+                        void const* const ready_handle_nt{wait_handles.index_unchecked(index_nt)};
+
+                        ::std::size_t socket_vec_index_nt{};
+                        bool is_socket_handle_nt{};
+
+                        for(auto const& e: wait_socket_events)
+                        {
+                            if(ready_handle_nt == reinterpret_cast<void const*>(e.native_handle()))
+                            {
+                                socket_vec_index_nt = i_nt;
+                                is_socket_handle_nt = true;
+                                break;
+                            }
+                        }
+
+                        if(is_socket_handle_nt)
                         {
                             ::fast_io::win32::wsanetworkevents ne{};
 
-                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(index_nt),
-                                                                      wait_socket_events.index_unchecked(index_nt).native_handle(),
+                            if(::fast_io::win32::WSAEnumNetworkEvents(wait_socket_handles.index_unchecked(socket_vec_index_nt),
+                                                                      wait_socket_events.index_unchecked(socket_vec_index_nt).native_handle(),
                                                                       ::std::addressof(ne)) != 0)
                             {
                                 evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             }
                             else
                             {
-                                if((ne.lNetworkEvents & 0x00000001L) != 0)  // FD_READ
+                                if((ne.lNetworkEvents & 0x00000001) != 0)  // FD_READ
                                 {
                                     evt.u.fd_readwrite.flags = static_cast<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>(
                                         static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(
                                             ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_read));
                                 }
 
-                                if((ne.lNetworkEvents & 0x00000002L) != 0)  // FD_WRITE
+                                if((ne.lNetworkEvents & 0x00000002) != 0)  // FD_WRITE
                                 {
                                     auto const old_flags_underlying{
                                         static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t>>(evt.u.fd_readwrite.flags)};
@@ -2793,7 +2819,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                    ::uwvm2::imported::wasi::wasip1::abi::eventrwflags_t::eventrw_write));
                                 }
 
-                                if((ne.lNetworkEvents & 0x00000020L) != 0)  // FD_CLOSE
+                                if((ne.lNetworkEvents & 0x00000020) != 0)  // FD_CLOSE
                                 {
                                     evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eof;
                                 }
@@ -2816,7 +2842,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             else if(have_timeout_nt)
             {
                 // Only timeout, no FDs to wait for
-                ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(min_timeout_ms_nt * 10000u)};
+                constexpr ::std::uint_least64_t max_timeout_ms_nt{
+                    static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::int_least64_t>::max() / 10000u)};
+
+                auto timeout_ms_nt{min_timeout_ms_nt};
+
+                if(timeout_ms_nt > max_timeout_ms_nt) { timeout_ms_nt = max_timeout_ms_nt; }
+
+                ::std::int_least64_t timeout_100ns_nt{-static_cast<::std::int_least64_t>(timeout_ms_nt * 10000u)};
 
                 constexpr bool alertable_nt{false};
                 auto const delay_status_nt{::fast_io::win32::nt::nt_delay_execution<zw_flag_nt>(alertable_nt, ::std::addressof(timeout_100ns_nt))};
