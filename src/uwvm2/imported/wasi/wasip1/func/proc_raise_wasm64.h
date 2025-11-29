@@ -51,7 +51,7 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
-# include "proc_raise_wasm64.h"
+# include "proc_raise.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
