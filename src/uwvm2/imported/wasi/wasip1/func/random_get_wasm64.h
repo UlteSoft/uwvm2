@@ -61,13 +61,13 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
-    /// @brief     WasiPreview1.random_get
-    /// @details   __wasi_errno_t random_get(void *buf, size_t buf_len);
+    /// @brief     WasiPreview1.random_get_wasm64
+    /// @details   __wasi_errno_t random_get_wasm64(void *buf, size_t buf_len);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t random_get(
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t random_get_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t buf,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t buf_len) noexcept
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t buf,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t buf_len) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
@@ -82,7 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"random_get",
+                                u8"random_get_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"(",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -97,7 +97,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
-            ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [info]  wasip1: random_get(", ::fast_io::mnp::addrvw(buf), u8", ", buf_len, u8") (wasi-trace)\n");
+            ::fast_io::io::perr(::fast_io::u8err(),
+                                u8"uwvm: [info]  wasip1: random_get_wasm64(",
+                                ::fast_io::mnp::addrvw(buf),
+                                u8", ",
+                                buf_len,
+                                u8") (wasi-trace)\n");
 #endif
         }
 
@@ -107,7 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // Full locking is required during reading.
             [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, buf, buf_len);
+            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(memory, buf, buf_len);
 
             auto const write_memory_begin{memory.memory_begin + buf};
             auto const write_memory_end{write_memory_begin + buf_len};
@@ -118,7 +123,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 // The construction of the native_white_hole component may throw exceptions on certain platforms. Additionally, even if interrupted mid-read, it
                 // is impossible to pre-generate the random number and then copy it to memory—this is a security measure.
-
+                
                 // If an error occurs at the underlying layer, the buffer is not guaranteed to retain its state prior to the call.
                 ::fast_io::operations::read_all_bytes(::fast_io::native_white_hole{},
                                                       reinterpret_cast<::std::byte*>(write_memory_begin),
@@ -132,7 +137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #endif
         }
 
-        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+        return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
