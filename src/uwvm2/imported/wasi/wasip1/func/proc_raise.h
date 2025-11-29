@@ -83,7 +83,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #else
             if(::uwvm2::imported::wasi::wasip1::func::posix::raise(static_cast<int>(code)) != 0) [[unlikely]]
             {
-                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
+                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                    ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(errno)});
             }
 #endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
