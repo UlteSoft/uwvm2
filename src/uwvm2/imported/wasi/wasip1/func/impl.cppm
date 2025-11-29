@@ -95,6 +95,12 @@ export import :path_symlink_wasm64;
 export import :path_symlink;
 export import :path_unlink_file_wasm64;
 export import :path_unlink_file;
+export import :poll_oneoff_wasm64;
+export import :poll_oneoff;
+export import :proc_exit_wasm64;
+export import :proc_exit;
+export import :proc_raise_wasm64;
+export import :proc_raise;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

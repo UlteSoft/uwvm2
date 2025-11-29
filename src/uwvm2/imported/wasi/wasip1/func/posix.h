@@ -220,6 +220,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
                 ;
 
+        extern int raise(int) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("raise")
+# else
+            __asm__("_raise")
+# endif
+                ;
     }  // namespace posix
 #endif
 

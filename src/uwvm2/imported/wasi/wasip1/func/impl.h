@@ -95,4 +95,10 @@
 # include "path_symlink.h"
 # include "path_unlink_file_wasm64.h"
 # include "path_unlink_file.h"
+# include "poll_oneoff_wasm64.h"
+# include "poll_oneoff.h"
+# include "proc_exit_wasm64.h"
+# include "proc_exit.h"
+# include "proc_raise_wasm64.h"
+# include "proc_raise.h"
 #endif

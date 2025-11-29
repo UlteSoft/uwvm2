@@ -35,7 +35,7 @@ module;
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/utils/macro/push_macros.h>
 
-export module uwvm2.imported.wasi.wasip1.func:proc_raise;
+export module uwvm2.imported.wasi.wasip1.func:proc_raise_wasm64;
 
 import fast_io;
 import uwvm2.uwvm_predefine.utils.ansies;
@@ -49,6 +49,7 @@ import uwvm2.imported.wasi.wasip1.memory;
 import uwvm2.imported.wasi.wasip1.environment;
 import :base;
 import :posix;
+import :proc_raise;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -57,5 +58,5 @@ import :posix;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "proc_raise.h"
+#include "proc_raise_wasm64.h"
 

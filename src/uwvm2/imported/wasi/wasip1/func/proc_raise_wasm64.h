@@ -51,6 +51,7 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
+# include "proc_raise_wasm64.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
@@ -63,34 +64,10 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
-    /// @brief     WasiPreview1.proc_raise
-    /// @details   void proc_raise(__wasi_signal_t code);
+    /// @brief     WasiPreview1.proc_raise_wasm64
+    /// @details   void proc_raise_wasm64(__wasi_signal_t code);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise_impl(
-        ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-        ::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
-    {
-        if(env.wasip1_proc_raise_func_ptr != nullptr)
-        {
-            return static_cast<::uwvm2::imported::wasi::wasip1::abi::errno_t>(
-                env.wasip1_proc_raise_func_ptr(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(code)));
-        }
-        else
-        {
-#if defined(_WIN32)
-            // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
-            ::fast_io::win32::RaiseException(static_cast<::std::uint_least32_t>(code), 0u, 0u, nullptr);
-#else
-            if(::uwvm2::imported::wasi::wasip1::func::posix::raise(static_cast<int>(code)) != 0) [[unlikely]]
-            {
-                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
-            }
-#endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-        }
-    }
-
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise(
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t proc_raise_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
     {
@@ -107,7 +84,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"proc_raise",
+                                u8"proc_raise_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"(",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -119,13 +96,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
             ::fast_io::io::perr(::fast_io::u8err(),
-                                u8"uwvm: [info]  wasip1: proc_raise(",
+                                u8"uwvm: [info]  wasip1: proc_raise_wasm64(",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(code)>>>(code),
                                 u8") (wasi-trace)\n");
 #endif
         }
 
-        return proc_raise_impl(env, code);
+        return ::uwvm2::imported::wasi::wasip1::func::proc_raise_impl(env, code);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 

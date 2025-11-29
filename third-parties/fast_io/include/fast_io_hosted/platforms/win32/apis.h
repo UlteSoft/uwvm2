@@ -190,6 +190,7 @@ FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL GetVolumeInformationW(char16_t const*, 
 FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL GetVolumeInformationA(char const*, char*, ::std::uint_least32_t, ::std::uint_least32_t*, ::std::uint_least32_t*, ::std::uint_least32_t*, char*, ::std::uint_least32_t) noexcept FAST_IO_WINSTDCALL_RENAME(GetVolumeInformationA, 32);
 FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL GetDiskFreeSpaceW(char16_t const*, ::std::uint_least32_t*, ::std::uint_least32_t*, ::std::uint_least32_t*, ::std::uint_least32_t*) noexcept FAST_IO_WINSTDCALL_RENAME(GetDiskFreeSpaceW, 20);
 FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL GetDiskFreeSpaceA(char const*, ::std::uint_least32_t*, ::std::uint_least32_t*, ::std::uint_least32_t*, ::std::uint_least32_t*) noexcept FAST_IO_WINSTDCALL_RENAME(GetDiskFreeSpaceA, 20);
+FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RaiseException(::std::uint_least32_t, ::std::uint_least32_t, ::std::uint_least32_t, ::std::size_t const *) noexcept FAST_IO_WINSTDCALL_RENAME(RaiseException, 16);
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL ExitProcess(::std::uint_least32_t) noexcept FAST_IO_WINSTDCALL_RENAME(ExitProcess, 4);
 
 } // namespace fast_io::win32
