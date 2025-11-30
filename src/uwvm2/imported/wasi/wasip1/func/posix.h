@@ -212,6 +212,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
                 ;
 
+        extern int sched_yield(void) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("sched_yield")
+# else
+            __asm__("_sched_yield")
+# endif
+                ;
+
         [[noreturn]] extern void exit(int) noexcept
 # if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("exit")

@@ -72,8 +72,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     {
         if(env.wasip1_proc_raise_func_ptr != nullptr)
         {
-            return static_cast<::uwvm2::imported::wasi::wasip1::abi::errno_t>(
-                env.wasip1_proc_raise_func_ptr(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(code)));
+            return env.wasip1_proc_raise_func_ptr(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(code));
         }
         else
         {
