@@ -101,4 +101,4 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 // macro
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
-
+#endif
