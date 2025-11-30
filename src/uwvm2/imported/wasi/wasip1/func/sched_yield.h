@@ -82,8 +82,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
 #else
             auto const ret{::uwvm2::imported::wasi::wasip1::func::posix::sched_yield()};
-            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
-                ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(ret))});
+            if(ret == -1) [[unlikely]]
+            {
+                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                    ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
+            }
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 #endif
         }
     }
