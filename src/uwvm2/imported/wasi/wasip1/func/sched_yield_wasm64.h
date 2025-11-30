@@ -50,6 +50,7 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
+# include "sched_yield.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
@@ -65,30 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     /// @brief     WasiPreview1.sched_yield
     /// @details   __wasi_errno_t sched_yield(void);
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield_impl(
-        ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env) noexcept
-    {
-        if(env.wasip1_sched_yield_func_ptr != nullptr) { return env.wasip1_sched_yield_func_ptr(); }
-        else
-        {
-#if defined(_WIN32)
-# if defined(_WIN32_WINDOWS)
-            ::fast_io::win32::SwitchToThread();
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-# else
-            constexpr bool zw{false};
-            ::fast_io::win32::nt::nt_yield_execution<zw>();
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-# endif
-#else
-            auto const ret{::uwvm2::imported::wasi::wasip1::func::posix::sched_yield()};
-            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
-                ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(ret))});
-#endif
-        }
-    }
-
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield(
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sched_yield_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env) noexcept
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
@@ -104,18 +82,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"sched_yield",
+                                u8"sched_yield_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"() ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
-            ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [info]  wasip1: sched_yield() (wasi-trace)\n");
+            ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [info]  wasip1: sched_yield_wasm64() (wasi-trace)\n");
 #endif
         }
 
-        return sched_yield_impl(env);
+        return ::uwvm2::imported::wasi::wasip1::func::sched_yield_impl(env);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
