@@ -23,9 +23,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         inline constexpr ::uwvm2::utils::container::u8string_view wasip1_socket_tcp_connect_alias{u8"-I1tcpcon"};
         inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
             wasip1_socket_tcp_connect_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
-    }
+                                               ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                               ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+    }  // namespace details
 
 #if defined(__clang__)
 # pragma clang diagnostic push
