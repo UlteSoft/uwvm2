@@ -68,6 +68,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_listen),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_connect),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_bind),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_connect),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_raw),
 
             // log
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_output),

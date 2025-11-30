@@ -44,6 +44,11 @@ export import :wasm_list_weak_symbol_module;
 export import :wasip1_set_fd_limit;
 export import :wasip1_mount_dir;
 export import :wasi_disable_utf8_check;
+export import :wasip1_socket_tcp_listen;
+export import :wasip1_socket_tcp_connect;
+export import :wasip1_socket_udp_bind;
+export import :wasip1_socket_udp_connect;
+export import :wasip1_socket_raw;
 
 // log
 export import :log_output;
