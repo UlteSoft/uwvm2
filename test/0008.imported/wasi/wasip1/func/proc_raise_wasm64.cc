@@ -29,12 +29,13 @@
 namespace
 {
     using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+    using errno_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t;
 
     static wasm_i32 g_last_signal{};
     static bool g_raise_called{};
-    static int g_next_return_value{};
+    static errno_t g_next_return_value{};
 
-    int test_proc_raise_callback(wasm_i32 code) noexcept
+    errno_t test_proc_raise_callback(wasm_i32 code) noexcept
     {
         g_raise_called = true;
         g_last_signal = code;
@@ -66,7 +67,7 @@ int main()
 
     g_raise_called = false;
     g_last_signal = static_cast<wasm_i32>(0);
-    g_next_return_value = 5;
+    g_next_return_value = errno_t::eafnosupport;
 
     auto const err = ::uwvm2::imported::wasi::wasip1::func::proc_raise_wasm64(env, signal_code);
 
