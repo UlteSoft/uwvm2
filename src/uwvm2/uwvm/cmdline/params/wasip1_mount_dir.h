@@ -59,7 +59,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .usage{u8"<wasi dir:str> <system dir:path>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_mount_dir_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_mount_dir_callback)},
-        .pretreatment{nullptr},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
