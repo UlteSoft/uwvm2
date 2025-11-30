@@ -43,6 +43,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasi_disable_utf8_check_alias{u8"-Iu8relax"};
+        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+            wasi_disable_utf8_check_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                             ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #if defined(__clang__)
@@ -51,9 +55,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasi_disable_utf8_check{
         .name{u8"--wasi-disable-utf8-check"},
-        .describe{u8"Disable the UTF-8 check for WASI."},
+        .describe{u8"Disable the UTF-8 check for WASI (All versions)."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasi_disable_utf8_check_alias), 1uz}},
-        .is_exist{::std::addressof(::uwvm2::uwvm::wasm::storage::default_wasi_env.disable_utf8_check)},
+        .handle{::std::addressof(details::wasi_disable_utf8_check_callback)},
+        .is_exist{::std::addressof(::uwvm2::uwvm::wasm::storage::wasi_disable_utf8_check)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #if defined(__clang__)
 # pragma clang diagnostic pop

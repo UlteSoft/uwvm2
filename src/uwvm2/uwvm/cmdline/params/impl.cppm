@@ -42,7 +42,7 @@ export import :wasm_list_weak_symbol_module;
 
 // wasi
 export import :wasip1_set_fd_limit;
-export import :wasi_mount_dir;
+export import :wasip1_mount_dir;
 export import :wasi_disable_utf8_check;
 
 // log

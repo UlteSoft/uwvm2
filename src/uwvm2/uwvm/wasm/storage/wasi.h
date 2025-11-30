@@ -41,9 +41,13 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
-    using wasi_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
+    using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
+
+    /// @brief     Disable WASI UTF-8 Check
+    /// @note      During the command line phase, it is preferable to use `wasi_disable_utf8_check`.
+    inline bool wasi_disable_utf8_check{};
 
     /// @brief     Default WasiPreview1 environment
-    inline wasi_env_type default_wasi_env{};  // [global]
+    inline wasip1_env_type default_wasip1_env{};  // [global]
 
 }  // namespace uwvm2::uwvm::wasm::storage

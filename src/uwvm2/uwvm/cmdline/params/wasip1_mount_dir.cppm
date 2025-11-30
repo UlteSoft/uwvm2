@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-27
+ * @date        2025-10-01
  * @copyright   APL-2.0 License
  */
 
@@ -22,32 +22,17 @@
 
 module;
 
-export module uwvm2.uwvm.cmdline.callback;
-// global
-export import :version;
-export import :help;
-export import :mode;
+// std
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-// debug
-export import :debug_test;
+export module uwvm2.uwvm.cmdline.params:wasip1_mount_dir;
 
-// wasm
-export import :wasm_set_main_module_name;
-export import :wasm_preload_library;
-export import :wasm_register_dl;
-export import :wasm_depend_recursion_limit;
-export import :wasm_set_parser_limit;
-export import :wasm_list_weak_symbol_module;
-
-// wasi
-export import :wasip1_set_fd_limit;
-export import :wasip1_mount_dir;
-export import :wasi_disable_utf8_check;
-
-// log
-export import :log_output;
-export import :log_disable_warning;
-export import :log_convert_warn_to_fatal;
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.cmdline;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -56,4 +41,5 @@ export import :log_convert_warn_to_fatal;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "wasip1_mount_dir.h"
+

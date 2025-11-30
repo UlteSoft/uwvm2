@@ -42,23 +42,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view wasi_mount_dir_alias{u8"-Idir"};
-        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasi_mount_dir_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_mount_dir_alias{u8"-I1dir"};
+        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_mount_dir_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #if defined(__clang__)
 # pragma clang diagnostic push
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasi_mount_dir{
-        .name{u8"--wasi-mount-dir"},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_mount_dir{
+        .name{u8"--wasip1-mount-dir"},
         .describe{
-            u8"Mount a host directory to the WASI sandbox at a fixed WASI mount point. Usage requires two arguments: <wasi dir> <system dir>. The <wasi dir> may be an absolute POSIX-style path (e.g. /a/x/d) or a relative path. In both modes, '//' and any path segment of '.' or '..' are forbidden; '.' is only allowed when used alone as the entire mount point."},
+            u8"Mount a host directory to the WASI Preview 1 sandbox at a fixed WASI mount point. Usage requires two arguments: <wasi dir> <system dir>. The <wasi dir> may be an absolute POSIX-style path (e.g. /a/x/d) or a relative path. In both modes, '//' and any path segment of '.' or '..' are forbidden; '.' is only allowed when used alone as the entire mount point."},
         .usage{u8"<wasi dir:str> <system dir:path>"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasi_mount_dir_alias), 1uz}},
-        .handle{::std::addressof(details::wasi_mount_dir_callback)},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_mount_dir_alias), 1uz}},
+        .handle{::std::addressof(details::wasip1_mount_dir_callback)},
         .pretreatment{nullptr},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #if defined(__clang__)

@@ -52,7 +52,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasi_mount_dir_callback(
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_mount_dir_callback(
         [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
@@ -69,7 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasi_mount_dir),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
                                 u8"\n\n");
 
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
@@ -117,7 +117,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"<wasi dir>",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8" for ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasi_mount_dir),
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
@@ -491,9 +491,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
         }
 
-        auto& env{::uwvm2::uwvm::wasm::storage::default_wasi_env};
+        auto& env{::uwvm2::uwvm::wasm::storage::default_wasip1_env};
 
-        if(!env.disable_utf8_check) [[likely]]
+        // During the command line phase, it is preferable to use `wasi_disable_utf8_check` rather than `env.disable_utf8_check`
+        if(!(::uwvm2::uwvm::wasm::storage::wasi_disable_utf8_check || env.disable_utf8_check)) [[likely]]
         {
             // check utf8
             auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(wasidir.cbegin(),
