@@ -208,7 +208,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -217,7 +218,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -239,7 +241,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>::max() > ::std::numeric_limits<::std::size_t>::max())
         {
-            if(path_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enobufs; }
+            if(path_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enametoolong; }
         }
 
         auto const preloaded_dir_ptr{curr_dir_stack.dir_stack.front_unchecked().ptr};
@@ -253,7 +255,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const& preloaded_dir_name{preloaded_dir_ptr->dir_stack.name};
 
-        if(path_len < preloaded_dir_name.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enobufs; }
+        if(path_len < preloaded_dir_name.size()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enametoolong; }
 
         ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm64(memory,
                                                                             path,
