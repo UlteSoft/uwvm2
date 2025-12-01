@@ -253,7 +253,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -262,7 +263,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -290,7 +292,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
-        auto const& curr_fd_native_file{curr_dir_stack_entry.ptr->dir_stack.file};
+        ::fast_io::dir_io_observer curr_dir_io_observer{};
+
+        bool const is_observer{curr_dir_stack_entry.ptr->dir_stack.is_observer};
+
+        if(is_observer)
+        {
+            auto& curr_dir_io_observer_ref{curr_dir_stack_entry.ptr->dir_stack.storage.observer};
+            curr_dir_io_observer = curr_dir_io_observer_ref;
+        }
+        else
+        {
+            auto& curr_dir_file_ref{curr_dir_stack_entry.ptr->dir_stack.storage.file};
+            curr_dir_io_observer = curr_dir_file_ref;
+        }
+
+        auto const& curr_fd_native_file{curr_dir_io_observer};
 
         // check memory bounds
         ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64(memory, buf_ptrsz, buf_len);
