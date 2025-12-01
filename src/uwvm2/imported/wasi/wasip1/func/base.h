@@ -445,7 +445,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_impl(
         bool const disable_utf8_check,
         ::std::size_t& symlink_depth,
-        ::fast_io::dir_file const& curr_fd_native_dir_file,
+        ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -722,7 +722,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative(
         bool const disable_utf8_check,
-        ::fast_io::dir_file const& curr_fd_native_dir_file,
+        ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -738,7 +738,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     inline constexpr file_symlink_iterative_res_t file_symlink_iterative_impl(bool const disable_utf8_check,
                                                                               ::std::size_t& symlink_depth,
-                                                                              ::fast_io::dir_file const& curr_fd_native_dir_file,
+                                                                              ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
                                                                               ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
                                                                               ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -1204,7 +1204,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     inline constexpr file_symlink_iterative_res_t file_symlink_iterative(bool const disable_utf8_check,
-                                                                         ::fast_io::dir_file const& curr_fd_native_dir_file,
+                                                                         ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
                                                                          ::uwvm2::utils::container::vector<::fast_io::dir_file>& curr_path_stack,
                                                                          ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -1221,7 +1221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_with_name_impl(
         bool const disable_utf8_check,
         ::std::size_t& symlink_depth,
-        ::fast_io::dir_file const& curr_fd_native_dir_file,
+        ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -1498,7 +1498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_symlink_iterative_with_name(
         bool const disable_utf8_check,
-        ::fast_io::dir_file const& curr_fd_native_dir_file,
+        ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -1508,7 +1508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name_impl(bool const disable_utf8_check,
                                                                                         ::std::size_t& symlink_depth,
-                                                                                        ::fast_io::dir_file const& curr_fd_native_dir_file,
+                                                                                        ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
                                                                                         ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
                                                                                         ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
@@ -1976,7 +1976,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     inline constexpr file_symlink_iterative_res_t file_symlink_iterative_with_name(bool const disable_utf8_check,
-                                                                                   ::fast_io::dir_file const& curr_fd_native_dir_file,
+                                                                                   ::fast_io::dir_io_observer const& curr_fd_native_dir_file,
                                                                                    ::uwvm2::utils::container::vector<dir_with_name_t>& curr_path_stack,
                                                                                    ::uwvm2::utils::container::u8string_view symlink_symbol) noexcept
     {
