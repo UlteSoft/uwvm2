@@ -847,7 +847,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
                                 break;
                             }
@@ -865,6 +866,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                         }
 
+                        ::fast_io::native_io_observer curr_io_observer{};
+                        bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                        if(is_observer)
+                        {
+                            auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                            curr_io_observer = curr_io_observer_ref;
+                        }
+                        else
+                        {
+                            auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                            curr_io_observer = curr_file_ref;
+                        }
+                        auto const& curr_fd_native_file{curr_io_observer};
+
                         struct ::epoll_event ev{};
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
@@ -872,10 +888,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         ev.data.ptr = const_cast<void*>(static_cast<void const*>(::std::addressof(sub)));
 
-                        int ret{::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
-                                                                            EPOLL_CTL_ADD,
-                                                                            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
-                                                                            ::std::addressof(ev))};
+                        int ret{::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_ADD, curr_fd_native_file.native_handle(), ::std::addressof(ev))};
                         if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                         {
                             auto err{-ret};
@@ -888,10 +901,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // will not lose notifications.
                                 ev.events = EPOLLIN | EPOLLOUT;
 
-                                ret = ::fast_io::system_call<__NR_epoll_ctl, int>(epfd,
-                                                                                  EPOLL_CTL_MOD,
-                                                                                  curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle(),
-                                                                                  ::std::addressof(ev));
+                                ret =
+                                    ::fast_io::system_call<__NR_epoll_ctl, int>(epfd, EPOLL_CTL_MOD, curr_fd_native_file.native_handle(), ::std::addressof(ev));
                                 if(::fast_io::linux_system_call_fails(ret)) [[unlikely]]
                                 {
                                     ::fast_io::error fe{};
@@ -1292,7 +1303,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
                                 break;
                             }
@@ -1309,9 +1321,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::fast_terminate();
                             }
                         }
+                        ::fast_io::native_io_observer curr_io_observer{};
+                        bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                        if(is_observer)
+                        {
+                            auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                            curr_io_observer = curr_io_observer_ref;
+                        }
+                        else
+                        {
+                            auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                            curr_io_observer = curr_file_ref;
+                        }
+                        auto const& curr_fd_native_file{curr_io_observer};
 
                         struct ::pollfd pfd{};
-                        pfd.fd = curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle();
+                        pfd.fd = curr_fd_native_file.native_handle();
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
                         pfd.events = static_cast<short>(is_write ? POLLOUT : POLLIN);
@@ -2025,7 +2051,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
                                 break;
                             }
@@ -2042,9 +2069,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::fast_terminate();
                             }
                         }
+                        ::fast_io::native_io_observer curr_io_observer{};
+                        bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                        if(is_observer)
+                        {
+                            auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                            curr_io_observer = curr_io_observer_ref;
+                        }
+                        else
+                        {
+                            auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                            curr_io_observer = curr_file_ref;
+                        }
+                        auto const& curr_fd_native_file{curr_io_observer};
 
                         struct ::kevent kev{};
-                        int const native_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle()};
+                        int const native_fd{curr_fd_native_file.native_handle()};
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
                         EV_SET(::std::addressof(kev),
@@ -2561,10 +2602,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
+                                ::fast_io::native_io_observer curr_io_observer{};
+                                bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                                       ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                                if(is_observer)
+                                {
+                                    auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                                    curr_io_observer = curr_io_observer_ref;
+                                }
+                                else
+                                {
+                                    auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file};
+                                    curr_io_observer = curr_file_ref;
+                                }
+                                auto const& curr_fd_native_file{curr_io_observer};
+
                                 // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
-                                auto handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file.native_handle()};
+                                auto handle{curr_fd_native_file.file.native_handle()};
                                 wait_handles.push_back(handle);
 
                                 wait_handle_info_nt info{};
@@ -2579,10 +2636,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 // Directory FD is allowed to be passed in, but it will never be ready, so it is skipped here.
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
                             {
+                                ::fast_io::win32_socket_io_observer curr_socket_observer{};
+
+                                bool const is_socket_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                                              ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer};
+
+                                if(is_socket_observer)
+                                {
+                                    auto& curr_socket_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_observer};
+                                    curr_socket_observer = curr_socket_observer_ref;
+                                }
+                                else
+                                {
+                                    auto& curr_socket_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd};
+                                    curr_socket_observer = curr_socket_observer_ref;
+                                }
+
                                 // Windows sockets (ws2) and handles cannot share a single waitformultipleobject function.
-                                auto const socket_native_handle{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd.native_handle()};
+                                auto const socket_native_handle{curr_socket_observer.native_handle()};
 
                                 ::std::uint_least32_t network_events{};
 
@@ -3120,7 +3194,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
                                 break;
                             }
@@ -3138,8 +3213,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                         }
 
+                        ::fast_io::native_io_observer curr_io_observer{};
+                        bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                        if(is_observer)
+                        {
+                            auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                            curr_io_observer = curr_io_observer_ref;
+                        }
+                        else
+                        {
+                            auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                            curr_io_observer = curr_file_ref;
+                        }
+                        auto const& curr_fd_native_file{curr_io_observer};
+
                         struct ::pollfd pfd{};
-                        pfd.fd = curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle();
+                        pfd.fd = curr_fd_native_file.native_handle();
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_t::eventtype_fd_write};
                         pfd.events = static_cast<short>(is_write ? POLLOUT : POLLIN);
@@ -3619,7 +3709,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio);
                                 continue;
                             }
-                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                             {
                                 break;
                             }
@@ -3637,7 +3728,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                         }
 
-                        int const native_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.native_handle()};
+                        ::fast_io::native_io_observer curr_io_observer{};
+                        bool const is_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                        if(is_observer)
+                        {
+                            auto& curr_io_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                            curr_io_observer = curr_io_observer_ref;
+                        }
+                        else
+                        {
+                            auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                            curr_io_observer = curr_file_ref;
+                        }
+                        auto const& curr_fd_native_file{curr_io_observer};
+
+                        int const native_fd{curr_io_observer.native_handle()};
 
                         // Ensure native_fd is within the representable range of fd_set/FD_* macros.
 #  ifdef FD_SETSIZE
