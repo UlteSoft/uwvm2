@@ -227,6 +227,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                [[fallthrough]];
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 break;
             }
@@ -236,7 +238,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::espipe;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::espipe;
             }
@@ -250,13 +253,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        [[maybe_unused]] auto& file_fd{
+        [[maybe_unused]] ::fast_io::native_io_observer curr_fd_native_observer{};
+
+        bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type == ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+        if(is_file_observer)
+        {
+            auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+            curr_fd_native_observer = file_observer;
+        }
+        else
+        {
+            auto& file_fd{
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+                curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
 #else
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+                curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
 #endif
-        };
+            };
+            curr_fd_native_observer = file_fd;
+        }
 
         ::fast_io::seekdir seek_whence;  // no initialize
 
@@ -313,7 +328,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         try
 # endif
         {
-            new_offset_fpos = ::fast_io::operations::io_stream_seek_bytes(file_fd, int_fpos, seek_whence);
+            new_offset_fpos = ::fast_io::operations::io_stream_seek_bytes(curr_fd_native_observer, int_fpos, seek_whence);
         }
 # ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error e)
@@ -332,7 +347,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         case 87uz /*ERROR_INVALID_PARAMETER*/:
                         {
                             // Avoid interference from FILE_TYPE_REMOTE
-                            if((::fast_io::win32::GetFileType(file_fd.native_handle()) & 0xFFFF7FFFu) == 3 /*FILE_TYPE_PIPE*/)
+                            if((::fast_io::win32::GetFileType(curr_fd_native_observer.native_handle()) & 0xFFFF7FFFu) == 3 /*FILE_TYPE_PIPE*/)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::espipe;
                             }
@@ -383,7 +398,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             constexpr bool zw{false};
                             auto const status{::fast_io::win32::nt::nt_query_volume_information_file<zw>(
-                                file_fd.native_handle(),
+                                curr_fd_native_observer.native_handle(),
                                 ::std::addressof(isb),
                                 ::std::addressof(ffdt),
                                 static_cast<::std::uint_least32_t>(sizeof(ffdt)),
@@ -444,7 +459,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         try
 # endif
         {
-            new_offset_fpos = ::fast_io::operations::io_stream_seek_bytes(file_fd, int_fpos, seek_whence);
+            new_offset_fpos = ::fast_io::operations::io_stream_seek_bytes(curr_fd_native_observer, int_fpos, seek_whence);
         }
 # ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error e)
