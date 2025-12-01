@@ -232,7 +232,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -241,7 +242,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
@@ -269,7 +271,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
-        auto const& curr_fd_native_file{curr_dir_stack_entry.ptr->dir_stack.file};
+        ::fast_io::dir_io_observer curr_dir_io_observer{};
+
+        bool const is_observer{curr_dir_stack_entry.ptr->dir_stack.is_observer};
+
+        if(is_observer)
+        {
+            auto& curr_dir_io_observer_ref{curr_dir_stack_entry.ptr->dir_stack.storage.observer};
+            curr_dir_io_observer = curr_dir_io_observer_ref;
+        }
+        else
+        {
+            auto& curr_dir_file_ref{curr_dir_stack_entry.ptr->dir_stack.storage.file};
+            curr_dir_io_observer = curr_dir_file_ref;
+        }
+
+        auto const& curr_fd_native_file{curr_dir_io_observer};
 
         // check path (Copy from WASM memory for use)
         ::uwvm2::utils::container::u8string path{};
@@ -283,7 +300,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // Full locking is required during reading.
             [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, path_ptrsz, path_len);
+            ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(memory, path_ptrsz, path_len);
 
             using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
 
