@@ -183,6 +183,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
+        [[maybe_unused]] ::fast_io::native_io_observer curr_fd_native_observer{};
+
         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
@@ -191,6 +193,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
+                auto& file_fd{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+#else
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+#endif
+                };
+                curr_fd_native_observer = file_fd;
+
+                break;
+            }
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+            {
+                auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                curr_fd_native_observer = file_observer;
+
                 break;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
@@ -198,7 +216,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
             }
@@ -212,14 +231,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        [[maybe_unused]] auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
-        };
-
         using underlying_filesize_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filesize_t>;
 
         // Trivial success when len == 0
@@ -228,7 +239,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
         // Darwin
 
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
         // Do NOT saturate: if the requested size exceeds API limits, report error per WASI semantics.
@@ -350,9 +361,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // NT Version >= 6.0 (Vista)
 
         // Windows path. We accept a C runtime descriptor. Convert to HANDLE.
-        auto const& curr_posix_file{file_fd};
+        auto const& curr_native_file{curr_fd_native_observer};
         // Ensure that the handle obtained is for nt. If native is win32 or nt, there will be no overhead.
-        auto const curr_nt_io_observer{static_cast<::fast_io::nt_io_observer>(curr_posix_file)};
+        auto const curr_nt_io_observer{static_cast<::fast_io::nt_io_observer>(curr_native_file)};
         auto const curr_fd_nt_handle{curr_nt_io_observer.native_handle()};
 
         underlying_filesize_t allocation_size;  // no initialize
@@ -444,7 +455,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
 #elif defined(__CYGWIN__)
         // Cygwin (POSIX path)
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
         if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::off_t>::max())
@@ -463,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::off_t fallocate_offset{static_cast<::off_t>(offset)};
         ::off_t fallocate_len{static_cast<::off_t>(len)};
 
-        int result_pf{::posix_fallocate(curr_fd_native_handle, fallocate_offset, fallocate_len)};
+        int result_pf{::uwvm2::imported::wasi::wasip1::func::posix::posix_fallocate(curr_fd_native_handle, fallocate_offset, fallocate_len)};
         if(result_pf != 0) [[unlikely]]
         {
             switch(result_pf)
@@ -477,6 +488,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                 case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                 case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+                case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                 case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                 case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
 # if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
@@ -493,7 +505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(_WIN32) || defined(__CYGWIN__)) &&             \
     __has_include(<dirent.h>) && !defined(_PICOLIBC__)
         // Prefer posix_fallocate (portable) -- it returns 0 on success or an errno value on failure.
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
         // posix_fallocate signature: int posix_fallocate(int fd, ::off_t offset, ::off_t len);
@@ -534,6 +546,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                     case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+                    case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
 #  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
@@ -585,6 +598,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                     case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+                    case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
 #   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
@@ -702,6 +716,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                     case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+                    case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
 #  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
@@ -747,6 +762,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                 case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                 case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
+                case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                 case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                 case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
 #  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
