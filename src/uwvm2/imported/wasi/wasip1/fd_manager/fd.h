@@ -164,6 +164,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 #if defined(_WIN32) && !defined(__CYGWIN__)
         socket,
 #endif
+        file_observer
     };
 
     template <typename... Ty>
@@ -195,10 +196,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
     struct wasi_fd_storage_t
     {
         inline static constexpr ::std::size_t sizeof_wasi_fd_storage_u{get_union_size<wasi_file_fd_t,
+                                                                                      dir_stack_t
 #if defined(_WIN32) && !defined(__CYGWIN__)
-                                                                                      ::fast_io::win32_socket_file,
+                                                                                      ,
+                                                                                      ::fast_io::win32_socket_file
 #endif
-                                                                                      dir_stack_t>()};
+                                                                                      ,
+                                                                                      ::fast_io::native_io_observer>()};
 
         union storage_u UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
         {
@@ -213,6 +217,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
             /// @note Before using win32_socket_file, you must first create a ::fast_io::win32_wsa_service.
             ::fast_io::win32_socket_file socket_fd;
 #endif
+
+            // native file observer
+            ::fast_io::native_io_observer file_observer;
+
+            // The directory does not need to support observer mode:
+            // On platforms that support duplicate file operations, file systems use handles. On platforms that do not support duplicate file operations, such
+            // as Windows 9x, storage is handled via strings (which introduces TOCTOU issues), and direct copying is also possible.
 
             // Full occupancy is used to initialize the union, set the union to all zero.
             [[maybe_unused]] ::std::byte sizeof_wasi_fd_storage_u_reserve[sizeof_wasi_fd_storage_u]{};
@@ -257,6 +268,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -292,6 +308,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){other.storage.file_observer};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -327,6 +348,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){::std::move(other.storage.file_observer)};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -364,6 +390,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.file_observer));
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -398,6 +429,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){other.storage.file_observer};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -437,6 +473,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.file_observer));
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -471,6 +512,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){::std::move(other.storage.file_observer)};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -508,6 +554,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.file_observer));
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -545,6 +596,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.file_observer));
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -579,6 +635,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     break;
                 }
 #endif
+                case wasi_fd_type_e::file_observer:
+                {
+                    ::new(::std::addressof(this->storage.file_observer)) decltype(this->storage.file_observer){};
+                    break;
+                }
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

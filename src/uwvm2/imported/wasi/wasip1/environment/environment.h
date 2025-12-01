@@ -115,6 +115,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
     using wasip1_proc_raise_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32) noexcept;
     using wasip1_sched_yield_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)() noexcept;
 
+    enum class handle_type_e : unsigned
+    {
+        listen,
+        connect,
+        bind
+    };
+
+    using sock_family_t = ::fast_io::sock_family;
+    using ip_t = ::fast_io::ip;
+
+    struct preopen_socket_t
+    {
+        ip_t ip{};
+        sock_family_t sock_family{};
+        handle_type_e handle_type{};
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd{};
+    };
+
     /// @brief [singleton]
     template <wasip1_memory memory_type>
     struct wasip1_environment
@@ -128,11 +146,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
 
         ::uwvm2::imported::wasi::wasip1::fd_manager::wasm_fd_storage_t fd_storage{};  // [singleton]
 
-        /// @note  After preloading, the directory in `mount_dir_root_t` becomes invalid. Because its contents were moved to the file manager.
-        ///        Each use will clear it.
+        /// @brief Provide predefined wasi content, which is already opened during command-line processing (to prevent TOCTOU). Subsequent operations utilize
+        /// this content via dup.
         ::uwvm2::utils::container::vector<mount_dir_root_t> mount_dir_roots{};
 
-        /// @brief Custom process exit function pointer for WASI exit handling (No no-return operation is required, as plugin systems typically cannot operate without returning.)
+        /// @brief Automatically binds during environment initialization
+        ::uwvm2::utils::container::vector<preopen_socket_t> preopen_sockets{};
+
+        /// @brief Custom process exit function pointer for WASI exit handling (No no-return operation is required, as plugin systems typically cannot operate
+        /// without returning.)
         ///        If not set, the default exit behavior will be used. (exit(3))
         wasip1_proc_exit_ptr_t wasip1_proc_exit_func_ptr{};
         wasip1_proc_raise_ptr_t wasip1_proc_raise_func_ptr{};
