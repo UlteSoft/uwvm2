@@ -91,7 +91,7 @@ inline static void set_dirfd_root(wasip1_environment<native_memory_t>& env, ::st
     fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir);
     auto& ds = fd.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
     ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-    entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+    entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
     ds.dir_stack.push_back(::std::move(entry));
 }
 

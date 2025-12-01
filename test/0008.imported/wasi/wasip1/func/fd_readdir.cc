@@ -77,7 +77,7 @@ int main()
         auto& dir_stack = fde.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -114,7 +114,7 @@ int main()
         auto& dir_stack = fde.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -146,7 +146,7 @@ int main()
         dir_stack.dir_stack.clear();
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -198,7 +198,7 @@ int main()
 
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"a"};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"a"};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -231,7 +231,7 @@ int main()
             [[maybe_unused]] auto const dino = (static_cast<unsigned long long>(dino_hi) << 32) | static_cast<unsigned long long>(dino_lo);
 
             // compute root ino
-            ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.file)};
+            ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.storage.file)};
             [[maybe_unused]] auto const root_ino = static_cast<unsigned long long>(st_root.ino);
 
 #if !(defined(_WIN32) && defined(_WIN32_WINDOWS)) // Win9x uses pathname emulation, so you can tell directly.

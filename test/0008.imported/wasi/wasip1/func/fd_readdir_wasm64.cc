@@ -75,7 +75,7 @@ int main()
         auto& dir_stack = fde.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -112,7 +112,7 @@ int main()
         auto& dir_stack = fde.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -144,7 +144,7 @@ int main()
         dir_stack.dir_stack.clear();
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -195,7 +195,7 @@ int main()
 
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"a_wasm64"};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"a_wasm64"};
             dir_stack.dir_stack.push_back(::std::move(entry));
         }
 
@@ -225,7 +225,7 @@ int main()
                 ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory, buf_ptr1 + second_header_off + 8u);
 
             // compute root ino
-            ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.file)};
+            ::fast_io::posix_file_status st_root{status(dir_stack.dir_stack.front_unchecked().ptr->dir_stack.storage.file)};
             [[maybe_unused]] auto const root_ino = static_cast<wasi_size_wasm64_t>(st_root.ino);
 #if !(defined(_WIN32) && defined(_WIN32_WINDOWS))  // Win9x uses pathname emulation, so you can tell directly.
             if(dino_parent == static_cast<wasi_size_wasm64_t>(0u) || dino_parent != root_ino)

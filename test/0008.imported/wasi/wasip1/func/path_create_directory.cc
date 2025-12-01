@@ -70,7 +70,7 @@ int main()
     {
         auto& ds = fd_ok.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
         ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-        entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+        entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
         ds.dir_stack.push_back(::std::move(entry));
     }
 
@@ -82,7 +82,7 @@ int main()
         {
             auto& ds = fd1.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             ds.dir_stack.push_back(::std::move(entry));
         }
 
@@ -136,7 +136,7 @@ int main()
         {
             auto& ds = fd3.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             ds.dir_stack.push_back(::std::move(entry));
         }
 
@@ -166,7 +166,7 @@ int main()
         {
             auto& ds = fd4.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             ds.dir_stack.push_back(::std::move(entry));
         }
 
@@ -194,7 +194,7 @@ int main()
         {
             auto& ds = fd5.wasi_fd.ptr->wasi_fd_storage.storage.dir_stack;
             ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_ref_t entry{};
-            entry.ptr->dir_stack.file = ::fast_io::dir_file{u8"."};
+            entry.ptr->dir_stack.storage.file = ::fast_io::dir_file{u8"."};
             ds.dir_stack.push_back(::std::move(entry));
         }
 
