@@ -46,8 +46,11 @@
 ## Host C Library Environment
 * This project's Newlib build does not provide executable binaries, offering only linkable object files and libraries for flexible integration within higher-level systems or plugin frameworks. It does not support wasi and only supports plugins using weak symbol extensions.
 * newlib: unknown-none-eabi
-* avr: avr
 * Compilers (None Target): GCC >= 16, LLVM Clang >= 21
+
+## Freestanding + Minimal C Library Environment
+* AVR support is implemented as a freestanding C++ environment backed by a minimal C library (avr-libc). Only core runtime and basic stdio-style I/O are available; hosted features such as filesystems, processes, and threads are not supported.
+* avr: avr-elf
 
 ## Freestanding Environment
 * Freestanding support is only partially implemented for specific modules, such as the parser and interpreter components.
