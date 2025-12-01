@@ -298,7 +298,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -307,7 +308,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -327,7 +329,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -336,7 +339,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -377,8 +381,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
-        auto const& curr_old_fd_native_file{curr_old_dir_stack_entry.ptr->dir_stack.file};
-        auto const& curr_new_fd_native_file{curr_new_dir_stack_entry.ptr->dir_stack.file};
+        ::fast_io::dir_io_observer curr_old_dir_io_observer{};
+        bool const curr_old_fd_is_observer{curr_old_dir_stack_entry.ptr->dir_stack.is_observer};
+        if(curr_old_fd_is_observer)
+        {
+            auto& curr_dir_io_observer_ref{curr_old_dir_stack_entry.ptr->dir_stack.storage.observer};
+            curr_old_dir_io_observer = curr_dir_io_observer_ref;
+        }
+        else
+        {
+            auto& curr_dir_file_ref{curr_old_dir_stack_entry.ptr->dir_stack.storage.file};
+            curr_old_dir_io_observer = curr_dir_file_ref;
+        }
+
+        auto const& curr_old_fd_native_file{curr_old_dir_io_observer};
+
+        ::fast_io::dir_io_observer curr_new_dir_io_observer{};
+        bool const curr_new_fd_is_observer{curr_new_dir_stack_entry.ptr->dir_stack.is_observer};
+        if(curr_new_fd_is_observer)
+        {
+            auto& curr_dir_io_observer_ref{curr_new_dir_stack_entry.ptr->dir_stack.storage.observer};
+            curr_new_dir_io_observer = curr_dir_io_observer_ref;
+        }
+        else
+        {
+            auto& curr_dir_file_ref{curr_new_dir_stack_entry.ptr->dir_stack.storage.file};
+            curr_new_dir_io_observer = curr_dir_file_ref;
+        }
+
+        auto const& curr_new_fd_native_file{curr_new_dir_io_observer};
 
         bool const old_symlink_follow{(old_flags & ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow) ==
                                       ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow};
