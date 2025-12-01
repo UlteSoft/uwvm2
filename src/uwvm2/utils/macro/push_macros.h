@@ -463,6 +463,14 @@
 # define UWVM_NOT_SUPPORT_SPECIAL_CHAR
 #endif
 
+#pragma push_macro("UWVM_SUPPORT_UNIX_PATH_SOCKET")
+#undef UWVM_SUPPORT_UNIX_PATH_SOCKET
+#if (defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__CYGWIN__) || defined(__sun) || defined(__DragonFly__) ||                   \
+    defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) || defined(__OpenBSD__) ||             \
+    defined(__APPLE__)
+# define UWVM_SUPPORT_UNIX_PATH_SOCKET
+#endif
+
 /// @details      __gnu__::__used__
 #pragma push_macro("UWVM_GNU_USED")
 #undef UWVM_GNU_USED
