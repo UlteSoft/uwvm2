@@ -271,7 +271,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -280,7 +281,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
@@ -308,7 +310,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
-        [[maybe_unused]] auto const& curr_fd_native_file{curr_dir_stack_entry.ptr->dir_stack.file};
+        ::fast_io::dir_io_observer curr_dir_io_observer{};
+
+        bool const is_observer{curr_dir_stack_entry.ptr->dir_stack.is_observer};
+
+        if(is_observer)
+        {
+            auto& curr_dir_io_observer_ref{curr_dir_stack_entry.ptr->dir_stack.storage.observer};
+            curr_dir_io_observer = curr_dir_io_observer_ref;
+        }
+        else
+        {
+            auto& curr_dir_file_ref{curr_dir_stack_entry.ptr->dir_stack.storage.file};
+            curr_dir_io_observer = curr_dir_file_ref;
+        }
+
+        [[maybe_unused]] auto const& curr_fd_native_file{curr_dir_io_observer};
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
         // For winnt, you must first exclude non-directory files.
@@ -462,7 +479,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
-                auto const& privous_fd_native_file{privous_dir_stack_entry.ptr->dir_stack.file};
+                ::fast_io::dir_io_observer privous_dir_io_observer{};
+
+                bool const is_observer{privous_dir_stack_entry.ptr->dir_stack.is_observer};
+
+                if(is_observer)
+                {
+                    auto& privous_dir_io_observer_ref{privous_dir_stack_entry.ptr->dir_stack.storage.observer};
+                    privous_dir_io_observer = privous_dir_io_observer_ref;
+                }
+                else
+                {
+                    auto& privous_dir_file_ref{privous_dir_stack_entry.ptr->dir_stack.storage.file};
+                    privous_dir_io_observer = privous_dir_file_ref;
+                }
+
+                auto const& privous_fd_native_file{privous_dir_io_observer};
 
 #ifdef UWVM_CPP_EXCEPTIONS
                 try
@@ -687,17 +719,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 auto const curr_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(curr_write_size)};
-
-                auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + curr_write_size_wasi)};
-                if(new_byte_write_all_size < byte_write_all_size) [[unlikely]]
-                {
-                    // Overflow-induced wrap-around, though it returns correctly here.
-                    break;
-                }
+                auto const header_write_size_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(size_of_wasi_dirent_t)};
+                auto write_size_wasi{curr_write_size_wasi};
 
                 if(buf_remaining_size < curr_write_size_wasi)
                 {
                     // The remaining size of the buffer is less than the writable size.
+                    if(buf_remaining_size < header_write_size_wasi) [[unlikely]] { break; }
+
+                    write_size_wasi = buf_remaining_size;
+                }
+
+                auto const new_byte_write_all_size{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(byte_write_all_size + write_size_wasi)};
+                if(new_byte_write_all_size < byte_write_all_size) [[unlikely]]
+                {
+                    // Overflow-induced wrap-around, though it returns correctly here.
                     break;
                 }
 
@@ -745,13 +781,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         static_cast<::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filetype_t>>(d_type));
                 }
 
-                ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(memory,
-                                                                                              buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
-                                                                                              reinterpret_cast<::std::byte const*>(d_filename.cbegin()),
-                                                                                              reinterpret_cast<::std::byte const*>(d_filename.cend()));
+                if(write_size_wasi > header_write_size_wasi)
+                {
+                    auto const filename_write_size{static_cast<::std::size_t>(write_size_wasi - header_write_size_wasi)};
+
+                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked(
+                        memory,
+                        buf_ptrsz + byte_write_all_size + size_of_wasi_dirent_t,
+                        reinterpret_cast<::std::byte const*>(d_filename.cbegin()),
+                        reinterpret_cast<::std::byte const*>(d_filename.cbegin() + filename_write_size));
+                }
 
                 // Settlement upon completion of writing
-                buf_remaining_size -= curr_write_size_wasi;
+                buf_remaining_size -= write_size_wasi;
                 byte_write_all_size = new_byte_write_all_size;
 
                 ++dircookie_counter;
