@@ -278,7 +278,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
                 }
@@ -287,7 +288,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     break;
                 }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
                 }
@@ -315,7 +317,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
 
-            auto const& curr_fd_native_file{curr_dir_stack_entry.ptr->dir_stack.file};
+            ::fast_io::dir_io_observer curr_dir_io_observer{};
+
+            bool const is_observer{curr_dir_stack_entry.ptr->dir_stack.is_observer};
+
+            if(is_observer)
+            {
+                auto& curr_dir_io_observer_ref{curr_dir_stack_entry.ptr->dir_stack.storage.observer};
+                curr_dir_io_observer = curr_dir_io_observer_ref;
+            }
+            else
+            {
+                auto& curr_dir_file_ref{curr_dir_stack_entry.ptr->dir_stack.storage.file};
+                curr_dir_io_observer = curr_dir_file_ref;
+            }
+
+            auto const& curr_fd_native_file{curr_dir_io_observer};
 
             bool const symlink_follow{(dirflags & ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow) ==
                                       ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t::lookup_symlink_follow};
@@ -518,7 +535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                     auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                     newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                    newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                 }
                             }
                             else [[unlikely]]
@@ -545,7 +562,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                         auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                         newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr->name);
-                                        newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr->file);
+                                        newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr->file);
                                     }
                                 }
                             }
@@ -619,7 +636,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                     // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                                     auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                     newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                                 }
 
                                                 ::fast_io::dir_file new_dir_file{};
@@ -675,7 +692,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                                newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                                newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                             }
                                             else
                                             {
@@ -711,7 +728,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                     // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                                     auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                     newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                                 }
 
                                                 ::fast_io::dir_file new_dir_file{};
@@ -769,7 +786,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                                newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                                newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                             }
                                             else
                                             {
@@ -809,7 +826,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                             auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                             newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                            newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                         }
 
                                         ::fast_io::dir_file new_dir_file{};
@@ -865,7 +882,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                         auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                         newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                        newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                        newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                     }
                                     else
                                     {
@@ -945,7 +962,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                     // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                                     auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                     newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                                 }
 
                                                 ::fast_io::dir_file new_dir_file{};
@@ -1001,7 +1018,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                                newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                                newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                             }
                                             else
                                             {
@@ -1037,7 +1054,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                     // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                                     auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                     newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                                 }
 
                                                 ::fast_io::dir_file new_dir_file{};
@@ -1095,7 +1112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                                newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                                newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                             }
                                             else
                                             {
@@ -1135,7 +1152,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
                                             auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                             newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                            newdir.ptr->dir_stack.file = ::std::move(dir_with_name_curr.file);
+                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
                                         }
 
                                         ::fast_io::dir_file new_dir_file{};
@@ -1191,7 +1208,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                         auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                         newdir.ptr->dir_stack.name = ::std::move(open_file_name);
-                                        newdir.ptr->dir_stack.file = ::std::move(new_dir_file);
+                                        newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
                                     }
                                     else
                                     {
