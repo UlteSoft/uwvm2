@@ -168,14 +168,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
+        [[maybe_unused]] ::fast_io::native_io_observer curr_fd_native_observer{};
+
         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
+                auto& file_fd{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+#else
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+#endif
+                };
+                curr_fd_native_observer = file_fd;
+
+                break;
+            }
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+            {
+                auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                curr_fd_native_observer = file_observer;
+
                 break;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
@@ -184,7 +202,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 // Under the wasi semantics, advise returns the correct value for any valid fd.
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
@@ -199,17 +218,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        [[maybe_unused]] auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
-        };
-
 #if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
 
-        auto const curr_fd_native_handle{file_fd.native_handle()};
+        auto const curr_fd_native_handle{curr_fd_native_observer.native_handle()};
 
         switch(advice)
         {
@@ -269,7 +280,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 struct radvisory radvisory_advice{.ra_offset = static_cast<::off_t>(offset), .ra_count = static_cast<int>(len)};
 
-                ::uwvm2::imported::wasi::wasip1::func::posix::fcntl(curr_fd_native_handle, F_RDADVISE, ::std::addressof(radvisory_advice));
+                if(::uwvm2::imported::wasi::wasip1::func::posix::fcntl(curr_fd_native_handle, F_RDADVISE, ::std::addressof(radvisory_advice)) == -1)
+                    [[unlikely]]
+                {
+                    if(errno == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
@@ -323,7 +338,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         // If the file descriptor only requires a single operation that does not need locking, the operating system provides its own built-in lock mechanism.
-        auto const curr_fd_native_handle{file_fd.native_handle()};
+        auto const curr_fd_native_handle{curr_fd_native_observer.native_handle()};
 
         using underlying_filesize_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::filesize_t>;
 
@@ -351,7 +366,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::std::uint64_t offset_saturation{static_cast<::std::uint64_t>(offset)};
             ::std::uint64_t len_saturation{static_cast<::std::uint64_t>(len)};
 
-            ::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice);
+            auto const rest{::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice)};
+
+            if(::fast_io::linux_system_call_fails(rest))
+            {
+                auto const err{static_cast<int>(-rest)};
+                if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+            }
 #  else
             if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::off_t>::max())
             {
@@ -405,22 +426,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             if constexpr(::std::endian::native == ::std::endian::big)
             {
                 /* 6 args: fd, advice, offset (high, low), len (high, low) */
-                ::fast_io::system_call<__NR_arm_fadvise64_64, int>(curr_fd_native_handle,
-                                                                   curr_platform_advice,
-                                                                   offset_saturation_high,
-                                                                   offset_saturation_low,
-                                                                   len_saturation_high,
-                                                                   len_saturation_low);
+                auto const rest{::fast_io::system_call<__NR_arm_fadvise64_64, int>(curr_fd_native_handle,
+                                                                                   curr_platform_advice,
+                                                                                   offset_saturation_high,
+                                                                                   offset_saturation_low,
+                                                                                   len_saturation_high,
+                                                                                   len_saturation_low)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
             }
             else
             {
                 /* 6 args: fd, advice, offset (low, high), len (low, high) */
-                ::fast_io::system_call<__NR_arm_fadvise64_64, int>(curr_fd_native_handle,
-                                                                   curr_platform_advice,
-                                                                   offset_saturation_low,
-                                                                   offset_saturation_high,
-                                                                   len_saturation_low,
-                                                                   len_saturation_high);
+                auto const rest{::fast_io::system_call<__NR_arm_fadvise64_64, int>(curr_fd_native_handle,
+                                                                                   curr_platform_advice,
+                                                                                   offset_saturation_low,
+                                                                                   offset_saturation_high,
+                                                                                   len_saturation_low,
+                                                                                   len_saturation_high)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
             }
 
 #  elif defined(__NR_fadvise64_64)
@@ -451,40 +484,64 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
 #   if (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)) || defined(__XTENSA__)
                 /* 6 args: fd, advice, offset (high, low), len (high, low) */
-                ::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
-                                                               curr_platform_advice,
-                                                               offset_saturation_high,
-                                                               offset_saturation_low,
-                                                               len_saturation_high,
-                                                               len_saturation_low);
+                auto const rest{::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
+                                                                               curr_platform_advice,
+                                                                               offset_saturation_high,
+                                                                               offset_saturation_low,
+                                                                               len_saturation_high,
+                                                                               len_saturation_low)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
 #   else
                 /* 6 args: fd, offset (high, low), len (high, low), advice */
-                ::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
-                                                               offset_saturation_high,
-                                                               offset_saturation_low,
-                                                               len_saturation_high,
-                                                               len_saturation_low,
-                                                               curr_platform_advice);
+                auto const rest{::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
+                                                                               offset_saturation_high,
+                                                                               offset_saturation_low,
+                                                                               len_saturation_high,
+                                                                               len_saturation_low,
+                                                                               curr_platform_advice)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
 #   endif
             }
             else
             {
 #   if (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)) || defined(__XTENSA__)
                 /* 6 args: fd, advice, offset (low, high), len (low, high) */
-                ::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
-                                                               curr_platform_advice,
-                                                               offset_saturation_low,
-                                                               offset_saturation_high,
-                                                               len_saturation_low,
-                                                               len_saturation_high);
+                auto const rest{::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
+                                                                               curr_platform_advice,
+                                                                               offset_saturation_low,
+                                                                               offset_saturation_high,
+                                                                               len_saturation_low,
+                                                                               len_saturation_high)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
 #   else
                 /* 6 args: fd, offset (low, high), len (low, high), advice */
-                ::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
-                                                               offset_saturation_low,
-                                                               offset_saturation_high,
-                                                               len_saturation_low,
-                                                               len_saturation_high,
-                                                               curr_platform_advice);
+                auto const rest{::fast_io::system_call<__NR_fadvise64_64, int>(curr_fd_native_handle,
+                                                                               offset_saturation_low,
+                                                                               offset_saturation_high,
+                                                                               len_saturation_low,
+                                                                               len_saturation_high,
+                                                                               curr_platform_advice)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
 #   endif
             }
 
@@ -516,20 +573,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             if constexpr(::std::endian::native == ::std::endian::big)
             {
                 /* 5 args: fd, offset (high, low), len, advice */
-                ::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle,
-                                                            offset_saturation_high,
-                                                            offset_saturation_low,
-                                                            len_saturation,
-                                                            curr_platform_advice);
+                auto const rest{::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle,
+                                                                            offset_saturation_high,
+                                                                            offset_saturation_low,
+                                                                            len_saturation,
+                                                                            curr_platform_advice)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
             }
             else
             {
                 /* 5 args: fd, offset (low, high), len, advice */
-                ::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle,
-                                                            offset_saturation_low,
-                                                            offset_saturation_high,
-                                                            len_saturation,
-                                                            curr_platform_advice);
+                auto const rest{::fast_io::system_call<__NR_fadvise64, int>(curr_fd_native_handle,
+                                                                            offset_saturation_low,
+                                                                            offset_saturation_high,
+                                                                            len_saturation,
+                                                                            curr_platform_advice)};
+
+                if(::fast_io::linux_system_call_fails(rest))
+                {
+                    auto const err{static_cast<int>(-rest)};
+                    if(err == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
+                }
             }
 #  else
             if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::off_t>::max())
@@ -550,7 +619,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::off_t offset_saturation{static_cast<::off_t>(offset)};
             ::off_t len_saturation{static_cast<::off_t>(len)};
 
-            ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice);
+            int const result_pf{
+                ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice)};
+            if(result_pf == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
 #  endif
         }
@@ -576,8 +647,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::off_t offset_saturation{static_cast<::off_t>(offset)};
             ::off_t len_saturation{static_cast<::off_t>(len)};
 
-            ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice);
-        }
+            int const result_pf{
+                ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice)};
+            if(result_pf == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 
 # else
         // bsd series
@@ -600,7 +672,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::off_t offset_saturation{static_cast<::off_t>(offset)};
         ::off_t len_saturation{static_cast<::off_t>(len)};
 
-        ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice);
+        int const result_pf{
+            ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice)};
+        if(result_pf == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
 # endif
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
@@ -673,16 +747,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
-            ::fast_io::io::perr(::fast_io::u8err(),
-                                u8"uwvm: [info]  wasip1: fd_advise(",
-                                fd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(advice)>>>(advice),
-                                u8") (wasi-trace)\n");
+                ::fast_io::io::perr(::fast_io::u8err(),
+                                    u8"uwvm: [info]  wasip1: fd_advise(",
+                                    fd,
+                                    u8", ",
+                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
+                                    u8", ",
+                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
+                                    u8", ",
+                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(advice)>>>(advice),
+                                    u8") (wasi-trace)\n");
 #endif
         }
 
