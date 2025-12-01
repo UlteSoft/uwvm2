@@ -68,11 +68,11 @@ int main()
         ds.dir_stack.push_back(entry);
     }
 
-    // Case 1: buffer too small → enobufs
+    // Case 1: buffer too small → enametoolong
     {
         constexpr wasi_void_ptr_t buf{512u};
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::fd_prestat_dir_name(env, static_cast<wasi_posix_fd_t>(3), buf, static_cast<wasi_size_t>(3u));
-        if(ret != errno_t::enobufs) { ::fast_io::fast_terminate(); }
+        if(ret != errno_t::enametoolong) { ::fast_io::fast_terminate(); }
     }
 
     // Case 2: success and exact bytes copied, no NUL
