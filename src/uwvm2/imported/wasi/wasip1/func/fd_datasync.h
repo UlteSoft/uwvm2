@@ -170,6 +170,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
+        [[maybe_unused]] ::fast_io::native_io_observer curr_fd_native_observer{};
+
         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
@@ -178,6 +180,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
+                auto& file_fd{
+#if defined(_WIN32) && !defined(__CYGWIN__)
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+#else
+                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+#endif
+                };
+                curr_fd_native_observer = file_fd;
+
+                break;
+            }
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+            {
+                auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                curr_fd_native_observer = file_observer;
+
                 break;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
@@ -186,6 +204,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
             }
@@ -199,17 +218,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        [[maybe_unused]] auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
-            curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
-        };
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
 
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
 
 # ifdef UWVM_CPP_EXCEPTIONS
         try
@@ -282,7 +293,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // The Platform only supports fsync: MSDOS-DJGPP, hpux, OpenBSD
 
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
         auto const result_fsync{::uwvm2::imported::wasi::wasip1::func::posix::fsync(curr_fd_native_handle)};
@@ -326,7 +337,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // linux, bsd series, darwin
         // use fdatasync
 
-        auto const& curr_fd_native_file{file_fd};
+        auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
 # if defined(__linux__) && (defined(__NR_fdatasync) && defined(__NR_fsync))
