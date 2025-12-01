@@ -2621,7 +2621,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 auto const& curr_fd_native_file{curr_io_observer};
 
                                 // On Windows, wasi_file_fd_t is win32_native_file_with_flags_t which has a file member
-                                auto handle{curr_fd_native_file.file.native_handle()};
+                                auto handle{curr_fd_native_file.native_handle()};
                                 wait_handles.push_back(handle);
 
                                 wait_handle_info_nt info{};
