@@ -177,17 +177,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+                [[fallthrough]];
+            [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
-                [[maybe_unused]] auto& file_fd{
+                ::fast_io::native_io_observer curr_fd_native_observer{};
+
+                bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                            ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                if(is_file_observer)
+                {
+                    auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                    curr_fd_native_observer = file_observer;
+                }
+                else
+                {
+                    auto& file_fd{
 #if defined(_WIN32) && !defined(__CYGWIN__)
-                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+                        curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
 #else
-                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+                        curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
 #endif
-                };
+                    };
+                    curr_fd_native_observer = file_fd;
+                }
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
 
                 try
                 {
@@ -258,7 +273,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
 #else
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
 
                 try
                 {
@@ -305,7 +320,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
             }
