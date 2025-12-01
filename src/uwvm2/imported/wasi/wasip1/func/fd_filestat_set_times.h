@@ -73,7 +73,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
 
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_file const& dirfile,
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t set_dir_time(::fast_io::dir_io_observer const& dirfile,
                                                                       [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t atim,
                                                                       [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::timestamp_t mtim,
                                                                       [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::fstflags_t fstflags) noexcept
@@ -924,19 +924,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
-                [[maybe_unused]] auto& file_fd{
+                ::fast_io::native_io_observer curr_fd_native_observer{};
+
+                bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                            ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                if(is_file_observer)
+                {
+                    auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                    curr_fd_native_observer = file_observer;
+                }
+                else
+                {
+                    auto& file_fd{
 #if defined(_WIN32) && !defined(__CYGWIN__)
-                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
+                        curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
 #else
-                    curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
+                        curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
 #endif
-                };
+                    };
+                    curr_fd_native_observer = file_fd;
+                }
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
                 // windows
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
                 auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
                 constexpr ::std::uint_least64_t gap{static_cast<::std::uint_least64_t>(11644473600000ULL) * 10000ULL};
@@ -1074,7 +1088,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
 #elif defined(__MSDOS__) || defined(__DJGPP__)
                 // MSDOS-DJGPP
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
                 auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
                 // Since MS-DOS can obtain the file descriptor name and then call utime, this can be implemented here.
@@ -1244,7 +1258,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 // posix
 # if defined(__linux__)
                 // linux
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
                 auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
                 if constexpr(::std::numeric_limits<::std::size_t>::max() >= ::std::numeric_limits<::std::uint_least64_t>::max())
@@ -1614,7 +1628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE >= 200809L
                 // POSIX 2008
 
-                auto const& curr_fd_native_file{file_fd};
+                auto const& curr_fd_native_file{curr_fd_native_observer};
                 auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
 
                 struct timespec timestamp_spec[2];
@@ -1719,12 +1733,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
-                auto const& file_fd{curr_dir_stack_entry.ptr->dir_stack.file};
+                ::fast_io::dir_io_observer curr_dir_io_observer{};
 
-                return ::uwvm2::imported::wasi::wasip1::func::set_dir_time(file_fd, atim, mtim, fstflags);
+                bool const is_observer{curr_dir_stack_entry.ptr->dir_stack.is_observer};
+
+                if(is_observer)
+                {
+                    auto& curr_dir_io_observer_ref{curr_dir_stack_entry.ptr->dir_stack.storage.observer};
+                    curr_dir_io_observer = curr_dir_io_observer_ref;
+                }
+                else
+                {
+                    auto& curr_dir_file_ref{curr_dir_stack_entry.ptr->dir_stack.storage.file};
+                    curr_dir_io_observer = curr_dir_file_ref;
+                }
+
+                return ::uwvm2::imported::wasi::wasip1::func::set_dir_time(curr_dir_io_observer, atim, mtim, fstflags);
             }
 #if defined(_WIN32) && !defined(__CYGWIN__)
-            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket:
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
             }
