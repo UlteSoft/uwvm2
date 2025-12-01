@@ -51,6 +51,15 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 {
+    template <typename... Ty>
+    inline consteval ::std::size_t get_union_size() noexcept
+    {
+        ::std::size_t max_size{};
+        [&max_size]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
+        { ((max_size = ::std::max(max_size, sizeof(Ty...[I]))), ...); }(::std::make_index_sequence<sizeof...(Ty)>{});
+        return max_size;
+    }
+
     /// @brief Preload elements into the directory stack
     /// @note On the Win32 platform, when ::fast_io::open_mode::shared_delete is enabled, any process (including the current one) can rename an already opened
     ///       file or path, thereby removing its binding to the root. Consequently, subsequent attempts to open the directory cannot be performed using the
@@ -63,10 +72,119 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
     ///       it's merely a compromise for such ancient platforms.
     struct dir_stack_entry_t
     {
+        inline static constexpr ::std::size_t sizeof_dir_stack_entry_u{get_union_size<::fast_io::dir_file, ::fast_io::dir_io_observer>()};
+
+        union storage_u UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+        {
+            // dir file
+            ::fast_io::dir_file file;
+
+            // dir io observer
+            ::fast_io::dir_io_observer observer;
+
+            // Full occupancy is used to initialize the union, set the union to all zero.
+            [[maybe_unused]] ::std::byte storage_u_reserve[sizeof_dir_stack_entry_u]{};
+
+            // destructor of 'storage_u' is implicitly deleted because variant field 'typeidx_u8_vector' has a non-trivial destructor
+            inline constexpr ~storage_u() {}
+
+            // The release of table_idx is managed by struct wasm1_element_t, there is no issue of raii resources being unreleased.
+        } storage{};
+
+        static_assert(sizeof(storage_u) == sizeof_dir_stack_entry_u, "sizeof(storage_t) not equal to sizeof_dir_stack_entry_u");
+
+        // In wasm1, type stands for table index, which conceptually can be any value, but since the standard specifies only 1 table, it can only be 0. Here
+        // union does not need to make any type-safe judgments since there is only one type.
+
+        bool is_observer{};
+
         // For the stack low, it is the full WASTI path name of the preload directory.
         // For the upward path, it is the name of each level of the directory.
         ::uwvm2::utils::container::u8string name{};
-        ::fast_io::dir_file file{};
+
+        inline explicit constexpr dir_stack_entry_t() noexcept { ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){}; }
+
+        inline explicit constexpr dir_stack_entry_t(bool is_observer) noexcept : is_observer{is_observer}
+        {
+            if(is_observer) { ::new(::std::addressof(this->storage.observer)) decltype(this->storage.observer){}; }
+            else
+            {
+                ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){};
+            }
+        }
+
+        inline constexpr dir_stack_entry_t(dir_stack_entry_t const& other) noexcept : is_observer{other.is_observer}, name{other.name}
+        {
+            if(this->is_observer) { ::new(::std::addressof(this->storage.observer)) decltype(this->storage.observer){other.storage.observer}; }
+            else
+            {
+                ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){other.storage.file};
+            }
+        }
+
+        inline constexpr dir_stack_entry_t(dir_stack_entry_t&& other) noexcept : is_observer{other.is_observer}, name{::std::move(other.name)}
+        {
+            if(this->is_observer) { ::new(::std::addressof(this->storage.observer)) decltype(this->storage.observer){::std::move(other.storage.observer)}; }
+            else
+            {
+                ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){::std::move(other.storage.file)};
+            }
+        }
+
+        inline constexpr dir_stack_entry_t& operator= (dir_stack_entry_t const& other) noexcept
+        {
+            if(::std::addressof(other) == this) [[unlikely]] { return *this; }
+
+            if(this->is_observer) { ::std::destroy_at(::std::addressof(this->storage.observer)); }
+            else
+            {
+                ::std::destroy_at(::std::addressof(this->storage.file));
+            }
+
+            this->is_observer = other.is_observer;
+            this->name = other.name;
+
+            if(this->is_observer) { ::new(::std::addressof(this->storage.observer)) decltype(this->storage.observer){other.storage.observer}; }
+            else
+            {
+                ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){other.storage.file};
+            }
+
+            return *this;
+        }
+
+        inline constexpr dir_stack_entry_t& operator= (dir_stack_entry_t&& other) noexcept
+        {
+            if(::std::addressof(other) == this) [[unlikely]] { return *this; }
+
+            if(this->is_observer) { ::std::destroy_at(::std::addressof(this->storage.observer)); }
+            else
+            {
+                ::std::destroy_at(::std::addressof(this->storage.file));
+            }
+
+            this->is_observer = other.is_observer;
+            this->name = ::std::move(other.name);
+
+            if(this->is_observer) { ::new(::std::addressof(this->storage.observer)) decltype(this->storage.observer){::std::move(other.storage.observer)}; }
+            else
+            {
+                ::new(::std::addressof(this->storage.file)) decltype(this->storage.file){::std::move(other.storage.file)};
+            }
+
+            return *this;
+        }
+
+        inline constexpr ~dir_stack_entry_t()
+        {
+            if(this->is_observer) { ::std::destroy_at(::std::addressof(this->storage.observer)); }
+            else
+            {
+                ::std::destroy_at(::std::addressof(this->storage.file));
+            }
+
+            // multiple calls to the destructor are ub, no need to set it to nullptr here
+        }
     };
 
     /// @brief Shared body of the preloaded directory stack with atomic reference count
@@ -163,18 +281,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
         dir,
 #if defined(_WIN32) && !defined(__CYGWIN__)
         socket,
+        socket_observer,
 #endif
         file_observer
     };
-
-    template <typename... Ty>
-    inline consteval ::std::size_t get_union_size() noexcept
-    {
-        ::std::size_t max_size{};
-        [&max_size]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
-        { ((max_size = ::std::max(max_size, sizeof(Ty...[I]))), ...); }(::std::make_index_sequence<sizeof...(Ty)>{});
-        return max_size;
-    }
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
     struct win32_native_file_with_flags_t
@@ -199,7 +309,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                                                                                       dir_stack_t
 #if defined(_WIN32) && !defined(__CYGWIN__)
                                                                                       ,
-                                                                                      ::fast_io::win32_socket_file
+                                                                                      ::fast_io::win32_socket_file,
+                                                                                      ::fast_io::win32_socket_io_observer
 #endif
                                                                                       ,
                                                                                       ::fast_io::native_io_observer>()};
@@ -216,6 +327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 #if defined(_WIN32) && !defined(__CYGWIN__)
             /// @note Before using win32_socket_file, you must first create a ::fast_io::win32_wsa_service.
             ::fast_io::win32_socket_file socket_fd;
+            ::fast_io::win32_socket_io_observer socket_observer;
 #endif
 
             // native file observer
@@ -267,6 +379,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){};
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){};
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -307,6 +424,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){other.storage.socket_fd};
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){other.storage.socket_observer};
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -345,6 +467,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                 case wasi_fd_type_e::socket:
                 {
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){::std::move(other.storage.socket_fd)};
+                    break;
+                }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){::std::move(other.storage.socket_observer)};
                     break;
                 }
 #endif
@@ -389,6 +516,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::std::destroy_at(::std::addressof(this->storage.socket_fd));
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.socket_observer));
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -426,6 +558,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                 case wasi_fd_type_e::socket:
                 {
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){other.storage.socket_fd};
+                    break;
+                }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){other.storage.socket_observer};
                     break;
                 }
 #endif
@@ -472,6 +609,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::std::destroy_at(::std::addressof(this->storage.socket_fd));
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.socket_observer));
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -509,6 +651,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                 case wasi_fd_type_e::socket:
                 {
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){::std::move(other.storage.socket_fd)};
+                    break;
+                }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){::std::move(other.storage.socket_observer)};
                     break;
                 }
 #endif
@@ -553,6 +700,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::std::destroy_at(::std::addressof(this->storage.socket_fd));
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.socket_observer));
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -595,6 +747,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                     ::std::destroy_at(::std::addressof(this->storage.socket_fd));
                     break;
                 }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::std::destroy_at(::std::addressof(this->storage.socket_observer));
+                    break;
+                }
 #endif
                 case wasi_fd_type_e::file_observer:
                 {
@@ -632,6 +789,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                 case wasi_fd_type_e::socket:
                 {
                     ::new(::std::addressof(this->storage.socket_fd)) decltype(this->storage.socket_fd){};
+                    break;
+                }
+                case wasi_fd_type_e::socket_observer:
+                {
+                    ::new(::std::addressof(this->storage.socket_observer)) decltype(this->storage.socket_observer){};
                     break;
                 }
 #endif
