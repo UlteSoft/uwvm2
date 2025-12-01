@@ -650,7 +650,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             int const result_pf{
                 ::uwvm2::imported::wasi::wasip1::func::posix::posix_fadvise(curr_fd_native_handle, offset_saturation, len_saturation, curr_platform_advice)};
             if(result_pf == EBADF) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio; }
-
+        }
 # else
         // bsd series
 
@@ -747,16 +747,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 #else
-                ::fast_io::io::perr(::fast_io::u8err(),
-                                    u8"uwvm: [info]  wasip1: fd_advise(",
-                                    fd,
-                                    u8", ",
-                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
-                                    u8", ",
-                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
-                                    u8", ",
-                                    static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(advice)>>>(advice),
-                                    u8") (wasi-trace)\n");
+            ::fast_io::io::perr(::fast_io::u8err(),
+                                u8"uwvm: [info]  wasip1: fd_advise(",
+                                fd,
+                                u8", ",
+                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
+                                u8", ",
+                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
+                                u8", ",
+                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(advice)>>>(advice),
+                                u8") (wasi-trace)\n");
 #endif
         }
 
