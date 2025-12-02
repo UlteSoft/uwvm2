@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-31
+ * @date        2025-10-01
  * @copyright   APL-2.0 License
  */
 
@@ -37,17 +37,10 @@ module;
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 #endif
 
-export module uwvm2.uwvm.cmdline.callback:wasip1_socket_udp_connect;
+export module uwvm2.uwvm.cmdline.callback:wasip1_disable;
 
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.utils.ansies;
-import uwvm2.utils.cmdline;
-import uwvm2.utils.utf;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;
-import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.wasm.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -56,4 +49,4 @@ import uwvm2.uwvm.cmdline.params;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "wasip1_socket_udp_connect.h"
+#include "wasip1_disable.h"
