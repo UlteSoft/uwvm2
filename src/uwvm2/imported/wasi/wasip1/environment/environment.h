@@ -127,9 +127,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
 
     struct preopen_socket_t
     {
+        // sock_family != local
         ip_t ip{};
         sock_family_t sock_family{};
         handle_type_e handle_type{};
+
+        // sock_family == local
+        ::uwvm2::utils::container::u8string local_unix_path{};
+
+        // wasi fd
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd{};
     };
 

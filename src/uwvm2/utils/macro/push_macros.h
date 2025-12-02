@@ -466,9 +466,9 @@
 /// @details     Sockets can be created using the Unix path
 #pragma push_macro("UWVM_SUPPORT_UNIX_PATH_SOCKET")
 #undef UWVM_SUPPORT_UNIX_PATH_SOCKET
-#if (defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__CYGWIN__) || defined(__sun) || defined(__DragonFly__) ||                   \
-    defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) || defined(__OpenBSD__) ||             \
-    defined(__APPLE__)
+#if ((defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__CYGWIN__) || defined(__sun) || defined(__DragonFly__) ||                   \
+     defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(BSD) || defined(_SYSTYPE_BSD) || defined(__OpenBSD__) ||             \
+     defined(__APPLE__)) && !(defined(_WIN32) && !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__))
 # define UWVM_SUPPORT_UNIX_PATH_SOCKET
 #endif
 

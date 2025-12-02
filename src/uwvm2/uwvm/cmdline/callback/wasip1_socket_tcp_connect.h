@@ -63,6 +63,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
+        auto& wasip1_env{::uwvm2::uwvm::wasm::storage::default_wasip1_env};
+
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)
         //      ^^ para_curr
@@ -174,6 +176,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         currp2->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         auto const currp2_str{currp2->str};
 
+        // There is no need to perform duplicate checks on file descriptors here, as they will all be initialized together during the initialization phase.
+
 #  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
         if(currp2_str == u8"unix")
         {
@@ -191,11 +195,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 //                     ^^ currp3
 
                 // When currp3 is arg, it uses the Unix path format; otherwise, it resolves Unix paths as DNS.
+                currp3->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
+                auto const currp3_str{currp3->str};
+
+                ::uwvm2::imported::wasi::wasip1::environment::preopen_socket_t preopen_socket{};
+
+                preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local;
+                preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect;
+                preopen_socket.local_unix_path = ::uwvm2::utils::container::u8string{currp3_str};
+
+                wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));
+
+                return ::uwvm2::utils::cmdline::parameter_return_type::def;
             }
         }
 #  endif
 
-        /// @todo
+        ::fast_io::ipv4 ipv4;  // No initialization necessary
+        auto const [next2, err2]{::fast_io::parse_by_scan(currp2_str.cbegin(), currp2_str.cend(), ipv4)};
+
+        // parse fd error
+        if(err2 != ::fast_io::parse_code::ok || next2 != currp2_str.cend()) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Invalid fd (fd_t): \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                currp2_str,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". Usage: ",
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_connect),
+                                // print_usage comes with UWVM_COLOR_U8_RST_ALL
+                                u8"\n\n");
+
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
