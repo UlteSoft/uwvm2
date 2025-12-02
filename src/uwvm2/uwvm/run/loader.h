@@ -31,6 +31,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -107,6 +110,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     {
         // preload abi
 
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
         if(::uwvm2::uwvm::wasm::storage::local_preload_wasip1)
         {
             // verbose
@@ -129,7 +134,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             /// @todo
         }
+# endif
+#endif
 
+#if 0  /// @todo
         if(::uwvm2::uwvm::wasm::storage::local_preload_wasip2)
         {
             // verbose
@@ -175,19 +183,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             /// @todo
         }
+#endif
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
     }
 
     inline int load_weak_symbol_modules() noexcept
-    {
-        return ::uwvm2::uwvm::run::load_weak_symbol_modules_details(::uwvm2::uwvm::wasm::storage::wasm_parameter);
-    }
+    { return ::uwvm2::uwvm::run::load_weak_symbol_modules_details(::uwvm2::uwvm::wasm::storage::wasm_parameter); }
 
 }  // namespace uwvm2::uwvm::run
 
 #ifndef UWVM_MODULE
 // macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-12
+ * @date        2025-04-01
  * @copyright   APL-2.0 License
  */
 
@@ -20,39 +20,20 @@
  *                                      *
  ****************************************/
 
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-#include <concepts>
-#include <memory>
+// #pragma once
 
-#include <uwvm2/uwvm/crtmain/impl.h>
-
-int main()
-{
-    /// @brief Check if all headers are popped out
-
-#ifdef UWVM_DLLIMPORT
-# error "UWVM_DLLIMPORT existed"
+/// @brief This option automatically excludes unsupported systems.
+/// @note  UWVM_DISABLE_LOCAL_IMPORTED_WASIP1 controls imports within UWVM rather than this implementation.
+#pragma push_macro("UWVM_IMPORT_WASI_WASIP1")
+#undef UWVM_IMPORT_WASI_WASIP1
+#if !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(__freestanding__)
+#define UWVM_IMPORT_WASI_WASIP1
 #endif
 
-#ifdef UWVM_WASM_SUPPORT_WASM1
-# error "UWVM_WASM_SUPPORT_WASM1 existed"
+#pragma push_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET")
+#undef UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET
+#if defined(UWVM_IMPORT_WASI_WASIP1) && (defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>)))
+# define UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET
 #endif
 
-#ifdef UWVM_AES_RST_ALL
-# error "UWVM_AES_RST_ALL existed"
-#endif
-
-#ifdef UWVM_COLOR_RST_ALL
-# error "UWVM_COLOR_RST_ALL existed"
-#endif
-
-#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
-# error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
-#endif
-
-#ifdef UWVM_IMPORT_WASI_WASIP1
-# error "UWVM_IMPORT_WASI_WASIP1 existed"
-#endif
-}
+/// @todo add more features here

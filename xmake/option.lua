@@ -322,7 +322,7 @@ option("apple-platform", function()
     )
 end)
 
--- libfuzzer
+-- uwvm test option
 
 option("test-libfuzzer", function()
     set_description
@@ -362,6 +362,15 @@ option("use-multithread-allocator-memory", function()
     set_description
     (
         "Enable on platforms that do not support mmap but support multithreading.",
+        "default = false"
+    )
+    set_default(false)
+end)
+
+option("disable-local-imported-wasip1", function()
+    set_description
+    (
+        "Disable the import of wasip1 during compilation. For platforms that do not support wasip1, this option is ignored.",
         "default = false"
     )
     set_default(false)

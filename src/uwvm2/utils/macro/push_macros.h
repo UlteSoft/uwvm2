@@ -463,6 +463,7 @@
 # define UWVM_NOT_SUPPORT_SPECIAL_CHAR
 #endif
 
+/// @details     Sockets can be created using the Unix path
 #pragma push_macro("UWVM_SUPPORT_UNIX_PATH_SOCKET")
 #undef UWVM_SUPPORT_UNIX_PATH_SOCKET
 #if (defined(__linux) || defined(__linux__) || defined(__gnu_linux__)) || defined(__CYGWIN__) || defined(__sun) || defined(__DragonFly__) ||                   \

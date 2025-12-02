@@ -27,6 +27,9 @@
 # include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <uwvm2/utils/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
@@ -65,14 +68,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
 
             // wasi
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_listen),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_connect),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_bind),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_connect),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_raw),
+#  endif
+# endif
+#endif
 
             // log
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_output),
@@ -104,5 +113,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
 #ifndef UWVM_MODULE
 // macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

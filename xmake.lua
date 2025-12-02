@@ -66,6 +66,11 @@ function def_build()
 		add_defines("UWVM_USE_MULTITHREAD_ALLOCATOR")
 	end
 
+    local disable_local_imported_wasip1 = get_config("disable-local-imported-wasip1")
+	if disable_local_imported_wasip1 then
+		add_defines("UWVM_DISABLE_LOCAL_IMPORTED_WASIP1")
+	end
+
     local enable_int = get_config("enable-int")
 	if not enable_int or enable_int == "none" then
 		add_defines("UWVM_DISABLE_INT")

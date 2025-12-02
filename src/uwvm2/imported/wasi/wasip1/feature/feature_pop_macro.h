@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-12
+ * @date        2025-04-01
  * @copyright   APL-2.0 License
  */
 
@@ -20,39 +20,8 @@
  *                                      *
  ****************************************/
 
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-#include <concepts>
-#include <memory>
+// #pragma once
 
-#include <uwvm2/uwvm/crtmain/impl.h>
-
-int main()
-{
-    /// @brief Check if all headers are popped out
-
-#ifdef UWVM_DLLIMPORT
-# error "UWVM_DLLIMPORT existed"
-#endif
-
-#ifdef UWVM_WASM_SUPPORT_WASM1
-# error "UWVM_WASM_SUPPORT_WASM1 existed"
-#endif
-
-#ifdef UWVM_AES_RST_ALL
-# error "UWVM_AES_RST_ALL existed"
-#endif
-
-#ifdef UWVM_COLOR_RST_ALL
-# error "UWVM_COLOR_RST_ALL existed"
-#endif
-
-#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
-# error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
-#endif
-
-#ifdef UWVM_IMPORT_WASI_WASIP1
-# error "UWVM_IMPORT_WASI_WASIP1 existed"
-#endif
-}
+/// @todo add more features here
+#pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET")
+#pragma pop_macro("UWVM_IMPORT_WASI_WASIP1")

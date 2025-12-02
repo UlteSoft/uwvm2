@@ -31,6 +31,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -50,6 +53,9 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+
     UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_set_fd_limit_callback(
         [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
@@ -151,9 +157,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
+
+# endif
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

@@ -33,6 +33,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -52,6 +55,10 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+
     UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_mount_dir_callback(
         [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
@@ -127,7 +134,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // get system dir
         ::fast_io::dir_file entry;  // no initialize
 
-#if defined(_WIN32) && !defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && !defined(_WIN32_WINDOWS)
         if(system_dir.starts_with(u8"::NT::"))
         {
             // nt path
@@ -169,15 +176,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 }
             }
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             try
-# endif
+#   endif
             {
                 // allow symlink
                 ::fast_io::native_file tmp{::fast_io::io_kernel, systemdir_nt_subview, ::fast_io::open_mode::directory | ::fast_io::open_mode::follow};
                 entry = ::fast_io::dir_file{tmp.release()};
             }
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error e)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -196,20 +203,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     u8"\n");
                 return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
             }
-# endif
+#   endif
         }
         else
         {
             // win32 path
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             try
-# endif
+#   endif
             {
                 // allow symlink
                 entry = ::fast_io::dir_file{system_dir, ::fast_io::open_mode::follow};
             }
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error e)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -228,21 +235,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     u8"\n");
                 return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
             }
-# endif
+#   endif
         }
 
-#else
+#  else
 
         // win9x and posix
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
         try
-# endif
+#   endif
         {
             // allow symlink
             entry = ::fast_io::dir_file{system_dir, ::fast_io::open_mode::follow};
         }
-# ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error e)
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -259,14 +266,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 e,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 u8"\n"
-#  ifndef _WIN32
+#    ifndef _WIN32
                                 u8"\n"
-#  endif
+#    endif
             );
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
-# endif
-#endif
+#   endif
+#  endif
 
         param_cursor->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         ++param_cursor;
@@ -593,9 +600,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                            if(a.size() < b.size()) { return false; }
                                            if(a.size() == b.size()) { return a == b; }
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                            if(a.size() <= b.size()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+#  endif
 
                                            return (::uwvm2::utils::container::u8string_view{a.data(), b.size()} == b) && (a.index_unchecked(b.size()) == u8'/');
                                        }};
@@ -650,7 +657,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // windows 9x: unsafe (VxD does not provide directory handles, and multitasking exacerbates the TOCTOU problem.)
         // djgpp: safe (Due to single-task mode + full DJGPP control)
 
-#if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
         if(::uwvm2::uwvm::io::show_toctou_warning)
         {
             // show warning
@@ -688,7 +695,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 }
             }
         }
-#endif
+#  endif
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
@@ -720,9 +727,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
+
+# endif
+#endif
+
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

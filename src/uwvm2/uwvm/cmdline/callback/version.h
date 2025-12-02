@@ -28,6 +28,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h> // wasip1
+# endif
 // platform
 # if defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
 #  include <linux/version.h>
@@ -962,6 +965,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // Support Weak Symbol Module (via link)
             u8"  * Support Weak Symbol Module\n"
 #endif
+
+            // Local Imported
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# ifdef UWVM_IMPORT_WASI_WASIP1
+            // Support WASI WASIP1
+            u8"  * Support Imported WASI Preview 1\n"
+#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET
+            // Support WASI WASIP1 Socket: The wasip1 socket appears as an extension.
+            u8"      - Support Imported WASI Preview 1 Socket\n"
+#  endif
+# endif
+#endif
             u8"\n"
         );
 
@@ -972,6 +987,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h> // wasip1
+# endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

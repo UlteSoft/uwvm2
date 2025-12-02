@@ -25,6 +25,10 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+// macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
@@ -39,7 +43,21 @@
 #endif
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
     inline bool local_preload_wasip1{true};  // [global]
+# endif
+#endif
+
+#if 0  /// @todo
     inline bool local_preload_wasip2{true};  // [global]
     inline bool local_preload_wasix{false};  // [global]
+#endif
 }  // namespace uwvm2::uwvm::wasm::storage
+
+#ifndef UWVM_MODULE
+// macro
+# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+# endif
+#endif
