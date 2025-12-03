@@ -22,6 +22,40 @@ inline constexpr char_type *prtrsv_inaddr_common_define_impl(char_type *it,
 	return it;
 }
 
+inline constexpr bool ipv6_to_ipv4_mapped_bytes(::std::uint_least16_t const (&addr)[8],
+												char unsigned (&out)[4]) noexcept
+{
+	for (::std::size_t i{}; i != 5; ++i)
+	{
+		if (addr[i] != 0)
+		{
+			return false;
+		}
+	}
+
+	::std::uint_least16_t w5;
+	if constexpr (::std::numeric_limits<::std::uint_least16_t>::digits != 16)
+	{
+		w5 = ::fast_io::big_endian(addr[5]);
+	}
+	else
+	{
+		w5 = addr[5];
+	}
+
+	if (w5 != static_cast<::std::uint_least16_t>(0xFFFFu))
+	{
+		return false;
+	}
+	auto const w6{::fast_io::big_endian(addr[6])};
+	auto const w7{::fast_io::big_endian(addr[7])};
+	out[0] = static_cast<char unsigned>(w6 >> 8u);
+	out[1] = static_cast<char unsigned>(w6 & 0xFFu);
+	out[2] = static_cast<char unsigned>(w7 >> 8u);
+	out[3] = static_cast<char unsigned>(w7 & 0xFFu);
+	return true;
+}
+
 template <bool shorten, bool uppercase, bool showv6bracket, bool full, ::std::integral char_type>
 inline constexpr char_type *prtrsv_in6addr_common_define_impl(char_type *it,
 															  ::std::uint_least16_t const *__restrict start) noexcept
@@ -171,9 +205,23 @@ inline constexpr char_type *prtrsv_ipv4_define_impl(char_type *it, ::fast_io::ip
 	return it;
 }
 
-template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, ::std::integral char_type>
+template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, bool ipv4_mapped_ipv6,
+		  ::std::integral char_type>
 inline constexpr char_type *prtrsv_inaddr6_define_impl(char_type *it, ::fast_io::posix_in6_addr v) noexcept
 {
+	if constexpr (ipv4_mapped_ipv6)
+	{
+		char unsigned v4bytes[4]{};
+		if (ipv6_to_ipv4_mapped_bytes(v.address, v4bytes))
+		{
+			it = prtrsv_inaddr_common_define_impl(it, v4bytes);
+			if constexpr (showport)
+			{
+				it = prtrsv_ipport_zero_define_impl(it);
+			}
+			return it;
+		}
+	}
 	it = prtrsv_in6addr_common_define_impl<v6shorten, uppercase, showport ? true : showv6bracket, full>(it, v.address);
 	if constexpr (showport)
 	{
@@ -182,10 +230,25 @@ inline constexpr char_type *prtrsv_inaddr6_define_impl(char_type *it, ::fast_io:
 	return it;
 }
 
-template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, ::std::integral char_type>
+template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, bool ipv4_mapped_ipv6,
+		  ::std::integral char_type>
 inline constexpr char_type *prtrsv_ipv6_define_impl(char_type *it, ::fast_io::ipv6 v) noexcept
 {
-	it = prtrsv_in6addr_common_define_impl<v6shorten, uppercase, showport ? true : showv6bracket, full>(it, v.address.address);
+	if constexpr (ipv4_mapped_ipv6)
+	{
+		char unsigned v4bytes[4]{};
+		if (ipv6_to_ipv4_mapped_bytes(v.address.address, v4bytes))
+		{
+			it = prtrsv_inaddr_common_define_impl(it, v4bytes);
+			if constexpr (showport)
+			{
+				it = prtrsv_ipport_define_impl(it, v.port);
+			}
+			return it;
+		}
+	}
+	it = prtrsv_in6addr_common_define_impl<v6shorten, uppercase, showport ? true : showv6bracket, full>(it,
+																										v.address.address);
 	if constexpr (showport)
 	{
 		it = prtrsv_ipport_define_impl(it, v.port);
@@ -193,12 +256,13 @@ inline constexpr char_type *prtrsv_ipv6_define_impl(char_type *it, ::fast_io::ip
 	return it;
 }
 
-template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, ::std::integral char_type>
+template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, bool ipv4_mapped_ipv6,
+		  ::std::integral char_type>
 inline constexpr char_type *prtrsv_ip_address_define_impl(char_type *it, ::fast_io::ip_address v) noexcept
 {
 	if constexpr (showport)
 	{
-		it = prtrsv_ip_address_define_impl<v6shorten, uppercase, showv6bracket, false, full>(it, v);
+		it = prtrsv_ip_address_define_impl<v6shorten, uppercase, showv6bracket, false, full, ipv4_mapped_ipv6>(it, v);
 		return prtrsv_ipport_zero_define_impl(it);
 	}
 	else
@@ -216,11 +280,12 @@ inline constexpr char_type *prtrsv_ip_address_define_impl(char_type *it, ::fast_
 	}
 }
 
-template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, ::std::integral char_type>
+template <bool v6shorten, bool uppercase, bool showv6bracket, bool showport, bool full, bool ipv4_mapped_ipv6,
+		  ::std::integral char_type>
 inline constexpr char_type *prtrsv_ip_define_impl(char_type *it, ::fast_io::ip v) noexcept
 {
-	it = prtrsv_ip_address_define_impl<v6shorten, uppercase, (showport ? true : showv6bracket), false, full>(it,
-																											 v.address);
+	it = prtrsv_ip_address_define_impl<v6shorten, uppercase, (showport ? true : showv6bracket), false, full,
+									   ipv4_mapped_ipv6>(it, v.address);
 	if constexpr (showport)
 	{
 		it = prtrsv_ipport_define_impl(it, v.port);
@@ -343,22 +408,26 @@ print_reserve_define(::fast_io::io_reserve_type_t<char_type, ::fast_io::manipula
 	else if constexpr (::std::same_as<iptype, ::fast_io::posix_in6_addr>)
 	{
 		return ::fast_io::details::prtrsv_inaddr6_define_impl<flags.v6shorten, flags.v6uppercase,
-															  flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full>(iter, val.reference);
+															  flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full,
+															  flags.ipv4_mapped_ipv6>(iter, val.reference);
 	}
 	else if constexpr (::std::same_as<iptype, ::fast_io::ipv6>)
 	{
 		return ::fast_io::details::prtrsv_ipv6_define_impl<flags.v6shorten, flags.v6uppercase,
-														   flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full>(iter, val.reference);
+														   flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full,
+														   flags.ipv4_mapped_ipv6>(iter, val.reference);
 	}
 	else if constexpr (::std::same_as<iptype, ::fast_io::ip_address>)
 	{
 		return ::fast_io::details::prtrsv_ip_address_define_impl<flags.v6shorten, flags.v6uppercase,
-																 flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full>(iter, val.reference);
+																 flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full,
+																 flags.ipv4_mapped_ipv6>(iter, val.reference);
 	}
 	else
 	{
 		return ::fast_io::details::prtrsv_ip_define_impl<flags.v6shorten, flags.v6uppercase,
-														 flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full>(iter, val.reference);
+														 flags.showport ? true : flags.v6bracket, flags.showport, flags.v6full,
+														 flags.ipv4_mapped_ipv6>(iter, val.reference);
 	}
 }
 
