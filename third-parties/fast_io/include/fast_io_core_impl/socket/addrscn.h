@@ -489,7 +489,7 @@ scn_cnt_define_in6addr_shorten_impl(char_type const *begin, char_type const *end
 				++cur;
 				*cur = ::fast_io::big_endian(lo);
 				++cur;
-
+				
 				used_ipv4_suffix = true;
 				break;
 			}
@@ -515,7 +515,11 @@ scn_cnt_define_in6addr_shorten_impl(char_type const *begin, char_type const *end
 
 		// Here *it == ':'
 		++it;
-		if (it != end && *it == colon)
+		if (it == end)
+		{
+			return {it, parse_code::invalid};
+		}
+		if (*it == colon)
 		{
 			// Encountered "::"
 			if (colonp != nullptr) [[unlikely]]
