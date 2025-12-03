@@ -214,7 +214,38 @@ inline constexpr char_type *prtrsv_inaddr6_define_impl(char_type *it, ::fast_io:
 		char unsigned v4bytes[4]{};
 		if (ipv6_to_ipv4_mapped_bytes(v.address, v4bytes))
 		{
+			constexpr bool need_bracket{showport ? true : showv6bracket};
+			if constexpr (need_bracket)
+			{
+				*it = ::fast_io::char_literal_v<u8'[', char_type>;
+				++it;
+			}
+			if constexpr (::std::same_as<char_type, char>)
+			{
+				it = copy_string_literal("::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, wchar_t>)
+			{
+				it = copy_string_literal(L"::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, char16_t>)
+			{
+				it = copy_string_literal(u"::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, char32_t>)
+			{
+				it = copy_string_literal(U"::ffff:", it);
+			}
+			else
+			{
+				it = copy_string_literal(u8"::ffff:", it);
+			}
 			it = prtrsv_inaddr_common_define_impl(it, v4bytes);
+			if constexpr (need_bracket)
+			{
+				*it = ::fast_io::char_literal_v<u8']', char_type>;
+				++it;
+			}
 			if constexpr (showport)
 			{
 				it = prtrsv_ipport_zero_define_impl(it);
@@ -239,7 +270,38 @@ inline constexpr char_type *prtrsv_ipv6_define_impl(char_type *it, ::fast_io::ip
 		char unsigned v4bytes[4]{};
 		if (ipv6_to_ipv4_mapped_bytes(v.address.address, v4bytes))
 		{
+			constexpr bool need_bracket{showport ? true : showv6bracket};
+			if constexpr (need_bracket)
+			{
+				*it = ::fast_io::char_literal_v<u8'[', char_type>;
+				++it;
+			}
+			if constexpr (::std::same_as<char_type, char>)
+			{
+				it = copy_string_literal("::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, wchar_t>)
+			{
+				it = copy_string_literal(L"::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, char16_t>)
+			{
+				it = copy_string_literal(u"::ffff:", it);
+			}
+			else if constexpr (::std::same_as<char_type, char32_t>)
+			{
+				it = copy_string_literal(U"::ffff:", it);
+			}
+			else
+			{
+				it = copy_string_literal(u8"::ffff:", it);
+			}
 			it = prtrsv_inaddr_common_define_impl(it, v4bytes);
+			if constexpr (need_bracket)
+			{
+				*it = ::fast_io::char_literal_v<u8']', char_type>;
+				++it;
+			}
 			if constexpr (showport)
 			{
 				it = prtrsv_ipport_define_impl(it, v.port);
@@ -273,8 +335,8 @@ inline constexpr char_type *prtrsv_ip_address_define_impl(char_type *it, ::fast_
 		}
 		else
 		{
-			it = prtrsv_in6addr_common_define_impl<v6shorten, uppercase, showport ? true : showv6bracket,
-												   full>(it, v.address.v6.address);
+			it = prtrsv_inaddr6_define_impl<v6shorten, uppercase, showv6bracket, false, full,
+											ipv4_mapped_ipv6>(it, v.address.v6);
 		}
 		return it;
 	}
