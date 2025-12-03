@@ -811,6 +811,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"IBM OS/400"
 #elif defined(__sgi)
                                 u8"IRIX"
+#elif defined(__TANDEM) || defined(__NONSTOP)
+                                u8"HPE NonStop"
 #elif defined(__hpux)
                                 u8"HP-UX"
 #elif defined(__HAIKU__)
