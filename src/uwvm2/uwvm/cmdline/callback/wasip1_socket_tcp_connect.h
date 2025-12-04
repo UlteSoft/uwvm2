@@ -222,6 +222,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
                 preopen_socket.fd = fd;
                 preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local;
+                preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::ip;
+                preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
                 preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect;
                 preopen_socket.local_unix_path = ::uwvm2::utils::container::u8string{currp3_str};
 
@@ -440,9 +442,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
                     preopen_socket.sock_family = preopen_socket.ip.is_ipv4() ? ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet
                                                                              : ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet6;
+                    preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::tcp;
+                    preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
                     preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect;
 
                     wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));
+                }
+                else
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        u8"[error] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"DNS ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        tmp_dnsfile_path,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8" lookup returned empty results.\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                    return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
                 }
             }
             else
@@ -475,6 +496,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 }
 
                 preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet6;
+                preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::tcp;
+                preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
                 preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect;
 
                 wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));
@@ -510,6 +533,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet;
+            preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::tcp;
+            preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
             preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect;
 
             wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));

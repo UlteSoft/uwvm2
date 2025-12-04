@@ -123,6 +123,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
     };
 
     using sock_family_t = ::fast_io::sock_family;
+    using sock_protocol_t = ::fast_io::sock_protocol;
+    using sock_type_t = ::fast_io::sock_type;
     using ip_t = ::fast_io::ip;
 
     struct preopen_socket_t
@@ -130,6 +132,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         // sock_family != local
         ip_t ip{};
         sock_family_t sock_family{};
+        sock_protocol_t sock_protocol{};
+        sock_type_t sock_type{};
+
         handle_type_e handle_type{};
 
         // sock_family == local
@@ -158,7 +163,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         ::uwvm2::utils::container::vector<mount_dir_root_t> mount_dir_roots{};
 
         /// @brief Automatically binds during environment initialization
-        /// @note  Begin initializing the socket during environment initialization. 
+        /// @note  Begin initializing the socket during environment initialization.
         ::uwvm2::utils::container::vector<preopen_socket_t> preopen_sockets{};
 
         /// @brief Custom process exit function pointer for WASI exit handling (No no-return operation is required, as plugin systems typically cannot operate

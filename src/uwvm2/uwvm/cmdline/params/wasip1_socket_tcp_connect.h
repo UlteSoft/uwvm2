@@ -40,7 +40,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_socket_tcp_connect{
         .name{u8"--wasip1-socket-tcp-connect"},
         .describe{u8"Configure a WASI Preview 1 TCP client connection from the command line."},
-        .usage{u8"<fd:int> [<ipv4|ipv6|dns>:<port>"
+        .usage{u8"<fd:i32> [<ipv4|ipv6|dns>:<port>"
 #  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
                u8"|unix <path>"
 #  endif

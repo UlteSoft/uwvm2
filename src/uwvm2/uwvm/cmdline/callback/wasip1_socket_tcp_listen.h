@@ -222,6 +222,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
                 preopen_socket.fd = fd;
                 preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local;
+                preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::ip;
+                preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
                 preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen;
                 preopen_socket.local_unix_path = ::uwvm2::utils::container::u8string{currp3_str};
 
@@ -331,6 +333,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet6;
+            preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::tcp;
+            preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
             preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen;
 
             wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));
@@ -365,6 +369,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             preopen_socket.sock_family = ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet;
+            preopen_socket.sock_protocol = ::uwvm2::imported::wasi::wasip1::environment::sock_protocol_t::tcp;
+            preopen_socket.sock_type = ::uwvm2::imported::wasi::wasip1::environment::sock_type_t::stream;
             preopen_socket.handle_type = ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen;
 
             wasip1_env.preopen_sockets.emplace_back(::std::move(preopen_socket));

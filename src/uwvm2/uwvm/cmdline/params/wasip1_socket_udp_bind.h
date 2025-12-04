@@ -62,6 +62,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_socket_udp_bind{
         .name{u8"--wasip1-socket-udp-bind"},
         .describe{u8"Configure a WASI Preview 1 UDP socket bind from the command line."},
+        .usage{u8"<fd:i32> [<ipv4|ipv6>:<port>"
+#  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
+               u8"|unix <path>"
+#  endif
+               u8"]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_socket_udp_bind_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_socket_udp_bind_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
