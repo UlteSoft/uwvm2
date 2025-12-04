@@ -79,7 +79,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_connect),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_bind),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_connect),
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_raw),
 #  endif
 # endif
 #endif

@@ -48,7 +48,6 @@
 # include "wasip1_socket_tcp_connect.h"
 # include "wasip1_socket_udp_bind.h"
 # include "wasip1_socket_udp_connect.h"
-# include "wasip1_socket_raw.h"
 
 // log
 # include "log_output.h"
