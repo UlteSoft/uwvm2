@@ -114,7 +114,7 @@ struct win32_9xa_dns_iterator
 
 inline constexpr win32_9xa_dns_iterator operator*(win32_9xa_dns_iterator d) noexcept
 {
-	return {d.res};
+	return {d.res, d.pos};
 }
 
 inline constexpr win32_9xa_dns_iterator &operator++(win32_9xa_dns_iterator &d) noexcept
