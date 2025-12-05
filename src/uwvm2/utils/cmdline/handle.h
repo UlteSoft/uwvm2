@@ -31,8 +31,9 @@
 # include <algorithm>
 # include <limits>
 # include <utility>
-// import
+// macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 // import
 # include <fast_io.h>
 # include <fast_io_crypto.h>
@@ -96,8 +97,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
         global = 0u,
         debug,
         wasm,
-        wasi,
         log,
+#if defined(UWVM_IMPORT_WASI)
+        wasi,
+#endif
     };
 
     /// @brief Execution charset EBCDIC not supported
@@ -499,5 +502,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/feature/feature_pop_macro.h>  // wasi
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

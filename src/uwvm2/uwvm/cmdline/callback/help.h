@@ -30,6 +30,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -181,18 +182,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"--help wasm",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\" to display the wasm arguments." u8"\n\n",
-                                // wasi
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
-                                u8"  ",
-                                ::fast_io::mnp::left(u8"<wasi>", ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size),
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"  -----  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Use \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"--help wasi",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\" to display the wasi arguments." u8"\n\n",
                                 // log
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
                                 u8"  ",
@@ -205,6 +194,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"--help log",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\" to display the log arguments.",
+#if defined(UWVM_IMPORT_WASI)
+                                // wasi
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
+                                u8"  ",
+                                ::fast_io::mnp::left(u8"<wasi>", ::uwvm2::uwvm::cmdline::parameter_max_principal_name_size),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"  -----  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Use \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"--help wasi",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\" to display the wasi arguments." u8"\n\n",
+#endif
                                 // endl
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 u8"\n\n");
@@ -267,19 +270,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
             ::fast_io::io::perrln(u8log_output_ul);
         }
-        else if(currp1_str == u8"wasi")
-        {
-            ::fast_io::io::perr(u8log_output_ul,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"Arguments:\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
-                                u8"  <wasi>",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8":\n");
-            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::wasi);
-            // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
-            ::fast_io::io::perrln(u8log_output_ul);
-        }
         else if(currp1_str == u8"log")
         {
             ::fast_io::io::perr(u8log_output_ul,
@@ -293,6 +283,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
             ::fast_io::io::perrln(u8log_output_ul);
         }
+#if defined(UWVM_IMPORT_WASI)
+        else if(currp1_str == u8"wasi")
+        {
+            ::fast_io::io::perr(u8log_output_ul,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"Arguments:\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
+                                u8"  <wasi>",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8":\n");
+            help_output_singal_cate(u8log_output_ul, ::uwvm2::utils::cmdline::categorization::wasi);
+            // help_output_singal_cate comes with UWVM_COLOR_U8_RST_ALL
+            ::fast_io::io::perrln(u8log_output_ul);
+        }
+#endif
         else
         {
             ::fast_io::io::perr(u8log_output_ul,
@@ -321,6 +326,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
+# include <uwvm2/imported/wasi/feature/feature_pop_macro.h>  // wasi
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
