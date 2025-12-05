@@ -24,6 +24,7 @@
 
 // macro
 #include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+/// @todo add wasip2, wasip3 ...
 
 /// @brief This option automatically excludes unsupported systems.
 /// @note  UWVM_DISABLE_LOCAL_IMPORTED_WASIP1 controls imports within UWVM rather than this implementation.
@@ -37,4 +38,5 @@
 /// @todo add wasip2, wasip3 ...
 
 // macro
+/// @todo add wasip2, wasip3 ...
 #include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
