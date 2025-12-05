@@ -52,6 +52,10 @@ int main()
 # error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
 #endif
 
+#ifdef UWVM_IMPORT_WASI
+# error "UWVM_IMPORT_WASI existed"
+#endif
+
 #ifdef UWVM_IMPORT_WASI_WASIP1
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
