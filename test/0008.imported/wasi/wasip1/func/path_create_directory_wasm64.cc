@@ -968,7 +968,7 @@ int main()
     }
 #endif
 
-    // Case 21: permission boundary on parent dir -> eacces/enotcapable
+    // Case 21: permission boundary on parent dir -> eacces/eperm
 #if !defined(_WIN32) && !(defined(__MSDOS__) || defined(__DJGPP__)) && 0
     /*This cannot be tested, as implementations vary across platforms, and the test pertains to POSIX functionality rather than WASIs.*/
 
@@ -999,9 +999,9 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"pcd64_ro_a/no") - 1u));
-        if(!(ret == errno_wasm64_t::eacces || ret == errno_wasm64_t::enotcapable))
+        if(!(ret == errno_wasm64_t::eacces || ret == errno_wasm64_t::eperm))
         {
-            ::fast_io::io::perrln("error: pcd64 Case 21 expected eacces/enotcapable. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pcd64 Case 21 expected eacces/eperm. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 

@@ -228,10 +228,10 @@ int main()
                                                                                         static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                         p,
                                                                                         static_cast<wasi_size_wasm64_t>(sizeof(u8"puf64_dir") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable &&
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm &&
            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
         {
-            ::fast_io::io::perrln("error: puf64 Case 7 expected eisdir or enotcapable. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf64 Case 7 expected eisdir or eperm. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 

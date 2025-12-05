@@ -225,10 +225,10 @@ int main()
                                                                                  static_cast<wasi_posix_fd_t>(3),
                                                                                  p,
                                                                                  static_cast<wasi_size_t>(sizeof(u8"puf32_dir") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable &&
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm &&
            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent)
         {
-            ::fast_io::io::perrln("error: puf32 Case 7 expected eisdir or enotcapable. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf32 Case 7 expected eisdir or eperm. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
