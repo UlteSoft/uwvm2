@@ -193,7 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                 u8"--help log",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\" to display the log arguments.",
+                                u8"\" to display the log arguments." u8"\n\n",
 #if defined(UWVM_IMPORT_WASI)
                                 // wasi
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_CYAN),
@@ -209,8 +209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"\" to display the wasi arguments." u8"\n\n",
 #endif
                                 // endl
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
-                                u8"\n\n");
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
             // Here, guard will perform destructors.
             return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
