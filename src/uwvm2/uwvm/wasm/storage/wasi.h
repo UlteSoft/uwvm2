@@ -45,6 +45,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
+    /// @brief     This differs from the imported options; it is permanently present and used to control all wasi operations simultaneously.
+
     /// @brief     Disable WASI UTF-8 Check
     /// @note      During the command line phase, it is preferable to use `wasi_disable_utf8_check`.
     inline bool wasi_disable_utf8_check{};
