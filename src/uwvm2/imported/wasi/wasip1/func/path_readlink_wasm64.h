@@ -699,6 +699,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const symlink_symbol_size{symlink_symbol.size()};
 
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unchecked(
+            memory,
+            buf_used_ptrsz,
+            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(symlink_symbol_size));
+
         if(symlink_symbol_size > buf_len) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enobufs; }
 
         // write (checked before)
@@ -706,10 +711,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                                       buf_ptrsz,
                                                                                       reinterpret_cast<::std::byte const*>(symlink_symbol.cbegin()),
                                                                                       reinterpret_cast<::std::byte const*>(symlink_symbol.cend()));
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unchecked(
-            memory,
-            buf_used_ptrsz,
-            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(symlink_symbol_size));
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
     }
