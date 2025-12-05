@@ -39,7 +39,7 @@ module;
 
 export module uwvm2.uwvm.cmdline.callback:wasip1_disable;
 
-import uwvm2.uwvm.cmdline;
+import uwvm2.utils.cmdline;
 import uwvm2.uwvm.wasm.storage;
 
 #ifndef UWVM_MODULE

@@ -37,7 +37,6 @@ export module uwvm2.uwvm.imported.wasi.storage:utf8;
 import fast_io;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
-import uwvm2.imported.wasi.wasip1;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
