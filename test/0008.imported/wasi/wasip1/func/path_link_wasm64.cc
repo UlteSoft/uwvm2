@@ -679,7 +679,7 @@ int main()
         try_unlink(u8"pl64_loop");
     }
 
-    // ===== Case 12: old is directory -> enotcapable =====
+    // ===== Case 12: old is directory -> eperm =====
     {
         try
         {
@@ -706,7 +706,7 @@ int main()
                                                                                static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                P1,
                                                                                static_cast<wasi_size_wasm64_t>(sizeof(u8"pl64_dirD_hl") - 1u));
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm
 # if defined(_WIN32)
            && r != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir
 # endif

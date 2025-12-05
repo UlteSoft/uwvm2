@@ -72,6 +72,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     inline constexpr ::std::uint_least64_t max_full_protection_wasm32_length{static_cast<::std::uint_least64_t>(1u) << 33u};     // 8 GB
     inline constexpr ::std::uint_least32_t max_partial_protection_wasm32_length{static_cast<::std::uint_least32_t>(1u) << 28u};  // 256 MB
 
+    /// @note      Memory safety model for the mmap-backed linear memory:
+    ///            - The base pointer `memory_begin` is stable for the lifetime of the instance; growth commits additional virtual address space instead of
+    ///              reallocating or moving the buffer.
+    ///            - In “full protection” configurations (typically when the custom page size is greater than or equal to the platform page size), most
+    ///              out-of-bounds accesses are rejected by guard pages, so hot paths can omit explicit software bounds checks and only validate extreme
+    ///              offsets that might escape the protected region against `memory_length_p`.
+    ///            - When the custom page size is smaller than the platform page size, the base address is still stable, but page protection alone cannot
+    ///              distinguish all intra-page overflows. In this mode, the `check_memory_bounds_*` helpers perform explicit `(offset, size)` range checks
+    ///              using the atomically updated `memory_length_p`.
+    ///            - Because growth never relocates `memory_begin`, this backend does not require per-operation locks; concurrency is handled by the mutex used
+    ///              in `grow()` together with acquire/release operations on `memory_length_p`, unlike allocator-backed memories where multi-threaded `realloc`
+    ///              would otherwise require a double-atom guard.
+    ///            - WebAssembly linear memory is grow-only: once a given `(offset, size)` range has been validated against some length, that range remains
+    ///              valid after subsequent grows, so callers do not need to re-run bounds checks for the same range after a successful grow.
+
     struct mmap_memory_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"mmap"};
