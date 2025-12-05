@@ -31,9 +31,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasip1
-# endif
+# include <uwvm2/imported/wasi/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -46,17 +44,16 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::storage
 {
+#if defined(UWVM_IMPORT_WASI_WASIP1)
     /// @brief     Disable WASI UTF-8 Check
     /// @note      During the command line phase, it is preferable to use `wasi_disable_utf8_check`.
     inline bool wasi_disable_utf8_check{};
-
+#endif
 }  // namespace uwvm2::uwvm::imported::wasi::storage
 
 #ifndef UWVM_MODULE
 // macro
-# ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/feature/feature_pop_macro.h>  // wasip1
-# endif
+# include <uwvm2/imported/wasi/feature/feature_pop_macro.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

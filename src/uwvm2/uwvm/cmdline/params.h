@@ -27,6 +27,7 @@
 # include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/feature/feature_push_macro.h> // wasi
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
@@ -67,8 +68,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
 #endif
 
-            // wasi
+// wasi
+#if defined(UWVM_IMPORT_WASI)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
+#endif
+// wasip1
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
@@ -116,5 +120,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif
+# include <uwvm2/imported/wasi/feature/feature_pop_macro.h> // wasi
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
