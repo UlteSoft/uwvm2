@@ -153,7 +153,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
         }
 
-        ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasm_fd_storage.fd_limit = limit;
+        ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.fd_storage.fd_limit = limit;
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }

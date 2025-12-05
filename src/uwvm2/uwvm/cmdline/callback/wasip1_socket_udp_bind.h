@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
-        auto& wasip1_env{::uwvm2::uwvm::wasm::storage::default_wasip1_env};
+        auto& wasip1_env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
 
         auto currp1{para_curr + 1u};
 

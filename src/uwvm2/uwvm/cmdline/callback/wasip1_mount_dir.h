@@ -498,7 +498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
         }
 
-        auto& env{::uwvm2::uwvm::wasm::storage::default_wasip1_env};
+        auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
 
         // During the command line phase, it is preferable to use `wasi_disable_utf8_check` rather than `env.disable_utf8_check`
         if(!(::uwvm2::uwvm::wasm::storage::wasi_disable_utf8_check || env.disable_utf8_check)) [[likely]]

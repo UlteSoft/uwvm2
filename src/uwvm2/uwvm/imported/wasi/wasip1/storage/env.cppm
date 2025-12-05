@@ -31,7 +31,7 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.imported.wasi.wasip1.storage:wasi_global_storage;
+export module uwvm2.uwvm.imported.wasi.wasip1.storage:env;
 
 import fast_io;
 import uwvm2.utils.ansies;
@@ -45,4 +45,4 @@ import uwvm2.imported.wasi.wasip1;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "wasi_global_storage.h"
+#include "env.h"

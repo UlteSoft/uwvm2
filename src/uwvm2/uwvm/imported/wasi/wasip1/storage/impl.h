@@ -23,5 +23,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "wasi_global_storage.h"
+# include "env.h"
 #endif

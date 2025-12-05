@@ -23,7 +23,7 @@
 module;
 
 export module uwvm2.uwvm.imported.wasi.wasip1.storage;
-export import :wasi_global_storage;
+export import :env;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

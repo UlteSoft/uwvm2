@@ -49,7 +49,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
-    inline ::uwvm2::imported::wasi::wasip1::fd_manager::wasm_fd_storage_t wasm_fd_storage{};  // [[global]]
+    /// @brief     Default WasiPreview1 environment
+    using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
+    inline wasip1_env_type default_wasip1_env{};  // [global]
 # endif
 #endif
 }  // namespace uwvm2::uwvm::imported::wasi::wasip1::storage

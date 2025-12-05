@@ -66,7 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
         // Preview 1
-        auto& p1env{::uwvm2::uwvm::wasm::storage::default_wasip1_env};
+        auto& p1env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
         p1env.disable_utf8_check = true;
 # endif
 #endif
