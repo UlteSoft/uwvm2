@@ -24,6 +24,12 @@
 
 module;
 
+// macro
+#include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+#endif
+
 export module uwvm2.uwvm.wasm.storage:local_preload;
 
 import fast_io;

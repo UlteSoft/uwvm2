@@ -30,7 +30,7 @@
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
-# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>  // wasi
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
@@ -61,6 +61,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif
-# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h> // wasi
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
