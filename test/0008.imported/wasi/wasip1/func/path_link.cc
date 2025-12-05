@@ -977,7 +977,7 @@ int main()
         try_unlink(u8"pl32_absL");
     }
 
-    // ===== Case 18: symlink to directory; follow -> enotcapable; nofollow -> esuccess =====
+    // ===== Case 18: symlink to directory; follow -> eperm; nofollow -> esuccess =====
     {
         try
         {
@@ -1005,7 +1005,7 @@ int main()
                                                                          static_cast<wasi_posix_fd_t>(4),
                                                                          P1,
                                                                          static_cast<wasi_size_t>(sizeof(u8"pl32_dirE_dst") - 1u));
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm
 # if defined(_WIN32)
            && r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir
 # endif
