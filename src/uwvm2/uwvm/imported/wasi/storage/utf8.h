@@ -44,7 +44,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::storage
 {
-#if defined(UWVM_IMPORT_WASI_WASIP1)
+#if defined(UWVM_IMPORT_WASI)
     /// @brief     Disable WASI UTF-8 Check
     /// @note      During the command line phase, it is preferable to use `wasi_disable_utf8_check`.
     inline bool wasi_disable_utf8_check{};

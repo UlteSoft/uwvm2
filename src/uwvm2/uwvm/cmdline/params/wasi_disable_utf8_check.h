@@ -41,7 +41,7 @@
 #endif
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
-#if defined(UWVM_IMPORT_WASI_WASIP1)
+#if defined(UWVM_IMPORT_WASI)
 
     namespace details
     {
