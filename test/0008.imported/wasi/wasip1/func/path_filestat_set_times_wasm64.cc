@@ -168,7 +168,7 @@ int main()
 
     set_dirfd(5uz, static_cast<rights_wasm64_t>(-1));
 
-    // ===== Case 3: absolute path -> eperm =====
+    // ===== Case 3: absolute path -> enotcapable =====
     {
         write_string(P2, u8"/abs64");
         auto const ret = call_set_times64(static_cast<wasi_posix_fd_wasm64_t>(5),
@@ -178,9 +178,9 @@ int main()
                                           static_cast<timestamp_wasm64_t>(0u),
                                           static_cast<timestamp_wasm64_t>(0u),
                                           static_cast<fstflags_wasm64_t>(0));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst64 Case 3 expected eperm ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 3 expected enotcapable ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -225,7 +225,7 @@ int main()
         }
     }
 
-    // ===== Case 6: '..' final -> eperm =====
+    // ===== Case 6: '..' final -> enotcapable =====
     {
         write_string(P5, u8"..");
         auto const ret = call_set_times64(static_cast<wasi_posix_fd_wasm64_t>(5),
@@ -235,9 +235,9 @@ int main()
                                           static_cast<timestamp_wasm64_t>(0u),
                                           static_cast<timestamp_wasm64_t>(0u),
                                           fstflags_wasm64_t::filestat_set_mtim_now);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst64 Case 6 expected eperm ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst64 Case 6 expected enotcapable ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -567,9 +567,9 @@ int main()
                                          static_cast<timestamp_wasm64_t>(0u),
                                          static_cast<timestamp_wasm64_t>(0u),
                                          fstflags_wasm64_t::filestat_set_atim_now);
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst64 Case 17a expected eperm ", static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("pfst64 Case 17a expected enotcapable ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
         auto const r2 = call_set_times64(static_cast<wasi_posix_fd_wasm64_t>(5),

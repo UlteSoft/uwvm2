@@ -154,7 +154,7 @@ int main()
         }
     }
 
-    // Case 3: absolute path -> eperm
+    // Case 3: absolute path -> enotcapable
     {
         constexpr wasi_void_ptr_t p{12288u};
         constexpr auto s = u8"/abs32_file";
@@ -165,9 +165,9 @@ int main()
                                                                                   p,
                                                                                   static_cast<wasi_size_t>(sizeof(u8"/abs32_file") - 1u),
                                                                                   stat_ptr);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg32 Case 3 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pfg32 Case 3 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -625,7 +625,7 @@ int main()
         }
     }
 
-    // Case 16: symlink to absolute path; follow -> eperm; nofollow -> symbolic_link
+    // Case 16: symlink to absolute path; follow -> enotcapable; nofollow -> symbolic_link
     {
         try
         {
@@ -644,9 +644,9 @@ int main()
                                                                                  p1,
                                                                                  static_cast<wasi_size_t>(sizeof(u8"pfg32_abs") - 1u),
                                                                                  stat_ptr);
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg32 Case 16a expected eperm. ", static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("error: pfg32 Case 16a expected enotcapable. ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -847,7 +847,7 @@ int main()
     }
 #endif
 
-    // Case 17: '..' as final -> eperm (escape root rejected)
+    // Case 17: '..' as final -> enotcapable (escape root rejected)
     {
         constexpr wasi_void_ptr_t p{47104u};
         constexpr auto s = u8"..";
@@ -858,9 +858,9 @@ int main()
                                                                                 p,
                                                                                 static_cast<wasi_size_t>(sizeof(u8"..") - 1u),
                                                                                 stat_ptr);
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg32 Case 17 expected eperm. ", static_cast<unsigned>(r));
+            ::fast_io::io::perrln("error: pfg32 Case 17 expected enotcapable. ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }

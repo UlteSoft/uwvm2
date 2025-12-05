@@ -1168,6 +1168,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
         store_basic_wasm_type_to_memory_unchecked_unlocked<WasmType, Alloc>(memory, static_cast<::std::size_t>(offset), value);
     }
 
+    /// @note      This helper intentionally does not require that callers share the same
+    ///            `memory_operation_guard_t` instance that was used for any prior bounds
+    ///            check. Linear allocator-backed memories are grow-only: grow operations
+    ///            may increase `memory_length` but never shrink it. Unlike the mmap-based
+    ///            linear memory backend, which keeps a stable base address across grows,
+    ///            the allocator-backed variant may grow via a `realloc`-style relocation,
+    ///            so a grow can copy the underlying buffer and change `memory_begin`.
+    ///            Therefore, once a particular (offset, sizeof(WasmType)) range has been
+    ///            validated against some `memory_length` value, the same range remains
+    ///            contained within the memory after any subsequent grow. The guard
+    ///            constructed here only needs to synchronize with concurrent grow
+    ///            operations to avoid races while the underlying buffer may be relocated;
+    ///            its purpose is to ensure that no grow can occur while this write is in
+    ///            progress, not to revalidate an earlier bounds check. Call sites that
+    ///            require a single lock to cover both explicit bounds checks and the
+    ///            write itself should instead acquire a long-lived guard via `lock_memory`
+    ///            and use the `_unchecked_unlocked` variants.
+
     template <typename WasmType, typename Alloc>
     inline constexpr void store_basic_wasm_type_to_memory_unchecked(::uwvm2::object::memory::linear::basic_allocator_memory_t<Alloc> const& memory,
                                                                     ::std::size_t offset,

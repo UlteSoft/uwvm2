@@ -127,7 +127,7 @@ int main()
         }
     }
 
-    // Case 3: absolute path -> eperm
+    // Case 3: absolute path -> enotcapable
     {
         constexpr wasi_void_ptr_wasm64_t p{12288u};
         constexpr auto s = u8"/abs64_file";
@@ -137,9 +137,9 @@ int main()
                                                                                         static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                         p,
                                                                                         static_cast<wasi_size_wasm64_t>(sizeof(u8"/abs64_file") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: puf64 Case 3 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf64 Case 3 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -228,10 +228,10 @@ int main()
                                                                                         static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                         p,
                                                                                         static_cast<wasi_size_wasm64_t>(sizeof(u8"puf64_dir") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm &&
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable &&
            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enoent)
         {
-            ::fast_io::io::perrln("error: puf64 Case 7 expected eisdir or eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf64 Case 7 expected eisdir or enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 

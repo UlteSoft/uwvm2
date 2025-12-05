@@ -155,7 +155,7 @@ int main()
         }
     }
 
-    // Case 3: absolute path -> eperm
+    // Case 3: absolute path -> enotcapable
     {
         constexpr wasi_void_ptr_wasm64_t p{12288u};
         constexpr auto s = u8"/abs64_file";
@@ -166,9 +166,9 @@ int main()
                                                                                          p,
                                                                                          static_cast<wasi_size_wasm64_t>(sizeof(u8"/abs64_file") - 1u),
                                                                                          stat_ptr);
-        if(ret != errno_wasm64_t::eperm)
+        if(ret != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg64 Case 3 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pfg64 Case 3 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -626,7 +626,7 @@ int main()
         }
     }
 
-    // Case 16: symlink to absolute path; follow -> eperm; nofollow -> symbolic_link
+    // Case 16: symlink to absolute path; follow -> enotcapable; nofollow -> symbolic_link
     {
         try
         {
@@ -645,9 +645,9 @@ int main()
                                                                                         p1,
                                                                                         static_cast<wasi_size_wasm64_t>(sizeof(u8"pfg64_abs") - 1u),
                                                                                         stat_ptr);
-        if(r1 != errno_wasm64_t::eperm)
+        if(r1 != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg64 Case 16a expected eperm. ", static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("error: pfg64 Case 16a expected enotcapable. ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 
@@ -848,7 +848,7 @@ int main()
     }
 #endif
 
-    // Case 17: '..' as final -> eperm
+    // Case 17: '..' as final -> enotcapable
     {
         constexpr wasi_void_ptr_wasm64_t p{47104u};
         constexpr auto s = u8"..";
@@ -859,9 +859,9 @@ int main()
                                                                                        p,
                                                                                        static_cast<wasi_size_wasm64_t>(sizeof(u8"..") - 1u),
                                                                                        stat_ptr);
-        if(r != errno_wasm64_t::eperm)
+        if(r != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pfg64 Case 17 expected eperm. ", static_cast<unsigned>(r));
+            ::fast_io::io::perrln("error: pfg64 Case 17 expected enotcapable. ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();
         }
     }

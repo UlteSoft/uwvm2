@@ -498,7 +498,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // The path series functions in wasip1 reject absolute paths.
         if(old_path_split_path_res.is_absolute || new_path_split_path_res.is_absolute) [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable;
         }
         if(old_path_split_path_res.res.empty() || new_path_split_path_res.res.empty()) [[unlikely]]
         {
@@ -569,7 +569,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
+                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
 
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eexist;
                     }
@@ -600,7 +600,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
+                        if(new_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
                         else
                         {
                             new_path_stack.pop_back_unchecked();
@@ -821,7 +821,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
+                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
 
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir;
                     }
@@ -1292,7 +1292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                     {
-                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm; }
+                        if(old_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
                         else
                         {
                             old_path_stack.pop_back_unchecked();

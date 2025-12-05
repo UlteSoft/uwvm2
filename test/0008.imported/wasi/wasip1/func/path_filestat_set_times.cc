@@ -165,7 +165,7 @@ int main()
     // ===== Prepare a directory fd with full rights at index 5 =====
     set_dirfd(5uz, static_cast<rights_t>(-1));
 
-    // ===== Case 3: absolute path -> eperm =====
+    // ===== Case 3: absolute path -> enotcapable =====
     {
         write_string(P2, u8"/abs32");
         auto const ret = call_set_times(static_cast<wasi_posix_fd_t>(5),
@@ -175,9 +175,9 @@ int main()
                                         static_cast<timestamp_t>(0u),
                                         static_cast<timestamp_t>(0u),
                                         static_cast<fstflags_t>(0));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst32 Case 3 expected eperm ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst32 Case 3 expected enotcapable ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -222,7 +222,7 @@ int main()
         }
     }
 
-    // ===== Case 6: '..' final -> eperm =====
+    // ===== Case 6: '..' final -> enotcapable =====
     {
         write_string(P5, u8"..");
         auto const ret = call_set_times(static_cast<wasi_posix_fd_t>(5),
@@ -232,9 +232,9 @@ int main()
                                         static_cast<timestamp_t>(0u),
                                         static_cast<timestamp_t>(0u),
                                         fstflags_t::filestat_set_mtim_now);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst32 Case 6 expected eperm ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("pfst32 Case 6 expected enotcapable ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -555,7 +555,7 @@ int main()
         }
     }
 
-    // ===== Case 17: symlink to absolute path; follow -> eperm; nofollow -> esuccess =====
+    // ===== Case 17: symlink to absolute path; follow -> enotcapable; nofollow -> esuccess =====
     try
     {
         ::fast_io::native_symlinkat(u8"/etc", ::fast_io::at_fdcwd(), u8"pfst32_abs");
@@ -572,9 +572,9 @@ int main()
                                        static_cast<timestamp_t>(0u),
                                        static_cast<timestamp_t>(0u),
                                        fstflags_t::filestat_set_atim_now);
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("pfst32 Case 17a expected eperm ", static_cast<unsigned>(r1));
+            ::fast_io::io::perrln("pfst32 Case 17a expected enotcapable ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
         }
 

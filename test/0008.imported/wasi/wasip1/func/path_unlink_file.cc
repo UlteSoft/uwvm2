@@ -127,7 +127,7 @@ int main()
         }
     }
 
-    // Case 3: absolute path -> eperm
+    // Case 3: absolute path -> enotcapable
     {
         constexpr wasi_void_ptr_t p{12288u};
         constexpr auto s = u8"/abs32_file";
@@ -137,9 +137,9 @@ int main()
                                                                                  static_cast<wasi_posix_fd_t>(3),
                                                                                  p,
                                                                                  static_cast<wasi_size_t>(sizeof(u8"/abs32_file") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: puf32 Case 3 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf32 Case 3 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -225,10 +225,10 @@ int main()
                                                                                  static_cast<wasi_posix_fd_t>(3),
                                                                                  p,
                                                                                  static_cast<wasi_size_t>(sizeof(u8"puf32_dir") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm &&
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable &&
            ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces && ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent)
         {
-            ::fast_io::io::perrln("error: puf32 Case 7 expected eisdir or eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: puf32 Case 7 expected eisdir or enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 

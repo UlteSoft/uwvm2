@@ -201,7 +201,7 @@ int main()
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eilseq) { ::fast_io::fast_terminate(); }
     }
 
-    // ===== Case 5: absolute path -> eperm =====
+    // ===== Case 5: absolute path -> enotcapable =====
     {
         write_cu8str64(memory, P0, u8"/abs_po64");
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::path_open_wasm64(env,
@@ -214,7 +214,7 @@ int main()
                                                                                  static_cast<rights_wasm64_t>(0),
                                                                                  static_cast<fdflags_wasm64_t>(0),
                                                                                  PFD);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm) { ::fast_io::fast_terminate(); }
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable) { ::fast_io::fast_terminate(); }
     }
 
     // ===== Case 6a: final '.' and open as dir -> esuccess =====
@@ -249,7 +249,7 @@ int main()
         if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisdir) { ::fast_io::fast_terminate(); }
     }
 
-    // ===== Case 7a: final '..' and dirfd path_stack empty -> eperm (dir) =====
+    // ===== Case 7a: final '..' and dirfd path_stack empty -> enotcapable (dir) =====
     {
         write_cu8str64(memory, P0, u8"..");
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::path_open_wasm64(env,
@@ -262,7 +262,7 @@ int main()
                                                                                  static_cast<rights_wasm64_t>(0),
                                                                                  static_cast<fdflags_wasm64_t>(0),
                                                                                  PFD);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm) { ::fast_io::fast_terminate(); }
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable) { ::fast_io::fast_terminate(); }
     }
 
     // ===== Case 7b: final '..' and open as file -> eisdir =====
@@ -618,7 +618,7 @@ int main()
         if(r2 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir) { ::fast_io::fast_terminate(); }
     }
 
-    // ===== Case 19: symlink to absolute path; follow -> eperm; nofollow -> enotdir =====
+    // ===== Case 19: symlink to absolute path; follow -> enotcapable; nofollow -> enotdir =====
     try
     {
         ::fast_io::native_symlinkat(u8"/etc", ::fast_io::at_fdcwd(), u8"po64_absL");
@@ -638,7 +638,7 @@ int main()
                                                                                 static_cast<rights_wasm64_t>(0),
                                                                                 static_cast<fdflags_wasm64_t>(0),
                                                                                 PFD);
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm) { ::fast_io::fast_terminate(); }
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable) { ::fast_io::fast_terminate(); }
 
         auto const r2 = ::uwvm2::imported::wasi::wasip1::func::path_open_wasm64(env,
                                                                                 static_cast<wasi_posix_fd_wasm64_t>(3),

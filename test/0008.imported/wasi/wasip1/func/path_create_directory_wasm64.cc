@@ -130,7 +130,7 @@ int main()
         }
     }
 
-    // Case 3: absolute path -> eperm
+    // Case 3: absolute path -> enotcapable
     {
         auto& fd3 = *env.fd_storage.opens.index_unchecked(6uz).fd_p;
         fd3.rights_base = static_cast<rights_t>(-1);
@@ -153,9 +153,9 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(6),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"/abs64_dir") - 1u));
-        if(ret != errno_wasm64_t::eperm)
+        if(ret != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pcd64 Case 3 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pcd64 Case 3 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -717,7 +717,7 @@ int main()
 #endif
 
 #if !(defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x600) || defined(__MSDOS__) || defined(__DJGPP__))
-    // Case 16: symlink escapes root -> eperm
+    // Case 16: symlink escapes root -> enotcapable
     {
         try
         {
@@ -738,9 +738,9 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"pcd64_up/x") - 1u));
-        if(ret != errno_wasm64_t::eperm)
+        if(ret != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pcd64 Case 16 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pcd64 Case 16 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -805,7 +805,7 @@ int main()
     }
 
 #if !(defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x600) || defined(__MSDOS__) || defined(__DJGPP__))
-    // Case 18: symlink to absolute path (e.g., /etc) -> eperm
+    // Case 18: symlink to absolute path (e.g., /etc) -> enotcapable
     {
         try
         {
@@ -826,9 +826,9 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"pcd64_abs/hack") - 1u));
-        if(ret != errno_wasm64_t::eperm)
+        if(ret != errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: pcd64 Case 18 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pcd64 Case 18 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -968,7 +968,7 @@ int main()
     }
 #endif
 
-    // Case 21: permission boundary on parent dir -> eacces/eperm
+    // Case 21: permission boundary on parent dir -> eacces/enotcapable
 #if !defined(_WIN32) && !(defined(__MSDOS__) || defined(__DJGPP__)) && 0
     /*This cannot be tested, as implementations vary across platforms, and the test pertains to POSIX functionality rather than WASIs.*/
 
@@ -999,9 +999,9 @@ int main()
                                                                                              static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                              p,
                                                                                              static_cast<wasi_size_wasm64_t>(sizeof(u8"pcd64_ro_a/no") - 1u));
-        if(!(ret == errno_wasm64_t::eacces || ret == errno_wasm64_t::eperm))
+        if(!(ret == errno_wasm64_t::eacces || ret == errno_wasm64_t::enotcapable))
         {
-            ::fast_io::io::perrln("error: pcd64 Case 21 expected eacces/eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: pcd64 Case 21 expected eacces/enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 

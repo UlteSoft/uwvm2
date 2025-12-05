@@ -229,7 +229,7 @@ int main()
     }
 #endif
 
-    // ===== Case 5: absolute new path -> eperm =====
+    // ===== Case 5: absolute new path -> enotcapable =====
     {
         constexpr wasi_void_ptr_wasm64_t P_OLD{22528u};
         constexpr wasi_void_ptr_wasm64_t P_NEW{24576u};
@@ -243,9 +243,9 @@ int main()
                                                                                     static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                     P_NEW,
                                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"/psl64_abs_new") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: psl64 Case 5 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: psl64 Case 5 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -282,7 +282,7 @@ int main()
         try_rmdir(u8"psl64_dot_dir");
     }
 
-    // ===== Case 7: last component '..' and empty stack -> eperm =====
+    // ===== Case 7: last component '..' and empty stack -> enotcapable =====
     {
         constexpr wasi_void_ptr_wasm64_t P_OLD{30720u};
         constexpr wasi_void_ptr_wasm64_t P_NEW{32768u};
@@ -296,9 +296,9 @@ int main()
                                                                                     static_cast<wasi_posix_fd_wasm64_t>(3),
                                                                                     P_NEW,
                                                                                     static_cast<wasi_size_wasm64_t>(sizeof(u8"..") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: psl64 Case 7 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: psl64 Case 7 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }

@@ -474,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
 
-        if(split_path_res.is_absolute) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+        if(split_path_res.is_absolute) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable; }
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__))
         // For the Windows API, the parsing strategy differs from POSIX. Windows supports the backslash as a delimiter while rejecting
@@ -507,7 +507,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
                 case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                 {
-                    if(curr_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                    if(curr_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable; }
                     else
                     {
                         curr_path_stack.pop_back_unchecked();
@@ -784,7 +784,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(split_path_res.is_absolute) [[unlikely]]
         {
-            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
             return res;
         }
 
@@ -836,7 +836,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(curr_path_stack.empty()) [[unlikely]]
                         {
-                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
                             return res;
                         }
                         else
@@ -950,7 +950,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(curr_path_stack.empty()) [[unlikely]]
                         {
-                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
                             return res;
                         }
                         else
@@ -1250,7 +1250,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const split_path_res{::uwvm2::imported::wasi::wasip1::func::split_posix_path(symlink_symbol)};
 
-        if(split_path_res.is_absolute) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+        if(split_path_res.is_absolute) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable; }
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__))
         // For the Windows API, the parsing strategy differs from POSIX. Windows supports the backslash as a delimiter while rejecting
@@ -1283,7 +1283,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
                 case ::uwvm2::imported::wasi::wasip1::func::dir_type_e::prev:
                 {
-                    if(curr_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm; }
+                    if(curr_path_stack.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable; }
                     else
                     {
                         curr_path_stack.pop_back_unchecked();
@@ -1554,7 +1554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(split_path_res.is_absolute) [[unlikely]]
         {
-            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
             return res;
         }
 
@@ -1606,7 +1606,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(curr_path_stack.empty()) [[unlikely]]
                         {
-                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
                             return res;
                         }
                         else
@@ -1722,7 +1722,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(curr_path_stack.empty()) [[unlikely]]
                         {
-                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
+                            res.err = ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
                             return res;
                         }
                         else

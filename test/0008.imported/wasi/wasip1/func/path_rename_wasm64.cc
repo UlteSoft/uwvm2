@@ -169,7 +169,7 @@ int main()
         }
     }
 
-    // Case 4: absolute path -> eperm
+    // Case 4: absolute path -> enotcapable
     {
         write_cu8str64(memory, P0, u8"/abs_old");
         write_cu8str64(memory, P1, u8"/abs_new");
@@ -180,7 +180,7 @@ int main()
                                                                                    static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                    P1,
                                                                                    static_cast<wasi_size_wasm64_t>(sizeof(u8"/abs_new") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
             ::fast_io::io::perrln("pr64 Case4", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
@@ -385,7 +385,7 @@ int main()
                                                                                    static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                    P1,
                                                                                    static_cast<wasi_size_wasm64_t>(sizeof(u8"../x") - 1u));
-        if(r14 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(r14 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
             ::fast_io::io::perrln("pr64 Case14", static_cast<unsigned>(r14));
             ::fast_io::fast_terminate();
@@ -402,7 +402,7 @@ int main()
                                                                                    static_cast<wasi_posix_fd_wasm64_t>(4),
                                                                                    P1,
                                                                                    static_cast<wasi_size_wasm64_t>(sizeof(u8"pr64_rn_new_d") - 1u));
-        if(r15 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eperm)
+        if(r15 != ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable)
         {
             ::fast_io::io::perrln("pr64 Case15", static_cast<unsigned>(r15));
             ::fast_io::fast_terminate();

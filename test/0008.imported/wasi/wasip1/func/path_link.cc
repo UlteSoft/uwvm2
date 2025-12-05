@@ -320,7 +320,7 @@ int main()
         try_unlink(u8"uwvm_ut_pl32_dst_e.txt");
     }
 
-    // ===== Case 4b: absolute path (old) -> eperm =====
+    // ===== Case 4b: absolute path (old) -> enotcapable =====
     {
         write_cu8str32(memory, P0, u8"/abs_src");
         write_cu8str32(memory, P1, u8"dst.txt");
@@ -332,7 +332,7 @@ int main()
                                                                           static_cast<wasi_posix_fd_t>(4),
                                                                           P1,
                                                                           static_cast<wasi_size_t>(sizeof(u8"dst.txt") - 1u));
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::io::perrln("[pl32] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
@@ -696,7 +696,7 @@ int main()
         try_unlink(u8"pl32_loop");
     }
 
-    // ===== Case 12: old is directory -> eperm =====
+    // ===== Case 12: old is directory -> enotcapable =====
     {
         try
         {
@@ -723,7 +723,7 @@ int main()
                                                                         static_cast<wasi_posix_fd_t>(4),
                                                                         P1,
                                                                         static_cast<wasi_size_t>(sizeof(u8"pl32_dirD_hl") - 1u));
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable
 # if defined(_WIN32)
            && r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir
 # endif
@@ -916,7 +916,7 @@ int main()
         try_unlink(u8"pl32_exist.txt");
     }
 
-    // ===== Case 17: old symlink to absolute path; follow -> eperm; nofollow -> esuccess and new is symlink =====
+    // ===== Case 17: old symlink to absolute path; follow -> enotcapable; nofollow -> esuccess and new is symlink =====
     {
         try
         {
@@ -937,7 +937,7 @@ int main()
                                                                          static_cast<wasi_posix_fd_t>(4),
                                                                          P1,
                                                                          static_cast<wasi_size_t>(sizeof(u8"pl32_abs_follow_dst") - 1u));
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::io::perrln("[pl32] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
@@ -977,7 +977,7 @@ int main()
         try_unlink(u8"pl32_absL");
     }
 
-    // ===== Case 18: symlink to directory; follow -> eperm; nofollow -> esuccess =====
+    // ===== Case 18: symlink to directory; follow -> enotcapable; nofollow -> esuccess =====
     {
         try
         {
@@ -1005,7 +1005,7 @@ int main()
                                                                          static_cast<wasi_posix_fd_t>(4),
                                                                          P1,
                                                                          static_cast<wasi_size_t>(sizeof(u8"pl32_dirE_dst") - 1u));
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable
 # if defined(_WIN32)
            && r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir
 # endif
@@ -1274,7 +1274,7 @@ int main()
         try_unlink(u8"pl32_many_src.txt");
     }
 
-    // ===== Case 23: new path final '..' -> eperm =====
+    // ===== Case 23: new path final '..' -> enotcapable =====
     {
         write_cu8str32(memory, P0, u8"uwvm_ut_pl32_src.txt");
         write_cu8str32(memory, P1, u8"..");
@@ -1286,7 +1286,7 @@ int main()
                                                                         static_cast<wasi_posix_fd_t>(4),
                                                                         P1,
                                                                         static_cast<wasi_size_t>(sizeof(u8"..") - 1u));
-        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::io::perrln("[pl32] L:", static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r));
             ::fast_io::fast_terminate();

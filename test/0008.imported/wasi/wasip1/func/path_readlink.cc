@@ -185,7 +185,7 @@ int main()
         }
     }
 
-    // ===== Case 4: absolute path -> eperm =====
+    // ===== Case 4: absolute path -> enotcapable =====
     {
         constexpr auto s = u8"/abs";
         write_cu8str32(memory, P_PATH0, s);
@@ -197,9 +197,9 @@ int main()
                                                                               P_BUF,
                                                                               static_cast<wasi_size_t>(64u),
                                                                               P_USED);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: prl32 Case 4 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: prl32 Case 4 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -336,7 +336,7 @@ int main()
         }
     }
 
-    // ===== Case 9: traversal escape via symlink in middle -> eperm =====
+    // ===== Case 9: traversal escape via symlink in middle -> enotcapable =====
 #if !(defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT <= 0x600) || defined(__MSDOS__) || defined(__DJGPP__))
     {
         try_unlink(u8"uwvm_ut_prl32_upup");
@@ -357,9 +357,9 @@ int main()
                                                                               P_BUF,
                                                                               static_cast<wasi_size_t>(64u),
                                                                               P_USED);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: prl32 Case 9 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: prl32 Case 9 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
 
@@ -462,7 +462,7 @@ int main()
         try_rmdir(u8"prl32_lastprev_a");
     }
 
-    // ===== Case 12: leading "../x" -> eperm =====
+    // ===== Case 12: leading "../x" -> enotcapable =====
     {
         constexpr auto s = u8"../x";
         write_cu8str32(memory, P_PATH0, s);
@@ -473,9 +473,9 @@ int main()
                                                                               P_BUF,
                                                                               static_cast<wasi_size_t>(64u),
                                                                               P_USED);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: prl32 Case 12 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: prl32 Case 12 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
     }
@@ -588,7 +588,7 @@ int main()
         try_unlink(u8"prl32_file_mid");
     }
 
-    // ===== Case 15: middle symlink to absolute path -> eperm =====
+    // ===== Case 15: middle symlink to absolute path -> enotcapable =====
     {
         try_unlink(u8"prl32_abs_mid");
         try
@@ -607,9 +607,9 @@ int main()
                                                                               P_BUF,
                                                                               static_cast<wasi_size_t>(64u),
                                                                               P_USED);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
-            ::fast_io::io::perrln("error: prl32 Case 15 expected eperm. ", static_cast<unsigned>(ret));
+            ::fast_io::io::perrln("error: prl32 Case 15 expected enotcapable. ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
         }
         try_unlink(u8"prl32_abs_mid");

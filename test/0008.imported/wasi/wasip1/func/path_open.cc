@@ -246,7 +246,7 @@ int main()
         }
     }
 
-    // ===== Case 5: absolute path -> eperm =====
+    // ===== Case 5: absolute path -> enotcapable =====
     {
         write_cu8str32(memory, P0, u8"/abs_po32");
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::path_open(env,
@@ -259,7 +259,7 @@ int main()
                                                                           static_cast<rights_t>(0),
                                                                           static_cast<fdflags_t>(0),
                                                                           PFD);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
@@ -306,7 +306,7 @@ int main()
         }
     }
 
-    // ===== Case 7a: final '..' and dirfd path_stack empty -> eperm (dir) =====
+    // ===== Case 7a: final '..' and dirfd path_stack empty -> enotcapable (dir) =====
     {
         write_cu8str32(memory, P0, u8"..");
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::path_open(env,
@@ -319,7 +319,7 @@ int main()
                                                                           static_cast<rights_t>(0),
                                                                           static_cast<fdflags_t>(0),
                                                                           PFD);
-        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(ret != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(ret));
             ::fast_io::fast_terminate();
@@ -744,7 +744,7 @@ int main()
         }
     }
 
-    // ===== Case 19: symlink to absolute path; follow -> eperm; nofollow -> esuccess =====
+    // ===== Case 19: symlink to absolute path; follow -> enotcapable; nofollow -> esuccess =====
     try
     {
         ::fast_io::native_symlinkat(u8"/etc", ::fast_io::at_fdcwd(), u8"po32_absL");
@@ -764,7 +764,7 @@ int main()
                                                                          static_cast<rights_t>(0),
                                                                          static_cast<fdflags_t>(0),
                                                                          PFD);
-        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm)
+        if(r1 != ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable)
         {
             ::fast_io::perrln(static_cast<unsigned>(__LINE__), " ", static_cast<unsigned>(r1));
             ::fast_io::fast_terminate();
