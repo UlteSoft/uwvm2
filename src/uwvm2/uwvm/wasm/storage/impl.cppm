@@ -30,7 +30,6 @@ export import :local_preload;
 export import :preloaded_dl;
 export import :weak_symbol;
 export import :all_module;
-export import :wasi;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

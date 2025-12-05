@@ -33,7 +33,7 @@ export module uwvm2.uwvm.cmdline.params:wasi_disable_utf8_check;
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.cmdline;
-import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.imported.wasi.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

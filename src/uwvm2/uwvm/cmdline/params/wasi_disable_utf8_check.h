@@ -32,7 +32,7 @@
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
-# include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/imported/wasi/storage/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -58,7 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .describe{u8"Disable the UTF-8 check for WASI (All versions), affecting both command-line processing and runtime behavior."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasi_disable_utf8_check_alias), 1uz}},
         .handle{::std::addressof(details::wasi_disable_utf8_check_callback)},
-        .is_exist{::std::addressof(::uwvm2::uwvm::wasm::storage::wasi_disable_utf8_check)},
+        .is_exist{::std::addressof(::uwvm2::uwvm::imported::wasi::storage::wasi_disable_utf8_check)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #if defined(__clang__)
 # pragma clang diagnostic pop

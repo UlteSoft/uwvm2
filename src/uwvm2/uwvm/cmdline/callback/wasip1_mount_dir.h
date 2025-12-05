@@ -47,6 +47,7 @@
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
+# include <uwvm2/uwvm/imported/wasi/storage/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -501,7 +502,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
 
         // During the command line phase, it is preferable to use `wasi_disable_utf8_check` rather than `env.disable_utf8_check`
-        if(!(::uwvm2::uwvm::wasm::storage::wasi_disable_utf8_check || env.disable_utf8_check)) [[likely]]
+        if(!(::uwvm2::uwvm::imported::wasi::storage::wasi_disable_utf8_check || env.disable_utf8_check)) [[likely]]
         {
             // check utf8
             auto const u8res{::uwvm2::utils::utf::check_legal_utf8<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(wasidir.cbegin(),

@@ -43,6 +43,10 @@
 #endif
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
+    ////////////////
+    ///// WASI /////
+    ////////////////
+    
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     inline bool local_preload_wasip1{true};  // [global]

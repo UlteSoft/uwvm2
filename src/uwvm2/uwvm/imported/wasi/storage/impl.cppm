@@ -5,11 +5,9 @@
  *************************************************************/
 
 /**
- * @brief       Imported wasm modules
- * @details     "--wasm-load-wasm" or "-Wlw"
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
+ * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -24,15 +22,8 @@
 
 module;
 
-export module uwvm2.uwvm.wasm.storage:wasi;
-
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.object.memory.linear;
-import uwvm2.imported.wasi;
-import uwvm2.uwvm.wasm.base;
-import uwvm2.uwvm.wasm.feature;
-import uwvm2.uwvm.wasm.type;
+export module uwvm2.uwvm.imported.wasi.storage;
+export import :utf8;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -41,4 +32,4 @@ import uwvm2.uwvm.wasm.type;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "wasi.h"
+#include "impl.h"

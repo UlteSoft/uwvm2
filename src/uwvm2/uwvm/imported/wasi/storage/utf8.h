@@ -5,11 +5,9 @@
  *************************************************************/
 
 /**
- * @brief       Imported wasm modules
- * @details     "--wasm-load-wasm" or "-Wlw"
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
+ * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -25,36 +23,40 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <cstdint>
+# include <type_traits>
+# include <utility>
 // macro
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+#  include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasip1
 # endif
 // import
 # include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include <uwvm2/object/memory/linear/impl.h>
-# include <uwvm2/imported/wasi/impl.h>
-# include <uwvm2/uwvm/wasm/base/impl.h>
-# include <uwvm2/uwvm/wasm/feature/impl.h>
-# include <uwvm2/uwvm/wasm/type/impl.h>
+# include <uwvm2/utils/ansies/impl.h>
+# include <uwvm2/utils/debug/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::storage
 {
-    /// @brief     This differs from the imported options; it is permanently present and used to control all wasi operations simultaneously.
-
     /// @brief     Disable WASI UTF-8 Check
     /// @note      During the command line phase, it is preferable to use `wasi_disable_utf8_check`.
     inline bool wasi_disable_utf8_check{};
-}  // namespace uwvm2::uwvm::wasm::storage
+
+}  // namespace uwvm2::uwvm::imported::wasi::storage
 
 #ifndef UWVM_MODULE
 // macro
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
+#  include <uwvm2/imported/wasi/feature/feature_pop_macro.h>  // wasip1
 # endif
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
 #endif

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
+ * @date        2025-04-01
  * @copyright   APL-2.0 License
  */
 
@@ -20,14 +20,7 @@
  *                                      *
  ****************************************/
 
-#pragma once
+// #pragma once
 
-#ifndef UWVM_MODULE
-# include "mode.h"
-# include "execute_wasm.h"
-# include "preloaded_wasm.h"
-# include "local_preload.h"
-# include "preloaded_dl.h"
-# include "weak_symbol.h"
-# include "all_module.h"
-#endif
+/// @todo add more features here
+#pragma pop_macro("UWVM_IMPORT_WASI")
