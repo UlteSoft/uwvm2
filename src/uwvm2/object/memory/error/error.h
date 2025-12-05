@@ -113,11 +113,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             u8" > ",
                             ::fast_io::mnp::addrvw(memerr.memory_length),
                             u8" (Read ",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                             memerr.memory_type_size,
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8" bytes)\n",
-                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            u8" bytes)\n");
 #endif
     }
 
