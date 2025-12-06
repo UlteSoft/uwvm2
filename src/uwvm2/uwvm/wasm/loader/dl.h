@@ -74,6 +74,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
     {
         if(::uwvm2::uwvm::io::show_untrusted_dl_warning)
         {
+            // We use atomic<bool>::exchange here instead of compare_exchange_xxx because this
+            // is a simple "warn once" flag: we only care whether this thread observes the
+            // previous value as `false`. The flag is always set to `true` regardless of which
+            // thread does it first, so there is no need for CAS semantics. Using exchange()
+            // is both correct and simpler, and relaxed memory order is sufficient because
+            // no synchronization with other state is required.
+
             // show warning
             static ::std::atomic<bool> warned{};  // [global]
 
