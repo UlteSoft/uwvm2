@@ -50,6 +50,35 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 {
+#if !(defined(_WIN32) || defined(__CYGWIN__))
+    namespace posix
+    {
+        extern int raise(int) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("raise")
+# else
+            __asm__("_raise")
+# endif
+                ;
+
+        extern int sigaction(int, struct ::sigaction const*, struct ::sigaction*) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("sigaction")
+# else
+            __asm__("_sigaction")
+# endif
+                ;
+
+        extern void (*signal(int, void (*)(int)))(int) noexcept
+# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("signal")
+# else
+            __asm__("_signal")
+# endif
+                ;
+    }  // namespace posix
+#endif
+
     struct protected_memory_segment_t
     {
         ::std::byte const* begin{};
@@ -68,8 +97,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #if defined(_WIN32) || defined(__CYGWIN__)
             void* vectored_handler_handle{};
 #else
-            ::sigaction previous_sigsegv{};
-            ::sigaction previous_sigbus{};
+            struct ::sigaction previous_sigsegv{};
+            struct ::sigaction previous_sigbus{};
             bool has_previous_sigsegv{};
             bool has_previous_sigbus{};
 #endif
@@ -78,7 +107,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         inline signal_handlers_t signal_handlers{};  // [global]
 
         inline constexpr ::std::uint_least64_t get_memory_length(protected_memory_segment_t const& seg) noexcept
-
         {
             if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::uint_least64_t>(seg.length_p->load(::std::memory_order_acquire)); }
 
@@ -169,103 +197,109 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             }
         }
 
-        inline constexpr void install_protected_memory_segment(protected_memory_segment_t const& seg) noexcept
-        {
-            segments.push_back(seg);
-        }
-
-        inline constexpr void install_protected_memory_segment(protected_memory_segment_t && seg) noexcept
-        {
-            segments.push_back(::std::move(seg));
-        }
 #else
-        inline constexpr void dispatch_previous_handler(int signal, ::siginfo_t* siginfo, void* context, ::sigaction const& previous) noexcept
+        inline constexpr void dispatch_previous_handler(int signal, ::siginfo_t* siginfo, void* context, struct ::sigaction const& previous) noexcept
         {
             if(previous.sa_flags & SA_SIGINFO)
             {
-                if(previous.sa_sigaction == SIG_DFL)
+                if(reinterpret_cast<void*>(previous.sa_sigaction) == reinterpret_cast<void*>(SIG_DFL))
                 {
-                    ::signal(signal, SIG_DFL);
-                    ::raise(signal);
+                    posix::signal(signal, SIG_DFL);
+                    posix::raise(signal);
                     return;
                 }
 
-                if(previous.sa_sigaction == SIG_IGN) { return; }
+                if(reinterpret_cast<void*>(previous.sa_sigaction) == reinterpret_cast<void*>(SIG_IGN)) { return; }
 
                 previous.sa_sigaction(signal, siginfo, context);
                 return;
             }
 
-            if(previous.sa_handler == SIG_DFL)
+            if(reinterpret_cast<void*>(previous.sa_handler) == reinterpret_cast<void*>(SIG_DFL))
             {
-                ::signal(signal, SIG_DFL);
-                ::raise(signal);
+                posix::signal(signal, SIG_DFL);
+                posix::raise(signal);
                 return;
             }
 
-            if(previous.sa_handler == SIG_IGN) { return; }
+            if(reinterpret_cast<void*>(previous.sa_handler) == reinterpret_cast<void*>(SIG_IGN)) { return; }
 
             previous.sa_handler(signal);
         }
 
-        inline void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
+        inline constexpr void posix_signal_handler(int signal, ::siginfo_t* siginfo, void* context) noexcept
         {
             auto const fault_addr{siginfo == nullptr ? nullptr : reinterpret_cast<::std::byte const*>(siginfo->si_addr)};
 
             if(handle_fault_address(fault_addr)) { return; }
 
-            if(signal == SIGSEGV && has_previous_sigsegv)
+            if(signal == SIGSEGV && signal_handlers.has_previous_sigsegv)
             {
-                dispatch_previous_handler(signal, siginfo, context, previous_sigsegv);
+                dispatch_previous_handler(signal, siginfo, context, signal_handlers.previous_sigsegv);
                 return;
             }
 
 # ifdef SIGBUS
-            if(signal == SIGBUS && has_previous_sigbus)
+            if(signal == SIGBUS && signal_handlers.has_previous_sigbus)
             {
-                dispatch_previous_handler(signal, siginfo, context, previous_sigbus);
+                dispatch_previous_handler(signal, siginfo, context, signal_handlers.previous_sigbus);
                 return;
             }
 # endif
 
-            ::signal(signal, SIG_DFL);
-            ::raise(signal);
+            posix::signal(signal, SIG_DFL);
+            posix::raise(signal);
         }
 
         inline void install_signal_handler() noexcept
         {
+            static ::std::atomic_bool signal_installed{};  // [global]
+
             bool expected{false};
             if(!signal_installed.compare_exchange_strong(expected, true, ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { return; }
 
-            ::sigaction act{};
+            struct ::sigaction act{};
             act.sa_sigaction = posix_signal_handler;
-            ::sigemptyset(::std::addressof(act.sa_mask));
+            sigemptyset(::std::addressof(act.sa_mask));
             act.sa_flags = SA_SIGINFO;
 
-            if(::sigaction(SIGSEGV, ::std::addressof(act), ::std::addressof(previous_sigsegv)) != 0) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-            has_previous_sigsegv = true;
+            if(posix::sigaction(SIGSEGV, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigsegv)) != 0) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            signal_handlers.has_previous_sigsegv = true;
 
 # ifdef SIGBUS
-            if(::sigaction(SIGBUS, ::std::addressof(act), ::std::addressof(previous_sigbus)) != 0) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-            has_previous_sigbus = true;
+            if(posix::sigaction(SIGBUS, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigbus)) != 0) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            signal_handlers.has_previous_sigbus = true;
 # endif
         }
 #endif
     }  // namespace detail
 
-    inline void register_protected_segment(::std::byte const* begin,
-                                           ::std::byte const* end,
-                                           ::std::atomic_size_t const* length_p = nullptr,
-                                           ::std::size_t memory_idx = 0uz,
-                                           ::std::uint_least64_t memory_static_offset = 0u) noexcept
+    /// @note       Protected memory segments are expected to be registered during VM/module initialization,
+    ///             before any guest code that may trigger memory access violations is executed. After
+    ///             initialization, the set of segments is treated as structurally immutable (only the
+    ///             dynamic length, when provided via @p length_p, may change), and no further calls to
+    ///             register_protected_segment, unregister_protected_segment, or clear_protected_segments
+    ///             are performed. This design ensures that the signal/exception handler can traverse the
+    ///             global segments container without additional synchronization, as there are no
+    ///             concurrent structural modifications.
+    
+    inline constexpr void register_protected_segment(::std::byte const* begin,
+                                                     ::std::byte const* end,
+                                                     ::std::atomic_size_t const* length_p = nullptr,
+                                                     ::std::size_t memory_idx = 0uz,
+                                                     ::std::uint_least64_t memory_static_offset = 0u) noexcept
     {
         if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         detail::install_signal_handler();
 
-        auto& segments{detail::tracked_segments()};
+        auto& segments{detail::segments};
 
 #ifdef UWVM_CPP_EXCEPTIONS
         try
@@ -281,11 +315,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 #endif
     }
 
-    inline void unregister_protected_segment(::std::byte const* begin, ::std::byte const* end) noexcept
+    inline constexpr void unregister_protected_segment(::std::byte const* begin, ::std::byte const* end) noexcept
     {
         if(begin == nullptr || end == nullptr) [[unlikely]] { return; }
 
-        auto& segments{detail::tracked_segments()};
+        auto& segments{detail::segments};
         for(auto it{segments.begin()}; it != segments.end(); ++it)
         {
             if(it->begin == begin && it->end == end)
@@ -296,7 +330,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
     }
 
-    inline void clear_protected_segments() noexcept { detail::tracked_segments().clear(); }
+    inline constexpr void clear_protected_segments() noexcept { detail::segments.clear(); }
 
 }  // namespace uwvm2::object::memory::signal
 
