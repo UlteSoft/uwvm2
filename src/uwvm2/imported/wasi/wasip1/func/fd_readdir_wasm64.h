@@ -36,6 +36,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if !defined(_WIN32)
 #  include <errno.h>
@@ -65,6 +66,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
@@ -97,20 +100,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::dircookie_wasm64_t cookie,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t buf_used_ptrsz) noexcept
     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
         {
             // Security issues inherent to virtual machines
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
         }
-#endif
+# endif
         auto& memory{*env.wasip1_memory};
 
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -145,7 +148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_readdir_wasm64(",
                                 fd,
@@ -158,7 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 ::fast_io::mnp::addrvw(buf_used_ptrsz),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
@@ -209,13 +212,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Lock before releasing fds_rwlock
             curr_fd_release_guard.device_p = ::std::addressof(curr_wasi_fd_t_p->fd_mutex);
@@ -249,9 +252,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
@@ -270,18 +273,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 break;
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
         }
@@ -294,9 +297,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_dir_stack_entry.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
@@ -317,9 +320,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         [[maybe_unused]] auto const& curr_fd_native_file{curr_dir_io_observer};
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
         // For winnt, you must first exclude non-directory files.
-# ifndef _WIN32_WINDOWS
+#  ifndef _WIN32_WINDOWS
         ::fast_io::win32::nt::file_basic_information fbi;
         ::fast_io::win32::nt::io_status_block isb;
 
@@ -336,9 +339,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         {
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
         }
-# endif
+#  endif
         // Win9x uses pathname emulation, so you can tell directly.
-#else
+# else
         struct ::stat stbuf;  // no initialize
         if(::uwvm2::imported::wasi::wasip1::func::posix::fstat(curr_fd_native_file.native_handle(), ::std::addressof(stbuf)) != 0) [[unlikely]]
         {
@@ -346,7 +349,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         if(!S_ISDIR(stbuf.st_mode)) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
-#endif
+# endif
 
         // Exclude dot, primarily exclude .., because during the process of opening an FD, other processes can move the FD to any position (Windows
         // requires setting the FILE_SHARED_WRITE flag to enable this). At this point, .. cannot be trusted. Naturally, we maintain a directory stack.
@@ -359,19 +362,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             auto d_ino{static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_wasm64_t>(0u)};
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
             try
-#endif
+# endif
             {
                 auto const& curr_file{curr_fd_native_file};
                 ::fast_io::posix_file_status curr_fd_status{status(curr_file)};
                 d_ino = static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_wasm64_t>(curr_fd_status.ino);
             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
             {
             }
-#endif
+# endif
 
             if(dircookie_counter < underlying_dircookie)
             {
@@ -464,9 +467,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(privous_dir_stack_entry.ptr == nullptr) [[unlikely]]
                 {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                 }
 
@@ -487,19 +490,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 auto const& privous_fd_native_file{privous_dir_io_observer};
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                 try
-#endif
+# endif
                 {
                     auto const& privous_file{privous_fd_native_file};
                     ::fast_io::posix_file_status privous_fd_status{status(privous_file)};
                     d_ino = static_cast<::uwvm2::imported::wasi::wasip1::abi::inode_wasm64_t>(privous_fd_status.ino);
                 }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error)
                 {
                 }
-#endif
+# endif
             }
 
             if(dircookie_counter < underlying_dircookie)
@@ -579,9 +582,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
     files:
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         try
-#endif
+# endif
         {
             for(auto const& ent: current(at(curr_fd_native_file)))
             {
@@ -681,9 +684,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     [[unlikely]] default:
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
 
                         d_type = ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t::filetype_unknown;
                         break;
@@ -792,13 +795,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 ++dircookie_counter;
             }
         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
         {
             // Exceptions may only be thrown when acquiring the iterator. In such cases, write directly to `all_byte` and then return.
             // WASI Semantic Specification: For a valid directory file descriptor, `fd_readdir` should not return an error.
         }
-#endif
+# endif
 
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(
             memory,
@@ -809,8 +812,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

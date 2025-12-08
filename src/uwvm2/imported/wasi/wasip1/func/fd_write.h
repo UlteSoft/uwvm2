@@ -37,6 +37,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if !UWVM_HAS_BUILTIN(__builtin_alloca) && (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__))
 #  include <malloc.h>
@@ -71,6 +72,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifdef UWVM_IMPORT_WASI_WASIP1
+
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_write
@@ -82,20 +85,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t iovs_len,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t nwritten) noexcept
     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
         {
             // Security issues inherent to virtual machines
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
         }
-#endif
+# endif
         auto& memory{*env.wasip1_memory};
 
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -126,7 +129,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_write(",
                                 fd,
@@ -137,7 +140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 ::fast_io::mnp::addrvw(nwritten),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
@@ -192,13 +195,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -281,19 +284,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             auto scatter_alloca_guaranteed_bytes_count{scatter_length * sizeof(::fast_io::io_scatter_t)};
             auto scatter_alloca_bytes_count{scatter_alloca_guaranteed_bytes_count + (alignof(::fast_io::io_scatter_t) - 1uz)};
 
-#if UWVM_HAS_BUILTIN(__builtin_alloca)
+# if UWVM_HAS_BUILTIN(__builtin_alloca)
             auto tmp_scatter_base_unaligned{__builtin_alloca(scatter_alloca_bytes_count)};
             scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
                 ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
-#elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
+# elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
             auto tmp_scatter_base_unaligned{_alloca(scatter_alloca_bytes_count)};
             scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
                 ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
-#else
+# else
             auto tmp_scatter_base_unaligned{alloca(scatter_alloca_bytes_count)};
             scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
                 ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
-#endif
+# endif
 
             // std::align may return nullptr
             if(scatter_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -389,16 +392,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 curr_tmp_scatter_base.len = static_cast<::std::size_t>(wasm_len);
 
-#if CHAR_BIT != 8
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if CHAR_BIT != 8
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 auto const curr_tmp_scatter_base_base{reinterpret_cast<::std::byte const*>(curr_tmp_scatter_base.base)};
                 auto const curr_tmp_scatter_base_end{curr_tmp_scatter_base_base + curr_tmp_scatter_base.len};
                 for(auto curr{curr_tmp_scatter_base_base}; curr != curr_tmp_scatter_base_end; ++curr)
                 {
                     if(::std::to_integer<unsigned>(*curr) & ~0xFFu != 0u) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                 }
+#  endif
 # endif
-#endif
             }
 
             // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
@@ -406,9 +409,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
             {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
 
@@ -433,26 +436,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     else
                     {
                         auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                             curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
+# else
                             curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
+# endif
                         };
                         curr_fd_native_observer = file_fd;
                     }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                     // win32
                     ::fast_io::io_scatter_status_t scatter_status;  // no initialize
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     try
-# endif
+#  endif
                     {
                         scatter_status = ::fast_io::operations::scatter_write_some_bytes(curr_fd_native_observer, scatter_base, scatter_length);
                     }
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error e)
                     {
                         switch(e.domain)
@@ -506,7 +509,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 break;
                             }
-#  if !defined(_WIN32_WINDOWS)
+#   if !defined(_WIN32_WINDOWS)
                             case ::fast_io::nt_domain_value:
                             {
                                 static_assert(sizeof(::fast_io::error::value_type) >= sizeof(::std::uint_least32_t));
@@ -573,22 +576,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 break;
                             }
-#  endif
+#   endif
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 // Security issues inherent to virtual machines
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             }
                         }
                     }
-# endif
+#  endif
 
                     total_bytes_write = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
 
-#else
+# else
                     // posix
 
                     // Reading or writing a directory file is undefined behavior on POSIX systems. Here, it uniformly returns `isdir`.
@@ -601,13 +604,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::fast_io::io_scatter_status_t scatter_status;  // no initialize
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     try
-# endif
+#  endif
                     {
                         scatter_status = ::fast_io::operations::scatter_write_some_bytes(curr_fd_native_observer, scatter_base, scatter_length);
                     }
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error e)
                     {
                         switch(e.code)
@@ -622,21 +625,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                             case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                             case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#  if defined(EDQUOT)
+#   if defined(EDQUOT)
                             case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
-#  endif
+#   endif
                             case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-#  if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
+#   if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
                             case EWOULDBLOCK: [[fallthrough]];
-#  endif
+#   endif
                             case EAGAIN: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
                             case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                             case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-#  if defined(ENOTSUP)
+#   endif
+#   if defined(ENOTSUP)
                             case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
+#   endif
                             case EFAULT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
                             case ENXIO: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enxio;
                             case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
@@ -645,22 +648,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             case EIO: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             case ENOMEM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enomem;
                             case EOVERFLOW: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-#  if defined(ETIMEDOUT)
+#   if defined(ETIMEDOUT)
                             case ETIMEDOUT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::etimedout;
-#  endif
-#  if defined(ECONNRESET)
+#   endif
+#   if defined(ECONNRESET)
                             case ECONNRESET: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnreset;
-#  endif
-#  if defined(EPIPE)
+#   endif
+#   if defined(EPIPE)
                             case EPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::epipe;
-#  endif
+#   endif
                             default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                         }
                     }
-# endif
+#  endif
 
                     total_bytes_write = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
-#endif
+# endif
 
                     break;
                 }
@@ -668,7 +671,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                 }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                 case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
                 case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
                 {
@@ -690,18 +693,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::fast_io::io_scatter_status_t scatter_status;  // no initialize
 
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     try
-# endif
+#  endif
                     {
                         scatter_status = ::fast_io::operations::scatter_write_some_bytes(curr_socket_observer, scatter_base, scatter_length);
                     }
-# ifdef UWVM_CPP_EXCEPTIONS
+#  ifdef UWVM_CPP_EXCEPTIONS
                     catch(::fast_io::error e)
                     {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(e.domain != ::fast_io::win32_domain_value) { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
                         switch(e.code)
                         {
                             // Winsock (WSA*) error codes mapping
@@ -767,18 +770,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                         }
                     }
-# endif
+#  endif
 
                     total_bytes_write = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
 
                     break;
                 }
-#endif
+# endif
                 [[unlikely]] default:
                 {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
             }
@@ -803,8 +806,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

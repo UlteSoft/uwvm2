@@ -35,6 +35,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
@@ -58,6 +59,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifdef UWVM_IMPORT_WASI_WASIP1
+
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.fd_prestat_dir_name
@@ -68,20 +71,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t path,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t path_len) noexcept
     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
         {
             // Security issues inherent to virtual machines
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
         }
-#endif
+# endif
         auto& memory{*env.wasip1_memory};
 
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -108,7 +111,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_prestat_dir_name(",
                                 fd,
@@ -117,7 +120,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 path_len,
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
@@ -172,13 +175,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -205,9 +208,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
@@ -226,18 +229,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 break;
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotdir;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
@@ -257,9 +260,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(preloaded_dir_ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
@@ -276,8 +279,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

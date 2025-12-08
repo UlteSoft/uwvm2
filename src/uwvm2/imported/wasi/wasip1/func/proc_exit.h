@@ -37,6 +37,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -61,6 +62,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifdef UWVM_IMPORT_WASI_WASIP1
+
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.proc_exit
@@ -75,14 +78,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
         else
         {
-#if defined(__linux__)
+# if defined(__linux__)
             ::fast_io::fast_exit(static_cast<int>(code));
-#elif defined(_WIN32)
+# elif defined(_WIN32)
             // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
             ::fast_io::win32::ExitProcess(static_cast<::std::uint_least32_t>(code));
-#else
+# else
             ::uwvm2::imported::wasi::wasip1::func::posix::exit(static_cast<int>(code));
-#endif
+# endif
         }
     }
 
@@ -93,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -112,20 +115,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: proc_exit(",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(code)>>>(code),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         proc_exit_impl(env, code);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

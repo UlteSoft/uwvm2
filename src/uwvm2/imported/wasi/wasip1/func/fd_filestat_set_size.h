@@ -36,6 +36,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #  include <unistd.h>
@@ -63,6 +64,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
@@ -126,13 +129,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing fdstat_get, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -164,9 +167,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
@@ -192,16 +195,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else
                 {
                     auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                         curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
+# else
                         curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
+# endif
                     };
                     curr_fd_native_observer = file_fd;
                 }
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                 auto const& curr_fd_native_file{curr_fd_native_observer};
 
                 try
@@ -236,7 +239,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             }
                         }
-# if !defined(_WIN32_WINDOWS)
+#  if !defined(_WIN32_WINDOWS)
                         case ::fast_io::nt_domain_value:
                         {
                             static_assert(sizeof(::fast_io::error::value_type) >= sizeof(::std::uint_least32_t));
@@ -260,19 +263,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                             }
                         }
-# endif
+#  endif
                         [[unlikely]] default:
                         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             // Security issues inherent to virtual machines
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
+#  endif
                             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                         }
                     }
                 }
 
-#else
+# else
                 auto const& curr_fd_native_file{curr_fd_native_observer};
 
                 try
@@ -293,25 +296,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                         case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                         case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-# if defined(EDQUOT)
+#  if defined(EDQUOT)
                         case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
-# endif
+#  endif
                         case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-# if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
+#  if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
                         case EWOULDBLOCK: [[fallthrough]];
-# endif
+#  endif
                         case EAGAIN: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
                         case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                         case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-# endif
-# if defined(ENOTSUP)
+#  endif
+#  if defined(ENOTSUP)
                         case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-# endif
+#  endif
                         default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                     }
                 }
-#endif
+# endif
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
@@ -319,18 +322,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
@@ -347,7 +350,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -370,22 +373,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_filestat_set_size(",
                                 fd,
                                 u8", ",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(size)>>>(size),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         return fd_filestat_set_size_base(env, fd, size);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

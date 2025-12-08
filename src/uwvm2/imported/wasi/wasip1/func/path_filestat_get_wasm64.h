@@ -37,6 +37,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #  include <unistd.h>
@@ -69,6 +70,8 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#ifdef UWVM_IMPORT_WASI_WASIP1
+
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
     /// @brief     WasiPreview1.path_filestat_get
@@ -83,20 +86,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t path_len,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t buf_ptrsz) noexcept
     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
         {
             // Security issues inherent to virtual machines
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
         }
-#endif
+# endif
         auto& memory{*env.wasip1_memory};
 
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -131,7 +134,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: path_filestat_get(",
                                 fd,
@@ -144,7 +147,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 ::fast_io::mnp::addrvw(buf_ptrsz),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
@@ -199,13 +202,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing fdatasync, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -236,9 +239,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
@@ -257,18 +260,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 break;
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
         }
@@ -281,9 +284,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_dir_stack_entry.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
@@ -369,7 +372,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(split_path_res.is_absolute) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
         if(split_path_res.res.empty()) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval; }
 
-#if (defined(_WIN32) || defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__))
+# if (defined(_WIN32) || defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__))
         // For the Windows API, the parsing strategy differs from POSIX. Windows supports the backslash as a delimiter while rejecting many characters.
         // This only eliminates the possibility of multi-level paths; the remaining issue of invalid filenames is handled by the API.
         for(auto const& split_curr: split_path_res.res)
@@ -387,7 +390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
             }
         }
-#endif
+# endif
 
         ::uwvm2::utils::container::vector<::fast_io::dir_file> path_stack{};
         path_stack.reserve(split_path_res.res.size());
@@ -407,33 +410,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         if(path_stack.empty())
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 open_file_status = ::fast_io::status(curr_fd_native_file);
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                             }
-#endif
+# endif
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 open_file_status = ::fast_io::status(path_stack.back_unchecked());
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                             }
-#endif
+# endif
                         }
 
                         break;
@@ -444,33 +447,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         if(path_stack_size == 0uz) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable; }
                         else if(path_stack_size == 1uz)
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 open_file_status = ::fast_io::status(curr_fd_native_file);
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                             }
-#endif
+# endif
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 open_file_status = ::fast_io::status(path_stack.index_unchecked(path_stack_size - 2uz));
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                             }
-#endif
+# endif
                         }
 
                         break;
@@ -484,19 +487,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(path_stack.empty())
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 // readlinkat is symlink_nofollow
                                 symlink_symbol = ::fast_io::native_readlinkat<char8_t>(at(curr_fd_native_file), next_name);
                                 is_symlink = true;
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                             }
-#endif
+# endif
 
                             if(is_symlink)
                             {
@@ -509,46 +512,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     // path_stack is always empty
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                     try
-#endif
+# endif
                                     {
                                         // native_fstatat is default follow, need symlink_nofollow flag
                                         open_file_status =
                                             ::fast_io::native_fstatat(at(curr_fd_native_file), open_file_name, ::fast_io::native_at_flags::symlink_nofollow);
                                     }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                     catch(::fast_io::error e)
                                     {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                         // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                         if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                         {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                             try
-#  endif
+#   endif
                                             {
                                                 // default is nofollow
                                                 ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
                                                 open_file_status = ::fast_io::status(tmp_dir_file);
                                             }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                             catch(::fast_io::error)
                                             {
                                                 // Use external error
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-#  endif
+#   endif
                                         }
                                         else
                                         {
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
-# else
+#  else
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                     }
-#endif
+# endif
                                 }
                                 else
                                 {
@@ -569,91 +572,91 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     if(path_stack.empty())
                                     {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#endif
+# endif
                                         {
                                             // native_fstatat is default follow, need symlink_nofollow flag
                                             open_file_status = ::fast_io::native_fstatat(at(curr_fd_native_file),
                                                                                          open_file_name,
                                                                                          ::fast_io::native_at_flags::symlink_nofollow);
                                         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                             // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                             if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                             {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 try
-#  endif
+#   endif
                                                 {
                                                     // default is nofollow
                                                     ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
                                                     open_file_status = ::fast_io::status(tmp_dir_file);
                                                 }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error)
                                                 {
                                                     // Use external error
                                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                                 }
-#  endif
+#   endif
                                             }
                                             else
                                             {
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-# else
+#  else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                         }
-#endif
+# endif
                                     }
                                     else
                                     {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#endif
+# endif
                                         {
                                             // native_fstatat is default follow, need symlink_nofollow flag
                                             open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
                                                                                          open_file_name,
                                                                                          ::fast_io::native_at_flags::symlink_nofollow);
                                         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                             // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                             if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                             {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 try
-#  endif
+#   endif
                                                 {
                                                     // default is nofollow
                                                     ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
                                                     open_file_status = ::fast_io::status(tmp_dir_file);
                                                 }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error)
                                                 {
                                                     // Use external error
                                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                                 }
-#  endif
+#   endif
                                             }
                                             else
                                             {
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-# else
+#  else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                         }
-#endif
+# endif
                                     }
                                 }
                             }
@@ -663,63 +666,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 // path_stack is always empty
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 try
-#endif
+# endif
                                 {
                                     // native_fstatat is default follow, need symlink_nofollow flag
                                     open_file_status =
                                         ::fast_io::native_fstatat(at(curr_fd_native_file), open_file_name, ::fast_io::native_at_flags::symlink_nofollow);
                                 }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                     // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                     if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                     {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#  endif
+#   endif
                                         {
                                             // default is nofollow
                                             ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
                                             open_file_status = ::fast_io::status(tmp_dir_file);
                                         }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error)
                                         {
                                             // Use external error
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
-#  endif
+#   endif
                                     }
                                     else
                                     {
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                     }
-# else
+#  else
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                 }
-#endif
+# endif
                             }
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 // readlinkat is symlink_nofollow
                                 symlink_symbol = ::fast_io::native_readlinkat<char8_t>(at(path_stack.back_unchecked()), next_name);
                                 is_symlink = true;
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                             }
-#endif
+# endif
 
                             if(is_symlink)
                             {
@@ -731,47 +734,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     // path_stack is not empty
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                     try
-#endif
+# endif
                                     {
                                         // native_fstatat is default follow, need symlink_nofollow flag
                                         open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
                                                                                      open_file_name,
                                                                                      ::fast_io::native_at_flags::symlink_nofollow);
                                     }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                     catch(::fast_io::error e)
                                     {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                         // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                         if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                         {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                             try
-#  endif
+#   endif
                                             {
                                                 // default is nofollow
                                                 ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
                                                 open_file_status = ::fast_io::status(tmp_dir_file);
                                             }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                             catch(::fast_io::error)
                                             {
                                                 // Use external error
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-#  endif
+#   endif
                                         }
                                         else
                                         {
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
-# else
+#  else
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                     }
-#endif
+# endif
                                 }
                                 else
                                 {
@@ -792,91 +795,91 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     if(path_stack.empty())
                                     {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#endif
+# endif
                                         {
                                             // native_fstatat is default follow, need symlink_nofollow flag
                                             open_file_status = ::fast_io::native_fstatat(at(curr_fd_native_file),
                                                                                          open_file_name,
                                                                                          ::fast_io::native_at_flags::symlink_nofollow);
                                         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                             // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                             if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                             {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 try
-#  endif
+#   endif
                                                 {
                                                     // default is nofollow
                                                     ::fast_io::dir_file tmp_dir_file{at(curr_fd_native_file), open_file_name};
                                                     open_file_status = ::fast_io::status(tmp_dir_file);
                                                 }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error)
                                                 {
                                                     // Use external error
                                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                                 }
-#  endif
+#   endif
                                             }
                                             else
                                             {
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-# else
+#  else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                         }
-#endif
+# endif
                                     }
                                     else
                                     {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#endif
+# endif
                                         {
                                             // native_fstatat is default follow, need symlink_nofollow flag
                                             open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
                                                                                          open_file_name,
                                                                                          ::fast_io::native_at_flags::symlink_nofollow);
                                         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                             // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                             if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                             {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 try
-#  endif
+#   endif
                                                 {
                                                     // default is nofollow
                                                     ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
                                                     open_file_status = ::fast_io::status(tmp_dir_file);
                                                 }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                                 catch(::fast_io::error)
                                                 {
                                                     // Use external error
                                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                                 }
-#  endif
+#   endif
                                             }
                                             else
                                             {
                                                 return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                             }
-# else
+#  else
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                         }
-#endif
+# endif
                                     }
                                 }
                             }
@@ -886,47 +889,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                 // path_stack is not empty
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 try
-#endif
+# endif
                                 {
                                     // native_fstatat is default follow, need symlink_nofollow flag
                                     open_file_status = ::fast_io::native_fstatat(at(path_stack.back_unchecked()),
                                                                                  open_file_name,
                                                                                  ::fast_io::native_at_flags::symlink_nofollow);
                                 }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                     // Windows 9x distinguishes between directory and file operations while attempting directory operations.
                                     if(e.code == 5uz /*ERROR_ACCESS_DENIED*/)
                                     {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#  endif
+#   endif
                                         {
                                             // default is nofollow
                                             ::fast_io::dir_file tmp_dir_file{at(path_stack.back_unchecked()), open_file_name};
                                             open_file_status = ::fast_io::status(tmp_dir_file);
                                         }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error)
                                         {
                                             // Use external error
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
-#  endif
+#   endif
                                     }
                                     else
                                     {
                                         return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                     }
-# else
+#  else
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-# endif
+#  endif
                                 }
-#endif
+# endif
                             }
                         }
 
@@ -934,9 +937,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     [[unlikely]] default:
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::std::unreachable();
                     }
                 }
@@ -970,19 +973,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(path_stack.empty())
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 // readlinkat is symlink_nofollow
                                 symlink_symbol = ::fast_io::native_readlinkat<char8_t>(at(curr_fd_native_file), next_name);
                                 is_symlink = true;
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                             }
-#endif
+# endif
 
                             if(is_symlink)
                             {
@@ -998,9 +1001,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             else
                             {
                                 ::fast_io::dir_file next{};
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 try
-#endif
+# endif
                                 {
                                     // default is symlink_nofollow
                                     next = ::fast_io::dir_file{at(curr_fd_native_file), next_name};
@@ -1009,7 +1012,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // directory. However, under the current fast_io strategy, `dir_file` does not utilize `CreateFileW`.
                                     // Instead, it employs `NTCreateFile` on NT systems and `FindNextFile` on Win9x systems.
 
-#if defined(__CYGWIN__)
+# if defined(__CYGWIN__)
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
@@ -1018,60 +1021,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                                     }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
-#elif defined(__MSDOS__) || defined(__DJGPP__)
+# elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
                                     ::fast_io::details::check_dos_fd_is_dir(next.native_handle());
-#endif
+# endif
                                 }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
                                     // Windows 9x can only distinguish between a directory and other items (files or nothing at all).
 
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                     if(e.code == 2uz /*ERROR_FILE_NOT_FOUND*/) [[unlikely]]
                                     {
                                         bool is_file{};
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#  endif
+#   endif
                                         {
                                             // native_file default nofollow
                                             ::fast_io::native_file{at(curr_fd_native_file), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
                                         }
-#  endif
+#   endif
                                         if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
-# endif
+#  endif
 
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                 }
-#endif
+# endif
 
                                 path_stack.push_back(::std::move(next));
                             }
                         }
                         else
                         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             try
-#endif
+# endif
                             {
                                 // readlinkat is symlink_nofollow
                                 symlink_symbol = ::fast_io::native_readlinkat<char8_t>(at(path_stack.back_unchecked()), next_name);
                                 is_symlink = true;
                             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                             catch(::fast_io::error e)
                             {
                             }
-#endif
+# endif
 
                             if(is_symlink)
                             {
@@ -1087,9 +1090,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             else
                             {
                                 ::fast_io::dir_file next{};
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 try
-#endif
+# endif
                                 {
                                     // default is symlink_nofollow
                                     next = ::fast_io::dir_file{at(path_stack.back_unchecked()), next_name};
@@ -1098,7 +1101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                     // directory. However, under the current fast_io strategy, `dir_file` does not utilize `CreateFileW`.
                                     // Instead, it employs `NTCreateFile` on NT systems and `FindNextFile` on Win9x systems.
 
-#if defined(__CYGWIN__)
+# if defined(__CYGWIN__)
                                     // Cygwin uses the Win32 CreateFile function internally to open directories, allowing both directories and files to be
                                     // opened simultaneously. A check must be added here.
                                     struct ::stat st;
@@ -1107,41 +1110,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                                     }
                                     if(!S_ISDIR(st.st_mode)) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
-#elif defined(__MSDOS__) || defined(__DJGPP__)
+# elif defined(__MSDOS__) || defined(__DJGPP__)
                                     // djgpp's `open` function does not distinguish between directories and files; manual differentiation is
                                     // required.
                                     ::fast_io::details::check_dos_fd_is_dir(next.native_handle());
-#endif
+# endif
                                 }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                                 catch(::fast_io::error e)
                                 {
                                     // Windows 9x can only distinguish between a directory and other items (files or nothing at all).
 
-# if defined(_WIN32) && defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && defined(_WIN32_WINDOWS)
                                     if(e.code == 2uz /*ERROR_FILE_NOT_FOUND*/) [[unlikely]]
                                     {
                                         bool is_file{};
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         try
-#  endif
+#   endif
                                         {
                                             // native_file default nofollow
                                             ::fast_io::native_file{at(path_stack.back_unchecked()), next_name, ::fast_io::open_mode::in};
                                             is_file = true;
                                         }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
                                         catch(::fast_io::error e)
                                         {
                                         }
-#  endif
+#   endif
                                         if(is_file) { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotdir; }
                                     }
-# endif
+#  endif
 
                                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                 }
-#endif
+# endif
 
                                 path_stack.push_back(::std::move(next));
                             }
@@ -1151,9 +1154,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     [[unlikely]] default:
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::std::unreachable();
                     }
                 }
@@ -1296,8 +1299,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif

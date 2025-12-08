@@ -35,6 +35,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if !defined(_WIN32)
 #  include <errno.h>
@@ -86,6 +87,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
@@ -210,13 +213,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t nsubscriptions,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t nevents) noexcept
     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
         {
             // Security issues inherent to virtual machines
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
         }
-#endif
+# endif
 
         auto& memory{*env.wasip1_memory};
 
@@ -224,7 +227,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -256,7 +259,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8"(wasi-trace)",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 u8"\n");
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: poll_oneoff_wasm64(",
                                 ::fast_io::mnp::addrvw(in),
@@ -267,7 +270,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 ::fast_io::mnp::addrvw(nevents),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         // Early exit: zero subscriptions -> zero events.
@@ -487,18 +490,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 ::fast_io::unix_timestamp ts;
-#if defined(UWVM_CPP_EXCEPTIONS)
+# if defined(UWVM_CPP_EXCEPTIONS)
                 try
-#endif
+# endif
                 {
                     ts = ::fast_io::posix_clock_gettime(posix_id);
                 }
-#if defined(UWVM_CPP_EXCEPTIONS)
+# if defined(UWVM_CPP_EXCEPTIONS)
                 catch(::fast_io::error)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                 }
-#endif
+# endif
 
                 constexpr timestamp_integral_t mul_factor{static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
 
@@ -656,13 +659,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
 
                 // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
                     {
                         // Security issues inherent to virtual machines
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
                     }
-#endif
+# endif
 
                     // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd
                     // vector). If the current thread is performing fdatasync, no other thread can be executing any close operations
@@ -768,22 +771,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ++produced;
                 }};
 
-#if defined(__linux__)
+# if defined(__linux__)
             // linux
 
-# if (defined(__NR_epoll_create1) || defined(__NR_epoll_create)) && defined(__NR_epoll_ctl) && defined(__NR_timerfd_create) &&                                 \
-     defined(__NR_timerfd_settime) && defined(__NR_epoll_wait)
+#  if (defined(__NR_epoll_create1) || defined(__NR_epoll_create)) && defined(__NR_epoll_ctl) && defined(__NR_timerfd_create) &&                                \
+      defined(__NR_timerfd_settime) && defined(__NR_epoll_wait)
             // syscall __NR_epoll_create1 or __NR_epoll_create, __NR_epoll_ctl, __NR_timerfd_create, __NR_timerfd_settime, __NR_epoll_wait
 
             ::uwvm2::utils::container::vector<::fast_io::posix_file> fds{};  // RAII Close
             bool has_epoll_interest{};
 
             int const epfd{
-#  if defined(__NR_epoll_create1)
+#   if defined(__NR_epoll_create1)
                 ::fast_io::system_call<__NR_epoll_create1, int>(EPOLL_CLOEXEC)
-#  else
+#   else
                 ::fast_io::system_call<__NR_epoll_create, int>(1)
-#  endif
+#   endif
             };
 
             if(::fast_io::linux_system_call_fails(epfd)) [[unlikely]]
@@ -839,9 +842,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
 // This will be checked at runtime.
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -865,9 +868,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -978,18 +981,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t mul_factor{
                                 static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -1156,9 +1159,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto const sub_p{static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_wasm64_t const*>(e.data.ptr)};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                     auto const sub_tag{sub_p->u.tag};
 
@@ -1245,7 +1248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
 
-# elif defined(__NR_poll)
+#  elif defined(__NR_poll)
 
             // syscall __NR_poll
 
@@ -1297,9 +1300,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -1323,9 +1326,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -1402,18 +1405,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t mul_factor{
                                 static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -1584,9 +1587,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto const sub_p{*sub_curr};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                     evt.userdata = sub_p->userdata;
                     evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
@@ -1606,7 +1609,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         bool have_nbytes{};
 
-#  if defined(__NR_ioctl)
+#   if defined(__NR_ioctl)
                         int avail{};
 
                         if(::fast_io::system_call<__NR_ioctl, int>(pfd.fd, FIONREAD, ::std::addressof(avail)) == 0 && avail > 0)
@@ -1617,7 +1620,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 static_cast<::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t>(static_cast<unsigned_int_t>(avail));
                             have_nbytes = true;
                         }
-#  endif
+#   endif
 
                         if(!have_nbytes)
                         {
@@ -1701,9 +1704,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             auto const sub_p{ce.sub};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                             auto const clock_flags{sub_p->u.u.clock.flags};
                             bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_wasm64_t::subscription_clock_abstime) ==
@@ -1747,18 +1750,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 ::fast_io::unix_timestamp ts2;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                                 try
-#  endif
+#   endif
                                 {
                                     ts2 = ::fast_io::posix_clock_gettime(posix_id);
                                 }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                                 catch(::fast_io::error)
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                                 }
-#  endif
+#   endif
 
                                 constexpr timestamp_integral_t_local mul_factor2{
                                     static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -1844,9 +1847,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                             auto const sub_p{ce.sub};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                             auto const clock_flags{sub_p->u.u.clock.flags};
                             bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_wasm64_t::subscription_clock_abstime) ==
@@ -1890,18 +1893,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
 
                                 ::fast_io::unix_timestamp ts2;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                                 try
-#  endif
+#   endif
                                 {
                                     ts2 = ::fast_io::posix_clock_gettime(posix_id);
                                 }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                                 catch(::fast_io::error)
                                 {
                                     return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                                 }
-#  endif
+#   endif
 
                                 constexpr timestamp_integral_t_local mul_factor2{
                                     static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -1982,11 +1985,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
-# else
+#  else
             // old linux
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enosys;
-# endif
-#elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  endif
+# elif defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             // Newer BSD
             // kqueue()
 
@@ -2049,9 +2052,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
+#  endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -2075,9 +2078,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
+#  endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -2158,18 +2161,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts;
-# if defined(UWVM_CPP_EXCEPTIONS)
+#  if defined(UWVM_CPP_EXCEPTIONS)
                             try
-# endif
+#  endif
                             {
                                 ts = ::fast_io::posix_clock_gettime(posix_id);
                             }
-# if defined(UWVM_CPP_EXCEPTIONS)
+#  if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-# endif
+#  endif
 
                             constexpr timestamp_integral_t mul_factor{
                                 static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -2304,9 +2307,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         auto const sub_p{static_cast<::uwvm2::imported::wasi::wasip1::func::wasi_subscription_wasm64_t const*>(e.udata)};
 
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
 
                         evt.userdata = sub_p->userdata;
                         evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
@@ -2351,9 +2354,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         auto const sub_p{ce.sub};
 
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
 
                         auto const clock_flags{sub_p->u.u.clock.flags};
                         bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_wasm64_t::subscription_clock_abstime) ==
@@ -2397,18 +2400,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts2;
-# if defined(UWVM_CPP_EXCEPTIONS)
+#  if defined(UWVM_CPP_EXCEPTIONS)
                             try
-# endif
+#  endif
                             {
                                 ts2 = ::fast_io::posix_clock_gettime(posix_id);
                             }
-# if defined(UWVM_CPP_EXCEPTIONS)
+#  if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-# endif
+#  endif
 
                             constexpr timestamp_integral_t_local mul_factor2{
                                 static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -2434,16 +2437,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
 
-#elif defined(_WIN32) && !defined(__CYGWIN__)
+# elif defined(_WIN32) && !defined(__CYGWIN__)
             // Windows
-# if defined(_WIN32_WINDOWS)
+#  if defined(_WIN32_WINDOWS)
             // Windows 9x
             // Since Win9x lacks the Win32 API encapsulation for DOS device operations, implementing DOS operations here would prevent porting to WinNT. UWVM2
             // aims to enable Win9x programs to run on WinNT as a compatibility target, hence this feature is not provided. Alternatively, you may use
             // msdos-djgpp.
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsup;
-# else
+#  else
             // Windows NT
             constexpr bool zw_flag_nt{false};
 
@@ -2534,18 +2537,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         }
 
                         ::fast_io::unix_timestamp ts;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                         try
-#  endif
+#   endif
                         {
                             ts = ::fast_io::posix_clock_gettime(posix_id);
                         }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                         catch(::fast_io::error)
                         {
                             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                         }
-#  endif
+#   endif
 
                         constexpr timestamp_integral_t_nt mul_factor_nt{
                             static_cast<timestamp_integral_t_nt>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -2602,9 +2605,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -2728,9 +2731,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -2784,18 +2787,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts_nt;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts_nt = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t_nt mul_factor_nt_local{
                                 static_cast<timestamp_integral_t_nt>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -3137,12 +3140,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
 
-# endif
-#elif defined(__unix) || defined(_XOPEN_SOURCE) || (defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE)) ||                                                     \
-    (defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE)) || (defined(__MSDOS__) || defined(__DJGPP__))
+#  endif
+# elif defined(__unix) || defined(_XOPEN_SOURCE) || (defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE)) ||                                                    \
+     (defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE)) || (defined(__MSDOS__) || defined(__DJGPP__))
             // POSIX or POSIX-like
 
-# if !defined(_POSIX_C_SOURCE) || (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
+#  if !defined(_POSIX_C_SOURCE) || (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
             // POSIX.1-2001
             // libc: poll()
 
@@ -3194,9 +3197,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -3220,9 +3223,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -3299,18 +3302,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t mul_factor{
                                 static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -3426,9 +3429,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto const sub_p{*sub_curr};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                     evt.userdata = sub_p->userdata;
                     evt.error = ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
@@ -3509,9 +3512,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         auto const sub_p{ce.sub};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                         auto const clock_flags{sub_p->u.u.clock.flags};
                         bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_wasm64_t::subscription_clock_abstime) ==
@@ -3555,18 +3558,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts2;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts2 = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t_local mul_factor2{
                                 static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -3646,7 +3649,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
-# elif defined(_POSIX_SOURCE) || (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE))
+#  elif defined(_POSIX_SOURCE) || (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE))
             // POSIX.1-1988/1990
             // select()
 
@@ -3668,13 +3671,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             struct ::fd_set readfds;
             struct ::fd_set writefds;
 
-#  if UWVM_HAS_BUILTIN(__builtin_bzero)
+#   if UWVM_HAS_BUILTIN(__builtin_bzero)
             __builtin_bzero(::std::addressof(readfds), sizeof(readfds));
             __builtin_bzero(::std::addressof(writefds), sizeof(writefds));
-#  else
+#   else
             FD_ZERO(::std::addressof(readfds));
             FD_ZERO(::std::addressof(writefds));
-#  endif
+#   endif
 
             int max_fd{-1};
 
@@ -3710,9 +3713,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
                         {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio);
                             continue;
                         }
@@ -3736,9 +3739,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
                             [[unlikely]] default:
                             {
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#  endif
+#   endif
                                 ::fast_io::fast_terminate();
                             }
                         }
@@ -3761,19 +3764,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         int const native_fd{curr_fd_native_file.native_handle()};
 
                         // Ensure native_fd is within the representable range of fd_set/FD_* macros.
-#  ifdef FD_SETSIZE
+#   ifdef FD_SETSIZE
                         if(native_fd < 0 || native_fd >= FD_SETSIZE) [[unlikely]]
                         {
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsup);
                             continue;
                         }
-#  else
+#   else
                         if(native_fd < 0) [[unlikely]]
                         {
                             push_immediate_event(sub, ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf);
                             continue;
                         }
-#  endif
+#   endif
 
                         bool const is_write{sub.u.tag == ::uwvm2::imported::wasi::wasip1::abi::eventtype_wasm64_t::eventtype_fd_write};
 
@@ -3835,18 +3838,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t mul_factor{
                                 static_cast<timestamp_integral_t>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -4054,9 +4057,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                         auto const sub_p{ce.sub};
 
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         if(sub_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
+#   endif
 
                         auto const clock_flags{sub_p->u.u.clock.flags};
                         bool const is_abstime{(clock_flags & ::uwvm2::imported::wasi::wasip1::abi::subclockflags_wasm64_t::subscription_clock_abstime) ==
@@ -4100,18 +4103,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             }
 
                             ::fast_io::unix_timestamp ts2;
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             try
-#  endif
+#   endif
                             {
                                 ts2 = ::fast_io::posix_clock_gettime(posix_id);
                             }
-#  if defined(UWVM_CPP_EXCEPTIONS)
+#   if defined(UWVM_CPP_EXCEPTIONS)
                             catch(::fast_io::error)
                             {
                                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                             }
-#  endif
+#   endif
 
                             constexpr timestamp_integral_t_local mul_factor2{
                                 static_cast<timestamp_integral_t_local>(::fast_io::uint_least64_subseconds_per_second / 1'000'000'000u)};
@@ -4191,17 +4194,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
-# else
+#  else
             // old unix
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsup;
-# endif
-#else
+#  endif
+# else
             // unknown os
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsup;
-#endif
+# endif
         }
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
     }
 }
 
+#endif
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+#endif

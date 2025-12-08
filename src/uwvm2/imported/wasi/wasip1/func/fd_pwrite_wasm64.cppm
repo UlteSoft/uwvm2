@@ -34,6 +34,7 @@ module;
 // macro
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 #if !UWVM_HAS_BUILTIN(__builtin_alloca) && (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__))
 # include <malloc.h>
@@ -69,5 +70,4 @@ import :posix;
 #endif
 
 #include "fd_pwrite_wasm64.h"
-
 

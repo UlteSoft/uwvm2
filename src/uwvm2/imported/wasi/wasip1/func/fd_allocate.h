@@ -36,6 +36,7 @@
 // macro
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
 # if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #  include <unistd.h>
@@ -73,6 +74,8 @@
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
@@ -140,13 +143,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing fadvise, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -177,9 +180,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
@@ -194,11 +197,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             [[likely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file:
             {
                 auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                     curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
+# else
                     curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
+# endif
                 };
                 curr_fd_native_observer = file_fd;
 
@@ -215,18 +218,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
@@ -236,7 +239,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // Trivial success when len == 0
         if(static_cast<underlying_filesize_t>(len) == 0u) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess; }
 
-#if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
+# if defined(__APPLE__) || defined(__DARWIN_C_LEVEL)
         // Darwin
 
         auto const& curr_fd_native_file{curr_fd_native_observer};
@@ -293,9 +296,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-# endif
+#  endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
@@ -313,9 +316,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             switch(errno)
             {
                 case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                 case EOPNOTSUPP: [[fallthrough]];
-# endif
+#  endif
                 case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
@@ -339,9 +342,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-# endif
+#  endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
@@ -351,13 +354,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#elif defined(_WIN32) && !defined(__CYGWIN__)
+# elif defined(_WIN32) && !defined(__CYGWIN__)
         // Windows
-# if !defined(__WINE__) && !defined(__BIONIC__) && defined(_WIN32_WINDOWS)
+#  if !defined(__WINE__) && !defined(__BIONIC__) && defined(_WIN32_WINDOWS)
         // Windows 9x
         // Windows 9x does not support any type.
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-# elif !defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x600
+#  elif !defined(_WIN32_WINNT) || _WIN32_WINNT >= 0x600
         // NT Version >= 6.0 (Vista)
 
         // Windows path. We accept a C runtime descriptor. Convert to HANDLE.
@@ -432,28 +435,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(fsi.end_of_file < allocation_size) [[unlikely]]
         {
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             try
-#  endif
+#   endif
             {
                 truncate(curr_nt_io_observer, static_cast<::std::uintmax_t>(allocation_size));
             }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error e)
             {
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
-#  endif
+#   endif
         }
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-# else
+#  else
         // NT Version < 6.0
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-# endif
+#  endif
 
-#elif defined(__CYGWIN__)
+# elif defined(__CYGWIN__)
         // Cygwin (POSIX path)
         auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
@@ -491,9 +494,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                 case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                 case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-# if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                 case EOPNOTSUPP: [[fallthrough]];
-# endif
+#  endif
                 case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
@@ -502,8 +505,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(_WIN32) || defined(__CYGWIN__)) &&             \
-    __has_include(<dirent.h>) && !defined(_PICOLIBC__)
+# elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(_WIN32) || defined(__CYGWIN__)) &&            \
+     __has_include(<dirent.h>) && !defined(_PICOLIBC__)
         // Prefer posix_fallocate (portable) -- it returns 0 on success or an errno value on failure.
         auto const& curr_fd_native_file{curr_fd_native_observer};
         auto const curr_fd_native_handle{curr_fd_native_file.native_handle()};
@@ -511,7 +514,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // posix_fallocate signature: int posix_fallocate(int fd, ::off_t offset, ::off_t len);
         // But on some platforms ::off_t might be smaller; do saturation.
 
-# if defined(__linux__) && defined(__NR_fallocate)
+#  if defined(__linux__) && defined(__NR_fallocate)
         if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint64_t))
         {
             // 64bits platform
@@ -549,9 +552,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-#  endif
+#   endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
@@ -561,7 +564,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         else if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint32_t))
         {
             // 32bits platform
-#  if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH)) && (defined(_MIPS_SIM) && defined(_ABIN32) && _MIPS_SIM == _ABIN32)
+#   if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH)) && (defined(_MIPS_SIM) && defined(_ABIN32) && _MIPS_SIM == _ABIN32)
             // MIPSN32
 
             if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::std::uint64_t>::max())
@@ -601,16 +604,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-#   endif
+#    endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
             }
 
-#  else
+#   else
             // default 32bits platform
             if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::std::uint64_t>::max())
             {
@@ -672,16 +675,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#    if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-#   endif
+#    endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
             }
 
-#  endif
+#   endif
         }
         else
         {
@@ -719,9 +722,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                     case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                     case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                     case EOPNOTSUPP: [[fallthrough]];
-#  endif
+#   endif
                     case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                     case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                     default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
@@ -729,7 +732,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-# else
+#  else
         // bsd series
 
         if constexpr(::std::numeric_limits<underlying_filesize_t>::max() > ::std::numeric_limits<::off_t>::max())
@@ -765,27 +768,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 case ENODEV: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enodev;
                 case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
                 case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                 case EOPNOTSUPP: [[fallthrough]];
-#  endif
+#   endif
                 case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                 default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
 
-# endif
+#  endif
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#else
+# else
         // Unsupported platform
         // If the underlying platform cannot guarantee this semantics at all (e.g., it completely lacks fallocate/posix_fallocate, etc.), then this
         // functionality cannot be implemented on that platform.
         // The specification states: Errors must be returned; success must not be simulated.
 
         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
-#endif
+# endif
     }
 
     inline ::uwvm2::imported::wasi::wasip1::abi::errno_t fd_allocate(
@@ -798,7 +801,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -825,7 +828,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_allocate(",
                                 fd,
@@ -834,15 +837,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 u8", ",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         return fd_allocate_base(env, fd, offset, len);
     }
 }  // namespace uwvm2::imported::wasi::wasip1::func
 
+#endif
+
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
