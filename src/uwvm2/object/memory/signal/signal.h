@@ -114,18 +114,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return static_cast<::std::size_t>(seg.end - seg.begin);
         }
 
-        inline constexpr ::uwvm2::object::memory::error::memory_error_t make_memory_error(protected_memory_segment_t const& seg,
-                                                                                          ::std::byte const* fault_addr) noexcept
+        inline constexpr ::uwvm2::object::memory::error::mmap_memory_error_t make_mmap_memory_error(protected_memory_segment_t const& seg,
+                                                                                                    ::std::byte const* fault_addr) noexcept
         {
             auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};
 
-            return {
-                .memory_idx = seg.memory_idx,
-                .memory_offset = {.offset = static_cast<::std::uint_least64_t>(offset), .offset_65_bit = false},
-                .memory_length = static_cast<::std::uint_least64_t>(memory_length),
-                .memory_type_size_unknown = true
-            };
+            return {.memory_idx = seg.memory_idx,
+                    .memory_offset = static_cast<::std::uint_least64_t>(offset),
+                    .memory_length = static_cast<::std::uint_least64_t>(memory_length)};
         }
 
         inline constexpr bool handle_fault_address(::std::byte const* fault_addr) noexcept
@@ -136,8 +133,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             {
                 if(seg.begin <= fault_addr && fault_addr < seg.end)
                 {
-                    auto const memerr{make_memory_error(seg, fault_addr)};
-                    ::uwvm2::object::memory::error::output_memory_error_and_terminate(memerr);
+                    auto const mmapmemerr{make_mmap_memory_error(seg, fault_addr)};
+                    ::uwvm2::object::memory::error::output_mmap_memory_error_and_terminate(mmapmemerr);
                     ::std::unreachable();
                 }
             }

@@ -71,7 +71,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
         ::std::uint_least64_t memory_static_offset{};
         ::std::uint_least64_t memory_length{};
         ::std::size_t memory_type_size{};
-        bool memory_type_size_unknown{};
     };
 
     inline constexpr void output_memory_error(memory_error_t const& memerr) noexcept
@@ -97,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8" (dynamic) + ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                            ::fast_io::mnp::cond(memerr.memory_type_size_unknown, u8"at least 1", memerr.memory_type_size),
+                            memerr.memory_type_size,
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8" (bytes) > ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -116,7 +115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             u8" (static) + ",
                             ::fast_io::mnp::addrvw(get_dynamic_offset(memerr.memory_offset, memerr.memory_static_offset)),
                             u8" (dynamic) + ",
-                            ::fast_io::mnp::cond(memerr.memory_type_size_unknown, u8"at least 1", memerr.memory_type_size),
+                            memerr.memory_type_size,
                             u8" (bytes) > ",
                             ::fast_io::mnp::addrvw(memerr.memory_length),
                             u8" (allocated)\n\n");
@@ -126,6 +125,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
     [[noreturn]] inline void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
     {
         output_memory_error(memerr);
+        ::fast_io::fast_terminate();
+    }
+
+    struct mmap_memory_error_t
+    {
+        ::std::size_t memory_idx{};
+        ::std::uint_least64_t memory_offset{};
+        ::std::uint_least64_t memory_length{};
+    };
+
+    inline constexpr void output_mmap_memory_error(mmap_memory_error_t const& memerr) noexcept
+    {
+#ifdef UWVM
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"memory[",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            memerr.memory_idx,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"] page protection fault: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            ::fast_io::mnp::addrvw(memerr.memory_offset),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" (fault offset) >= ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::fast_io::mnp::addrvw(memerr.memory_length),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" (allocated)\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#else
+        ::fast_io::io::perr(::fast_io::u8err(),
+                            u8"uwvm: "
+                            u8"[fatal] "
+                            u8"memory[",
+                            memerr.memory_idx,
+                            u8"] page protection fault: ",
+                            ::fast_io::mnp::addrvw(memerr.memory_offset),
+                            u8" (fault offset) >= ",
+                            ::fast_io::mnp::addrvw(memerr.memory_length),
+                            u8" (allocated)\n\n");
+#endif
+    }
+
+    [[noreturn]] inline void output_mmap_memory_error_and_terminate(mmap_memory_error_t const& memerr) noexcept
+    {
+        output_mmap_memory_error(memerr);
         ::fast_io::fast_terminate();
     }
 
