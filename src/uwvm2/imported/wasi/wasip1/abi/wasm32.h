@@ -417,6 +417,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::abi
         right_path_unlink_file = 0x0000000004000000,
         right_poll_fd_readwrite = 0x0000000008000000,
         right_sock_shutdown = 0x0000000010000000,
+        right_sock_accept = 0x0000000020000000,
     };
 
     inline constexpr rights_t operator& (rights_t x, rights_t y) noexcept
