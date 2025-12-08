@@ -48,36 +48,38 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if defined(UWVM_SUPPORT_MMAP)
+
 UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 {
-#if !(defined(_WIN32) || defined(__CYGWIN__))
+# if !(defined(_WIN32) || defined(__CYGWIN__))
     namespace posix
     {
         extern int raise(int) noexcept
-# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("raise")
-# else
+#  else
             __asm__("_raise")
-# endif
+#  endif
                 ;
 
         extern int sigaction(int, struct ::sigaction const*, struct ::sigaction*) noexcept
-# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("sigaction")
-# else
+#  else
             __asm__("_sigaction")
-# endif
+#  endif
                 ;
 
         extern void (*signal(int, void (*)(int)))(int) noexcept
-# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("signal")
-# else
+#  else
             __asm__("_signal")
-# endif
+#  endif
                 ;
     }  // namespace posix
-#endif
+# endif
 
     struct protected_memory_segment_t
     {
@@ -94,14 +96,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
         struct signal_handlers_t
         {
-#if defined(_WIN32) || defined(__CYGWIN__)
+# if defined(_WIN32) || defined(__CYGWIN__)
             void* vectored_handler_handle{};
-#else
+# else
             struct ::sigaction previous_sigsegv{};
             struct ::sigaction previous_sigbus{};
             bool has_previous_sigsegv{};
             bool has_previous_sigbus{};
-#endif
+# endif
         };
 
         inline signal_handlers_t signal_handlers{};  // [global]
@@ -145,18 +147,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return false;
         }
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+# if defined(_WIN32) || defined(__CYGWIN__)
         inline constexpr ::std::int_least32_t UWVM_WINSTDCALL vectored_exception_handler(::fast_io::win32::exception_pointers* exception_pointers) noexcept
         {
             if(exception_pointers == nullptr || exception_pointers->ExceptionRecord == nullptr) [[unlikely]] { return 0 /*EXCEPTION_CONTINUE_SEARCH*/; }
 
             auto const code{exception_pointers->ExceptionRecord->ExceptionCode};
             if(code ==
-# if defined(_WIN32_WINDOWS)
+#  if defined(_WIN32_WINDOWS)
                998 /*EXCEPTION_ACCESS_VIOLATION*/
-# else
+#  else
                0xC0000005u /*STATUS_ACCESS_VIOLATION*/
-# endif
+#  endif
             )
             {
                 if(exception_pointers->ExceptionRecord->NumberParameters >= 2u)
@@ -181,7 +183,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             signal_handlers.vectored_handler_handle = ::fast_io::win32::AddVectoredExceptionHandler(1u, vectored_exception_handler);
             if(signal_handlers.vectored_handler_handle == nullptr) [[unlikely]]
             {
-# ifdef UWVM
+#  ifdef UWVM
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
@@ -190,14 +192,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Failed to install signal handler.\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-# else
+#  else
                 ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [fatal] Failed to install signal handler.\n\n");
-# endif
+#  endif
                 ::fast_io::fast_terminate();
             }
         }
 
-#else
+# else
         inline constexpr void dispatch_previous_handler(int signal, ::siginfo_t* siginfo, void* context, struct ::sigaction const& previous) noexcept
         {
             if(previous.sa_flags & SA_SIGINFO)
@@ -239,13 +241,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                 return;
             }
 
-# ifdef SIGBUS
+#  ifdef SIGBUS
             if(signal == SIGBUS && signal_handlers.has_previous_sigbus)
             {
                 dispatch_previous_handler(signal, siginfo, context, signal_handlers.previous_sigbus);
                 return;
             }
-# endif
+#  endif
 
             posix::signal(signal, SIG_DFL);
             posix::raise(signal);
@@ -265,19 +267,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
             if(posix::sigaction(SIGSEGV, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigsegv)) != 0) [[unlikely]]
             {
+#  ifdef UWVM
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Failed to install signal handler (SIGSEGV).\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#  else
+                ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [fatal] Failed to install signal handler (SIGSEGV).\n\n");
+#  endif
                 ::fast_io::fast_terminate();
             }
             signal_handlers.has_previous_sigsegv = true;
 
-# ifdef SIGBUS
+#  ifdef SIGBUS
             if(posix::sigaction(SIGBUS, ::std::addressof(act), ::std::addressof(signal_handlers.previous_sigbus)) != 0) [[unlikely]]
             {
+#   ifdef UWVM
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Failed to install signal handler (SIGBUS).\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+#   else
+                ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [fatal] Failed to install signal handler (SIGBUS).\n\n");
+#   endif
                 ::fast_io::fast_terminate();
             }
             signal_handlers.has_previous_sigbus = true;
-# endif
+#  endif
         }
-#endif
+# endif
     }  // namespace detail
 
     /// @note       Protected memory segments are expected to be registered during VM/module initialization,
@@ -288,31 +314,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     ///             are performed. This design ensures that the signal/exception handler can traverse the
     ///             global segments container without additional synchronization, as there are no
     ///             concurrent structural modifications.
-    
+
     inline constexpr void register_protected_segment(::std::byte const* begin,
                                                      ::std::byte const* end,
                                                      ::std::atomic_size_t const* length_p = nullptr,
                                                      ::std::size_t memory_idx = 0uz,
                                                      ::std::uint_least64_t memory_static_offset = 0u) noexcept
     {
-        if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-        detail::install_signal_handler();
-
-        auto& segments{detail::segments};
-
-#ifdef UWVM_CPP_EXCEPTIONS
-        try
-#endif
+        if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]]
         {
-            segments.push_back({begin, end, length_p, memory_idx, memory_static_offset});
-        }
-#ifdef UWVM_CPP_EXCEPTIONS
-        catch(...)
-        {
+# ifdef UWVM
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                u8"[fatal] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Invalid protected memory segment.\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+# else
+            ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [fatal] Invalid protected memory segment.\n\n");
+# endif
             ::fast_io::fast_terminate();
         }
-#endif
+
+        detail::install_signal_handler();
+        detail::segments.push_back({begin, end, length_p, memory_idx, memory_static_offset});
     }
 
     inline constexpr void unregister_protected_segment(::std::byte const* begin, ::std::byte const* end) noexcept
@@ -333,6 +360,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     inline constexpr void clear_protected_segments() noexcept { detail::segments.clear(); }
 
 }  // namespace uwvm2::object::memory::signal
+
+#endif
 
 #ifndef UWVM_MODULE
 // macro
