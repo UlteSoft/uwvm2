@@ -87,7 +87,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         ::std::byte const* end{};
         ::std::atomic_size_t const* length_p{};
         ::std::size_t memory_idx{};
-        ::std::uint_least64_t memory_static_offset{};
     };
 
     namespace detail
@@ -108,25 +107,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
         inline signal_handlers_t signal_handlers{};  // [global]
 
-        inline constexpr ::std::uint_least64_t get_memory_length(protected_memory_segment_t const& seg) noexcept
+        inline constexpr ::std::size_t get_memory_length(protected_memory_segment_t const& seg) noexcept
         {
-            if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::uint_least64_t>(seg.length_p->load(::std::memory_order_acquire)); }
+            if(seg.length_p != nullptr) [[likely]] { return static_cast<::std::size_t>(seg.length_p->load(::std::memory_order_acquire)); }
 
-            return static_cast<::std::uint_least64_t>(seg.end - seg.begin);
+            return static_cast<::std::size_t>(seg.end - seg.begin);
         }
 
         inline constexpr ::uwvm2::object::memory::error::memory_error_t make_memory_error(protected_memory_segment_t const& seg,
                                                                                           ::std::byte const* fault_addr) noexcept
         {
-            auto const offset{static_cast<::std::uint_least64_t>(fault_addr - seg.begin)};
+            auto const offset{static_cast<::std::size_t>(fault_addr - seg.begin)};
             auto const memory_length{get_memory_length(seg)};
 
             return {
                 .memory_idx = seg.memory_idx,
-                .memory_offset = {.offset = offset, .offset_65_bit = false},
-                .memory_static_offset = seg.memory_static_offset,
-                .memory_length = memory_length,
-                .memory_type_size = 1uz
+                .memory_offset = {.offset = static_cast<::std::uint_least64_t>(offset), .offset_65_bit = false},
+                .memory_length = static_cast<::std::uint_least64_t>(memory_length),
+                .memory_type_size_unknown = true
             };
         }
 
@@ -318,8 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
     inline constexpr void register_protected_segment(::std::byte const* begin,
                                                      ::std::byte const* end,
                                                      ::std::atomic_size_t const* length_p = nullptr,
-                                                     ::std::size_t memory_idx = 0uz,
-                                                     ::std::uint_least64_t memory_static_offset = 0u) noexcept
+                                                     ::std::size_t memory_idx = 0uz) noexcept
     {
         if(begin == nullptr || end == nullptr || begin >= end) [[unlikely]]
         {
@@ -339,7 +336,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         }
 
         detail::install_signal_handler();
-        detail::segments.push_back({begin, end, length_p, memory_idx, memory_static_offset});
+        detail::segments.emplace_back(begin, end, length_p, memory_idx);
     }
 
     inline constexpr void unregister_protected_segment(::std::byte const* begin, ::std::byte const* end) noexcept

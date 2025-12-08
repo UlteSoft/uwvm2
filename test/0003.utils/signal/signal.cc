@@ -82,7 +82,7 @@ namespace
         auto* const seg_end{memory.memory_begin + segment_end_offset};
 
         clear_protected_segments();
-        register_protected_segment(seg_begin, seg_end, memory.memory_length_p, 0uz, 0u);
+        register_protected_segment(seg_begin, seg_end, memory.memory_length_p, 0uz);
 
         // Perform a volatile write to the non-committed page to trigger a fault.
         auto* const fault_ptr{memory.memory_begin + fault_offset};

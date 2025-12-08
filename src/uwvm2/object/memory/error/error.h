@@ -71,6 +71,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
         ::std::uint_least64_t memory_static_offset{};
         ::std::uint_least64_t memory_length{};
         ::std::size_t memory_type_size{};
+        bool memory_type_size_unknown{};
     };
 
     inline constexpr void output_memory_error(memory_error_t const& memerr) noexcept
@@ -96,7 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8" (dynamic) + ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                            memerr.memory_type_size,
+                            ::fast_io::mnp::cond(memerr.memory_type_size_unknown, u8"at least 1", memerr.memory_type_size),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                             u8" (bytes) > ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -115,7 +116,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
                             u8" (static) + ",
                             ::fast_io::mnp::addrvw(get_dynamic_offset(memerr.memory_offset, memerr.memory_static_offset)),
                             u8" (dynamic) + ",
-                            memerr.memory_type_size,
+                            ::fast_io::mnp::cond(memerr.memory_type_size_unknown, u8"at least 1", memerr.memory_type_size),
                             u8" (bytes) > ",
                             ::fast_io::mnp::addrvw(memerr.memory_length),
                             u8" (allocated)\n\n");
