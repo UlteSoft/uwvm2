@@ -143,6 +143,7 @@ function mingw_target()
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:6.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
+        add_syslinks("psapi")
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
             -- clang will automatically generate sse2 code on ix86 series, here use MinGW minimum support isa: i686
@@ -158,6 +159,7 @@ function mingw_target()
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.02", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
+        add_syslinks("psapi")
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
             -- clang will automatically generate sse2 code on ix86 series, here use MinGW minimum support isa: i686
@@ -172,6 +174,7 @@ function mingw_target()
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.01", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
+        add_syslinks("psapi")
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
             -- clang will automatically generate sse2 code on ix86 series, here use MinGW minimum support isa: i686
@@ -187,6 +190,7 @@ function mingw_target()
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:5.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("shell32")
+        add_syslinks("psapi")
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
             -- clang will automatically generate sse2 code on ix86 series, here use MinGW minimum support isa: i686
@@ -244,6 +248,7 @@ function mingw_target()
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:4.00", {force = true})
         add_syslinks("ntdll")
         add_syslinks("msvcrt")
+        add_syslinks("psapi")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
@@ -256,6 +261,8 @@ function mingw_target()
         add_defines("WINVER=0x0351")
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.51", {force = true})
         add_syslinks("ntdll")
+        add_syslinks("msvcrt")
+        add_syslinks("psapi")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
@@ -268,6 +275,8 @@ function mingw_target()
         add_defines("WINVER=0x0350")
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.50", {force = true})
         add_syslinks("ntdll")
+        add_syslinks("msvcrt")
+        add_syslinks("psapi")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
@@ -280,6 +289,8 @@ function mingw_target()
         add_defines("WINVER=0x0310")
         add_ldflags("-Wl,--stack,8388608", "-Wl,--subsystem,console:3.10", {force = true})
         add_syslinks("ntdll")
+        add_syslinks("msvcrt")
+        add_syslinks("psapi")
         add_ldflags("-static", {force = true}) -- Forced static linking on win9x
         local march = get_config("march")
         if march == "default" and is_arch("i686") then
