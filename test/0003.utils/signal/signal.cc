@@ -100,7 +100,7 @@ namespace
     // terminates abnormally (non-zero wait status).
     inline int run_parent(char const* self_path) noexcept
     {
-#if !defined(UWVM_SUPPORT_MMAP) || (defined(_WIN32_WINDOWS) && _WIN32_WINDOWS < 0x600) || defined(_WIN32_WINDOWS)
+#if !defined(UWVM_SUPPORT_MMAP)
         (void)self_path;
         // mmap backend unavailable; treat as success on such platforms.
         return 0;
