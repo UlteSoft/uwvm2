@@ -138,7 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                 {
                     auto const memerr{make_memory_error(seg, fault_addr)};
                     ::uwvm2::object::memory::error::output_memory_error_and_terminate(memerr);
-                    return true;
+                    ::std::unreachable();
                 }
             }
 
