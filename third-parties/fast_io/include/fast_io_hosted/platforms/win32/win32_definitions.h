@@ -526,4 +526,63 @@ struct sockaddr_storage
 									 //   __ss_align fields is 112
 };
 
+struct in_addr
+{
+	union S_un_u
+	{
+		struct S_un_b_t
+		{
+			::std::uint_least8_t s_b1, s_b2, s_b3, s_b4;
+		} S_un_b;
+		struct S_un_w_t
+		{
+			::std::uint_least16_t s_w1, s_w2;
+		} S_un_w;
+		::std::uint_least32_t S_addr;
+	} S_un;
+};
+
+struct sockaddr_in
+{
+	address_family sin_family;
+	::std::uint_least16_t sin_port;
+	in_addr sin_addr;
+	char sin_zero[8];
+};
+
+struct in6_addr
+{
+	union u_u
+	{
+		::std::uint_least8_t Byte[16];
+		::std::uint_least16_t Word[8];
+	} u;
+};
+
+struct scope_id
+{
+	union DUMMYUNIONNAME_U
+	{
+		struct DUMMYSTRUCTNAME_T
+		{
+			::std::uint_least32_t Zone : 28;
+			::std::uint_least32_t Level : 4;
+		} DUMMYSTRUCTNAME;
+		::std::uint_least32_t Value;
+	} DUMMYUNIONNAME;
+};
+
+struct sockaddr_in6
+{
+	address_family sin6_family;          // AF_INET6.
+	::std::uint_least16_t sin6_port;     // Transport level port number.
+	::std::uint_least32_t sin6_flowinfo; // IPv6 flow information.
+	in6_addr sin6_addr;                  // IPv6 address.
+	union sin6_scope_u
+	{
+		::std::uint_least32_t sin6_scope_id; // Set of interfaces for a scope.
+		scope_id sin6_scope_struct;
+	} sin6_scope;
+};
+
 } // namespace fast_io::win32

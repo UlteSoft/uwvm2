@@ -749,15 +749,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto* const raw_ptr{raw};
 
-                    if(addrlen > 0u)
+                    if(addrlen > 0)
                     {
                         switch(addr.ss_family)
                         {
-                            case AF_INET:
+                            case 2 /*AF_INET*/:
                             {
-                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::fast_io::win32::sockaddr_in)))
                                 {
-                                    using sockaddr_in_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in const*;
+                                    using sockaddr_in_const_may_alias UWVM_GNU_MAY_ALIAS = ::fast_io::win32::sockaddr_in const*;
                                     auto const sin{reinterpret_cast<sockaddr_in_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet4
@@ -777,11 +777,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
                                 break;
                             }
-                            case AF_INET6:
+                            case 23 /*AF_INET6*/:
                             {
-                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in6)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::fast_io::win32::sockaddr_in6)))
                                 {
-                                    using sockaddr_in6_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in6 const*;
+                                    using sockaddr_in6_const_may_alias UWVM_GNU_MAY_ALIAS = ::fast_io::win32::sockaddr_in6 const*;
                                     auto const sin6{reinterpret_cast<sockaddr_in6_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet6
