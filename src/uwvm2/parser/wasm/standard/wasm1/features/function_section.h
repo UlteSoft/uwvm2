@@ -4392,7 +4392,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)) ||                                                                                    \
      (defined(__ARM_NEON) && (UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32) || UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu))) ||                  \
-     (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16))))
+     (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16)))) &                     \
+        0
+
+        /// @deprecated After testing with aarch64 and SSE2, it was found that the SIMD implementation performs worse than the scalar implementation. Therefore,
+        /// it will not be enabled here.
+
         /// (Little Endian), [[gnu::vector_size]], no mask-u16, simd128
         ///  x86_64-sse2, aarch64-neon, wasm-simd128 (Since the wasm simd128 shuffle requirement is immediate, it cannot be used.)
         ///  Since the arm neon does not have a move mask, the shuffle algorithm cannot be used.
@@ -7604,7 +7609,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #elif UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && defined(__LITTLE_ENDIAN__) &&                                                                        \
     ((defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)) ||                                                                                    \
      (defined(__ARM_NEON) && (UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32) || UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu))) ||                  \
-     (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16))))
+     (defined(__wasm_simd128__) && (UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16) || UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16)))) &                     \
+        0
+
+        /// @deprecated After testing with aarch64 and SSE2, it was found that the SIMD implementation performs worse than the scalar implementation. Therefore,
+        /// it will not be enabled here.
+
         /// (Little Endian), [[gnu::vector_size]], no mask-u16, simd128
         ///  x86_64-sse2, aarch64-neon, wasm-simd128 (Since the wasm simd128 shuffle requirement is immediate, it cannot be used.)
         ///  Since the arm neon does not have a move mask, the shuffle algorithm cannot be used.
@@ -8459,9 +8469,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr function_section_storage_section_details_wrapper_t<Fs...> section_details(
         function_section_storage_t const& function_section_storage,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(function_section_storage), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(function_section_storage), ::std::addressof(all_sections)}; }
 
     /// @brief Print the function section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream

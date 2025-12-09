@@ -1,1 +1,3 @@
 outputs
+varint-simd-fair/target
+varint-simd-fair/Cargo.lock
