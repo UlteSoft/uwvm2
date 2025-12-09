@@ -370,6 +370,7 @@ end
 
 local function parse_varint_fair()
     local unsafe = {}
+    local safe = {}
 
     for line in io.lines(varint_log) do
         -- Lines look like:
@@ -378,8 +379,13 @@ local function parse_varint_fair()
         local scenario = line:match("scenario=([^%s]+)")
         local impl = line:match("impl=([^%s]+)")
         local ns_str = line:match("ns_per_value=([^%s]+)")
-        if scenario and impl == "unsafe" and ns_str then
-            unsafe[scenario] = tonumber(ns_str)
+        if scenario and impl and ns_str then
+            local ns = tonumber(ns_str)
+            if impl == "unsafe" then
+                unsafe[scenario] = ns
+            elseif impl == "safe" then
+                safe[scenario] = ns
+            end
         end
     end
 
@@ -387,10 +393,13 @@ local function parse_varint_fair()
     for scenario, ns in pairs(unsafe) do
         summary_lines[#summary_lines + 1] = string.format("scenario=%s impl=unsafe ns_per_value=%.6f", scenario, ns)
     end
+    for scenario, ns in pairs(safe) do
+        summary_lines[#summary_lines + 1] = string.format("scenario=%s impl=safe ns_per_value=%.6f", scenario, ns)
+    end
     table.sort(summary_lines)
     write_file(varint_summary, table.concat(summary_lines, "\n") .. (next(summary_lines) and "\n" or ""))
 
-    return unsafe
+    return unsafe, safe
 end
 
 -- Parse uwvm2 SIMD timings per scenario --------------------------------------
@@ -410,7 +419,7 @@ end
 
 -- Pretty comparison per scenario ---------------------------------------------
 
-local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, bench_unsafe)
+local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, varint_safe)
     print()
     print(string.rep("=", 80))
     print("Scenario: " .. scenario)
@@ -425,12 +434,18 @@ local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, bench_un
 
     local ns_varint_u = varint_unsafe[scenario]
     if not ns_varint_u then
-        print(string.format("  varint-simd (unsafe) : <bench %s not found in varint-simd output>", bench_unsafe))
+        print("  varint-simd (unsafe, fair-file) : <no unsafe result found>")
     else
         print(string.format("  varint-simd (unsafe, fair-file) : ns_per_value ≈ %.6f",
                             ns_varint_u))
-        local ratio = ns_uwvm / ns_varint_u
-        print(string.format("  ratio (unsafe)       : uwvm2 / varint-simd ≈ %.3f  ( <1 means uwvm2 is faster )", ratio))
+        local ratio_u = ns_uwvm / ns_varint_u
+        print(string.format("  ratio (unsafe)       : uwvm2 / varint-simd ≈ %.3f  ( <1 means uwvm2 is faster )", ratio_u))
+    end
+
+    local ns_varint_s = varint_safe[scenario]
+    if ns_varint_s then
+        print(string.format("  varint-simd (safe,   fair-file) : ns_per_value ≈ %.6f",
+                            ns_varint_s))
     end
 end
 
@@ -450,7 +465,7 @@ local function main()
 
     -- Parse results.
     local uwvm_simd_ns = parse_uwvm_simd()
-    local varint_unsafe = parse_varint_fair()
+    local varint_unsafe, varint_safe = parse_varint_fair()
 
     print()
     print(string.rep("=", 80))
@@ -462,7 +477,7 @@ local function main()
         "typeidx < 2^7, always 1-byte encoding (fast path, zero-copy u8 view)",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     compare_one(
@@ -470,7 +485,7 @@ local function main()
         "2^7 ≤ typeidx < 2^8, 1–2 byte encodings, main fair comparison against varint-u8/decode",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     compare_one(
@@ -478,7 +493,7 @@ local function main()
         "2^8 ≤ typeidx < 2^14, 1–2 byte encodings, rare in real-world wasm but useful as a stress case",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     print()
