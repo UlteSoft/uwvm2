@@ -22,6 +22,33 @@ Unless otherwise noted, the example numbers in this file come from a single run 
 - C++ built using `clang++ -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables`
 - Rust fair benchmark run with `RUSTFLAGS="-C target-cpu=native"` and `cargo run --release` in `varint-simd-fair/`
 
+## Prerequisites and basic build steps
+
+Before running the benchmark, make sure the following tools are available on your `$PATH`:
+
+- `clang++` (or a compatible C++ compiler) with C++26 support
+- `rustc` and `cargo` (for building the Rust `varint-simd` helper)
+- `lua` (5.3 or later)
+- `git` (for cloning `as-com/varint-simd` when needed)
+
+A quick sanity check:
+
+```bash
+clang++ --version
+rustc --version
+cargo --version
+lua -v
+git --version
+```
+
+If any of these commands fail, install the corresponding toolchain first. On platforms that require a custom sysroot or linker (for example, cross-compilation setups), you can pass extra C++ flags through `CXXFLAGS_EXTRA`, e.g.:
+
+```bash
+CXXFLAGS_EXTRA="--sysroot=$SYSROOT -fuse-ld=lld" lua benchmark/0002.parser/0001.function_section/compare_varint_simd.lua
+```
+
+On non‑x86 platforms that do not expose the x86 SIMD intrinsics used by `varint-simd`, the Rust part of the benchmark may fail to build. In that case the Lua driver will still run the uwvm2 C++ benchmarks and emit a clear warning that no `varint-simd` baseline is available on this host.
+
 ## Methodology
 
 ### uwvm2 side (data generation and decode)
