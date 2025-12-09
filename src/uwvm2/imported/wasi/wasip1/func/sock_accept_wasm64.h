@@ -551,12 +551,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
                 {
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(e.domain != ::fast_io::win32_domain_value) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#   endif
                     switch(e.code)
                     {
-                        case 10035 /*WSAEWOULDBLOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eagain;
-                        case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsock;
+                        // Winsock (WSA*) error codes mapping (subset relevant to accept)
+                        case 10004 /*WSAEINTR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eintr;
+                        case 10009 /*WSAEBADF*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
+                        case 10013 /*WSAEACCES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                        case 10014 /*WSAEFAULT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::efault;
                         case 10022 /*WSAEINVAL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
-                        default: return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                        case 10024 /*WSAEMFILE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::emfile;
+                        case 10035 /*WSAEWOULDBLOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eagain;
+                        case 10036 /*WSAEINPROGRESS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einprogress;
+                        case 10037 /*WSAEALREADY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ealready;
+                        case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsock;
+                        case 10050 /*WSAENETDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enetdown;
+                        case 10051 /*WSAENETUNREACH*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enetunreach;
+                        case 10052 /*WSAENETRESET*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enetreset;
+                        case 10053 /*WSAECONNABORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::econnaborted;
+                        case 10054 /*WSAECONNRESET*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::econnreset;
+                        case 10055 /*WSAENOBUFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enobufs;
+                        case 10056 /*WSAEISCONN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eisconn;
+                        case 10057 /*WSAENOTCONN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotconn;
+                        case 10058 /*WSAESHUTDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotconn;
+                        case 10060 /*WSAETIMEDOUT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::etimedout;
+                        case 10061 /*WSAECONNREFUSED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::econnrefused;
+                        case 10064 /*WSAEHOSTDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ehostunreach;
+                        case 10065 /*WSAEHOSTUNREACH*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ehostunreach;
+                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                     }
                 }
 #  endif
