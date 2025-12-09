@@ -48,6 +48,9 @@
 # if __has_include(<netinet/in.h>)
 #  include <netinet/in.h>
 # endif
+# if defined(_WIN32) && !defined(__CYGWIN__)
+#  include <winsock.h>
+# endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -373,13 +376,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 struct ::sockaddr_storage addr{};
                 ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
-                ::fast_io::posix_file_factory new_socket_factory{};
+                ::fast_io::posix_file new_socket_file{};
 
 #  ifdef UWVM_CPP_EXCEPTIONS
                 try
 #  endif
                 {
-                    new_socket_factory = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
+                    new_socket_file = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
                 }
 #  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
@@ -390,7 +393,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // set nonblock flag
 
-                auto flags{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_factory.native_handle(), F_GETFL, 0)};
+                auto flags{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_file.native_handle(), F_GETFL, 0)};
 
                 if(flags == -1) [[unlikely]]
                 {
@@ -403,7 +406,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     flags &= ~O_NONBLOCK;
                 }
 
-                if(::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_factory.native_handle(), F_SETFL, flags) == -1) [[unlikely]]
+                if(::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_file.native_handle(), F_SETFL, flags) == -1) [[unlikely]]
                 {
                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
                 }
@@ -418,8 +421,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 new_wasi_fd.fd_p->rights_base = curr_fd.rights_base & curr_fd.rights_inherit;
                 new_wasi_fd.fd_p->rights_inherit = new_wasi_fd.fd_p->rights_base;
                 new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
-                new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.file_fd =
-                    ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_file_fd_t{new_socket_factory.release()};
+                new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::std::move(new_socket_file);
 
                 // Release locks that are no longer needed to avoid excessive lock granularity.
                 curr_fd_release_guard.unlock();
@@ -609,22 +611,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 struct ::sockaddr_storage addr{};
                 ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
-                ::fast_io::win32_socket_factory new_socket_factory{};
+                ::fast_io::win32_socket_file new_socket_file{};
 
 #  ifdef UWVM_CPP_EXCEPTIONS
                 try
 #  endif
                 {
-                    new_socket_factory = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
+                    new_socket_file = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
                 }
 #  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
                 {
                     switch(e.code)
                     {
-                        case WSAEWOULDBLOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
-                        case WSAENOTSOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
-                        case WSAEINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                        case 10035 /*WSAEWOULDBLOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
+                        case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                        case 10022 /*WSAEINVAL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
                         default: return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                     }
                 }
@@ -634,7 +636,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 ::std::uint_least32_t mode{static_cast<::std::uint_least32_t>(is_nonblock)};
 
-                if(::fast_io::win32::ioctlsocket(new_socket_factory.native_handle(), 0x8004'667El /*FIONBIO*/, ::std::addressof(mode)) == -1) [[unlikely]]
+                if(::fast_io::win32::ioctlsocket(new_socket_file.native_handle(), 0x8004'667El /*FIONBIO*/, ::std::addressof(mode)) == -1) [[unlikely]]
                 {
                     switch(::fast_io::win32::WSAGetLastError())
                     {
@@ -659,7 +661,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 new_wasi_fd.fd_p->rights_base = curr_fd.rights_base & curr_fd.rights_inherit;
                 new_wasi_fd.fd_p->rights_inherit = new_wasi_fd.fd_p->rights_base;
                 new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket);
-                new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::fast_io::win32_socket_file{new_socket_factory.release()};
+                new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::std::move(new_socket_file);
 
                 // Release locks that are no longer needed to avoid excessive lock granularity.
                 curr_fd_release_guard.unlock();

@@ -45,6 +45,9 @@ module;
 #if __has_include(<netinet/in.h>)
 # include <netinet/in.h>
 #endif
+#if defined(_WIN32) && !defined(__CYGWIN__)
+# include <winsock.h>
+#endif
 
 export module uwvm2.imported.wasi.wasip1.func:sock_accept;
 
