@@ -4634,7 +4634,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         //                                                        ^^ section_curr
 
 #else
-        /// SIMT 64bit pointer and little endian
+        /// SIMT little endian
         if constexpr(::std::endian::native == ::std::endian::little && CHAR_BIT == 8)
         {
             auto fast_decode_uleb128_u32{[&] UWVM_ALWAYS_INLINE(::std::byte const* p,
@@ -4647,7 +4647,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              auto const remaining{static_cast<::std::size_t>(end - p)};
                                              if(remaining == 0uz) [[unlikely]] { return false; }
 
-                                             // This provides a maximum of 2 bytes for data storage. You can use `unsigned short`, but it will be type-promoted to `int` or `unsigned int` in expressions. To avoid type promotion, use `unsigned int` (i.e., `unsigned`) directly, which will not be promoted. According to the C standard, `short` is at least 16 bits, and `int` is at least as large as `short`. Therefore, the size of `unsigned int` is typically ≥ 2 bytes.
+                                             // This provides a maximum of 2 bytes for data storage. You can use `unsigned short`, but it will be type-promoted
+                                             // to `int` or `unsigned int` in expressions. To avoid type promotion, use `unsigned int` (i.e., `unsigned`)
+                                             // directly, which will not be promoted. According to the C standard, `short` is at least 16 bits, and `int` is at
+                                             // least as large as `short`. Therefore, the size of `unsigned int` is typically ≥ 2 bytes.
                                              if(remaining < sizeof(unsigned)) [[unlikely]] { return false; }
 
                                              // wasm_byte is uint_least8_t, so it is safe to reinterpret_cast
@@ -4671,20 +4674,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              unsigned const len_bits{static_cast<unsigned>(::std::countr_zero(msbs)) + 1u};
                                              unsigned const len_bytes{len_bits / 8u};
 
-                                             // This can only hold up to 2 bytes. 
+                                             // This can only hold up to 2 bytes.
                                              if(len_bytes == 0u || len_bytes > 2u || static_cast<::std::size_t>(len_bytes) > remaining) [[unlikely]]
                                              {
                                                  return false;
                                              }
 
                                              // Scalar reconstruction from the packed bytes in 'word'.
-                                             ::std::uint_least32_t value{static_cast<std::uint_least32_t>(word & 0x7Fu)};
-
-                                             if (len_bytes == 2u)
-                                             {
-                                                 value |= static_cast<std::uint_least32_t>(((word >> 8u) & 0x7Fu) << 7u);
-                                             }
-                                             
+                                             unsigned value{word & 0x7Fu};
+                                             if(len_bytes == 2u) { value |= ((word >> 8u) & 0x7Fu) << 7u; }
 
                                              out_value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(value);
                                              out_len = len_bytes;
@@ -4833,7 +4831,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 //                     ^^ section_curr
             }
         }
-            
+
         // [before_section ... | func_count ... typeidx1 ... ...] (end)
         // [                       safe                         ] unsafe (could be the section_end)
         //                                                        ^^ section_curr
