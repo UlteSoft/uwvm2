@@ -50,14 +50,25 @@
 --
 -- Environment variables:
 --
---   CXX              : C++ compiler (default: clang++)
---   CXXFLAGS_EXTRA   : extra C++ flags appended after the defaults
+--   CXX               : C++ compiler (default: clang++)
+--   CXXFLAGS_EXTRA    : extra C++ flags appended after the defaults
 --   VARINT_SIMD_DIR   : path to an existing varint-simd checkout
 --                        (default: auto-clone into ./outputs/varint-simd next to this file)
 --   FUNC_COUNT        : forwarded to uwvm2 benchmark (default: 1_000_000 in C++)
 --   ITERS             : forwarded to both uwvm2 and Rust fair benchmarks (default: 20)
 --   RUSTFLAGS         : existing flags will be preserved and extended with
---                       "-C target-cpu=native" for the Rust fair benchmark run.
+--                        per-run CPU/feature flags
+--   UWVM2_SIMD_LEVEL  : optional fixed SIMD level for both C++ and Rust.
+--                        Recognized values:
+--                          "native"    : use -march=native / -C target-cpu=native (default)
+--                          "sse2"      : x86-64 + SSE2 only
+--                          "sse3"      : x86-64 + SSE3
+--                          "ssse3"     : x86-64 + SSSE3
+--                          "sse4"      : x86-64 + SSE4.1/SSE4.2
+--                          "avx"       : x86-64 + AVX
+--                          "avx2"      : x86-64 + AVX2
+--                          "avx512bw"  : x86-64 + AVX2 + AVX-512BW
+--                          "avx512vbmi": x86-64 + AVX2 + AVX-512BW + AVX-512VBMI/VBMI2
 --
 
 local function join(list, sep)
@@ -155,11 +166,37 @@ local function build_uwvm_bench()
         "-std=c++2c",
         "-O3",
         "-ffast-math",
-        "-march=native",
         "-fno-rtti",
         "-fno-unwind-tables",
         "-fno-asynchronous-unwind-tables",
     }
+
+    local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
+    if simd_level == "native" then
+        table.insert(default_flags, "-march=native")
+    elseif simd_level == "sse2" then
+        table.insert(default_flags, "-msse2")
+    elseif simd_level == "sse3" then
+        table.insert(default_flags, "-msse3")
+    elseif simd_level == "ssse3" then
+        table.insert(default_flags, "-mssse3")
+    elseif simd_level == "sse4" then
+        table.insert(default_flags, "-msse4.1")
+        table.insert(default_flags, "-msse4.2")
+    elseif simd_level == "avx" then
+        table.insert(default_flags, "-mavx")
+    elseif simd_level == "avx2" then
+        table.insert(default_flags, "-mavx2")
+    elseif simd_level == "avx512bw" then
+        table.insert(default_flags, "-mavx512bw")
+    elseif simd_level == "avx512vbmi" then
+        table.insert(default_flags, "-mavx512bw")
+        table.insert(default_flags, "-mavx512vbmi")
+        table.insert(default_flags, "-mavx512vbmi2")
+    else
+        -- Fallback: native
+        table.insert(default_flags, "-march=native")
+    end
 
     local extra = os.getenv("CXXFLAGS_EXTRA")
     local extra_flags = {}
@@ -265,12 +302,48 @@ local function run_varint_bench(varint_dir)
     print()
     print("==> Running Rust varint-simd fair benchmark (shared data files)")
 
-    -- Extend RUSTFLAGS with -C target-cpu=native for this invocation.
-    local rustflags = os.getenv("RUSTFLAGS")
-    if rustflags and #rustflags > 0 then
-        rustflags = rustflags .. " -C target-cpu=native"
+    -- Extend RUSTFLAGS with an explicit CPU/feature set for this invocation.
+    local rustflags = os.getenv("RUSTFLAGS") or ""
+
+    local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
+    local extra
+    if simd_level == "native" then
+        extra = "-C target-cpu=native"
     else
-        rustflags = "-C target-cpu=native"
+        -- Map UWVM2_SIMD_LEVEL to an explicit x86-64 + feature set.
+        local features
+        if simd_level == "sse2" then
+            features = "+sse2"
+        elseif simd_level == "sse3" then
+            features = "+sse2,+sse3"
+        elseif simd_level == "ssse3" then
+            features = "+sse2,+sse3,+ssse3"
+        elseif simd_level == "sse4" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2"
+        elseif simd_level == "avx" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx"
+        elseif simd_level == "avx2" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2"
+        elseif simd_level == "avx512bw" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+avx512bw"
+        elseif simd_level == "avx512vbmi" then
+            -- AVX-512VBMI level also enables AVX-512BW and both VBMI/VBMI2.
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+avx512bw,+avx512vbmi,+avx512vbmi2"
+        else
+            features = nil
+        end
+
+        if features then
+            extra = "-C target-cpu=x86-64 -C target-feature=" .. features
+        else
+            extra = "-C target-cpu=native"
+        end
+    end
+
+    if #rustflags > 0 then
+        rustflags = rustflags .. " " .. extra
+    else
+        rustflags = extra
     end
 
     local fs_data_dir = data_dir
@@ -297,6 +370,7 @@ end
 
 local function parse_varint_fair()
     local unsafe = {}
+    local safe = {}
 
     for line in io.lines(varint_log) do
         -- Lines look like:
@@ -305,8 +379,13 @@ local function parse_varint_fair()
         local scenario = line:match("scenario=([^%s]+)")
         local impl = line:match("impl=([^%s]+)")
         local ns_str = line:match("ns_per_value=([^%s]+)")
-        if scenario and impl == "unsafe" and ns_str then
-            unsafe[scenario] = tonumber(ns_str)
+        if scenario and impl and ns_str then
+            local ns = tonumber(ns_str)
+            if impl == "unsafe" then
+                unsafe[scenario] = ns
+            elseif impl == "safe" then
+                safe[scenario] = ns
+            end
         end
     end
 
@@ -314,10 +393,13 @@ local function parse_varint_fair()
     for scenario, ns in pairs(unsafe) do
         summary_lines[#summary_lines + 1] = string.format("scenario=%s impl=unsafe ns_per_value=%.6f", scenario, ns)
     end
+    for scenario, ns in pairs(safe) do
+        summary_lines[#summary_lines + 1] = string.format("scenario=%s impl=safe ns_per_value=%.6f", scenario, ns)
+    end
     table.sort(summary_lines)
     write_file(varint_summary, table.concat(summary_lines, "\n") .. (next(summary_lines) and "\n" or ""))
 
-    return unsafe
+    return unsafe, safe
 end
 
 -- Parse uwvm2 SIMD timings per scenario --------------------------------------
@@ -337,7 +419,7 @@ end
 
 -- Pretty comparison per scenario ---------------------------------------------
 
-local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, bench_unsafe)
+local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, varint_safe)
     print()
     print(string.rep("=", 80))
     print("Scenario: " .. scenario)
@@ -352,12 +434,18 @@ local function compare_one(scenario, desc, uwvm_simd_ns, varint_unsafe, bench_un
 
     local ns_varint_u = varint_unsafe[scenario]
     if not ns_varint_u then
-        print(string.format("  varint-simd (unsafe) : <bench %s not found in varint-simd output>", bench_unsafe))
+        print("  varint-simd (unsafe, fair-file) : <no unsafe result found>")
     else
         print(string.format("  varint-simd (unsafe, fair-file) : ns_per_value ≈ %.6f",
                             ns_varint_u))
-        local ratio = ns_uwvm / ns_varint_u
-        print(string.format("  ratio (unsafe)       : uwvm2 / varint-simd ≈ %.3f  ( <1 means uwvm2 is faster )", ratio))
+        local ratio_u = ns_uwvm / ns_varint_u
+        print(string.format("  ratio (unsafe)       : uwvm2 / varint-simd ≈ %.3f  ( <1 means uwvm2 is faster )", ratio_u))
+    end
+
+    local ns_varint_s = varint_safe[scenario]
+    if ns_varint_s then
+        print(string.format("  varint-simd (safe,   fair-file) : ns_per_value ≈ %.6f",
+                            ns_varint_s))
     end
 end
 
@@ -377,7 +465,7 @@ local function main()
 
     -- Parse results.
     local uwvm_simd_ns = parse_uwvm_simd()
-    local varint_unsafe = parse_varint_fair()
+    local varint_unsafe, varint_safe = parse_varint_fair()
 
     print()
     print(string.rep("=", 80))
@@ -389,7 +477,7 @@ local function main()
         "typeidx < 2^7, always 1-byte encoding (fast path, zero-copy u8 view)",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     compare_one(
@@ -397,7 +485,7 @@ local function main()
         "2^7 ≤ typeidx < 2^8, 1–2 byte encodings, main fair comparison against varint-u8/decode",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     compare_one(
@@ -405,7 +493,7 @@ local function main()
         "2^8 ≤ typeidx < 2^14, 1–2 byte encodings, rare in real-world wasm but useful as a stress case",
         uwvm_simd_ns,
         varint_unsafe,
-        "unused"
+        varint_safe
     )
 
     print()

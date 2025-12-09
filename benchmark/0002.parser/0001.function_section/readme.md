@@ -93,15 +93,17 @@ The Lua script:
   - `cargo run --release`
 - the Rust fair benchmark:
   - reads `${FS_BENCH_DATA_DIR}/${scenario}.bin` into a `Vec<u8>` (for `u8_1b` / `u8_2b`) or `Vec<u16>` (for `u16_2b`), adding a small padding area required by `decode_unsafe`;
-  - decodes the LEB128 stream `ITERS` times using `varint_simd::decode_unsafe` with the same `FUNC_COUNT` and `ITERS` as the C++ benchmark;
+  - decodes the LEB128 stream `ITERS` times using both `varint_simd::decode_unsafe` (unsafe) and `varint_simd::decode` (safe) with the same `FUNC_COUNT` and `ITERS` as the C++ benchmark;
   - prints machine-readable lines of the form:
 
 ```text
 varint_simd_fs scenario=<...> impl=unsafe values=<...> total_ns=<...> \
                ns_per_value=<...> avg_bytes_value=<...> gib_per_s=<...>
+varint_simd_fs scenario=<...> impl=safe   values=<...> total_ns=<...> \
+               ns_per_value=<...> avg_bytes_value=<...> gib_per_s=<...>
 ```
 
-The Lua driver parses these lines and matches `scenario` names (`u8_1b`, `u8_2b`, `u16_2b`) directly against the uwvm2 results, so both sides are compared on exactly the same LEB128 bytes, with the same `FUNC_COUNT` and `ITERS` configuration.
+The Lua driver currently uses the `impl=unsafe` lines for its ratios, but the `impl=safe` lines are also emitted so that users can inspect the performance of the safe `decode` API on the same shared LEB128 streams.
 
 ## Running the fair shared-data benchmark
 
@@ -128,18 +130,57 @@ lua benchmark/0002.parser/0001.function_section/compare_varint_simd.lua
 
 The Lua driver forwards these variables to both the C++ and Rust fair benchmarks so that all measurements remain comparable.
 
+### Selecting a fixed SIMD level (SSE2 / AVX / AVX2 / AVX-512, etc.)
+
+By default, both the C++ and Rust code are built for the native host CPU (e.g., AVX2 on an i9‑14900HK) using `-march=native` / `-C target-cpu=native`. To force a fair configuration where uwvm2 and varint-simd are compiled for the same *fixed* SIMD level (without any CPUID-based runtime downgrades), you can set:
+
+```bash
+export UWVM2_SIMD_LEVEL=<level>
+lua benchmark/0002.parser/0001.function_section/compare_varint_simd.lua
+```
+
+The recognized `<level>` values are:
+
+- `native`      : default, `-march=native` / `-C target-cpu=native`
+- `sse2`        : x86‑64 + SSE2
+- `sse3`        : x86‑64 + SSE3
+- `ssse3`       : x86‑64 + SSSE3
+- `sse4`        : x86‑64 + SSE4.1/SSE4.2
+- `avx`         : x86‑64 + AVX
+- `avx2`        : x86‑64 + AVX2
+- `avx512bw`    : x86‑64 + AVX2 + AVX‑512BW
+- `avx512vbmi`  : x86‑64 + AVX2 + AVX‑512BW + AVX‑512VBMI/VBMI2
+
+In these modes:
+
+- the C++ benchmark adds the corresponding `-m...` flags (e.g., `-msse2`, `-mavx2`, `-mavx512bw -mavx512vbmi -mavx512vbmi2`) instead of `-march=native`, so the compiler only emits instructions up to the requested SIMD level for uwvm2’s scalar/SIMD paths;
+- the Rust fair benchmark extends `RUSTFLAGS` with an explicit `-C target-cpu=x86-64 -C target-feature=...` string that enables exactly the same SIMD features (e.g., `+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2` for `avx2`), so the `varint-simd` crate is compiled under the same ISA.
+
+This ensures that, for a chosen SIMD level (SSE2, SSE3, SSSE3, SSE4, AVX, AVX2, AVX‑512BW, AVX‑512VBMI), both uwvm2 and varint-simd are evaluated using the same statically selected instruction set, without relying on runtime CPUID dispatch.
+
 ## Example results (i9‑14900HK, AVX2)
 
-All times are in ns/value (smaller is faster). “Ratio” is `uwvm2 SIMD / varint-simd (unsafe)`; values `< 1` mean uwvm2 is faster.
+All times are in ns/value (smaller is faster).
 
-| Scenario | Description                                        | uwvm2 scalar | uwvm2 SIMD | varint-simd (unsafe) | Ratio (SIMD / varint-simd) |
-|----------|----------------------------------------------------|--------------|------------|-----------------------|-----------------------------|
-| u8_1b    | 1-byte encodings, zero-copy view fast path         | 0.3970       | 0.0209     | ≈ 2.5747              | ≈ 0.008                    |
-| u8_2b    | 1–2 byte encodings into `u8` array (main compare)  | 2.6078       | 1.0149     | ≈ 2.5129              | ≈ 0.404                    |
-| u16_2b   | 1–2 byte encodings into `u16` array (stress case)  | 1.0400       | 0.8533     | ≈ 2.5126              | ≈ 0.340                    |
+| Scenario | Description                                        | uwvm2 scalar | uwvm2 SIMD | varint-simd (unsafe) | varint-simd (safe) |
+|----------|----------------------------------------------------|--------------|------------|-----------------------|---------------------|
+| u8_1b    | 1-byte encodings, zero-copy view fast path         | 0.3788       | 0.0165     | ≈ 2.5590              | ≈ 1.2078           |
+| u8_2b    | 1–2 byte encodings into `u8` array (main compare)  | 2.5696       | 0.9691     | ≈ 2.6691              | ≈ 3.1461           |
+| u16_2b   | 1–2 byte encodings into `u16` array (stress case)  | 1.0386       | 0.8275     | ≈ 2.4951              | ≈ 2.7019           |
 
 - The uwvm2 numbers come from the `ns_per_value` field of the C++ benchmark.
-- The varint-simd numbers come from the `varint_simd_fs` lines printed by the Rust fair benchmark, which decodes the same shared LEB128 streams using `varint_simd::decode_unsafe`.
+- The varint-simd (unsafe) numbers come from the `varint_simd_fs` lines with `impl=unsafe` printed by the Rust fair benchmark, which decodes the same shared LEB128 streams using `varint_simd::decode_unsafe`.
+- The varint-simd (safe) numbers come from the corresponding `varint_simd_fs` lines with `impl=safe` (using `varint_simd::decode`).
+
+### Relative ratios (dimensionless)
+
+Ratios are `uwvm2 / varint-simd`; values `< 1` mean uwvm2 is faster.
+
+| Scenario | scalar / unsafe | SIMD / unsafe | scalar / safe | SIMD / safe |
+|----------|-----------------|---------------|---------------|-------------|
+| u8_1b    | ≈ 0.148         | ≈ 0.006       | ≈ 0.314       | ≈ 0.014     |
+| u8_2b    | ≈ 0.963         | ≈ 0.363       | ≈ 0.817       | ≈ 0.308     |
+| u16_2b   | ≈ 0.416         | ≈ 0.332       | ≈ 0.384       | ≈ 0.306     |
 
 ## How to interpret each scenario
 
@@ -151,7 +192,7 @@ The `u8_1b` scenario uses the specialized fast path `scan_function_section_impl_
 - validates the LEB128 stream and creates a zero-copy `u8` view over the function types;
 - does **not** materialize every value into a separate array element.
 
-In contrast, the varint-simd fair benchmark decodes each LEB128 value into a `u8` array using `decode_unsafe::<u8>`. The very large reported speedup (ratio ≈ 0.008) is therefore an upper bound for a highly specialized validation/view fast path, not an apples-to-apples comparison against a generic varint decoder that always decodes into an array.
+In contrast, the varint-simd fair benchmark decodes each LEB128 value into a `u8` array using `decode_unsafe::<u8>`. The very large reported speedup (ratio ≈ 0.006) is therefore an upper bound for a highly specialized validation/view fast path, not an apples-to-apples comparison against a generic varint decoder that always decodes into an array.
 
 ### `u8_2b` – main fair decoder comparison
 
@@ -163,7 +204,7 @@ The `u8_2b` scenario is the primary, reasonably fair comparison point:
 
 The encoded distribution corresponds to uniformly sampling type indices in `[0, type_section_count)` with `type_section_count = 200`, which yields an average encoded length of about 1.36 bytes per value (see the `avg_bytes_value` field). The fair benchmark ensures this distribution is identical for uwvm2 and varint-simd.
 
-Under this setup, the measured ratio of ≈ 0.404 (≈ 2.5× faster) reflects a genuine SIMD decoding advantage for uwvm2’s function-section decoder on this class of data.
+Under this setup, the measured ratio of ≈ 0.363 (≈ 2.8× faster) reflects a genuine SIMD decoding advantage for uwvm2’s function-section decoder on this class of data.
 
 ### `u16_2b` – stress / completeness scenario (not a fully symmetric compare)
 
