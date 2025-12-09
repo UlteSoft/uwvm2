@@ -1,0 +1,8 @@
+[package]
+name = "uwvm2_varint_simd_fair"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+varint-simd = { path = "../outputs/varint-simd" }
+

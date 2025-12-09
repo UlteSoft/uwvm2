@@ -48,6 +48,8 @@
 #include <random>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
+#include <string>
 
 #include <uwvm2/parser/wasm/standard/wasm1/features/function_section.h>
 // Bring in the full wasm1 feature definition (feature name, binfmt version, etc.).
@@ -123,6 +125,111 @@ static std::vector<std::byte> generate_stream(scenario_config cfg,
     }
 
     return buf;
+}
+
+// Load or generate a LEB128 stream for the given scenario.
+// If FS_BENCH_DATA_DIR is set, we use a shared on-disk file so that
+// both uwvm2 and the Rust varint-simd benchmark can decode the exact
+// same bytes:
+//
+//   <FS_BENCH_DATA_DIR>/<scenario>.bin
+//
+// The file format is:
+//   - 8-byte little-endian u64: number of encoded values (func_count)
+//   - raw LEB128 bytes for those values
+//
+// If the file does not exist it is created; otherwise its func_count
+// header must match the requested func_count.
+static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
+                                                      std::size_t func_count,
+                                                      std::uint64_t seed)
+{
+    if(char const* data_dir = std::getenv("FS_BENCH_DATA_DIR"))
+    {
+        std::string path{data_dir};
+        if(!path.empty())
+        {
+            char const back = path.back();
+            if(back != '/' && back != '\\')
+            {
+                path.push_back('/');
+            }
+        }
+        path += cfg.name;
+        path += ".bin";
+
+        {
+            std::ifstream in{path, std::ios::binary};
+            if(in)
+            {
+                std::uint64_t file_func_count{};
+                in.read(reinterpret_cast<char*>(&file_func_count),
+                        static_cast<std::streamsize>(sizeof(file_func_count)));
+                if(!in)
+                {
+                    std::fprintf(stderr,
+                                 "load_or_generate_stream: failed to read header from %s\n",
+                                 path.c_str());
+                    std::abort();
+                }
+
+                if(file_func_count != static_cast<std::uint64_t>(func_count))
+                {
+                    std::fprintf(stderr,
+                                 "load_or_generate_stream: func_count mismatch in %s "
+                                 "(file=%llu, requested=%llu)\n",
+                                 path.c_str(),
+                                 static_cast<unsigned long long>(file_func_count),
+                                 static_cast<unsigned long long>(func_count));
+                    std::abort();
+                }
+
+                std::vector<char> tmp{std::istreambuf_iterator<char>(in),
+                                      std::istreambuf_iterator<char>()};
+                std::vector<std::byte> buf(tmp.size());
+                for(std::size_t i{}; i < tmp.size(); ++i)
+                {
+                    buf[i] = static_cast<std::byte>(
+                        static_cast<unsigned char>(tmp[i]));
+                }
+                return buf;
+            }
+        }
+
+        // File does not exist yet: generate and persist it.
+        auto buf = generate_stream(cfg, func_count, seed);
+
+        std::ofstream out{path, std::ios::binary};
+        if(!out)
+        {
+            std::fprintf(stderr,
+                         "load_or_generate_stream: failed to open %s for write\n",
+                         path.c_str());
+            std::abort();
+        }
+
+        std::uint64_t const header_func_count{
+            static_cast<std::uint64_t>(func_count)};
+        out.write(reinterpret_cast<char const*>(&header_func_count),
+                  static_cast<std::streamsize>(sizeof(header_func_count)));
+        if(!buf.empty())
+        {
+            out.write(reinterpret_cast<char const*>(buf.data()),
+                      static_cast<std::streamsize>(buf.size()));
+        }
+        if(!out)
+        {
+            std::fprintf(stderr,
+                         "load_or_generate_stream: failed to write data to %s\n",
+                         path.c_str());
+            std::abort();
+        }
+
+        return buf;
+    }
+
+    // No shared data directory requested; fall back to in-memory generation.
+    return generate_stream(cfg, func_count, seed);
 }
 
 // Scalar baseline: linear decode using fast_io's leb128_get with basic validation.
@@ -268,9 +375,9 @@ static bench_result run_benchmark(scenario_config cfg,
                                   std::size_t func_count,
                                   std::size_t iterations)
 {
-    // 1. Generate input buffer
+    // 1. Load or generate input buffer.
     auto const buffer{
-        generate_stream(cfg, func_count, 0x1234'5678'9ABC'DEF0ull)};
+        load_or_generate_stream(cfg, func_count, 0x1234'5678'9ABC'DEF0ull)};
 
     auto const* const begin{buffer.data()};
     auto const* const end{buffer.data() + buffer.size()};
