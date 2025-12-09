@@ -534,48 +534,18 @@ inline ::std::size_t open_win32_socket_impl(sock_family d, sock_type t, open_mod
 struct win32_socket_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
 {
 	using native_handle_type = ::std::size_t;
-	::std::size_t hsocket{SIZE_MAX};
-	inline constexpr win32_socket_factory() noexcept = default;
+	::std::size_t hsocket{};
 	inline explicit constexpr win32_socket_factory(::std::size_t v) noexcept
 		: hsocket(v)
 	{}
-	inline constexpr win32_socket_factory(win32_socket_factory const &) = delete;
-	inline constexpr win32_socket_factory &operator=(win32_socket_factory const &) = delete;
-	inline constexpr win32_socket_factory(win32_socket_factory &&other) noexcept
-		: hsocket(other.hsocket)
+	inline win32_socket_factory(win32_socket_factory const &) = delete;
+	inline win32_socket_factory &operator=(win32_socket_factory const &) = delete;
+	inline ~win32_socket_factory()
 	{
-		other.hsocket = SIZE_MAX;
-	}
-	inline constexpr win32_socket_factory &operator=(win32_socket_factory &&other) noexcept
-	{
-		if (__builtin_addressof(other) == this) [[unlikely]]
-		{
-			return *this;
-		}
-		if (hsocket != SIZE_MAX) [[likely]]
+		if (hsocket) [[likely]]
 		{
 			::fast_io::win32::closesocket(hsocket);
 		}
-		hsocket = other.hsocket;
-		other.hsocket = SIZE_MAX;
-		return *this;
-	}
-	inline constexpr ~win32_socket_factory()
-	{
-		if (hsocket != SIZE_MAX) [[likely]]
-		{
-			::fast_io::win32::closesocket(hsocket);
-		}
-	}
-	inline constexpr native_handle_type native_handle() const noexcept
-	{
-		return hsocket;
-	}
-	inline constexpr native_handle_type release() noexcept
-	{
-		native_handle_type temp{hsocket};
-		hsocket = SIZE_MAX;
-		return temp;
 	}
 };
 
