@@ -130,6 +130,34 @@ lua benchmark/0002.parser/0001.function_section/compare_varint_simd.lua
 
 The Lua driver forwards these variables to both the C++ and Rust fair benchmarks so that all measurements remain comparable.
 
+### Selecting a fixed SIMD level (SSE2 / AVX / AVX2 / AVX-512, etc.)
+
+By default, both the C++ and Rust code are built for the native host CPU (e.g., AVX2 on an i9‑14900HK) using `-march=native` / `-C target-cpu=native`. To force a fair configuration where uwvm2 and varint-simd are compiled for the same *fixed* SIMD level (without any CPUID-based runtime downgrades), you can set:
+
+```bash
+export UWVM2_SIMD_LEVEL=<level>
+lua benchmark/0002.parser/0001.function_section/compare_varint_simd.lua
+```
+
+The recognized `<level>` values are:
+
+- `native`      : default, `-march=native` / `-C target-cpu=native`
+- `sse2`        : x86‑64 + SSE2
+- `sse3`        : x86‑64 + SSE3
+- `ssse3`       : x86‑64 + SSSE3
+- `sse4`        : x86‑64 + SSE4.1/SSE4.2
+- `avx`         : x86‑64 + AVX
+- `avx2`        : x86‑64 + AVX2
+- `avx512bw`    : x86‑64 + AVX2 + AVX‑512BW
+- `avx512vbmi`  : x86‑64 + AVX2 + AVX‑512BW + AVX‑512VBMI/VBMI2
+
+In these modes:
+
+- the C++ benchmark adds the corresponding `-m...` flags (e.g., `-msse2`, `-mavx2`, `-mavx512bw -mavx512vbmi -mavx512vbmi2`) instead of `-march=native`, so the compiler only emits instructions up to the requested SIMD level for uwvm2’s scalar/SIMD paths;
+- the Rust fair benchmark extends `RUSTFLAGS` with an explicit `-C target-cpu=x86-64 -C target-feature=...` string that enables exactly the same SIMD features (e.g., `+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2` for `avx2`), so the `varint-simd` crate is compiled under the same ISA.
+
+This ensures that, for a chosen SIMD level (SSE2, SSE3, SSSE3, SSE4, AVX, AVX2, AVX‑512BW, AVX‑512VBMI), both uwvm2 and varint-simd are evaluated using the same statically selected instruction set, without relying on runtime CPUID dispatch.
+
 ## Example results (i9‑14900HK, AVX2)
 
 All times are in ns/value (smaller is faster).

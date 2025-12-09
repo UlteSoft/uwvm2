@@ -50,14 +50,25 @@
 --
 -- Environment variables:
 --
---   CXX              : C++ compiler (default: clang++)
---   CXXFLAGS_EXTRA   : extra C++ flags appended after the defaults
+--   CXX               : C++ compiler (default: clang++)
+--   CXXFLAGS_EXTRA    : extra C++ flags appended after the defaults
 --   VARINT_SIMD_DIR   : path to an existing varint-simd checkout
 --                        (default: auto-clone into ./outputs/varint-simd next to this file)
 --   FUNC_COUNT        : forwarded to uwvm2 benchmark (default: 1_000_000 in C++)
 --   ITERS             : forwarded to both uwvm2 and Rust fair benchmarks (default: 20)
 --   RUSTFLAGS         : existing flags will be preserved and extended with
---                       "-C target-cpu=native" for the Rust fair benchmark run.
+--                        per-run CPU/feature flags
+--   UWVM2_SIMD_LEVEL  : optional fixed SIMD level for both C++ and Rust.
+--                        Recognized values:
+--                          "native"    : use -march=native / -C target-cpu=native (default)
+--                          "sse2"      : x86-64 + SSE2 only
+--                          "sse3"      : x86-64 + SSE3
+--                          "ssse3"     : x86-64 + SSSE3
+--                          "sse4"      : x86-64 + SSE4.1/SSE4.2
+--                          "avx"       : x86-64 + AVX
+--                          "avx2"      : x86-64 + AVX2
+--                          "avx512bw"  : x86-64 + AVX2 + AVX-512BW
+--                          "avx512vbmi": x86-64 + AVX2 + AVX-512BW + AVX-512VBMI/VBMI2
 --
 
 local function join(list, sep)
@@ -155,11 +166,37 @@ local function build_uwvm_bench()
         "-std=c++2c",
         "-O3",
         "-ffast-math",
-        "-march=native",
         "-fno-rtti",
         "-fno-unwind-tables",
         "-fno-asynchronous-unwind-tables",
     }
+
+    local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
+    if simd_level == "native" then
+        table.insert(default_flags, "-march=native")
+    elseif simd_level == "sse2" then
+        table.insert(default_flags, "-msse2")
+    elseif simd_level == "sse3" then
+        table.insert(default_flags, "-msse3")
+    elseif simd_level == "ssse3" then
+        table.insert(default_flags, "-mssse3")
+    elseif simd_level == "sse4" then
+        table.insert(default_flags, "-msse4.1")
+        table.insert(default_flags, "-msse4.2")
+    elseif simd_level == "avx" then
+        table.insert(default_flags, "-mavx")
+    elseif simd_level == "avx2" then
+        table.insert(default_flags, "-mavx2")
+    elseif simd_level == "avx512bw" then
+        table.insert(default_flags, "-mavx512bw")
+    elseif simd_level == "avx512vbmi" then
+        table.insert(default_flags, "-mavx512bw")
+        table.insert(default_flags, "-mavx512vbmi")
+        table.insert(default_flags, "-mavx512vbmi2")
+    else
+        -- Fallback: native
+        table.insert(default_flags, "-march=native")
+    end
 
     local extra = os.getenv("CXXFLAGS_EXTRA")
     local extra_flags = {}
@@ -265,12 +302,48 @@ local function run_varint_bench(varint_dir)
     print()
     print("==> Running Rust varint-simd fair benchmark (shared data files)")
 
-    -- Extend RUSTFLAGS with -C target-cpu=native for this invocation.
-    local rustflags = os.getenv("RUSTFLAGS")
-    if rustflags and #rustflags > 0 then
-        rustflags = rustflags .. " -C target-cpu=native"
+    -- Extend RUSTFLAGS with an explicit CPU/feature set for this invocation.
+    local rustflags = os.getenv("RUSTFLAGS") or ""
+
+    local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
+    local extra
+    if simd_level == "native" then
+        extra = "-C target-cpu=native"
     else
-        rustflags = "-C target-cpu=native"
+        -- Map UWVM2_SIMD_LEVEL to an explicit x86-64 + feature set.
+        local features
+        if simd_level == "sse2" then
+            features = "+sse2"
+        elseif simd_level == "sse3" then
+            features = "+sse2,+sse3"
+        elseif simd_level == "ssse3" then
+            features = "+sse2,+sse3,+ssse3"
+        elseif simd_level == "sse4" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2"
+        elseif simd_level == "avx" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx"
+        elseif simd_level == "avx2" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2"
+        elseif simd_level == "avx512bw" then
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+avx512bw"
+        elseif simd_level == "avx512vbmi" then
+            -- AVX-512VBMI level also enables AVX-512BW and both VBMI/VBMI2.
+            features = "+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+avx512bw,+avx512vbmi,+avx512vbmi2"
+        else
+            features = nil
+        end
+
+        if features then
+            extra = "-C target-cpu=x86-64 -C target-feature=" .. features
+        else
+            extra = "-C target-cpu=native"
+        end
+    end
+
+    if #rustflags > 0 then
+        rustflags = rustflags .. " " .. extra
+    else
+        rustflags = extra
     end
 
     local fs_data_dir = data_dir
