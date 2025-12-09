@@ -239,29 +239,29 @@ The `u16_2b` scenario should thus be interpreted as:
 
 This section compiles the per-value execution times (ns/value) output by the Lua script `compare_varint_simd.lua` when explicitly setting C++ and Rust compilation parameters for different `UWVM2_SIMD_LEVEL` (SSE2, SSE3, SSSE3, SSE4, AVX, AVX2) on a fixed host.
 
-All time units are ns/value, where lower values indicate faster performance; the ratio column represents `uwvm2 / varint-simd (unsafe)`, with values below 1 indicating uwvm2 is faster.
+All time units are ns/value, where lower values indicate faster performance. Both the uwvm2 scalar baseline and SIMD implementation are shown; the ratio column represents `uwvm2 SIMD / varint-simd (unsafe)`, with values below 1 indicating uwvm2 SIMD is faster.
 
-| UWVM2_SIMD_LEVEL | Scenario | uwvm2 ns/value | varint-simd (unsafe) ns/value | ratio (uwvm2/unsafe) | varint-simd (safe) ns/value |
-|------------------|----------|----------------|--------------------------------|-----------------------|-----------------------------|
-| sse2             | u8_1b    | 0.028107       | ≈ 2.493716                     | ≈ 0.011               | ≈ 1.216680                  |
-| sse2             | u8_2b    | 2.747664       | ≈ 2.515034                     | ≈ 1.092               | ≈ 3.188452                  |
-| sse2             | u16_2b   | 1.204023       | ≈ 2.623844                     | ≈ 0.459               | ≈ 2.831848                  |
-| sse3             | u8_1b    | 0.037465       | ≈ 2.840755                     | ≈ 0.013               | ≈ 1.420337                  |
-| sse3             | u8_2b    | 3.000886       | ≈ 2.879563                     | ≈ 1.042               | ≈ 3.760658                  |
-| sse3             | u16_2b   | 1.325757       | ≈ 3.211448                     | ≈ 0.413               | ≈ 3.299425                  |
-| ssse3            | u8_1b    | 0.032394       | ≈ 2.773981                     | ≈ 0.012               | ≈ 1.328446                  |
-| ssse3            | u8_2b    | 0.705934       | ≈ 2.722914                     | ≈ 0.259               | ≈ 3.453877                  |
-| ssse3            | u16_2b   | 0.850092       | ≈ 2.812776                     | ≈ 0.302               | ≈ 3.031550                  |
-| sse4             | u8_1b    | 0.031192       | ≈ 2.595154                     | ≈ 0.012               | ≈ 1.258592                  |
-| sse4             | u8_2b    | 0.666224       | ≈ 2.646469                     | ≈ 0.252               | ≈ 3.212863                  |
-| sse4             | u16_2b   | 0.817972       | ≈ 2.765576                     | ≈ 0.296               | ≈ 2.863301                  |
-| avx              | u8_1b    | 0.018877       | ≈ 2.555923                     | ≈ 0.007               | ≈ 1.182833                  |
-| avx              | u8_2b    | 0.702502       | ≈ 2.512577                     | ≈ 0.280               | ≈ 3.014511                  |
-| avx              | u16_2b   | 0.802967       | ≈ 2.601113                     | ≈ 0.309               | ≈ 2.769782                  |
-| avx2             | u8_1b    | 0.015158       | ≈ 2.558267                     | ≈ 0.006               | ≈ 1.157513                  |
-| avx2             | u8_2b    | 0.895701       | ≈ 2.527859                     | ≈ 0.354               | ≈ 2.982243                  |
-| avx2             | u16_2b   | 0.807479       | ≈ 2.636942                     | ≈ 0.306               | ≈ 2.871885                  |
+| UWVM2_SIMD_LEVEL | Scenario | fast_io (uwvm2 scalar) ns/value | uwvm2 ns/value | varint-simd (unsafe) ns/value | ratio (SIMD/unsafe) | varint-simd (safe) ns/value |
+|------------------|----------|------------------------|---------------------|--------------------------------|----------------------|-----------------------------|
+| sse2             | u8_1b    | 0.623009               | 0.028107            | ≈ 2.493716                     | ≈ 0.011              | ≈ 1.216680                  |
+| sse2             | u8_2b    | 3.892114               | 2.747664            | ≈ 2.515034                     | ≈ 1.092              | ≈ 3.188452                  |
+| sse2             | u16_2b   | 1.396773               | 1.204023            | ≈ 2.623844                     | ≈ 0.459              | ≈ 2.831848                  |
+| sse3             | u8_1b    | 0.713941               | 0.037465            | ≈ 2.840755                     | ≈ 0.013              | ≈ 1.420337                  |
+| sse3             | u8_2b    | 4.276907               | 3.000886            | ≈ 2.879563                     | ≈ 1.042              | ≈ 3.760658                  |
+| sse3             | u16_2b   | 1.528552               | 1.325757            | ≈ 3.211448                     | ≈ 0.413              | ≈ 3.299425                  |
+| ssse3            | u8_1b    | 0.716849               | 0.032394            | ≈ 2.773981                     | ≈ 0.012              | ≈ 1.328446                  |
+| ssse3            | u8_2b    | 4.296264               | 0.705934            | ≈ 2.722914                     | ≈ 0.259              | ≈ 3.453877                  |
+| ssse3            | u16_2b   | 1.512101               | 0.850092            | ≈ 2.812776                     | ≈ 0.302              | ≈ 3.031550                  |
+| sse4             | u8_1b    | 0.651683               | 0.031192            | ≈ 2.595154                     | ≈ 0.012              | ≈ 1.258592                  |
+| sse4             | u8_2b    | 3.963856               | 0.666224            | ≈ 2.646469                     | ≈ 0.252              | ≈ 3.212863                  |
+| sse4             | u16_2b   | 1.346232               | 0.817972            | ≈ 2.765576                     | ≈ 0.296              | ≈ 2.863301                  |
+| avx              | u8_1b    | 0.678372               | 0.018877            | ≈ 2.555923                     | ≈ 0.007              | ≈ 1.182833                  |
+| avx              | u8_2b    | 4.037088               | 0.702502            | ≈ 2.512577                     | ≈ 0.280              | ≈ 3.014511                  |
+| avx              | u16_2b   | 1.326338               | 0.802967            | ≈ 2.601113                     | ≈ 0.309              | ≈ 2.769782                  |
+| avx2             | u8_1b    | 0.657058               | 0.015158            | ≈ 2.558267                     | ≈ 0.006              | ≈ 1.157513                  |
+| avx2             | u8_2b    | 3.937200               | 0.895701            | ≈ 2.527859                     | ≈ 0.354              | ≈ 2.982243                  |
+| avx2             | u16_2b   | 1.384856               | 0.807479            | ≈ 2.636942                     | ≈ 0.306              | ≈ 2.871885                  |
 
-The above data is derived from a single baseline run and is primarily intended for comparing the relative performance of uwvm2 and varint-simd across different SIMD levels, rather than serving as absolute performance metrics across machines.
+The above data is derived from a single baseline run and is primarily intended for comparing the relative performance of uwvm2 and varint-simd (both scalar and SIMD paths) across different SIMD levels, rather than serving as absolute performance metrics across machines.
 
 ![benchmark](output.png)
