@@ -107,12 +107,12 @@ All times are in ns/value (smaller is faster). “Ratio” is `uwvm2 SIMD / vari
 
 | Scenario | Description                                        | uwvm2 scalar | uwvm2 SIMD | varint-simd (unsafe) | Ratio (SIMD / varint-simd) |
 |----------|----------------------------------------------------|--------------|------------|-----------------------|-----------------------------|
-| u8_1b    | 1-byte encodings, zero-copy view fast path         | 0.4089       | 0.0159     | ≈ 2.3719              | ≈ 0.007                    |
-| u8_2b    | 1–2 byte encodings into `u8` array (main compare)  | 2.6234       | 0.9621     | ≈ 2.3719              | ≈ 0.406                    |
-| u16_2b   | 1–2 byte encodings into `u16` array (stress case)  | 1.0904       | 0.8889     | ≈ 2.4648              | ≈ 0.361                    |
+| u8_1b    | 1-byte encodings, zero-copy view fast path         | 0.3970       | 0.0209     | ≈ 2.5747              | ≈ 0.008                    |
+| u8_2b    | 1–2 byte encodings into `u8` array (main compare)  | 2.6078       | 1.0149     | ≈ 2.5129              | ≈ 0.404                    |
+| u16_2b   | 1–2 byte encodings into `u16` array (stress case)  | 1.0400       | 0.8533     | ≈ 2.5126              | ≈ 0.340                    |
 
 - The uwvm2 numbers come from the `ns_per_value` field of the C++ benchmark.
-- The varint-simd numbers are parsed from `varint-u8/decode/varint-simd/unsafe` and `varint-u16/decode/varint-simd/unsafe` in the upstream bench log.
+- The varint-simd numbers come from the `varint_simd_fs` lines printed by the Rust fair benchmark, which decodes the same shared LEB128 streams using `varint_simd::decode_unsafe`.
 
 ## How to interpret each scenario
 
@@ -124,21 +124,19 @@ The `u8_1b` scenario uses the specialized fast path `scan_function_section_impl_
 - validates the LEB128 stream and creates a zero-copy `u8` view over the function types;
 - does **not** materialize every value into a separate array element.
 
-In contrast, `varint-u8/decode/varint-simd/unsafe` decodes each LEB128 value into a `Vec<u8>`. The very large reported speedup (ratio ≈ 0.007) is therefore an upper bound for a highly specialized validation/view fast path, not an apples-to-apples comparison against a generic varint decoder that always decodes into an array.
+In contrast, the varint-simd fair benchmark decodes each LEB128 value into a `u8` array using `decode_unsafe::<u8>`. The very large reported speedup (ratio ≈ 0.008) is therefore an upper bound for a highly specialized validation/view fast path, not an apples-to-apples comparison against a generic varint decoder that always decodes into an array.
 
 ### `u8_2b` – main fair decoder comparison
 
 The `u8_2b` scenario is the primary, reasonably fair comparison point:
 
-- both uwvm2 and varint-simd decode 1–2 byte LEB128<u32> values into an array of `u8`;
+- both uwvm2 and the varint-simd fair benchmark decode 1–2 byte LEB128<u32> values into an array of `u8`;
+- both sides run on the **exact same** LEB128 byte stream, generated once by the C++ code and written to `${FS_BENCH_DATA_DIR}/u8_2b.bin`;
 - the benchmark reports ns/value for both implementations.
 
-There is a small difference in the input distributions:
+The encoded distribution corresponds to uniformly sampling type indices in `[0, type_section_count)` with `type_section_count = 200`, which yields an average encoded length of about 1.36 bytes per value (see the `avg_bytes_value` field). The fair benchmark ensures this distribution is identical for uwvm2 and varint-simd.
 
-- varint-simd’s `varint-u8/decode` benches use uniformly random `u8` values in `[0, 255]`, so roughly half the values require 2-byte encodings;
-- the uwvm2 `u8_2b` scenario samples type indices uniformly in `[0, type_section_count)` with `type_section_count = 200`, which yields an average encoded length of about 1.36 bytes per value (see the `avg_bytes_value` field).
-
-This means the uwvm2 run is measured on slightly “lighter” inputs than the default varint-simd benchmark. Even after accounting for this, the measured ratio of ≈ 0.406 (≈ 2.5× faster) reflects a genuine SIMD decoding advantage for uwvm2’s function-section decoder on this class of data.
+Under this setup, the measured ratio of ≈ 0.404 (≈ 2.5× faster) reflects a genuine SIMD decoding advantage for uwvm2’s function-section decoder on this class of data.
 
 ### `u16_2b` – stress / completeness scenario (not a fully symmetric compare)
 
