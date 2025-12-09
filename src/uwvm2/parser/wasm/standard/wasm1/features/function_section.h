@@ -4635,7 +4635,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
 #else
         /// SIMT 64bit pointer and little endian
-        if constexpr(static_cast<unsigned>(::std::numeric_limits<::std::size_t>::digits) == 64u && ::std::endian::native == ::std::endian::little)
+        if constexpr(::std::endian::native == ::std::endian::little && CHAR_BIT == 8)
         {
             auto fast_decode_uleb128_u32{[&] UWVM_ALWAYS_INLINE(::std::byte const* p,
                                                                 ::std::byte const* end,
@@ -4647,19 +4647,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              auto const remaining{static_cast<::std::size_t>(end - p)};
                                              if(remaining == 0uz) [[unlikely]] { return false; }
 
-                                             // Only use the 64-bit trick when we have enough bytes; otherwise,
-                                             // let the scalar path handle the tail.
-                                             if(remaining < sizeof(::std::uint_least64_t)) [[unlikely]] { return false; }
+                                             // This provides a maximum of 2 bytes for data storage. You can use `unsigned short`, but it will be type-promoted to `int` or `unsigned int` in expressions. To avoid type promotion, use `unsigned int` (i.e., `unsigned`) directly, which will not be promoted. According to the C standard, `short` is at least 16 bits, and `int` is at least as large as `short`. Therefore, the size of `unsigned int` is typically ≥ 2 bytes.
+                                             if(remaining < sizeof(unsigned)) [[unlikely]] { return false; }
 
                                              // wasm_byte is uint_least8_t, so it is safe to reinterpret_cast
                                              auto const* bytes{reinterpret_cast<wasm_byte const*>(p)};
 
-                                             ::std::uint_least64_t word{};
+                                             unsigned word{};
                                              ::std::memcpy(::std::addressof(word), bytes, sizeof(word));
 
                                              // Bits 7, 15, 23, ... are zero for the terminating byte.
-                                             constexpr ::std::uint_least64_t msb_mask{~0x7F7F7F7F7F7F7F7FULL};
-                                             ::std::uint_least64_t const msbs{~word & msb_mask};
+                                             constexpr unsigned msb_mask{~0x7F7F7F7Fu};
+                                             unsigned const msbs{~word & msb_mask};
 
                                              if(msbs == 0u) [[unlikely]]
                                              {
@@ -4679,17 +4678,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              }
 
                                              // Scalar reconstruction from the packed bytes in 'word'.
-                                             ::std::uint_least64_t tmp{word};
-                                             ::std::uint_least32_t value{};
+                                             ::std::uint_least32_t value{static_cast<std::uint_least32_t>(word & 0x7Fu)};
 
-                                             if(len_bytes == 1u)
+                                             if (len_bytes == 2u)
                                              {
-                                                value = static_cast<::std::uint_least32_t>(tmp & 0xFFu);
+                                                 value |= static_cast<std::uint_least32_t>(((word >> 8u) & 0x7Fu) << 7u);
                                              }
-                                             else /* len_bytes == 2u */
-                                             {
-                                                 value = static_cast<::std::uint_least32_t>(tmp & 0xFFFFu);
-                                             }
+                                             
 
                                              out_value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(value);
                                              out_len = len_bytes;
