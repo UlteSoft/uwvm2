@@ -270,5 +270,6 @@ int main()
     return 0;
 }
 
-// clang++ -o RWSpinLock RWSpinLock.cc -std=c++26 -Ofast -s -flto -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I ../../src -I ../../third-parties/fast_io/include -I ../../third-parties/bizwen/include -I ../../third-parties/boost_unordered/include -fuse-ld=lld
-// g++ -o RWSpinLock RWSpinLock.cc -std=c++26 -Ofast -s -flto -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I ../../src -I ../../third-parties/fast_io/include -I ../../third-parties/bizwen/include -I ../../third-parties/boost_unordered/include
+  // From project root:
+  // clang++   benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I third-parties/bizwen/include -I third-parties/boost_unordered/include
+  // g++       benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I third-parties/bizwen/include -I third-parties/boost_unordered/include
