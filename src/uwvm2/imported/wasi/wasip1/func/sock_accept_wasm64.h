@@ -48,9 +48,6 @@
 # if __has_include(<netinet/in.h>)
 #  include <netinet/in.h>
 # endif
-# if defined(_WIN32) && !defined(__CYGWIN__)
-#  include <winsock.h>
-# endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
