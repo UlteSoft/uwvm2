@@ -21,6 +21,8 @@ Unless otherwise noted, the example numbers in this file come from a single run 
 
 - C++ built using `clang++ -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables`
 - Rust fair benchmark run with `RUSTFLAGS="-C target-cpu=native"` and `cargo run --release` in `varint-simd-fair/`
+- uwvm2 repository at commit [`03bc4a36cf8037386a91bf8fdf73a652d6230a8d`](https://github.com/MacroModel/uwvm2/commit/03bc4a36cf8037386a91bf8fdf73a652d6230a8d)
+- `as-com/varint-simd` crate at commit [`41a86e3470b7cc8b5cc17f9d20f86679b325715d`](https://github.com/as-com/varint-simd/commit/41a86e3470b7cc8b5cc17f9d20f86679b325715d)
 
 ## Prerequisites and basic build steps
 
