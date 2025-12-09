@@ -4681,11 +4681,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              // Scalar reconstruction from the packed bytes in 'word'.
                                              ::std::uint_least64_t tmp{word};
                                              ::std::uint_least32_t value{};
-                                             for(unsigned i{}; i != len_bytes; ++i)
+
+                                             if(len_bytes == 1u)
                                              {
-                                                 auto const byte{static_cast<wasm_byte>(tmp & 0xFFu)};
-                                                 value |= static_cast<::std::uint_least32_t>(byte & 0x7Fu) << (i * 7u);
-                                                 tmp >>= 8u;
+                                                value = static_cast<::std::uint_least32_t>(tmp & 0xFFu);
+                                             }
+                                             else /* len_bytes == 2u */
+                                             {
+                                                 value = static_cast<::std::uint_least32_t>(tmp & 0xFFFFu);
                                              }
 
                                              out_value = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(value);
