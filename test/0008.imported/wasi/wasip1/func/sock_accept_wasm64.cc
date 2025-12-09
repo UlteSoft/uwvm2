@@ -23,7 +23,7 @@
 
 #include <fast_io.h>
 
-#if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32)
+#if (!defined(__NEWLIB__) || defined(__CYGWIN__))
 
 #include <uwvm2/imported/wasi/wasip1/func/sock_accept_wasm64.h>
 
