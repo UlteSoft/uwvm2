@@ -260,10 +260,25 @@ local function run_varint_bench(varint_dir)
     -- robust even if the upstream CLI changes.
     local cmd = string.format('cd %q && RUSTFLAGS=%q CARGO_TERM_COLOR=never cargo bench --bench varint_bench > %q 2>&1',
                               varint_dir, rustflags, varint_log)
-    run_or_die(cmd)
+    print(">> " .. cmd)
+    local ok, why, code = os.execute(cmd)
+    if not (ok == true or ok == 0) then
+        print()
+        print("WARNING: failed to run Rust varint-simd benchmarks.")
+        print("         The varint-simd crate currently targets x86/x86_64")
+        print("         with SIMD extensions (e.g. SSE2/AVX2). On non-x86")
+        print("         platforms these intrinsics are unavailable, so the")
+        print("         Rust benchmark build will fail and cross-project")
+        print("         comparisons cannot be produced.")
+        print()
+        print("         uwvm2 native SIMD/scalar results above are still valid,")
+        print("         but no varint-simd baseline is available on this host.")
+        return false
+    end
 
     print("varint-simd raw output saved to:")
     print("  " .. varint_log)
+    return true
 end
 
 -- Parse varint-simd decode timings -------------------------------------------
@@ -385,7 +400,17 @@ local function main()
     run_uwvm_bench()
 
     local varint_dir = ensure_varint_repo()
-    run_varint_bench(varint_dir)
+    local ok_varint = run_varint_bench(varint_dir)
+    if not ok_varint then
+        print()
+        print(string.rep("=", 80))
+        print("Skipping varint-simd decode comparison because varint-simd")
+        print("benches could not be built on this non-x86 SIMD platform.")
+        print(string.rep("=", 80))
+        print()
+        print("Done.")
+        return
+    end
 
     -- Parse results.
     local uwvm_simd_ns = parse_uwvm_simd()
@@ -437,5 +462,4 @@ local function main()
 end
 
 main()
-
 
