@@ -73,6 +73,14 @@ The file-descriptor manager in `fd_manager` provides the core machinery for impl
 - **Capability-based rights.** Each entry in the descriptor table tracks base and inheriting rights. The WASI P1 functions check these rights before
   performing operations such as `path_open`, `fd_read`, or `fd_renumber`, returning errors like `enotcapable` when the caller lacks the required
   capabilities.
+- **Socket child rights and inheritance.** For socket-related operations such as `sock_accept`, newly created child descriptors derive their rights
+  from the parent descriptor’s rights intersection: `child.rights_base = parent.rights_base & parent.rights_inherit`, and
+  `child.rights_inherit = child.rights_base`. This ensures that children never gain capabilities beyond what the parent is both allowed to use and
+  allowed to delegate.
+- **Non-blocking flag inheritance.** On POSIX hosts, accepted sockets inherit non-blocking behavior from both the call-time flags and the listening
+  descriptor. Concretely, the effective non-blocking mode is computed as `is_nonblock_effective = (fdflags & NONBLOCK) || (listener has O_NONBLOCK)`,
+  and the new socket’s `O_NONBLOCK` bit is set or cleared accordingly. On Windows, where the existing model does not track `O_NONBLOCK` for sockets,
+  the non-blocking state of accepted sockets is determined solely by the WASI `fdflags` passed to `sock_accept`.
 - **Typed descriptors.** Descriptors differentiate between files, directories, and other resources. This allows the implementation to reject invalid
   operations early (for example, using a file descriptor where a directory is required).
 - **Native integration via fast_io.** The manager uses `fast_io` to open, read, write, and enumerate host files and directories, leveraging

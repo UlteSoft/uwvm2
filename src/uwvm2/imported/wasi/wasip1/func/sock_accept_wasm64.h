@@ -62,6 +62,7 @@
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
 # include "base.h"
 # include "posix.h"
+# include "sock_accept.h"
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
@@ -76,89 +77,12 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
-    struct wasi_addr_ip4_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n0;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n1;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n2;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n3;
-    };
-
-    inline constexpr ::std::size_t size_of_wasi_addr_ip4_t{4uz};
-
-    inline consteval bool is_default_wasi_addr_ip4_data_layout() noexcept
-    {
-        return __builtin_offsetof(wasi_addr_ip4_t, n0) == 0uz && __builtin_offsetof(wasi_addr_ip4_t, n1) == 1uz &&
-               __builtin_offsetof(wasi_addr_ip4_t, n2) == 2uz && __builtin_offsetof(wasi_addr_ip4_t, n3) == 3uz &&
-               sizeof(wasi_addr_ip4_t) == size_of_wasi_addr_ip4_t && alignof(wasi_addr_ip4_t) == 1uz && ::std::endian::native == ::std::endian::little;
-    }
-
-    struct wasi_addr_ip6_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n[16];
-    };
-
-    inline constexpr ::std::size_t size_of_wasi_addr_ip6_t{16uz};
-
-    inline consteval bool is_default_wasi_addr_ip6_data_layout() noexcept
-    {
-        return __builtin_offsetof(wasi_addr_ip6_t, n[0]) == 0uz && __builtin_offsetof(wasi_addr_ip6_t, n[1]) == 1uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[2]) == 2uz && __builtin_offsetof(wasi_addr_ip6_t, n[3]) == 3uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[4]) == 4uz && __builtin_offsetof(wasi_addr_ip6_t, n[5]) == 5uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[6]) == 6uz && __builtin_offsetof(wasi_addr_ip6_t, n[7]) == 7uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[8]) == 8uz && __builtin_offsetof(wasi_addr_ip6_t, n[9]) == 9uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[10]) == 10uz && __builtin_offsetof(wasi_addr_ip6_t, n[11]) == 11uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[12]) == 12uz && __builtin_offsetof(wasi_addr_ip6_t, n[13]) == 13uz &&
-               __builtin_offsetof(wasi_addr_ip6_t, n[14]) == 14uz && __builtin_offsetof(wasi_addr_ip6_t, n[15]) == 15uz &&
-               sizeof(wasi_addr_ip6_t) == size_of_wasi_addr_ip6_t && alignof(wasi_addr_ip6_t) == 1uz && ::std::endian::native == ::std::endian::little;
-    }
-
-    struct wasi_addr_t
-    {
-        // 0 = ipv4, 1 = ipv6
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 tag;
-
-        union wasi_addr_u_t
-        {
-            wasi_addr_ip4_t ip4;
-            wasi_addr_ip6_t ip6;
-        } u;
-    };
-
-    // In standard layout, this struct has size 17:
-    // 1 byte tag + 16-byte union.
-    inline constexpr ::std::size_t size_of_wasi_addr_t{17uz};
-
-    inline consteval bool is_default_wasi_addr_data_layout() noexcept
-    {
-        return __builtin_offsetof(wasi_addr_t, tag) == 0uz && __builtin_offsetof(wasi_addr_t, u) == 1uz && __builtin_offsetof(wasi_addr_t, u.ip4) == 1uz &&
-               __builtin_offsetof(wasi_addr_t, u.ip6) == 1uz && sizeof(wasi_addr_t) == size_of_wasi_addr_t && alignof(wasi_addr_t) == 1uz &&
-               ::std::endian::native == ::std::endian::little && is_default_wasi_addr_ip4_data_layout() && is_default_wasi_addr_ip6_data_layout();
-    }
-
-    struct wasi_addr_port_t
-    {
-        wasi_addr_t addr;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u16 port;
-    };
-
-    // In standard layout, this struct has size 20:
-    // 17-byte addr + 1 byte padding + 2-byte port.
-    inline constexpr ::std::size_t size_of_wasi_addr_port_t{20uz};
-
-    inline consteval bool is_default_wasi_addr_port_data_layout() noexcept
-    {
-        return __builtin_offsetof(wasi_addr_port_t, addr) == 0uz && __builtin_offsetof(wasi_addr_port_t, port) == 18uz &&
-               sizeof(wasi_addr_port_t) == size_of_wasi_addr_port_t && alignof(wasi_addr_port_t) == 2uz && ::std::endian::native == ::std::endian::little &&
-               is_default_wasi_addr_data_layout();
-    }
-
-    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_accept(
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t sock_accept_wasm64(
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
-        ::uwvm2::imported::wasi::wasip1::abi::fdflags_t fd_flags,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t ro_fd_ptrsz,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t ro_addr_ptrsz) noexcept
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t sock_fd,
+        ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t fd_flags,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_fd_ptrsz,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_addr_ptrsz) noexcept
     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
@@ -183,7 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"wasip1: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                u8"sock_accept",
+                                u8"sock_accept_wasm64",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"(",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -207,7 +131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 # else
             ::fast_io::io::perr(::fast_io::u8err(),
-                                u8"uwvm: [info]  wasip1: sock_accept(",
+                                u8"uwvm: [info]  wasip1: sock_accept_wasm64(",
                                 sock_fd,
                                 u8", ",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
@@ -220,7 +144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
-        if(sock_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+        if(sock_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
 
         auto& wasm_fd_storage{env.fd_storage};
 
@@ -239,14 +163,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::mutex::rw_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
             // Negative states have been excluded, so the conversion result will only be positive numbers.
-            using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>;
+            using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t>;
             auto const unsigned_fd{static_cast<unsigned_fd_t>(sock_fd)};
 
             // On platforms where `size_t` is smaller than the `fd` type, this check must be added.
             constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
             if constexpr(::std::numeric_limits<unsigned_fd_t>::max() > size_t_max)
             {
-                if(unsigned_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+                if(unsigned_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
             }
 
             auto const fd_opens_pos{static_cast<::std::size_t>(unsigned_fd)};
@@ -261,7 +185,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
                 else [[unlikely]]
                 {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
                 }
             }
             else
@@ -295,22 +219,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         // If obtained from the renumber map, it will always be the correct value. If obtained from the open vec, it requires checking whether it is closed.
         // Therefore, a unified check is implemented.
-        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }
 
-        if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_sock_accept) !=
-           ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_sock_accept) [[unlikely]]
+        if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_sock_accept) !=
+           ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_sock_accept) [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable;
         }
 
-        // Only fdflag_nonblock is supported for sock_accept. Any other bits are treated as invalid arguments.
-        if((fd_flags & ~::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) != ::uwvm2::imported::wasi::wasip1::abi::fdflags_t{}) [[unlikely]]
+        // Only fdflag_nonblock is supported for sock_accept_wasm64. Any other bits are treated as invalid arguments.
+        if((fd_flags & ~::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_nonblock) != ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t{})
+            [[unlikely]]
         {
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
         }
 
-        [[maybe_unused]] bool const is_nonblock{(fd_flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
-                                                ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock};
+        [[maybe_unused]] bool const is_nonblock{(fd_flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_nonblock) ==
+                                                ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t::fdflag_nonblock};
 
         // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
         // being processed, making this a virtual machine implementation error.
@@ -320,20 +245,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
         }
 
         switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
             {
 # if defined(_WIN32) && !defined(__CYGWIN__)
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsock;
 # else
 
                 ::fast_io::native_io_observer curr_fd_native_observer{};
@@ -408,7 +333,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
                 }
 
-                using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
+                using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t;
 
                 fd_t new_fd{};
 
@@ -430,12 +355,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
                     // check limit
-                    using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
+                    using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t;
                     if constexpr(::std::numeric_limits<::std::size_t>::max() > ::std::numeric_limits<fd_t>::max())
                     {
                         if(env.fd_storage.fd_limit > ::std::numeric_limits<fd_t>::max()) [[unlikely]]
                         {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                         }
                     }
 
@@ -445,7 +370,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     // There is no need to worry about overflow here, as all files in wasip1 are created using path_open and are incrementally assigned.
                     auto const all_size{open_size - close_size + renumber_size};
-                    if(all_size >= env.fd_storage.fd_limit) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile; }
+                    if(all_size >= env.fd_storage.fd_limit) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::emfile; }
 
                     // create new
                     if(!wasm_fd_storage.closes.empty())
@@ -467,7 +392,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         {
                             if(wasm_fd_storage.opens.size() >= ::std::numeric_limits<fd_t>::max()) [[unlikely]]
                             {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile;
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::emfile;
                             }
                         }
 
@@ -481,7 +406,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         // Use while loop to avoid iterator invalidation during erase
                         for(;;)
                         {
-                            auto it2{wasm_fd_storage.renumber_map.find(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(open_size))};
+                            auto it2{wasm_fd_storage.renumber_map.find(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t>(open_size))};
                             if(it2 == wasm_fd_storage.renumber_map.end()) { break; }
 
                             wasm_fd_storage.opens.push_back(it2->second.release());
@@ -494,7 +419,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unlocked(memory, ro_fd_ptrsz, new_fd);
 
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
                     //
@@ -503,9 +428,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     //   u.octs: [port_be[0], port_be[1], ip bytes...]
                     //
                     // The buffer pointed to by ro_addr_ptrsz must hold size_of_wasi_addr_port_t bytes.
-                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, ro_addr_ptrsz, size_of_wasi_addr_port_t);
+                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(
+                        memory,
+                        ro_addr_ptrsz,
+                        ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
 
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[size_of_wasi_addr_port_t]{};
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t]{};
 
                     auto* const raw_ptr{raw};
 
@@ -570,19 +498,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         }
                     }
 
-                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(memory,
-                                                                                                           ro_addr_ptrsz,
-                                                                                                           reinterpret_cast<::std::byte const*>(raw_ptr),
-                                                                                                           reinterpret_cast<::std::byte const*>(raw_ptr) +
-                                                                                                               size_of_wasi_addr_port_t);
+                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm64_unchecked_unlocked(
+                        memory,
+                        ro_addr_ptrsz,
+                        reinterpret_cast<::std::byte const*>(raw_ptr),
+                        reinterpret_cast<::std::byte const*>(raw_ptr) + ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
                 }
 
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
 # endif
             }
             [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
             {
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsock;
             }
 # if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
@@ -622,9 +550,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     switch(e.code)
                     {
-                        case WSAEWOULDBLOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
-                        case WSAENOTSOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
-                        case WSAEINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                        case WSAEWOULDBLOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eagain;
+                        case WSAENOTSOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotsock;
+                        case WSAEINVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
                         default: return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                     }
                 }
@@ -638,18 +566,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     switch(::fast_io::win32::WSAGetLastError())
                     {
-                        case 10022 /*WSAEINVAL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                        case 10004 /*WSAEINTR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-                        case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
-                        case 10013 /*WSAEACCES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
-                        case 10050 /*WSAENETDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                        case 10055 /*WSAENOBUFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enobufs;
-                        case 10014 /*WSAEFAULT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
-                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10022 /*WSAEINVAL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::einval;
+                        case 10004 /*WSAEINTR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eintr;
+                        case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf;
+                        case 10013 /*WSAEACCES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eacces;
+                        case 10050 /*WSAENETDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
+                        case 10055 /*WSAENOBUFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enobufs;
+                        case 10014 /*WSAEFAULT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::efault;
+                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                     }
                 }
 
-                using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
+                using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t;
 
                 fd_t new_fd{};
 
@@ -670,12 +598,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
                     // check limit
-                    using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
+                    using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t;
                     if constexpr(::std::numeric_limits<::std::size_t>::max() > ::std::numeric_limits<fd_t>::max())
                     {
                         if(env.fd_storage.fd_limit > ::std::numeric_limits<fd_t>::max()) [[unlikely]]
                         {
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
                         }
                     }
 
@@ -685,7 +613,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     // There is no need to worry about overflow here, as all files in wasip1 are created using path_open and are incrementally assigned.
                     auto const all_size{open_size - close_size + renumber_size};
-                    if(all_size >= env.fd_storage.fd_limit) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile; }
+                    if(all_size >= env.fd_storage.fd_limit) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::emfile; }
 
                     // create new
                     if(!wasm_fd_storage.closes.empty())
@@ -707,7 +635,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         {
                             if(wasm_fd_storage.opens.size() >= ::std::numeric_limits<fd_t>::max()) [[unlikely]]
                             {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile;
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::emfile;
                             }
                         }
 
@@ -721,7 +649,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         // Use while loop to avoid iterator invalidation during erase
                         for(;;)
                         {
-                            auto it2{wasm_fd_storage.renumber_map.find(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>(open_size))};
+                            auto it2{wasm_fd_storage.renumber_map.find(static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t>(open_size))};
                             if(it2 == wasm_fd_storage.renumber_map.end()) { break; }
 
                             wasm_fd_storage.opens.push_back(it2->second.release());
@@ -734,7 +662,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_fd_ptrsz, new_fd);
+                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unlocked(memory, ro_fd_ptrsz, new_fd);
 
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
                     //
@@ -743,9 +671,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     //   u.octs: [port_be[0], port_be[1], ip bytes...]
                     //
                     // The buffer pointed to by ro_addr_ptrsz must hold size_of_wasi_addr_port_t bytes.
-                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, ro_addr_ptrsz, size_of_wasi_addr_port_t);
+                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64_unlocked(
+                        memory,
+                        ro_addr_ptrsz,
+                        ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
 
-                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[size_of_wasi_addr_port_t]{};
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t]{};
 
                     auto* const raw_ptr{raw};
 
@@ -809,14 +740,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         }
                     }
 
-                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32_unchecked_unlocked(memory,
-                                                                                                           ro_addr_ptrsz,
-                                                                                                           reinterpret_cast<::std::byte const*>(raw_ptr),
-                                                                                                           reinterpret_cast<::std::byte const*>(raw_ptr) +
-                                                                                                               size_of_wasi_addr_port_t);
+                    ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm64_unchecked_unlocked(
+                        memory,
+                        ro_addr_ptrsz,
+                        reinterpret_cast<::std::byte const*>(raw_ptr),
+                        reinterpret_cast<::std::byte const*>(raw_ptr) + ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
                 }
 
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
             }
 # endif
             [[unlikely]] default:
@@ -824,7 +755,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::eio;
             }
         }
     }
