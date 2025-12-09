@@ -54,6 +54,7 @@
 #include <uwvm2/parser/wasm/standard/wasm1/features/function_section.h>
 // Bring in the full wasm1 feature definition (feature name, binfmt version, etc.).
 #include <uwvm2/parser/wasm/standard/wasm1/features/binfmt.h>
+#include <uwvm2/utils/macro/push_macros.h>
 
 namespace wasm1_ns = ::uwvm2::parser::wasm::standard::wasm1;
 namespace feat = ::uwvm2::parser::wasm::standard::wasm1::features;
@@ -101,22 +102,20 @@ static void uleb128_encode_u32(std::vector<std::byte>& out, wasm_u32 v)
         value >>= 7u;
         if(value != 0u) { byte = static_cast<std::uint8_t>(byte | 0x80u); }
         out.push_back(static_cast<std::byte>(byte));
-    } while(value != 0u);
+    }
+    while(value != 0u);
 }
 
 // Generate a LEB128 stream for the given scenario.
 // Values are drawn uniformly from [0, type_section_count).
-static std::vector<std::byte> generate_stream(scenario_config cfg,
-                                              std::size_t func_count,
-                                              std::uint64_t seed)
+static std::vector<std::byte> generate_stream(scenario_config cfg, std::size_t func_count, std::uint64_t seed)
 {
     std::vector<std::byte> buf;
     // Reserve assuming 1–2 bytes per value as the common case.
     buf.reserve(func_count * 2u);
 
     std::mt19937_64 rng{seed};
-    std::uniform_int_distribution<wasm_u32> dist{
-        0u, static_cast<wasm_u32>(cfg.type_section_count - 1u)};
+    std::uniform_int_distribution<wasm_u32> dist{0u, static_cast<wasm_u32>(cfg.type_section_count - 1u)};
 
     for(std::size_t i{}; i < func_count; ++i)
     {
@@ -140,9 +139,7 @@ static std::vector<std::byte> generate_stream(scenario_config cfg,
 //
 // If the file does not exist it is created; otherwise its func_count
 // header must match the requested func_count.
-static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
-                                                      std::size_t func_count,
-                                                      std::uint64_t seed)
+static std::vector<std::byte> load_or_generate_stream(scenario_config cfg, std::size_t func_count, std::uint64_t seed)
 {
     if(char const* data_dir = std::getenv("FS_BENCH_DATA_DIR"))
     {
@@ -150,10 +147,7 @@ static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
         if(!path.empty())
         {
             char const back = path.back();
-            if(back != '/' && back != '\\')
-            {
-                path.push_back('/');
-            }
+            if(back != '/' && back != '\\') { path.push_back('/'); }
         }
         path += cfg.name;
         path += ".bin";
@@ -163,35 +157,26 @@ static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
             if(in)
             {
                 std::uint64_t file_func_count{};
-                in.read(reinterpret_cast<char*>(&file_func_count),
-                        static_cast<std::streamsize>(sizeof(file_func_count)));
+                in.read(reinterpret_cast<char*>(&file_func_count), static_cast<std::streamsize>(sizeof(file_func_count)));
                 if(!in)
                 {
-                    std::fprintf(stderr,
-                                 "load_or_generate_stream: failed to read header from %s\n",
-                                 path.c_str());
+                    std::fprintf(stderr, "load_or_generate_stream: failed to read header from %s\n", path.c_str());
                     std::abort();
                 }
 
                 if(file_func_count != static_cast<std::uint64_t>(func_count))
                 {
                     std::fprintf(stderr,
-                                 "load_or_generate_stream: func_count mismatch in %s "
-                                 "(file=%llu, requested=%llu)\n",
+                                 "load_or_generate_stream: func_count mismatch in %s " "(file=%llu, requested=%llu)\n",
                                  path.c_str(),
                                  static_cast<unsigned long long>(file_func_count),
                                  static_cast<unsigned long long>(func_count));
                     std::abort();
                 }
 
-                std::vector<char> tmp{std::istreambuf_iterator<char>(in),
-                                      std::istreambuf_iterator<char>()};
+                std::vector<char> tmp{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
                 std::vector<std::byte> buf(tmp.size());
-                for(std::size_t i{}; i < tmp.size(); ++i)
-                {
-                    buf[i] = static_cast<std::byte>(
-                        static_cast<unsigned char>(tmp[i]));
-                }
+                for(std::size_t i{}; i < tmp.size(); ++i) { buf[i] = static_cast<std::byte>(static_cast<unsigned char>(tmp[i])); }
                 return buf;
             }
         }
@@ -202,26 +187,16 @@ static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
         std::ofstream out{path, std::ios::binary};
         if(!out)
         {
-            std::fprintf(stderr,
-                         "load_or_generate_stream: failed to open %s for write\n",
-                         path.c_str());
+            std::fprintf(stderr, "load_or_generate_stream: failed to open %s for write\n", path.c_str());
             std::abort();
         }
 
-        std::uint64_t const header_func_count{
-            static_cast<std::uint64_t>(func_count)};
-        out.write(reinterpret_cast<char const*>(&header_func_count),
-                  static_cast<std::streamsize>(sizeof(header_func_count)));
-        if(!buf.empty())
-        {
-            out.write(reinterpret_cast<char const*>(buf.data()),
-                      static_cast<std::streamsize>(buf.size()));
-        }
+        std::uint64_t const header_func_count{static_cast<std::uint64_t>(func_count)};
+        out.write(reinterpret_cast<char const*>(&header_func_count), static_cast<std::streamsize>(sizeof(header_func_count)));
+        if(!buf.empty()) { out.write(reinterpret_cast<char const*>(buf.data()), static_cast<std::streamsize>(buf.size())); }
         if(!out)
         {
-            std::fprintf(stderr,
-                         "load_or_generate_stream: failed to write data to %s\n",
-                         path.c_str());
+            std::fprintf(stderr, "load_or_generate_stream: failed to write data to %s\n", path.c_str());
             std::abort();
         }
 
@@ -232,56 +207,142 @@ static std::vector<std::byte> load_or_generate_stream(scenario_config cfg,
     return generate_stream(cfg, func_count, seed);
 }
 
-// Scalar baseline: linear decode using fast_io's leb128_get with basic validation.
-static void scalar_decode_uleb128_u32(std::byte const* begin,
+// Scalar baseline: decode + full validation + write into functionsec.funcs,
+// mirroring the structure of the real function_section scanners.
+static void scalar_decode_uleb128_u32(scenario_config cfg,
+                                      module_storage_t& module,
+                                      [[maybe_unused]] feature_param_t const& fs_para,
+                                      std::byte const* begin,
                                       std::byte const* end,
-                                      wasm_u32 type_section_count,
                                       wasm_u32 func_count)
 {
-    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 counter{};
+    using function_section_storage_t = feat::function_section_storage_t;
+    using type_section_storage_t = feat::type_section_storage_t<wasm1_feature>;
+
+    auto& functionsec{wasm_concepts::operation::get_first_type_in_tuple<function_section_storage_t>(module.sections)};
+
+    // Clear previous contents but keep any reserved capacity.
+    functionsec.funcs.clear();
+
+    auto const& typesec{wasm_concepts::operation::get_first_type_in_tuple<type_section_storage_t>(module.sections)};
+    auto const type_section_count{static_cast<wasm_u32>(typesec.types.size())};
+
+    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 func_counter{};
+    ::uwvm2::parser::wasm::base::error_impl err{};
 
     auto section_curr{begin};
 
+    // Configure storage mode to match the real parser for each scenario.
+    switch(cfg.kind)
+    {
+        case scenario_kind::u8_1b:
+        {
+            // typeidx < 2^7, canonical 1-byte encodings; use u8_view.
+            functionsec.funcs.change_mode(feat::vectypeidx_minimize_storage_mode::u8_view);
+
+            using wasm_u8_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = wasm1_ns::type::wasm_u8 const*;
+            functionsec.funcs.storage.typeidx_u8_view.begin = reinterpret_cast<wasm_u8_const_may_alias_ptr>(begin);
+            break;
+        }
+        case scenario_kind::u8_2b:
+        {
+            // 1-byte storage, values in [2^7, 2^8).
+            functionsec.funcs.change_mode(feat::vectypeidx_minimize_storage_mode::u8_vector);
+            functionsec.funcs.storage.typeidx_u8_vector.reserve(static_cast<std::size_t>(func_count));
+            break;
+        }
+        case scenario_kind::u16_2b:
+        {
+            // 2-byte storage, values in [2^8, 2^14).
+            functionsec.funcs.change_mode(feat::vectypeidx_minimize_storage_mode::u16_vector);
+            functionsec.funcs.storage.typeidx_u16_vector.reserve(static_cast<std::size_t>(func_count));
+            break;
+        }
+        default:
+        {
+            std::fprintf(stderr, "scalar_decode_uleb128_u32: unknown scenario_kind\n");
+            std::abort();
+        }
+    }
+
     while(section_curr != end)
     {
-        if(counter == func_count) [[unlikely]]
+        // Ensure content is available before counting (section_curr != end) and
+        // detect func_counter overflow in the same way as the real parser.
+        if(::uwvm2::parser::wasm::utils::counter_selfinc_throw_when_overflow(func_counter, section_curr, err) > func_count) [[unlikely]]
         {
-            std::fprintf(stderr,
-                         "scalar_decode: func_counter exceeded expected func_count\n");
-            std::abort();
+            err.err_curr = section_curr;
+            err.err_selectable.u32 = func_count;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::func_section_resolved_exceeded_the_actual_number;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
         wasm_u32 value;  // no init
 
-        auto const [next_ptr, err]{::fast_io::parse_by_scan(
-            reinterpret_cast<char8_t const*>(section_curr),
-            reinterpret_cast<char8_t const*>(end),
-            ::fast_io::mnp::leb128_get(value))};
+        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
 
-        if(err != ::fast_io::parse_code::ok) [[unlikely]]
+        auto const [next_ptr, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
+                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(end),
+                                                                  ::fast_io::mnp::leb128_get(value))};
+
+        if(parse_err != ::fast_io::parse_code::ok) [[unlikely]]
         {
-            std::fprintf(stderr, "scalar_decode: parse_by_scan error\n");
-            std::abort();
+            err.err_curr = section_curr;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::invalid_type_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(parse_err);
         }
 
         if(value >= type_section_count) [[unlikely]]
         {
-            std::fprintf(stderr,
-                         "scalar_decode: decoded value >= type_section_count\n");
-            std::abort();
+            err.err_curr = section_curr;
+            err.err_selectable.u32 = value;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::illegal_type_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
-        ++counter;
+        // Materialize into the same storage shape as the real function_section paths.
+        switch(cfg.kind)
+        {
+            case scenario_kind::u8_1b:
+            {
+                // u8_view: no per-element write; the view points at the raw bytes
+                // that encode the canonical 1-byte LEB128 values.
+                break;
+            }
+            case scenario_kind::u8_2b:
+            {
+                functionsec.funcs.storage.typeidx_u8_vector.emplace_back_unchecked(static_cast<wasm1_ns::type::wasm_u8>(value));
+                break;
+            }
+            case scenario_kind::u16_2b:
+            {
+                functionsec.funcs.storage.typeidx_u16_vector.emplace_back_unchecked(static_cast<wasm1_ns::type::wasm_u16>(value));
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+
         section_curr = reinterpret_cast<std::byte const*>(next_ptr);
     }
 
-    if(counter != func_count)
+    // Match the function_section behavior: func_counter must equal func_count.
+    if(func_counter != func_count) [[unlikely]]
     {
-        std::fprintf(stderr,
-                     "scalar_decode: func_counter mismatch (got %u, expect %u)\n",
-                     static_cast<unsigned>(counter),
-                     static_cast<unsigned>(func_count));
-        std::abort();
+        err.err_curr = section_curr;
+        err.err_selectable.u32arr[0] = func_counter;
+        err.err_selectable.u32arr[1] = func_count;
+        err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::func_section_resolved_not_match_the_actual_number;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
+    // For the u8_1b fast-path, finalize the view's end pointer.
+    if(cfg.kind == scenario_kind::u8_1b)
+    {
+        using wasm_u8_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = wasm1_ns::type::wasm_u8 const*;
+        functionsec.funcs.storage.typeidx_u8_view.end = reinterpret_cast<wasm_u8_const_may_alias_ptr>(section_curr);
     }
 }
 
@@ -296,8 +357,7 @@ static void simd_decode_once(scenario_config cfg,
 {
     using function_section_storage_t = feat::function_section_storage_t;
 
-    auto& functionsec{
-        wasm_concepts::operation::get_first_type_in_tuple<function_section_storage_t>(module.sections)};
+    auto& functionsec{wasm_concepts::operation::get_first_type_in_tuple<function_section_storage_t>(module.sections)};
 
     // Clear results from previous iterations so that the underlying vectors
     // do not grow without bound across iterations.
@@ -306,8 +366,7 @@ static void simd_decode_once(scenario_config cfg,
     wasm_u32 func_counter{};
     ::uwvm2::parser::wasm::base::error_impl err{};
 
-    auto const sec_adl =
-        wasm_concepts::feature_reserve_type_t<function_section_storage_t>{};
+    auto const sec_adl = wasm_concepts::feature_reserve_type_t<function_section_storage_t>{};
 
     ::std::byte const* result_ptr{};
 
@@ -315,20 +374,17 @@ static void simd_decode_once(scenario_config cfg,
     {
         case scenario_kind::u8_1b:
         {
-            result_ptr = feat::scan_function_section_impl_u8_1b(
-                sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
+            result_ptr = feat::scan_function_section_impl_u8_1b(sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
             break;
         }
         case scenario_kind::u8_2b:
         {
-            result_ptr = feat::scan_function_section_impl_u8_2b(
-                sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
+            result_ptr = feat::scan_function_section_impl_u8_2b(sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
             break;
         }
         case scenario_kind::u16_2b:
         {
-            result_ptr = feat::scan_function_section_impl_u16_2b(
-                sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
+            result_ptr = feat::scan_function_section_impl_u16_2b(sec_adl, module, begin, end, err, fs_para, func_counter, func_count);
             break;
         }
         default:
@@ -340,10 +396,7 @@ static void simd_decode_once(scenario_config cfg,
 
     if(result_ptr != end)
     {
-        std::fprintf(stderr,
-                     "simd_decode_once: scan_* did not consume all bytes "
-                     "(%td bytes left)\n",
-                     end - result_ptr);
+        std::fprintf(stderr, "simd_decode_once: scan_* did not consume all bytes " "(%td bytes left)\n", end - result_ptr);
         std::abort();
     }
 
@@ -369,15 +422,10 @@ static std::size_t read_env_size(char const* name, std::size_t default_value)
     return default_value;
 }
 
-static bench_result run_benchmark(scenario_config cfg,
-                                  char const* impl_name,
-                                  bool use_simd,
-                                  std::size_t func_count,
-                                  std::size_t iterations)
+static bench_result run_benchmark(scenario_config cfg, char const* impl_name, bool use_simd, std::size_t func_count, std::size_t iterations)
 {
     // 1. Load or generate input buffer.
-    auto const buffer{
-        load_or_generate_stream(cfg, func_count, 0x1234'5678'9ABC'DEF0ull)};
+    auto const buffer{load_or_generate_stream(cfg, func_count, 0x1234'5678'9ABC'DEF0ull)};
 
     auto const* const begin{buffer.data()};
     auto const* const end{buffer.data() + buffer.size()};
@@ -387,8 +435,7 @@ static bench_result run_benchmark(scenario_config cfg,
     feature_param_t fs_para{};
 
     using type_section_storage_t = feat::type_section_storage_t<wasm1_feature>;
-    auto& typesec{
-        wasm_concepts::operation::get_first_type_in_tuple<type_section_storage_t>(module.sections)};
+    auto& typesec{wasm_concepts::operation::get_first_type_in_tuple<type_section_storage_t>(module.sections)};
     typesec.types.resize(static_cast<std::size_t>(cfg.type_section_count));
 
     // 3. Measure total decode time over all iterations
@@ -396,36 +443,23 @@ static bench_result run_benchmark(scenario_config cfg,
 
     for(std::size_t i{}; i < iterations; ++i)
     {
-        if(use_simd)
-        {
-            simd_decode_once(cfg,
-                             module,
-                             fs_para,
-                             begin,
-                             end,
-                             static_cast<wasm_u32>(func_count));
-        }
+        if(use_simd) { simd_decode_once(cfg, module, fs_para, begin, end, static_cast<wasm_u32>(func_count)); }
         else
         {
-            scalar_decode_uleb128_u32(
-                begin, end, cfg.type_section_count, static_cast<wasm_u32>(func_count));
+            scalar_decode_uleb128_u32(cfg, module, fs_para, begin, end, static_cast<wasm_u32>(func_count));
         }
     }
 
     auto const t1{std::chrono::steady_clock::now()};
 
-    long long const total_ns{
-        std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()};
+    long long const total_ns{std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()};
 
     std::size_t const total_values{func_count * iterations};
-    double const ns_per_value{
-        static_cast<double>(total_ns) / static_cast<double>(total_values)};
+    double const ns_per_value{static_cast<double>(total_ns) / static_cast<double>(total_values)};
 
-    double const avg_bytes_per_value{
-        static_cast<double>(buffer.size()) / static_cast<double>(func_count)};
+    double const avg_bytes_per_value{static_cast<double>(buffer.size()) / static_cast<double>(func_count)};
 
-    double const total_bytes{
-        static_cast<double>(buffer.size()) * static_cast<double>(iterations)};
+    double const total_bytes{static_cast<double>(buffer.size()) * static_cast<double>(iterations)};
 
     double const seconds{static_cast<double>(total_ns) * 1e-9};
     double const gib_per_s{(total_bytes / (1024.0 * 1024.0 * 1024.0)) / seconds};
@@ -445,8 +479,7 @@ static void print_bench_result(bench_result const& r)
 {
     // Single machine-readable line; external scripts only need this format.
     std::printf(
-        "uwvm2_fs scenario=%s impl=%s values=%zu total_ns=%lld "
-        "ns_per_value=%.6f avg_bytes_value=%.6f gib_per_s=%.6f\n",
+        "uwvm2_fs scenario=%s impl=%s values=%zu total_ns=%lld " "ns_per_value=%.6f avg_bytes_value=%.6f gib_per_s=%.6f\n",
         r.scenario,
         r.impl,
         r.values,
@@ -468,9 +501,9 @@ int main()
 
     scenario_config const scenarios[]{
         // [0, 2^7)
-        {"u8_1b", scenario_kind::u8_1b, static_cast<wasm_u32>(100u)},
+        {"u8_1b",  scenario_kind::u8_1b,  static_cast<wasm_u32>(100u) },
         // [2^7, 2^8)
-        {"u8_2b", scenario_kind::u8_2b, static_cast<wasm_u32>(200u)},
+        {"u8_2b",  scenario_kind::u8_2b,  static_cast<wasm_u32>(200u) },
         // [2^8, 2^14)
         {"u16_2b", scenario_kind::u16_2b, static_cast<wasm_u32>(2048u)},
     };
@@ -482,17 +515,13 @@ int main()
     for(auto const& cfg: scenarios)
     {
         // baseline scalar
-        auto const r_scalar{
-            run_benchmark(cfg, "scalar", false, func_count, iterations)};
+        auto const r_scalar{run_benchmark(cfg, "scalar", false, func_count, iterations)};
         print_bench_result(r_scalar);
 
         // function_section SIMD
-        auto const r_simd{
-            run_benchmark(cfg, "simd", true, func_count, iterations)};
+        auto const r_simd{run_benchmark(cfg, "simd", true, func_count, iterations)};
         print_bench_result(r_simd);
     }
 
     return 0;
 }
-
-
