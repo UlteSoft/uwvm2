@@ -66,15 +66,17 @@ The Lua script:
   - `cargo run --release`
 - the Rust fair benchmark:
   - reads `${FS_BENCH_DATA_DIR}/${scenario}.bin` into a `Vec<u8>` (for `u8_1b` / `u8_2b`) or `Vec<u16>` (for `u16_2b`), adding a small padding area required by `decode_unsafe`;
-  - decodes the LEB128 stream `ITERS` times using `varint_simd::decode_unsafe` with the same `FUNC_COUNT` and `ITERS` as the C++ benchmark;
+  - decodes the LEB128 stream `ITERS` times using both `varint_simd::decode_unsafe` (unsafe) and `varint_simd::decode` (safe) with the same `FUNC_COUNT` and `ITERS` as the C++ benchmark;
   - prints machine-readable lines of the form:
 
 ```text
 varint_simd_fs scenario=<...> impl=unsafe values=<...> total_ns=<...> \
                ns_per_value=<...> avg_bytes_value=<...> gib_per_s=<...>
+varint_simd_fs scenario=<...> impl=safe   values=<...> total_ns=<...> \
+               ns_per_value=<...> avg_bytes_value=<...> gib_per_s=<...>
 ```
 
-The Lua driver parses these lines and matches `scenario` names (`u8_1b`, `u8_2b`, `u16_2b`) directly against the uwvm2 results, so both sides are compared on exactly the same LEB128 bytes, with the same `FUNC_COUNT` and `ITERS` configuration.
+The Lua driver currently uses the `impl=unsafe` lines for its ratios, but the `impl=safe` lines are also emitted so that users can inspect the performance of the safe `decode` API on the same shared LEB128 streams.
 
 ## Running the fair shared-data benchmark
 
