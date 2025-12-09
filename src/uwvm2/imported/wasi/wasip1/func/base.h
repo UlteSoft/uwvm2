@@ -400,6 +400,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(ECONNRESET)
             case ECONNRESET: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnreset;
 #  endif
+#  if defined(ECONNABORTED)
+            case ECONNABORTED: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnaborted;
+#  endif
+#  if defined(ENOBUFS)
+            case ENOBUFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enobufs;
+#  endif
+#  if defined(EPROTO)
+            case EPROTO: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eproto;
+#  endif
+#  if defined(ENOTSOCK)
+            case ENOTSOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+#  endif
 #  if defined(EPIPE)
             case EPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::epipe;
 #  endif

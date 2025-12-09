@@ -303,6 +303,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
         }
 
+        // Only fdflag_nonblock is supported for sock_accept. Any other bits are treated as invalid arguments.
+        if((fd_flags & ~::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) != ::uwvm2::imported::wasi::wasip1::abi::fdflags_t{}) [[unlikely]]
+        {
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+        }
+
         [[maybe_unused]] bool const is_nonblock{(fd_flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
                                                 ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock};
 
@@ -348,7 +354,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 auto const& curr_fd_native_file{curr_fd_native_observer};
 
                 struct ::sockaddr_storage addr{};
-                ::fast_io::posix_socklen_t addrlen{sizeof(addr)};
+                ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
                 ::fast_io::posix_file_factory new_socket_factory{};
 
@@ -399,6 +405,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_file_fd_t{new_socket_factory.release()};
 
                 {
+                    // Release locks that are no longer needed to avoid excessive lock granularity.
+                    curr_fd_release_guard.unlock();
+                    curr_fd_release_guard.device_p = nullptr;
+
                     // Manipulating fd_manager requires a unique_lock.
                     ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
@@ -482,55 +492,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto* const raw_ptr{raw};
 
-                    if(addrlen > 0)
+                    if(addrlen > 0u)
                     {
                         switch(addr.ss_family)
                         {
                             case AF_INET:
                             {
-                                if(addrlen >= static_cast<::fast_io::posix_socklen_t>(sizeof(::sockaddr_in)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in)))
                                 {
-                                    auto const* sin{reinterpret_cast<::sockaddr_in const*>(::std::addressof(addr))};
+                                    using sockaddr_in_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in const*;
+
+                                    auto const sin{reinterpret_cast<sockaddr_in_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet4
                                     raw_ptr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(1u);
                                     raw_ptr[1] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(0u);
 
-                                    auto const* port_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin->sin_port))};
-                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0]);
-                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1]);
+                                    // ::std::uint_least8_t = unsigned char, default may alias
+                                    auto const port_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin->sin_port))};
+                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0u]);
+                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1u]);
 
-                                    auto const* ip_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin->sin_addr))};
-                                    raw_ptr[4] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[0]);
-                                    raw_ptr[5] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[1]);
-                                    raw_ptr[6] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[2]);
-                                    raw_ptr[7] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[3]);
+                                    auto const ip_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin->sin_addr))};
+                                    raw_ptr[4] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[0u]);
+                                    raw_ptr[5] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[1u]);
+                                    raw_ptr[6] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[2u]);
+                                    raw_ptr[7] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[3u]);
                                 }
                                 break;
                             }
                             case AF_INET6:
                             {
-                                if(addrlen >= static_cast<::fast_io::posix_socklen_t>(sizeof(::sockaddr_in6)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in6)))
                                 {
-                                    auto const* sin6{reinterpret_cast<::sockaddr_in6 const*>(::std::addressof(addr))};
+                                    using sockaddr_in6_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in6 const*;
+                                    auto const sin6{reinterpret_cast<sockaddr_in6_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet6
                                     raw_ptr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(2u);
                                     raw_ptr[1] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(0u);
 
-                                    auto const* port_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin6->sin6_port))};
-                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0]);
-                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1]);
+                                    // ::std::uint_least8_t = unsigned char, default may alias
+                                    auto const port_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin6->sin6_port))};
+                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0u]);
+                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1u]);
 
-                                    auto const* ip_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin6->sin6_addr))};
-                                    for(::std::size_t i{}; i != 16u; ++i)
+                                    auto const ip_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin6->sin6_addr))};
+                                    for(unsigned i{}; i != 16u; ++i)
                                     {
                                         raw_ptr[4u + i] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[i]);
                                     }
                                 }
                                 break;
                             }
-                            default:
+                            [[unlikely]] default:
                             {
                                 // Unknown family: leave all zeros (tag = Addressfamily::Unspec).
                                 break;
@@ -575,9 +590,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 auto const& curr_fd_native_file{curr_socket_observer};
 
                 struct ::sockaddr_storage addr{};
-                ::fast_io::posix_socklen_t addrlen{sizeof(addr)};
+                ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
-                ::fast_io::posix_file_factory new_socket_factory{};
+                ::fast_io::win32_socket_factory new_socket_factory{};
 
 #  ifdef UWVM_CPP_EXCEPTIONS
                 try
@@ -602,7 +617,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 ::std::uint_least32_t mode{static_cast<::std::uint_least32_t>(is_nonblock)};
 
-                if(::fast_io::win32::ioctlsocket(curr_fd_native_file.native_handle(), 0x8004'667El /*FIONBIO*/, ::std::addressof(mode)) == -1) [[unlikely]]
+                if(::fast_io::win32::ioctlsocket(new_socket_factory.native_handle(), 0x8004'667El /*FIONBIO*/, ::std::addressof(mode)) == -1) [[unlikely]]
                 {
                     switch(::fast_io::win32::WSAGetLastError())
                     {
@@ -610,6 +625,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         case 10004 /*WSAEINTR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
                         case 10038 /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
                         case 10013 /*WSAEACCES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                        case 10050 /*WSAENETDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10055 /*WSAENOBUFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enobufs;
+                        case 10014 /*WSAEFAULT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
                         default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                     }
                 }
@@ -627,6 +645,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::fast_io::win32_socket_file{new_socket_factory.release()};
 
                 {
+                    // Release locks that are no longer needed to avoid excessive lock granularity.
+                    curr_fd_release_guard.unlock();
+                    curr_fd_release_guard.device_p = nullptr;
+
                     // Manipulating fd_manager requires a unique_lock.
                     ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
@@ -710,47 +732,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     auto* const raw_ptr{raw};
 
-                    if(addrlen > 0)
+                    if(addrlen > 0u)
                     {
                         switch(addr.ss_family)
                         {
                             case AF_INET:
                             {
-                                if(addrlen >= static_cast<::fast_io::posix_socklen_t>(sizeof(::sockaddr_in)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in)))
                                 {
-                                    auto const* sin{reinterpret_cast<::sockaddr_in const*>(::std::addressof(addr))};
+                                    using sockaddr_in_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in const*;
+                                    auto const sin{reinterpret_cast<sockaddr_in_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet4
                                     raw_ptr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(1u);
                                     raw_ptr[1] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(0u);
 
-                                    auto const* port_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin->sin_port))};
-                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0]);
-                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1]);
+                                    // ::std::uint_least8_t = unsigned char, default may alias
+                                    auto const port_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin->sin_port))};
+                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0u]);
+                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1u]);
 
-                                    auto const* ip_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin->sin_addr))};
-                                    raw_ptr[4] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[0]);
-                                    raw_ptr[5] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[1]);
-                                    raw_ptr[6] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[2]);
-                                    raw_ptr[7] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[3]);
+                                    auto const ip_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin->sin_addr))};
+                                    raw_ptr[4] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[0u]);
+                                    raw_ptr[5] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[1u]);
+                                    raw_ptr[6] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[2u]);
+                                    raw_ptr[7] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[3u]);
                                 }
                                 break;
                             }
                             case AF_INET6:
                             {
-                                if(addrlen >= static_cast<::fast_io::posix_socklen_t>(sizeof(::sockaddr_in6)))
+                                if(addrlen >= static_cast<::fast_io::native_socklen_t>(sizeof(::sockaddr_in6)))
                                 {
-                                    auto const* sin6{reinterpret_cast<::sockaddr_in6 const*>(::std::addressof(addr))};
+                                    using sockaddr_in6_const_may_alias UWVM_GNU_MAY_ALIAS = ::sockaddr_in6 const*;
+                                    auto const sin6{reinterpret_cast<sockaddr_in6_const_may_alias>(::std::addressof(addr))};
 
                                     // tag: Inet6
                                     raw_ptr[0] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(2u);
                                     raw_ptr[1] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(0u);
 
-                                    auto const* port_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin6->sin6_port))};
-                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0]);
-                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1]);
+                                    // ::std::uint_least8_t = unsigned char, default may alias
+                                    auto const port_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin6->sin6_port))};
+                                    raw_ptr[2] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[0u]);
+                                    raw_ptr[3] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(port_bytes[1u]);
 
-                                    auto const* ip_bytes{reinterpret_cast<unsigned char const*>(::std::addressof(sin6->sin6_addr))};
+                                    auto const ip_bytes{reinterpret_cast<::std::uint_least8_t const*>(::std::addressof(sin6->sin6_addr))};
                                     for(::std::size_t i{}; i != 16u; ++i)
                                     {
                                         raw_ptr[4u + i] = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8>(ip_bytes[i]);
@@ -758,7 +784,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 }
                                 break;
                             }
-                            default:
+                            [[unlikely]] default:
                             {
                                 // Unknown family: leave all zeros (tag = Addressfamily::Unspec).
                                 break;
