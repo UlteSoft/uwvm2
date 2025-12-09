@@ -456,7 +456,7 @@ using farproc = ::std::ptrdiff_t(FAST_IO_STDCALL *)() noexcept;
 
 struct win32_memory_range_entry
 {
-	void* VirtualAddress;
+	void *VirtualAddress;
 	::std::size_t NumberOfBytes;
 };
 
@@ -464,41 +464,66 @@ inline constexpr ::std::size_t exception_maximum_parameters{15u};
 
 struct exception_record
 {
-    ::std::uint_least32_t ExceptionCode;
-    ::std::uint_least32_t ExceptionFlags;
-    exception_record* ExceptionRecord;
-    void* ExceptionAddress;
-    ::std::uint_least32_t NumberParameters;
-    ::std::size_t ExceptionInformation[exception_maximum_parameters];
+	::std::uint_least32_t ExceptionCode;
+	::std::uint_least32_t ExceptionFlags;
+	exception_record *ExceptionRecord;
+	void *ExceptionAddress;
+	::std::uint_least32_t NumberParameters;
+	::std::size_t ExceptionInformation[exception_maximum_parameters];
 };
 
 struct exception_record32
 {
-    ::std::uint_least32_t ExceptionCode;
-    ::std::uint_least32_t ExceptionFlags;
-    ::std::uint_least32_t ExceptionRecord;
-    ::std::uint_least32_t ExceptionAddress;
-    ::std::uint_least32_t NumberParameters;
-    ::std::uint_least32_t ExceptionInformation[exception_maximum_parameters];
+	::std::uint_least32_t ExceptionCode;
+	::std::uint_least32_t ExceptionFlags;
+	::std::uint_least32_t ExceptionRecord;
+	::std::uint_least32_t ExceptionAddress;
+	::std::uint_least32_t NumberParameters;
+	::std::uint_least32_t ExceptionInformation[exception_maximum_parameters];
 };
 
 struct exception_record64
 {
-    ::std::uint_least32_t ExceptionCode;
-    ::std::uint_least32_t ExceptionFlags;
-    ::std::uint_least64_t ExceptionRecord;
-    ::std::uint_least64_t ExceptionAddress;
-    ::std::uint_least32_t NumberParameters;
-    ::std::uint_least32_t UnusedAlignment;
-    ::std::uint_least64_t ExceptionInformation[exception_maximum_parameters];
+	::std::uint_least32_t ExceptionCode;
+	::std::uint_least32_t ExceptionFlags;
+	::std::uint_least64_t ExceptionRecord;
+	::std::uint_least64_t ExceptionAddress;
+	::std::uint_least32_t NumberParameters;
+	::std::uint_least32_t UnusedAlignment;
+	::std::uint_least64_t ExceptionInformation[exception_maximum_parameters];
 };
 
 struct exception_pointers
 {
-    exception_record* ExceptionRecord;
-    void* ContextRecord;
+	exception_record *ExceptionRecord;
+	void *ContextRecord;
 };
 
 using pvectored_exception_handler = ::std::int_least32_t(FAST_IO_WINSTDCALL *)(exception_pointers *) noexcept;
+
+using address_family = ::std::uint_least16_t;
+
+inline constexpr ::std::size_t ss_maxsize{128u};
+inline constexpr ::std::size_t ss_alignsize{sizeof(::std::int_least64_t)};
+inline constexpr ::std::size_t ss_pad1size{ss_alignsize - sizeof(::std::uint_least16_t)};
+inline constexpr ::std::size_t ss_pad2size{ss_maxsize - (sizeof(::std::uint_least16_t) + ss_pad1size + ss_alignsize)};
+
+//
+// Definitions used for sockaddr_storage structure paddings design.
+//
+
+struct sockaddr_storage
+{
+	address_family ss_family;        // address family
+	char ss_pad1[ss_pad1size];       // 6 byte pad, this is to make
+									 //   implementation specific pad up to
+									 //   alignment field that follows explicit
+									 //   in the data structure
+	::std::int_least64_t __ss_align; // Field to force desired structure
+	char ss_pad2[ss_pad2size];       // 112 byte pad to achieve desired size;
+									 //   _SS_MAXSIZE value minus size of
+									 //   ss_family, __ss_pad1, and
+									 //   __ss_align fields is 112
+};
 
 } // namespace fast_io::win32

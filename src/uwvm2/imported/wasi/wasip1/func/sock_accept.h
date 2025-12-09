@@ -379,7 +379,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 try
 #  endif
                 {
-                    new_socket_file = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
+                    new_socket_file = ::fast_io::posix_file{::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen))};
                 }
 #  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
@@ -605,7 +605,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 auto const& curr_fd_native_file{curr_socket_observer};
 
-                struct ::sockaddr_storage addr{};
+                ::fast_io::win32::sockaddr_storage addr{};
                 ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
                 ::fast_io::win32_socket_file new_socket_file{};
@@ -614,7 +614,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 try
 #  endif
                 {
-                    new_socket_file = ::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen));
+                    new_socket_file =
+                        ::fast_io::win32_socket_file{::fast_io::posix_accept(curr_fd_native_file, ::std::addressof(addr), ::std::addressof(addrlen))};
                 }
 #  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
