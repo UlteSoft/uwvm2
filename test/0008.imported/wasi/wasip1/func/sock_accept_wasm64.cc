@@ -25,9 +25,9 @@
 
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__))
 
-#include <uwvm2/imported/wasi/wasip1/func/sock_accept_wasm64.h>
-
-#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+# include <uwvm2/imported/wasi/wasip1/func/sock_accept_wasm64.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 int main()
 {
@@ -116,11 +116,8 @@ int main()
 
         auto const invalid_flags = fdflags_wasm64_t::fdflag_append;
 
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(3),
-                                                                                   invalid_flags,
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env, static_cast<wasi_posix_fd_wasm64_t>(3), invalid_flags, FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::einval)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected einval for unsupported fdflags");
@@ -151,11 +148,11 @@ int main()
     return 0;
 }
 
-#else
+# else
 
 int main() {}
 
-#endif
+# endif
 
 #else
 

@@ -25,9 +25,9 @@
 
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__))
 
-#include <uwvm2/imported/wasi/wasip1/func/sock_accept.h>
-
-#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+# include <uwvm2/imported/wasi/wasip1/func/sock_accept.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 int main()
 {
@@ -57,11 +57,7 @@ int main()
 
     // Case 0: negative fd -> ebadf
     {
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env,
-                                                                            static_cast<wasi_posix_fd_t>(-1),
-                                                                            static_cast<fdflags_t>(0),
-                                                                            FD_PTR,
-                                                                            ADDR_PTR);
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(-1), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_t::ebadf)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected ebadf for negative fd");
@@ -74,8 +70,7 @@ int main()
         auto& fde = *env.fd_storage.opens.index_unchecked(1uz).fd_p;
         fde.close_pos = 0u;
 
-        auto const ret =
-            ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(1), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(1), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_t::ebadf)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected ebadf for closed descriptor");
@@ -91,8 +86,7 @@ int main()
         fde.rights_inherit = static_cast<rights_t>(0);
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
 
-        auto const ret =
-            ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(2), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(2), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_t::enotcapable)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected enotcapable when right_sock_accept missing");
@@ -110,8 +104,7 @@ int main()
 
         auto const invalid_flags = fdflags_t::fdflag_append;
 
-        auto const ret =
-            ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(3), invalid_flags, FD_PTR, ADDR_PTR);
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(3), invalid_flags, FD_PTR, ADDR_PTR);
         if(ret != errno_t::einval)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected einval for unsupported fdflags");
@@ -127,8 +120,7 @@ int main()
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_sock_accept;
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir);
 
-        auto const ret =
-            ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(0), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env, static_cast<wasi_posix_fd_t>(0), static_cast<fdflags_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_t::enotsock)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected enotsock for directory descriptor");
@@ -139,11 +131,11 @@ int main()
     return 0;
 }
 
-#else
+# else
 
 int main() {}
 
-#endif
+# endif
 
 #else
 
