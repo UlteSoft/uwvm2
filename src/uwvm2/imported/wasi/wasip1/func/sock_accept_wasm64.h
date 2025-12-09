@@ -285,7 +285,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     if(listen_flags == -1) [[unlikely]]
                     {
-                        return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
+                        return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                            ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
                     }
 
 #  if defined(O_NONBLOCK)
@@ -319,7 +320,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 if(flags == -1) [[unlikely]]
                 {
-                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
+                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                        ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
                 }
 
                 if(is_nonblock_effective) { flags |= O_NONBLOCK; }
@@ -330,7 +332,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 if(::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_file.native_handle(), F_SETFL, flags) == -1) [[unlikely]]
                 {
-                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(::fast_io::error{::fast_io::posix_domain_value, errno});
+                    return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                        ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
                 }
 
                 using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t;
