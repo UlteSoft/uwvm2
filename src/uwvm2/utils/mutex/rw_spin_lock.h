@@ -37,6 +37,7 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/debug/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -66,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         ::std::atomic_uint bits{};
     };
 
-    inline constexpr void rwlock_pause() noexcept
+    UWVM_ALWAYS_INLINE inline constexpr void rwlock_pause() noexcept
     {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
         // x86 / x64: use PAUSE if available
@@ -111,6 +112,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         return static_cast<unsigned>(~(rwlock_reader_mask() - 1u));
     }
 
+    UWVM_ALWAYS_INLINE inline constexpr void rwlock_assert_no_reader_overflow([[maybe_unused]] unsigned old) noexcept
+    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        constexpr auto reader_count_mask{rwlock_reader_count_mask()};
+        // Theoretically unreachable: would require an astronomically large
+        // number of concurrent readers; if this ever triggers, something
+        // elsewhere is badly wrong.
+        if((old & reader_count_mask) == reader_count_mask) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+    }
+
     /// @brief Non-fair shared guard for read operations.
     /// @details
     ///   Reader-preferred (non-fair) variant:
@@ -134,6 +146,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
             {
                 // Acquire on success to synchronize with writer's release-unlock.
                 auto const old{bits.fetch_add(reader_mask, ::std::memory_order_acquire)};
+                rwlock_assert_no_reader_overflow(old);
                 if((old & writer_mask) == 0u) { break; }
 
                 // On failure we only roll back our own increment; no ordering needed.
@@ -243,6 +256,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
                     continue;
                 }
 
+                rwlock_assert_no_reader_overflow(old);
                 auto const desired{old + reader_mask};
                 // Acquire on success to synchronize with writer's release-unlock.
                 if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
@@ -381,6 +395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
                     continue;
                 }
 
+                rwlock_assert_no_reader_overflow(old);
                 auto const desired{old + reader_mask};
                 // Acquire on success to synchronize with writer's release-unlock.
                 if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
@@ -545,6 +560,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
                     continue;
                 }
 
+                rwlock_assert_no_reader_overflow(old);
                 auto const desired{old + reader_mask};
                 // Acquire on success to synchronize with writer's release-unlock.
                 if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
@@ -711,6 +727,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
                     continue;
                 }
 
+                rwlock_assert_no_reader_overflow(old);
                 auto const desired{old + reader_mask};
                 // Acquire on success to synchronize with writer's release-unlock.
                 if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
