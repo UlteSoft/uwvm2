@@ -47,17 +47,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 {
     /// @brief RW spin lock state word.
     /// @details
-    ///   Shared by two variants:
+    ///   Shared by three variants:
     ///   - A non-fair, reader-preferred RW spin lock (`rw_shared_guard_t` / `rw_unique_guard_t`), where writers
     ///     may starve under heavy read load, but readers are extremely cheap.
     ///   - A fair, phase-fair writer-preferred RW spin lock (`rw_fair_shared_guard_t` / `rw_fair_unique_guard_t`),
     ///     which guarantees that once a writer starts waiting, no new readers can enter.
+    ///   - A non-fair, writer-preferred RW spin lock (`rw_writer_pref_shared_guard_t` / `rw_writer_pref_unique_guard_t`),
+    ///     where waiting writers block new readers, and readers can starve under heavy write load.
     struct rwlock_t
     {
         // Bit layout (similar to folly::RWSpinLock):
-        //   bit0: WRITER   (exclusive owner)
-        //   bit1: PENDING  (ticketed waiting writer; only used by the fair variant)
-        //   bit2: reserved (currently unused by the algorithms)
+        //   bit0: WRITER         (exclusive owner)
+        //   bit1: PENDING        (ticketed waiting writer; only used by the fair variant)
+        //   bit2: WRITER_WAITING (there exists at least one waiting writer; only used by the writer-preferred variant)
         //   bits[3..]: READER count (each reader adds READER_MASK).
         ::std::atomic_uint bits{};
     };
@@ -88,8 +90,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 
     inline consteval unsigned rwlock_writer_mask() noexcept { return 1u; }          // WRITER (bit0)
     inline consteval unsigned rwlock_pending_mask() noexcept { return 2u; }         // PENDING (bit1, fair variant)
-    inline consteval unsigned rwlock_reader_waiting_mask() noexcept { return 4u; }  // reserved (bit2, currently unused)
-    inline consteval unsigned rwlock_reader_mask() noexcept { return 8u; }          // READER increment (bits[3..])
+    inline consteval unsigned rwlock_writer_waiting_mask() noexcept { return 4u; }  // WRITER_WAITING (bit2, writer-preferred variant)
+    inline consteval unsigned rwlock_reader_waiting_mask() noexcept
+    {
+        // Backward-compatible alias (no external users in this project).
+        return rwlock_writer_waiting_mask();
+    }
+    inline consteval unsigned rwlock_reader_mask() noexcept { return 8u; }  // READER increment (bits[3..])
     inline consteval unsigned rwlock_reader_count_mask() noexcept
     {
         // All bits used for the reader count (bits[3..]).
@@ -99,8 +106,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     /// @brief Non-fair shared guard for read operations.
     /// @details
     ///   Reader-preferred (non-fair) variant:
-    ///   - Readers can always enter as long as no writer currently owns the lock.
+    ///   - Readers can always enter as long as no writer currently owns the lock (WRITER bit is 0).
     ///   - Writers only proceed when there are no readers, and can be starved by a continuous stream of readers.
+    ///   - When readers and writers contend at the same time, readers are statistically more likely to win,
+    ///     because they only require WRITER==0 while writers require the whole state word to be zero.
     struct rw_shared_guard_t
     {
         rwlock_t* lock_ptr{};
@@ -147,8 +156,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     /// @brief Non-fair unique guard for write operations.
     /// @details
     ///   Non-fair writer side of the reader-preferred RW spin lock:
-    ///   - Tries to acquire exclusive ownership only when the state word is entirely zero.
-    ///   - Under heavy read contention, writers may wait for a long time or be starved.
+    ///   - Tries to acquire exclusive ownership only when the state word is entirely zero (no readers, no writer).
+    ///   - Under heavy read contention, writers may wait for a long time or be starved; in head-to-head races,
+    ///     readers tend to win because they have a weaker acquisition condition.
     struct rw_unique_guard_t
     {
         rwlock_t* lock_ptr{};
@@ -189,11 +199,153 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         inline constexpr rw_unique_guard_t& operator= (rw_unique_guard_t&&) = delete;
     };
 
+    /// @brief Writer-preferred shared guard for read operations.
+    /// @details
+    ///   Writer-preferred (non-fair) variant:
+    ///   - Once a writer has indicated interest in the lock (WRITER_WAITING bit set),
+    ///     new readers are blocked until writers have made progress.
+    ///   - Existing readers are allowed to finish, but if writers keep arriving,
+    ///     readers may be starved in the long run.
+    struct rw_writer_pref_shared_guard_t
+    {
+        rwlock_t* lock_ptr{};
+
+        inline explicit constexpr rw_writer_pref_shared_guard_t(rwlock_t& lock) noexcept : lock_ptr(::std::addressof(lock))
+        {
+            auto& bits{this->lock_ptr->bits};
+            constexpr auto reader_mask{rwlock_reader_mask()};
+            constexpr auto writer_mask{rwlock_writer_mask()};
+            constexpr auto writer_waiting_mask{rwlock_writer_waiting_mask()};
+
+            unsigned spin_count{};
+
+            for(;;)
+            {
+                auto old{bits.load(::std::memory_order_acquire)};
+
+                // Writer-preferred: if there is a writer owning or waiting,
+                // new readers must not enter.
+                if((old & (writer_mask | writer_waiting_mask)) != 0u)
+                {
+                    if(++spin_count > 1000u) { ::fast_io::this_thread::yield(); }
+                    else
+                    {
+                        rwlock_pause();
+                    }
+                    continue;
+                }
+
+                auto const desired{old + reader_mask};
+                // Acquire on success to synchronize with writer's release-unlock.
+                if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
+
+                if(++spin_count > 1000u) { ::fast_io::this_thread::yield(); }
+                else
+                {
+                    rwlock_pause();
+                }
+            }
+        }
+
+        inline constexpr ~rw_writer_pref_shared_guard_t()
+        {
+            // no necessary to check lock_ptr, because the guard is always valid
+            constexpr auto reader_mask{rwlock_reader_mask()};
+            this->lock_ptr->bits.fetch_sub(reader_mask, ::std::memory_order_release);
+        }
+
+        rw_writer_pref_shared_guard_t() = delete;
+        rw_writer_pref_shared_guard_t(rw_writer_pref_shared_guard_t const&) = delete;
+        rw_writer_pref_shared_guard_t& operator= (rw_writer_pref_shared_guard_t const&) = delete;
+        rw_writer_pref_shared_guard_t(rw_writer_pref_shared_guard_t&&) = delete;
+        rw_writer_pref_shared_guard_t& operator= (rw_writer_pref_shared_guard_t&&) = delete;
+    };
+
+    /// @brief Writer-preferred unique guard for write operations.
+    /// @details
+    ///   Writer-preferred (non-fair) variant:
+    ///   - Writers set WRITER_WAITING to block new readers while they are waiting.
+    ///   - Once no readers and no writer own the lock, a waiting writer acquires WRITER.
+    ///   - If writers are continuously arriving, readers can be starved.
+    struct rw_writer_pref_unique_guard_t
+    {
+        rwlock_t* lock_ptr{};
+
+        inline explicit constexpr rw_writer_pref_unique_guard_t(rwlock_t& lock) noexcept : lock_ptr(::std::addressof(lock))
+        {
+            auto& bits{this->lock_ptr->bits};
+            constexpr auto writer_mask{rwlock_writer_mask()};
+            constexpr auto writer_waiting_mask{rwlock_writer_waiting_mask()};
+            constexpr auto reader_count_mask{rwlock_reader_count_mask()};
+
+            unsigned spin_count{};
+
+            for(;;)
+            {
+                auto old{bits.load(::std::memory_order_acquire)};
+
+                // Phase 1: announce that a writer is waiting.
+                if((old & writer_waiting_mask) == 0u)
+                {
+                    auto const desired{old | writer_waiting_mask};
+                    if(!bits.compare_exchange_weak(old, desired, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
+                    {
+                        if(++spin_count > 1000u) { ::fast_io::this_thread::yield(); }
+                        else
+                        {
+                            rwlock_pause();
+                        }
+                        continue;
+                    }
+                    // Successfully set WRITER_WAITING; reload state in next iteration
+                    // to wait for readers to drain and then grab WRITER.
+                    if(++spin_count > 1000u) { ::fast_io::this_thread::yield(); }
+                    else
+                    {
+                        rwlock_pause();
+                    }
+                    continue;
+                }
+
+                // Phase 2: WRITER_WAITING is set. Once no readers and no writer
+                // own the lock, acquire exclusive ownership.
+                if((old & writer_mask) == 0u && (old & reader_count_mask) == 0u)
+                {
+                    auto const desired{old | writer_mask};
+                    // Acquire on success to see prior critical sections.
+                    if(bits.compare_exchange_weak(old, desired, ::std::memory_order_acquire, ::std::memory_order_relaxed)) { break; }
+                }
+
+                if(++spin_count > 1000u) { ::fast_io::this_thread::yield(); }
+                else
+                {
+                    rwlock_pause();
+                }
+            }
+        }
+
+        inline constexpr ~rw_writer_pref_unique_guard_t()
+        {
+            // no necessary to check lock_ptr, because the guard is always valid
+            constexpr auto writer_mask{rwlock_writer_mask()};
+            constexpr auto writer_waiting_mask{rwlock_writer_waiting_mask()};
+            this->lock_ptr->bits.fetch_and(~(writer_mask | writer_waiting_mask), ::std::memory_order_release);
+        }
+
+        inline constexpr rw_writer_pref_unique_guard_t() = delete;
+        inline constexpr rw_writer_pref_unique_guard_t(rw_writer_pref_unique_guard_t const&) = delete;
+        inline constexpr rw_writer_pref_unique_guard_t& operator= (rw_writer_pref_unique_guard_t const&) = delete;
+        inline constexpr rw_writer_pref_unique_guard_t(rw_writer_pref_unique_guard_t&&) = delete;
+        inline constexpr rw_writer_pref_unique_guard_t& operator= (rw_writer_pref_unique_guard_t&&) = delete;
+    };
+
     /// @brief Fair shared guard for read operations.
     /// @details
     ///   Fair writer-preferred variant:
     ///   - Once a writer acquires the PENDING ticket, new readers are blocked until that writer has finished.
     ///   - Prevents writers from being starved by an unbounded stream of new readers.
+    ///   - After a writer releases the lock, readers and writers race for the next phase; because there can be many
+    ///     readers but usually few writers, readers are statistically more likely to acquire the lock first.
     struct rw_fair_shared_guard_t
     {
         rwlock_t* lock_ptr{};
@@ -255,6 +407,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     ///   Phase-fair writer-preferred variant:
     ///   - Uses a PENDING ticket to serialize writers and block new readers while a writer is waiting.
     ///   - Acquires WRITER only after all current readers have left, ensuring writers eventually make progress.
+    ///   - At phase boundaries (when WRITER and PENDING are cleared) both readers and writers may be waiting;
+    ///     there is no deliberate bias, but in practice new readers often win this race.
     struct rw_fair_unique_guard_t
     {
         rwlock_t* lock_ptr{};
@@ -350,6 +504,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         inline constexpr rw_fair_unique_guard_t(rw_fair_unique_guard_t&&) = delete;
         inline constexpr rw_fair_unique_guard_t& operator= (rw_fair_unique_guard_t&&) = delete;
     };
+
+    /// @brief Fair, writer-biased aliases.
+    /// @details
+    ///   These aliases expose a "read-write fair but writer-biased" style:
+    ///   - When a writer indicates interest via WRITER_WAITING (used by `rw_writer_pref_*`), new readers are blocked,
+    ///     so in situations where both readers and writers become ready at the same time, writers tend to acquire
+    ///     the lock first.
+    ///   - Under sustained write-heavy load, readers may wait longer and can be starved; this is stronger writer
+    ///     preference than `rw_fair_*` while keeping the same state layout.
+    using rw_fair_writer_pref_shared_guard_t = rw_writer_pref_shared_guard_t;
+    using rw_fair_writer_pref_unique_guard_t = rw_writer_pref_unique_guard_t;
 }
 
 #ifndef UWVM_MODULE
