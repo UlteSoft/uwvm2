@@ -50,7 +50,7 @@ All numbers below are from one full run on the Apple M4 platform (unit: seconds)
 | 0.9 | 0.186360041 |
 | 1.0 | 0.084782041 |
 
-### mylock: `rw_fair_shared_guard_t` / `rw_fair_unique_guard_t`
+### mylock: `rw_fair_*`
 
 | read ratio `r` | time (s) |
 |----------------|----------|
@@ -82,7 +82,7 @@ All numbers below are from one full run on the Apple M4 platform (unit: seconds)
 | 0.9 | 0.104293250 |
 | 1.0 | 0.187156667 |
 
-### mylock: `rw_shared_guard_t` / `rw_unique_guard_t` (reader-preferred, non-fair)
+### mylock: `rw_*` (reader-preferred, non-fair)
 
 | read ratio `r` | time (s) |
 |----------------|----------|
