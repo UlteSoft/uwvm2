@@ -18,8 +18,21 @@
 namespace mylock
 {
     using rwlock_t = ::uwvm2::utils::mutex::rwlock_t;
+
+    using rw_shared_guard_t = ::uwvm2::utils::mutex::rw_shared_guard_t;
+    using rw_unique_guard_t = ::uwvm2::utils::mutex::rw_unique_guard_t;
+
+    using rw_writer_pref_shared_guard_t = ::uwvm2::utils::mutex::rw_writer_pref_shared_guard_t;
+    using rw_writer_pref_unique_guard_t = ::uwvm2::utils::mutex::rw_writer_pref_unique_guard_t;
+
+    using rw_writer_pref_no_starvation_shared_guard_t = ::uwvm2::utils::mutex::rw_writer_pref_no_starvation_shared_guard_t;
+    using rw_writer_pref_no_starvation_unique_guard_t = ::uwvm2::utils::mutex::rw_writer_pref_no_starvation_unique_guard_t;
+
     using rw_fair_shared_guard_t = ::uwvm2::utils::mutex::rw_fair_shared_guard_t;
     using rw_fair_unique_guard_t = ::uwvm2::utils::mutex::rw_fair_unique_guard_t;
+
+    using rw_fair_writer_pref_shared_guard_t = ::uwvm2::utils::mutex::rw_fair_writer_pref_shared_guard_t;
+    using rw_fair_writer_pref_unique_guard_t = ::uwvm2::utils::mutex::rw_fair_writer_pref_unique_guard_t;
 }  // namespace mylock
 
 // =================== Simplified folly::RWSpinLock port ====================
@@ -192,26 +205,31 @@ void bench_single_thread_folly(std::size_t iters)
     }
 }
 
-// -------------------- Multi-threaded contention benchmark: 90% read / 10% write -----------------
+// -------------------- Multi-threaded contention benchmark: configurable read/write ratio --------
 
 template <typename Lock, typename ReadOp, typename WriteOp>
-void bench_contention(char const* name, std::size_t thread_count, std::size_t iters_per_thread, ReadOp read_op, WriteOp write_op)
+void bench_contention(char const* name,
+                      std::size_t thread_count,
+                      std::size_t iters_per_thread,
+                      unsigned read_ratio_x10,  // 0..10 => 0%..100% reads
+                      ReadOp read_op,
+                      WriteOp write_op)
 {
     Lock lock{};
 
     std::atomic<bool> start_flag{false};
 
-    auto worker = [&](unsigned tid)
+    auto worker = [&](unsigned)
     {
-        // Simple 90% read / 10% write pattern: 9 reads and 1 write per 10 operations
         while(!start_flag.load(std::memory_order_acquire)) { /* spin */ }
 
         for(std::size_t i{}; i < iters_per_thread; ++i)
         {
-            if((i % 10u) == 0u) { write_op(lock); }
+            auto const bucket{static_cast<unsigned>(i % 10u)};
+            if(bucket < read_ratio_x10) { read_op(lock); }
             else
             {
-                read_op(lock);
+                write_op(lock);
             }
         }
     };
@@ -223,7 +241,13 @@ void bench_contention(char const* name, std::size_t thread_count, std::size_t it
     start_flag.store(true, std::memory_order_release);
     for(auto& t: threads) { t.join(); }
 
-    std::printf("[%s] contention: threads=%zu, iters/thread=%zu\n", name, thread_count, iters_per_thread);
+    double const read_ratio{static_cast<double>(read_ratio_x10) / 10.0};
+    std::printf("[%s] contention: threads=%zu, iters/thread=%zu, read_ratio=%.1f, write_ratio=%.1f\n",
+                name,
+                thread_count,
+                iters_per_thread,
+                read_ratio,
+                1.0 - read_ratio);
 }
 
 int main()
@@ -234,42 +258,183 @@ int main()
     bench_single_thread_mylock(single_iters);
     bench_single_thread_folly(single_iters);
 
-    // Multi-threaded contention: thread count can be adjusted as needed
+    // Multi-threaded contention: thread count and iterations can be adjusted as needed
     constexpr std::size_t iters_per_thread{200000};
+    constexpr std::size_t thread_count{8};
 
     using uwvm2::utils::debug::timer;
 
+    for(unsigned read_ratio_x10 = 0; read_ratio_x10 <= 10; ++read_ratio_x10)
     {
-        timer t{u8"mylock contention"};
-        bench_contention<mylock::rwlock_t>(
-            "mylock",
-            8,
-            iters_per_thread,
-            [](mylock::rwlock_t& lk) { mylock::rw_fair_shared_guard_t g{lk}; },
-            [](mylock::rwlock_t& lk) { mylock::rw_fair_unique_guard_t g{lk}; });
-    }
+        double const rf{static_cast<double>(read_ratio_x10) / 10.0};
 
-    {
-        timer t{u8"folly contention"};
-        bench_contention<bench_folly::RWSpinLock>(
-            "folly",
-            8,
-            iters_per_thread,
-            [](bench_folly::RWSpinLock& lk)
-            {
-                lk.lock_shared();
-                lk.unlock_shared();
-            },
-            [](bench_folly::RWSpinLock& lk)
-            {
-                lk.lock();
-                lk.unlock();
-            });
+        // Reader-preferred (non-fair) variant
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"mylock rw_shared/rw_unique r=0.0",
+                u8"mylock rw_shared/rw_unique r=0.1",
+                u8"mylock rw_shared/rw_unique r=0.2",
+                u8"mylock rw_shared/rw_unique r=0.3",
+                u8"mylock rw_shared/rw_unique r=0.4",
+                u8"mylock rw_shared/rw_unique r=0.5",
+                u8"mylock rw_shared/rw_unique r=0.6",
+                u8"mylock rw_shared/rw_unique r=0.7",
+                u8"mylock rw_shared/rw_unique r=0.8",
+                u8"mylock rw_shared/rw_unique r=0.9",
+                u8"mylock rw_shared/rw_unique r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<mylock::rwlock_t>(
+                "mylock.read_pref",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](mylock::rwlock_t& lk) { mylock::rw_shared_guard_t g{lk}; },
+                [](mylock::rwlock_t& lk) { mylock::rw_unique_guard_t g{lk}; });
+        }
+
+        // Writer-preferred (non-fair) variant
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"mylock rw_writer_pref r=0.0",
+                u8"mylock rw_writer_pref r=0.1",
+                u8"mylock rw_writer_pref r=0.2",
+                u8"mylock rw_writer_pref r=0.3",
+                u8"mylock rw_writer_pref r=0.4",
+                u8"mylock rw_writer_pref r=0.5",
+                u8"mylock rw_writer_pref r=0.6",
+                u8"mylock rw_writer_pref r=0.7",
+                u8"mylock rw_writer_pref r=0.8",
+                u8"mylock rw_writer_pref r=0.9",
+                u8"mylock rw_writer_pref r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<mylock::rwlock_t>(
+                "mylock.writer_pref",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](mylock::rwlock_t& lk) { mylock::rw_writer_pref_shared_guard_t g{lk}; },
+                [](mylock::rwlock_t& lk) { mylock::rw_writer_pref_unique_guard_t g{lk}; });
+        }
+
+        // Writer-preferred, writer-starvation-free variant
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"mylock rw_writer_pref_no_starvation r=0.0",
+                u8"mylock rw_writer_pref_no_starvation r=0.1",
+                u8"mylock rw_writer_pref_no_starvation r=0.2",
+                u8"mylock rw_writer_pref_no_starvation r=0.3",
+                u8"mylock rw_writer_pref_no_starvation r=0.4",
+                u8"mylock rw_writer_pref_no_starvation r=0.5",
+                u8"mylock rw_writer_pref_no_starvation r=0.6",
+                u8"mylock rw_writer_pref_no_starvation r=0.7",
+                u8"mylock rw_writer_pref_no_starvation r=0.8",
+                u8"mylock rw_writer_pref_no_starvation r=0.9",
+                u8"mylock rw_writer_pref_no_starvation r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<mylock::rwlock_t>(
+                "mylock.writer_pref_no_starvation",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](mylock::rwlock_t& lk) { mylock::rw_writer_pref_no_starvation_shared_guard_t g{lk}; },
+                [](mylock::rwlock_t& lk) { mylock::rw_writer_pref_no_starvation_unique_guard_t g{lk}; });
+        }
+
+        // Fair writer-preferred (phase-fair) variant
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"mylock rw_fair r=0.0",
+                u8"mylock rw_fair r=0.1",
+                u8"mylock rw_fair r=0.2",
+                u8"mylock rw_fair r=0.3",
+                u8"mylock rw_fair r=0.4",
+                u8"mylock rw_fair r=0.5",
+                u8"mylock rw_fair r=0.6",
+                u8"mylock rw_fair r=0.7",
+                u8"mylock rw_fair r=0.8",
+                u8"mylock rw_fair r=0.9",
+                u8"mylock rw_fair r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<mylock::rwlock_t>(
+                "mylock.fair",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](mylock::rwlock_t& lk) { mylock::rw_fair_shared_guard_t g{lk}; },
+                [](mylock::rwlock_t& lk) { mylock::rw_fair_unique_guard_t g{lk}; });
+        }
+
+        // Fair, writer-biased variant
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"mylock rw_fair_writer_pref r=0.0",
+                u8"mylock rw_fair_writer_pref r=0.1",
+                u8"mylock rw_fair_writer_pref r=0.2",
+                u8"mylock rw_fair_writer_pref r=0.3",
+                u8"mylock rw_fair_writer_pref r=0.4",
+                u8"mylock rw_fair_writer_pref r=0.5",
+                u8"mylock rw_fair_writer_pref r=0.6",
+                u8"mylock rw_fair_writer_pref r=0.7",
+                u8"mylock rw_fair_writer_pref r=0.8",
+                u8"mylock rw_fair_writer_pref r=0.9",
+                u8"mylock rw_fair_writer_pref r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<mylock::rwlock_t>(
+                "mylock.fair_writer_pref",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](mylock::rwlock_t& lk) { mylock::rw_fair_writer_pref_shared_guard_t g{lk}; },
+                [](mylock::rwlock_t& lk) { mylock::rw_fair_writer_pref_unique_guard_t g{lk}; });
+        }
+
+        // Folly-style baseline
+        {
+            static constexpr ::uwvm2::utils::container::u8string_view labels[] = {
+                u8"folly RWSpinLock r=0.0",
+                u8"folly RWSpinLock r=0.1",
+                u8"folly RWSpinLock r=0.2",
+                u8"folly RWSpinLock r=0.3",
+                u8"folly RWSpinLock r=0.4",
+                u8"folly RWSpinLock r=0.5",
+                u8"folly RWSpinLock r=0.6",
+                u8"folly RWSpinLock r=0.7",
+                u8"folly RWSpinLock r=0.8",
+                u8"folly RWSpinLock r=0.9",
+                u8"folly RWSpinLock r=1.0",
+            };
+            timer t{labels[read_ratio_x10]};
+            bench_contention<bench_folly::RWSpinLock>(
+                "folly",
+                thread_count,
+                iters_per_thread,
+                read_ratio_x10,
+                [](bench_folly::RWSpinLock& lk)
+                {
+                    lk.lock_shared();
+                    lk.unlock_shared();
+                },
+                [](bench_folly::RWSpinLock& lk)
+                {
+                    lk.lock();
+                    lk.unlock();
+                });
+        }
+
+        (void)rf;  // suppress unused warning if timers are disabled
     }
 
     return 0;
 }
 
-  // From project root:
-  // clang++   benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I third-parties/bizwen/include -I third-parties/boost_unordered/include
-  // g++       benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3 -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I third-parties/bizwen/include -I third-parties/boost_unordered/include
+// From project root:
+// clang++   benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3 -ffast-math -march=native -fno-rtti
+// -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I third-parties/bizwen/include -I
+// third-parties/boost_unordered/include g++       benchmark/0001.utils/0001.mutex/RWSpinLock.cc -o benchmark/0001.utils/0001.mutex/RWSpinLock -std=c++2c -O3
+// -ffast-math -march=native -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -I src -I third-parties/fast_io/include -I
+// third-parties/bizwen/include -I third-parties/boost_unordered/include
