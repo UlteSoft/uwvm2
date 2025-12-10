@@ -26,6 +26,15 @@ The Lua driver will:
 
 All numbers below are from one full run on the Apple M4 platform (unit: seconds).
 
+## Code Provenance
+
+- The baseline `bench_folly::RWSpinLock` implementation is adapted from
+  `folly::RWSpinLock` as of commit `7243f43c1b4cd974b332ac81727db0c860f271a7`:
+  <https://github.com/facebook/folly/blob/7243f43c1b4cd974b332ac81727db0c860f271a7/folly/synchronization/RWSpinLock.h#L122>
+- The `uwvm2::utils::mutex::rwlock_t` implementation and this benchmark configuration
+  correspond to project commit `3c6ccdb2fb3e9ec06cfe25991341a0a01e99ab18`:
+  <https://github.com/MacroModel/uwvm2/commit/3c6ccdb2fb3e9ec06cfe25991341a0a01e99ab18>
+
 ## Multi-threaded Contention: Read/Write Ratio Sweep
 
 - Threads: `8`
