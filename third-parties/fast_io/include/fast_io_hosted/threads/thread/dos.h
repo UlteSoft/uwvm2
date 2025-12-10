@@ -1,11 +1,14 @@
 ﻿#pragma once
 
+// std
 #include <chrono>
 #include <ranges>
 #include <cstdint>
 #include <utility>
 #include <functional>
 #include <type_traits>
+// system
+#include <dpmi.h>
 
 namespace fast_io
 {
@@ -122,6 +125,18 @@ inline
 	auto const delta{unix_expect - now};
 	::fast_io::dos::this_thread::sleep_for(delta);
 }
+
+inline
+#if __cpp_constexpr >= 202207L
+	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
+	// for reduce some warning purpose
+	constexpr
+#endif
+	void yield() noexcept
+{
+	::fast_io::noexcept_call(::__dpmi_yield());
+}
+
 } // namespace dos::this_thread
 
 #if defined(__MSDOS__) || defined(__DJGPP__)
@@ -131,6 +146,7 @@ namespace this_thread
 using ::fast_io::dos::this_thread::get_id;
 using ::fast_io::dos::this_thread::sleep_for;
 using ::fast_io::dos::this_thread::sleep_until;
+using ::fast_io::dos::this_thread::yield;
 } // namespace this_thread
 #endif
 

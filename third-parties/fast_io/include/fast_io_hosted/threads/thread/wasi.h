@@ -264,6 +264,15 @@ void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) no
 	::fast_io::wasi::this_thread::sleep_for(delta);
 }
 
+inline
+#if __cpp_constexpr >= 202207L
+	constexpr
+#endif
+void yield() noexcept
+{
+	__wasi_sched_yield();
+}
+
 } // namespace this_thread
 
 #if defined(__wasi_thread__)
@@ -404,6 +413,7 @@ namespace this_thread
 using ::fast_io::wasi::this_thread::get_id;
 using ::fast_io::wasi::this_thread::sleep_for;
 using ::fast_io::wasi::this_thread::sleep_until;
+using ::fast_io::wasi::this_thread::yield;
 } // namespace this_thread
 
 } // namespace fast_io

@@ -32,6 +32,8 @@ module;
 #include <utility>
 #include <type_traits>
 #include <atomic>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
 
 export module uwvm2.utils.mutex:rw_spin_lock;
 

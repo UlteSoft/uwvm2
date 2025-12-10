@@ -385,6 +385,21 @@ inline
 	::fast_io::win32::Sleep(ms);
 }
 
+inline
+#if __cpp_constexpr >= 202207L
+	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
+	// for reduce some warning purpose
+	constexpr
+#endif
+	void yield() noexcept
+{
+#if (!defined(_WIN32_WINNT) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0500)) && !defined(_WIN32_WINDOWS)
+	::fast_io::win32::SwitchToThread();
+#else
+	::fast_io::win32::Sleep(0);
+#endif
+}
+
 } // namespace this_thread
 
 } // namespace win32
@@ -399,6 +414,7 @@ namespace this_thread
 using ::fast_io::win32::this_thread::get_id;
 using ::fast_io::win32::this_thread::sleep_for;
 using ::fast_io::win32::this_thread::sleep_until;
+using ::fast_io::win32::this_thread::yield;
 } // namespace this_thread
 #endif
 } // namespace fast_io

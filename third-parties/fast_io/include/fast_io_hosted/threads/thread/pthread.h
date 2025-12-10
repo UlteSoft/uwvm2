@@ -1,12 +1,15 @@
 ﻿#pragma once
 
+// std
 #include <chrono>
 #include <ranges>
 #include <cstdint>
 #include <utility>
 #include <functional>
 #include <type_traits>
+// system
 #include <pthread.h>
+#include <sched.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -32,8 +35,8 @@ public:
 
 	inline constexpr pthread_thread_start_routine_tuple_allocate_guard(pthread_thread_start_routine_tuple_allocate_guard const &) noexcept = delete;
 	inline constexpr pthread_thread_start_routine_tuple_allocate_guard(pthread_thread_start_routine_tuple_allocate_guard &&other) noexcept = delete;
-	inline constexpr pthread_thread_start_routine_tuple_allocate_guard& operator=(pthread_thread_start_routine_tuple_allocate_guard const &) noexcept = delete;
-	inline constexpr pthread_thread_start_routine_tuple_allocate_guard& operator=(pthread_thread_start_routine_tuple_allocate_guard &&other) noexcept = delete;
+	inline constexpr pthread_thread_start_routine_tuple_allocate_guard &operator=(pthread_thread_start_routine_tuple_allocate_guard const &) noexcept = delete;
+	inline constexpr pthread_thread_start_routine_tuple_allocate_guard &operator=(pthread_thread_start_routine_tuple_allocate_guard &&other) noexcept = delete;
 
 	inline constexpr ~pthread_thread_start_routine_tuple_allocate_guard()
 	{
@@ -91,8 +94,6 @@ private:
 	bool joinable_{false};
 
 private:
-
-
 public:
 	inline constexpr pthread_thread() noexcept = default;
 
@@ -101,7 +102,7 @@ public:
 	inline constexpr pthread_thread(Func &&func, Args &&...args)
 	{
 		using start_routine_tuple_type = ::fast_io::containers::tuple<::std::decay_t<Func>, ::std::decay_t<Args>...>;
-        using alloc = ::fast_io::native_typed_global_allocator<start_routine_tuple_type>;
+		using alloc = ::fast_io::native_typed_global_allocator<start_routine_tuple_type>;
 
 		auto start_routine_tuple{alloc::allocate(1u)};
 #if defined(__clang__)
@@ -225,25 +226,25 @@ namespace this_thread
 {
 
 [[nodiscard]]
-inline 
+inline
 #if __cpp_constexpr >= 202207L
 	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
 	// for reduce some warning purpose
 	constexpr
 #endif
-::fast_io::posix::pthread_thread::id get_id() noexcept
+	::fast_io::posix::pthread_thread::id get_id() noexcept
 {
 	return ::fast_io::noexcept_call(::pthread_self);
 }
 
 template <typename Rep, typename Period>
-inline 
+inline
 #if __cpp_constexpr >= 202207L
 	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
 	// for reduce some warning purpose
 	constexpr
 #endif
-void sleep_for(::std::chrono::duration<Rep, Period> const &sleep_duration) noexcept
+	void sleep_for(::std::chrono::duration<Rep, Period> const &sleep_duration) noexcept
 {
 	auto const ns64{::std::chrono::duration_cast<::std::chrono::nanoseconds>(sleep_duration).count()};
 	if (ns64 <= 0)
@@ -257,13 +258,13 @@ void sleep_for(::std::chrono::duration<Rep, Period> const &sleep_duration) noexc
 }
 
 template <typename Clock, typename Duration>
-inline 
+inline
 #if __cpp_constexpr >= 202207L
 	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
 	// for reduce some warning purpose
 	constexpr
 #endif
-void sleep_until(::std::chrono::time_point<Clock, Duration> const &expect_time) noexcept
+	void sleep_until(::std::chrono::time_point<Clock, Duration> const &expect_time) noexcept
 {
 	auto const now{Clock::now()};
 	if (now < expect_time)
@@ -294,13 +295,13 @@ void sleep_until(::std::chrono::time_point<Clock, Duration> const &expect_time) 
 }
 
 template <::std::int_least64_t off_to_epoch>
-inline 
+inline
 #if __cpp_constexpr >= 202207L
 	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
 	// for reduce some warning purpose
 	constexpr
 #endif
-void sleep_for(::fast_io::basic_timestamp<off_to_epoch> const &sleep_duration) noexcept
+	void sleep_for(::fast_io::basic_timestamp<off_to_epoch> const &sleep_duration) noexcept
 {
 	if (sleep_duration.seconds < 0)
 	{
@@ -316,18 +317,18 @@ void sleep_for(::fast_io::basic_timestamp<off_to_epoch> const &sleep_duration) n
 	{
 		return;
 	}
-	
-    ::fast_io::noexcept_call(::nanosleep, __builtin_addressof(req), nullptr);
+
+	::fast_io::noexcept_call(::nanosleep, __builtin_addressof(req), nullptr);
 }
 
 template <::std::int_least64_t off_to_epoch>
-inline 
+inline
 #if __cpp_constexpr >= 202207L
 	// https://en.cppreference.com/w/cpp/compiler_support/23.html#cpp_constexpr_202207L
 	// for reduce some warning purpose
 	constexpr
 #endif
-void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) noexcept
+	void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) noexcept
 {
 	if (expect_time.seconds < 0)
 	{
@@ -336,7 +337,7 @@ void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) no
 
 	::timespec ts{};
 
-    auto const unix_ts{static_cast<::fast_io::unix_timestamp>(expect_time)};
+	auto const unix_ts{static_cast<::fast_io::unix_timestamp>(expect_time)};
 	ts.tv_sec = static_cast<::time_t>(unix_ts.seconds);
 	constexpr ::std::uint_least64_t mul_factor{::fast_io::uint_least64_subseconds_per_second / 1000000000u};
 	ts.tv_nsec = static_cast<long>(unix_ts.subseconds / mul_factor);
@@ -346,8 +347,8 @@ void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) no
 #else
 	::timespec now{};
 	::fast_io::noexcept_call(::clock_gettime, CLOCK_REALTIME, __builtin_addressof(now));
-	
-    if ((ts.tv_sec < now.tv_sec) || (ts.tv_sec == now.tv_sec && ts.tv_nsec <= now.tv_nsec))
+
+	if ((ts.tv_sec < now.tv_sec) || (ts.tv_sec == now.tv_sec && ts.tv_nsec <= now.tv_nsec))
 	{
 		return;
 	}
@@ -359,9 +360,18 @@ void sleep_until(::fast_io::basic_timestamp<off_to_epoch> const &expect_time) no
 		delta.tv_nsec += 1'000'000'000L;
 		delta.tv_sec -= 1;
 	}
-	
-    ::fast_io::noexcept_call(::nanosleep, __builtin_addressof(delta), nullptr);
+
+	::fast_io::noexcept_call(::nanosleep, __builtin_addressof(delta), nullptr);
 #endif
+}
+
+inline
+#if __cpp_constexpr >= 202207L
+	constexpr
+#endif
+	void yield() noexcept
+{
+	::fast_io::noexcept_call(::sched_yield);
 }
 
 } // namespace this_thread
@@ -378,6 +388,7 @@ namespace this_thread
 using ::fast_io::posix::this_thread::get_id;
 using ::fast_io::posix::this_thread::sleep_for;
 using ::fast_io::posix::this_thread::sleep_until;
+using ::fast_io::posix::this_thread::yield;
 } // namespace this_thread
 #endif
 
