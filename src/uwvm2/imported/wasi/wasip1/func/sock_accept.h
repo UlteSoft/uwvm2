@@ -236,7 +236,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             // Since the file descriptor's location is fixed and accessed via the unique pointer,
 
             // Simply acquiring data using a shared_lock
-            ::uwvm2::utils::mutex::rw_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+            ::uwvm2::utils::mutex::rw_fair_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
             // Negative states have been excluded, so the conversion result will only be positive numbers.
             using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>;
@@ -429,7 +429,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 {
                     // Manipulating fd_manager requires a unique_lock.
-                    ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+                    ::uwvm2::utils::mutex::rw_fair_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
                     // check limit
                     using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
@@ -694,7 +694,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 {
                     // Manipulating fd_manager requires a unique_lock.
-                    ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+                    ::uwvm2::utils::mutex::rw_fair_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
                     // check limit
                     using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;

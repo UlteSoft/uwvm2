@@ -1,7 +1,7 @@
 ﻿// rwlock_bench.cc
 //
 // Performance comparison between uwvm2::utils::mutex::rwlock_t and folly::RWSpinLock style implementation.
-// - Uses rwlock_t / rw_shared_guard_t / rw_unique_guard_t from the project
+// - Uses rwlock_t / rw_fair_shared_guard_t / rw_fair_unique_guard_t from the project
 // - Embeds a renamed bench_folly::RWSpinLock implementation with folly dependencies removed
 
 #include <uwvm2/utils/mutex/impl.h>
@@ -18,8 +18,8 @@
 namespace mylock
 {
     using rwlock_t = ::uwvm2::utils::mutex::rwlock_t;
-    using rw_shared_guard_t = ::uwvm2::utils::mutex::rw_shared_guard_t;
-    using rw_unique_guard_t = ::uwvm2::utils::mutex::rw_unique_guard_t;
+    using rw_fair_shared_guard_t = ::uwvm2::utils::mutex::rw_fair_shared_guard_t;
+    using rw_fair_unique_guard_t = ::uwvm2::utils::mutex::rw_fair_unique_guard_t;
 }  // namespace mylock
 
 // =================== Simplified folly::RWSpinLock port ====================
@@ -158,12 +158,12 @@ void bench_single_thread_mylock(std::size_t iters)
 
     {
         timer t{u8"mylock single-thread read"};
-        for(std::size_t i{}; i < iters; ++i) { mylock::rw_shared_guard_t g{lock}; }
+        for(std::size_t i{}; i < iters; ++i) { mylock::rw_fair_shared_guard_t g{lock}; }
     }
 
     {
         timer t{u8"mylock single-thread write"};
-        for(std::size_t i{}; i < iters; ++i) { mylock::rw_unique_guard_t g{lock}; }
+        for(std::size_t i{}; i < iters; ++i) { mylock::rw_fair_unique_guard_t g{lock}; }
     }
 }
 
@@ -245,8 +245,8 @@ int main()
             "mylock",
             8,
             iters_per_thread,
-            [](mylock::rwlock_t& lk) { mylock::rw_shared_guard_t g{lk}; },
-            [](mylock::rwlock_t& lk) { mylock::rw_unique_guard_t g{lk}; });
+            [](mylock::rwlock_t& lk) { mylock::rw_fair_shared_guard_t g{lk}; },
+            [](mylock::rwlock_t& lk) { mylock::rw_fair_unique_guard_t g{lk}; });
     }
 
     {

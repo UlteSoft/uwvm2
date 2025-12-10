@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // If same fd, only succeed when fd_from is valid (exists and not closed)
         if(fd_opens_pos_from == fd_opens_pos_to) [[unlikely]]
         {
-            ::uwvm2::utils::mutex::rw_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+            ::uwvm2::utils::mutex::rw_fair_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
             bool valid;  // no initialize
             if(wasm_fd_storage.opens.size() > fd_opens_pos_from)
             {
@@ -127,7 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             ::uwvm2::utils::mutex::mutex_merely_release_guard_t curr_fd_release_guard_from{};
 
             // Manipulating fd_manager requires a unique_lock.
-            ::uwvm2::utils::mutex::rw_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+            ::uwvm2::utils::mutex::rw_fair_unique_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
 
             // from
 
