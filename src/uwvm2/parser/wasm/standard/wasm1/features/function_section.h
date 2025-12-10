@@ -4660,7 +4660,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              ::std::memcpy(::std::addressof(word), bytes, sizeof(word));
 
                                              // Bits 7, 15, 23, ... are zero for the terminating byte.
-                                             constexpr unsigned msb_mask{~0x7F7F7F7Fu};
+                                             // The unsigned standard does not specify a size; 64 bits are provided here to ensure absolute safety.
+                                             constexpr unsigned msb_mask{~static_cast<unsigned>(0x7F7F'7F7F'7F7F'7F7Fu)};
                                              unsigned const msbs{~word & msb_mask};
 
                                              if(msbs == 0u) [[unlikely]]
