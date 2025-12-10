@@ -24,7 +24,7 @@ The Lua driver will:
 - Run the benchmark and capture detailed output in `outputs/rwspinlock_bench.log`.
 - Write a condensed summary to `outputs/rwspinlock_summary.txt`.
 
-All numbers below are from one full run on the Apple M4 platform (unit: seconds).
+All numbers in the next section are from one full run on the Apple M4 platform (unit: seconds).
 
 ## Code Provenance
 
@@ -157,4 +157,115 @@ All numbers below are from one full run on the Apple M4 platform (unit: seconds)
 
 > Note: These numbers are from a single benchmark run on one machine. For rigorous conclusions, multiple runs and measurements on different platforms are recommended.
 
-![benchmark](output.png)
+![benchmark](output-aarch64.png)
+
+## Additional Results: x86_64 (Intel Core i7-13700F)
+
+The following numbers were obtained by running the same benchmark binary on an x86_64 machine with an Intel Core i7-13700F CPU (unit: seconds).
+
+### folly::RWSpinLock (baseline, x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.125819935 |
+| 0.1 | 0.137058010 |
+| 0.2 | 0.134193917 |
+| 0.3 | 0.143021313 |
+| 0.4 | 0.126689332 |
+| 0.5 | 0.139813138 |
+| 0.6 | 0.137698962 |
+| 0.7 | 0.132002213 |
+| 0.8 | 0.113865601 |
+| 0.9 | 0.097431267 |
+| 1.0 | 0.051634758 |
+
+### mylock: `rw_fair_*` (x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.222157018 |
+| 0.1 | 0.250912337 |
+| 0.2 | 0.240525707 |
+| 0.3 | 0.223964641 |
+| 0.4 | 0.220448537 |
+| 0.5 | 0.200496823 |
+| 0.6 | 0.168370400 |
+| 0.7 | 0.161525087 |
+| 0.8 | 0.128287358 |
+| 0.9 | 0.106167590 |
+| 1.0 | 0.074786694 |
+
+### mylock: `rw_fair_writer_pref_*` (x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.464588902 |
+| 0.1 | 0.431620210 |
+| 0.2 | 0.428203730 |
+| 0.3 | 0.406400210 |
+| 0.4 | 0.363210868 |
+| 0.5 | 0.291397370 |
+| 0.6 | 0.271801837 |
+| 0.7 | 0.215928349 |
+| 0.8 | 0.178950446 |
+| 0.9 | 0.132165346 |
+| 1.0 | 0.077989257 |
+
+### mylock: `rw_shared_guard_t` / `rw_unique_guard_t` (x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.125732152 |
+| 0.1 | 0.115671535 |
+| 0.2 | 0.121170085 |
+| 0.3 | 0.114512183 |
+| 0.4 | 0.123247374 |
+| 0.5 | 0.111239976 |
+| 0.6 | 0.114633512 |
+| 0.7 | 0.112135078 |
+| 0.8 | 0.082360819 |
+| 0.9 | 0.096878587 |
+| 1.0 | 0.038977657 |
+
+### mylock: `rw_writer_pref_*` (x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.274025044 |
+| 0.1 | 0.256148286 |
+| 0.2 | 0.266446047 |
+| 0.3 | 0.234094531 |
+| 0.4 | 0.220809950 |
+| 0.5 | 0.197230241 |
+| 0.6 | 0.173605151 |
+| 0.7 | 0.157830127 |
+| 0.8 | 0.135410184 |
+| 0.9 | 0.105746664 |
+| 1.0 | 0.073378736 |
+
+### mylock: `rw_writer_pref_no_starvation_*` (x86_64)
+
+| read ratio `r` | time (s) |
+|----------------|----------|
+| 0.0 | 0.216104250 |
+| 0.1 | 0.239526767 |
+| 0.2 | 0.241461241 |
+| 0.3 | 0.234457859 |
+| 0.4 | 0.220356094 |
+| 0.5 | 0.204344044 |
+| 0.6 | 0.171972358 |
+| 0.7 | 0.155676716 |
+| 0.8 | 0.130009907 |
+| 0.9 | 0.121969581 |
+| 1.0 | 0.054328192 |
+
+### Single-threaded Benchmarks (x86_64)
+
+| case | time (s) |
+|------|----------|
+| folly single-thread read  | 0.009145662 |
+| folly single-thread write | 0.009131499 |
+| mylock single-thread read | 0.009992890 |
+| mylock single-thread write| 0.025608184 |
+
+![benchmark](output-x86_64.png)
