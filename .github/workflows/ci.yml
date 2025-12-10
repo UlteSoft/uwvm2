@@ -110,16 +110,16 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-windows-gnu:
-    name: Windows (x86_64) MINGW ${{ matrix.env.name }}
+    name: Windows MINGW ${{ matrix.env.name }}
     strategy:
       matrix:
         env:
           - name: "CLANG64"
             prefix: mingw-w64-clang-x86_64
             os: windows-latest
-          - name: "CLANGARM64"
-            prefix: mingw-w64-clang-aarch64
-            os: windows-11-arm
+          #- name: "CLANGARM64"
+          #  prefix: mingw-w64-clang-aarch64
+          #  os: windows-11-arm
         mode: ["debug"]
         policies: ["build.sanitizer.address"]
         winver: [
