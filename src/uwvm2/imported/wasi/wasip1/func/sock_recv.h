@@ -301,216 +301,300 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                                             ri_data_ptrsz,
                                                                             ri_data_len * ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t);
 
-        // If using reassignment
-        ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard tmp_allocator_guard{};
-
-        ::fast_io::io_scatter_t* scatter_base;  // no initialize
-
-        if(scatter_length < 1024uz / sizeof(::fast_io::io_scatter_t)) [[likely]]
+        // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
+        // being processed, making this a virtual machine implementation error.
+        if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
-            // When the bytes count less than 1024, it exists on the stack and is highly efficient.
-            auto scatter_alloca_guaranteed_bytes_count{scatter_length * sizeof(::fast_io::io_scatter_t)};
-            auto scatter_alloca_bytes_count{scatter_alloca_guaranteed_bytes_count + (alignof(::fast_io::io_scatter_t) - 1uz)};
-
-# if UWVM_HAS_BUILTIN(__builtin_alloca)
-            auto tmp_scatter_base_unaligned{__builtin_alloca(scatter_alloca_bytes_count)};
-            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
-                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
-# elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
-            auto tmp_scatter_base_unaligned{_alloca(scatter_alloca_bytes_count)};
-            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
-                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
-# else
-            auto tmp_scatter_base_unaligned{alloca(scatter_alloca_bytes_count)};
-            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
-                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
+// This will be checked at runtime.
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 # endif
-
-            // std::align may return nullptr
-            if(scatter_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-        }
-        else
-        {
-            // When the bytes count is greater than 1024, it exists on the heap.
-            // The allocator crashes upon failure.
-            scatter_base = ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard::allocator::allocate(scatter_length);
-
-            // Start the raii guard to deallocate the memory.
-            tmp_allocator_guard.ptr = scatter_base;
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
-        // for nread
-        [[maybe_unused]] ::fast_io::intfpos_t total_bytes_read{};
-
+        switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
         {
-            // Full locking is required during writing.
-            [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
-
-            // get scatter base
-            auto iovs_curr{ri_data_ptrsz};
-
-            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t length_counter{};
-
-            for(::std::size_t i{}; i != scatter_length; ++i)
+            [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
             {
-                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t wasm_base;  // no initialize
-                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t wasm_len;       // no initialize
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+            {
+# if defined(_WIN32) && !defined(__CYGWIN__)
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+# else
+                // If using reassignment
+                ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard tmp_allocator_guard{};
 
-                if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
+                ::fast_io::io_scatter_t* scatter_base;  // no initialize
+
+                if(scatter_length < 1024uz / sizeof(::fast_io::io_scatter_t)) [[likely]]
                 {
-                    ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
+                    // When the bytes count less than 1024, it exists on the stack and is highly efficient.
+                    auto scatter_alloca_guaranteed_bytes_count{scatter_length * sizeof(::fast_io::io_scatter_t)};
+                    auto scatter_alloca_bytes_count{scatter_alloca_guaranteed_bytes_count + (alignof(::fast_io::io_scatter_t) - 1uz)};
 
-                    // iovs_len has been checked.
-                    ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm32_unchecked_unlocked(
-                        memory,
-                        iovs_curr,
-                        reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
-                        reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
-                    iovs_curr += 8uz;
+#  if UWVM_HAS_BUILTIN(__builtin_alloca)
+                    auto tmp_scatter_base_unaligned{__builtin_alloca(scatter_alloca_bytes_count)};
+                    scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(::std::align(alignof(::fast_io::io_scatter_t),
+                                                                                                 scatter_alloca_guaranteed_bytes_count,
+                                                                                                 tmp_scatter_base_unaligned,
+                                                                                                 scatter_alloca_bytes_count));
+#  elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
+                    auto tmp_scatter_base_unaligned{_alloca(scatter_alloca_bytes_count)};
+                    scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(::std::align(alignof(::fast_io::io_scatter_t),
+                                                                                                 scatter_alloca_guaranteed_bytes_count,
+                                                                                                 tmp_scatter_base_unaligned,
+                                                                                                 scatter_alloca_bytes_count));
+#  else
+                    auto tmp_scatter_base_unaligned{alloca(scatter_alloca_bytes_count)};
+                    scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(::std::align(alignof(::fast_io::io_scatter_t),
+                                                                                                 scatter_alloca_guaranteed_bytes_count,
+                                                                                                 tmp_scatter_base_unaligned,
+                                                                                                 scatter_alloca_bytes_count));
+#  endif
 
-                    wasm_base = tmp_iovec.buf;
-                    wasm_len = tmp_iovec.buf_len;
+                    // std::align may return nullptr
+                    if(scatter_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                 }
                 else
                 {
-                    wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
-                        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(memory, iovs_curr);
-                    iovs_curr += 4uz;
+                    // When the bytes count is greater than 1024, it exists on the heap.
+                    // The allocator crashes upon failure.
+                    scatter_base = ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard::allocator::allocate(scatter_length);
 
-                    wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
-                        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(memory, iovs_curr);
-                    iovs_curr += 4uz;
+                    // Start the raii guard to deallocate the memory.
+                    tmp_allocator_guard.ptr = scatter_base;
                 }
 
-                // It is necessary to verify whether the memory referenced within the WASM is sufficient.
-                ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, wasm_base, wasm_len);
+                // for nread
+                [[maybe_unused]] ::fast_io::intfpos_t total_bytes_read{};
 
-                auto& curr_tmp_scatter_base{scatter_base[i]};
+                // Full locking is required during writing.
+                [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
-                // Already verified as legitimate
-                curr_tmp_scatter_base.base = memory.memory_begin + wasm_base;
+                // get scatter base
+                auto iovs_curr{ri_data_ptrsz};
 
-                // check counter
-                if(wasm_len > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() - length_counter) [[unlikely]]
+                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t length_counter{};
+
+                for(::std::size_t i{}; i != scatter_length; ++i)
                 {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
-                }
+                    ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t wasm_base;  // no initialize
+                    ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t wasm_len;       // no initialize
 
-                length_counter += wasm_len;
-
-                if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() >
-                             ::std::numeric_limits<::fast_io::intfpos_t>::max())
-                {
-                    if(length_counter > ::std::numeric_limits<::fast_io::intfpos_t>::max()) [[unlikely]]
+                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
                     {
-                        // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                    }
-                }
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
 
-                // Conversion requires verification.
-                if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > ::std::numeric_limits<::std::size_t>::max())
-                {
-                    if(wasm_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]]
-                    {
-                        // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
-                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
-                    }
-                }
+                        // iovs_len has been checked.
+                        ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm32_unchecked_unlocked(
+                            memory,
+                            iovs_curr,
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
+                        iovs_curr += 8uz;
 
-                curr_tmp_scatter_base.len = static_cast<::std::size_t>(wasm_len);
-            }
-
-            // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
-            // being processed, making this a virtual machine implementation error.
-            if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
-            {
-// This will be checked at runtime.
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
-                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-            }
-
-            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
-            {
-                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
-                {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
-                }
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
-                {
-# if defined(_WIN32) && !defined(__CYGWIN__)
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
-# else
-                    // posix
-                    ::fast_io::native_io_observer curr_fd_native_observer{};
-
-                    bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
-                                                ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
-                    if(is_file_observer)
-                    {
-                        auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
-                        curr_fd_native_observer = file_observer;
+                        wasm_base = tmp_iovec.buf;
+                        wasm_len = tmp_iovec.buf_len;
                     }
                     else
                     {
-                        auto& file_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
-                        curr_fd_native_observer = file_fd;
+                        wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                            ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(memory, iovs_curr);
+                        iovs_curr += 4uz;
+
+                        wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(memory, iovs_curr);
+                        iovs_curr += 4uz;
                     }
 
-                    auto const& curr_fd_native_file{curr_fd_native_observer};
+                    // It is necessary to verify whether the memory referenced within the WASM is sufficient.
+                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, wasm_base, wasm_len);
 
-                    int const native_fd{curr_fd_native_file.native_handle()};
+                    auto& curr_tmp_scatter_base{scatter_base[i]};
 
-                    bool is_datagram_socket{};
+                    // Already verified as legitimate
+                    curr_tmp_scatter_base.base = memory.memory_begin + wasm_base;
+
+                    // check counter
+                    if(wasm_len > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() - length_counter) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    }
+
+                    length_counter += wasm_len;
+
+                    if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() >
+                                 ::std::numeric_limits<::fast_io::intfpos_t>::max())
+                    {
+                        if(length_counter > ::std::numeric_limits<::fast_io::intfpos_t>::max()) [[unlikely]]
+                        {
+                            // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                        }
+                    }
+
+                    // Conversion requires verification.
+                    if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > ::std::numeric_limits<::std::size_t>::max())
+                    {
+                        if(wasm_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]]
+                        {
+                            // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                        }
+                    }
+
+                    curr_tmp_scatter_base.len = static_cast<::std::size_t>(wasm_len);
+                }
+
+                // posix
+                ::fast_io::native_io_observer curr_fd_native_observer{};
+
+                bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                            ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                if(is_file_observer)
+                {
+                    auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                    curr_fd_native_observer = file_observer;
+                }
+                else
+                {
+                    auto& file_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                    curr_fd_native_observer = file_fd;
+                }
+
+                auto const& curr_fd_native_file{curr_fd_native_observer};
+
+                int const native_fd{curr_fd_native_file.native_handle()};
+
+                bool is_datagram_socket{};
 
 #  if !defined(__MSDOS__) && !defined(__DJGPP__)
+                {
+                    int sock_type{};
+                    ::socklen_t sock_type_len{static_cast<::socklen_t>(sizeof(sock_type))};
+
+                    auto const getsockopt_res{::uwvm2::imported::wasi::wasip1::func::posix::getsockopt(native_fd,
+                                                                                                       SOL_SOCKET,
+                                                                                                       SO_TYPE,
+                                                                                                       static_cast<void*>(::std::addressof(sock_type)),
+                                                                                                       ::std::addressof(sock_type_len))};
+
+                    if(getsockopt_res == 0)
                     {
-                        int sock_type{};
-                        ::socklen_t sock_type_len{static_cast<::socklen_t>(sizeof(sock_type))};
-
-                        auto const getsockopt_res{::uwvm2::imported::wasi::wasip1::func::posix::getsockopt(native_fd,
-                                                                                                           SOL_SOCKET,
-                                                                                                           SO_TYPE,
-                                                                                                           static_cast<void*>(::std::addressof(sock_type)),
-                                                                                                           ::std::addressof(sock_type_len))};
-
-                        if(getsockopt_res == 0)
-                        {
 #   if defined(SOCK_DGRAM)
-                            if(sock_type == SOCK_DGRAM) { is_datagram_socket = true; }
+                        if(sock_type == SOCK_DGRAM) { is_datagram_socket = true; }
 #   endif
-                        }
-                        else
-                        {
+                    }
+                    else
+                    {
 #   if defined(ENOTSOCK)
-                            if(errno == ENOTSOCK) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock; }
+                        if(errno == ENOTSOCK) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock; }
 #   endif
+                    }
+                }
+#  endif
+
+                // ::fast_io::io_scatter_t -> struct ::iovec
+                using iovec_may_alias UWVM_GNU_MAY_ALIAS = struct ::iovec*;
+                static_assert(sizeof(struct ::iovec) == sizeof(::fast_io::io_scatter_t) && alignof(struct ::iovec) == alignof(::fast_io::io_scatter_t) &&
+                              __builtin_offsetof(struct ::iovec, iov_base) == __builtin_offsetof(::fast_io::io_scatter_t, base) &&
+                              __builtin_offsetof(struct ::iovec, iov_len) == __builtin_offsetof(::fast_io::io_scatter_t, len));
+
+                if(is_datagram_socket)
+                {
+                    struct ::msghdr msg{};
+                    msg.msg_iov = reinterpret_cast<iovec_may_alias>(scatter_base);
+
+                    if constexpr(::std::numeric_limits<::std::size_t>::max() > ::std::numeric_limits<decltype(msg.msg_iovlen)>::max())
+                    {
+                        if(scatter_length > ::std::numeric_limits<decltype(msg.msg_iovlen)>::max()) [[unlikely]]
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
                         }
+                    }
+
+                    msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(scatter_length);
+
+                    int recv_flags{};
+
+                    using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
+                    auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
+                    auto const ri_flags_waitall_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
+                    auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
+
+#  if defined(MSG_PEEK)
+                    if((ri_flags_curr_value & ri_flags_value) != 0) { recv_flags |= MSG_PEEK; }
+#  endif
+#  if defined(MSG_WAITALL)
+                    if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
+#  endif
+
+                    auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
+
+                    if(recv_res < 0) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                            ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
+                    }
+
+                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                        memory,
+                        ro_data_len_ptrsz,
+                        static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(recv_res));
+
+                    using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                    roflags_underlying_t roflags_value{};
+
+#  if defined(MSG_TRUNC)
+                    if((msg.msg_flags & MSG_TRUNC) != 0)
+                    {
+                        roflags_value |= static_cast<roflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated);
                     }
 #  endif
 
-                    if(is_datagram_socket)
+                    ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
+
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                }
+                else
+                {
+                    using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
+                    auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
+                    auto const ri_flags_waitall_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
+                    auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
+
+                    if((ri_flags_curr_value & ri_flags_value) != 0
+#  if defined(MSG_WAITALL)
+                       || (ri_flags_curr_value & ri_flags_waitall_value) != 0
+#  endif
+                    )
                     {
                         struct ::msghdr msg{};
-                        msg.msg_iov = reinterpret_cast<struct ::iovec*>(scatter_base);
+
+                        msg.msg_iov = reinterpret_cast<iovec_may_alias>(scatter_base);
+
+                        if constexpr(::std::numeric_limits<::std::size_t>::max() > ::std::numeric_limits<decltype(msg.msg_iovlen)>::max())
+                        {
+                            if(scatter_length > ::std::numeric_limits<decltype(msg.msg_iovlen)>::max()) [[unlikely]]
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                            }
+                        }
+
                         msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(scatter_length);
 
                         int recv_flags{};
-
-                        using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
-                        auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
-                        auto const ri_flags_waitall_value{
-                            static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
-                        auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
 
 #  if defined(MSG_PEEK)
                         if((ri_flags_curr_value & ri_flags_value) != 0) { recv_flags |= MSG_PEEK; }
 #  endif
 #  if defined(MSG_WAITALL)
                         if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
+#  else
+                        if((ri_flags_curr_value & ri_flags_waitall_value) != 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
 #  endif
 
                         auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
@@ -529,121 +613,239 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
                         roflags_underlying_t roflags_value{};
 
-#  if defined(MSG_TRUNC)
-                        if((msg.msg_flags & MSG_TRUNC) != 0)
-                        {
-                            roflags_value |= static_cast<roflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated);
-                        }
-#  endif
-
                         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
 
                         return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
                     }
                     else
                     {
-                        using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
-                        auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
-                        auto const ri_flags_waitall_value{
-                            static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
-                        auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
-
-                        if((ri_flags_curr_value & ri_flags_value) != 0
-#  if defined(MSG_WAITALL)
-                           || (ri_flags_curr_value & ri_flags_waitall_value) != 0
-#  endif
-                        )
-                        {
-                            struct ::msghdr msg{};
-                            msg.msg_iov = reinterpret_cast<struct ::iovec*>(scatter_base);
-                            msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(scatter_length);
-
-                            int recv_flags{};
-
-#  if defined(MSG_PEEK)
-                            if((ri_flags_curr_value & ri_flags_value) != 0) { recv_flags |= MSG_PEEK; }
-#  endif
-#  if defined(MSG_WAITALL)
-                            if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
-#  else
-                            if((ri_flags_curr_value & ri_flags_waitall_value) != 0) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-                            }
-#  endif
-
-                            auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
-
-                            if(recv_res < 0) [[unlikely]]
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
-                                    ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
-                            }
-
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
-                                memory,
-                                ro_data_len_ptrsz,
-                                static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(recv_res));
-
-                            using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
-                            roflags_underlying_t roflags_value{};
-
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
-
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-                        }
-                        else
-                        {
-                            ::fast_io::io_scatter_status_t scatter_status;  // no initialize
+                        ::fast_io::io_scatter_status_t scatter_status;  // no initialize
 
 #  ifdef UWVM_CPP_EXCEPTIONS
-                            try
+                        try
 #  endif
-                            {
-                                scatter_status = ::fast_io::operations::scatter_read_some_bytes(curr_fd_native_file, scatter_base, scatter_length);
-                            }
-#  ifdef UWVM_CPP_EXCEPTIONS
-                            catch(::fast_io::error e)
-                            {
-                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
-                            }
-#  endif
-
-                            total_bytes_read = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
-
-                            // Verified: fposoffadd_scatters cannot produce negative values; it undergoes saturation handling during overflow.
-                            [[assume(total_bytes_read >= 0)]];
-
-                            constexpr auto max_val{::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max()};
-                            if constexpr(max_val < ::std::numeric_limits<::fast_io::intfpos_t>::max()) { [[assume(total_bytes_read <= max_val)]]; }
-
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
-                                memory,
-                                ro_data_len_ptrsz,
-                                static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(total_bytes_read));
-
-                            using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
-                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory,
-                                                                                                                     ro_flags_ptrsz,
-                                                                                                                     static_cast<roflags_underlying_t>(0u));
-
-                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        {
+                            scatter_status = ::fast_io::operations::scatter_read_some_bytes(curr_fd_native_file, scatter_base, scatter_length);
                         }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                        catch(::fast_io::error e)
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                        }
+#  endif
+
+                        total_bytes_read = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
+
+                        // Verified: fposoffadd_scatters cannot produce negative values; it undergoes saturation handling during overflow.
+                        [[assume(total_bytes_read >= 0)]];
+
+                        constexpr auto max_val{::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max()};
+                        if constexpr(max_val < ::std::numeric_limits<::fast_io::intfpos_t>::max()) { [[assume(total_bytes_read <= max_val)]]; }
+
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                            memory,
+                            ro_data_len_ptrsz,
+                            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(total_bytes_read));
+
+                        using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory,
+                                                                                                                 ro_flags_ptrsz,
+                                                                                                                 static_cast<roflags_underlying_t>(0u));
+
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
                     }
-# endif
-                }
-                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
-                {
-                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
-                }
-# if defined(_WIN32) && !defined(__CYGWIN__)
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
-                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
-                {
-                    /// @todo
                 }
 # endif
             }
+            [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
+            {
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+            }
+# if defined(_WIN32) && !defined(__CYGWIN__)
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+            case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
+            {
+                ::fast_io::win32_socket_io_observer curr_socket_observer{};
+
+                bool const is_socket_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                              ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer};
+
+                if(is_socket_observer)
+                {
+                    auto& curr_socket_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_observer};
+                    curr_socket_observer = curr_socket_observer_ref;
+                }
+                else
+                {
+                    auto& curr_socket_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd};
+                    curr_socket_observer = curr_socket_observer_ref;
+                }
+
+                auto const& curr_fd_native_file{curr_socket_observer};
+
+                using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
+                auto const ri_flags_peek_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
+                auto const ri_flags_waitall_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
+                auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
+
+                bool const want_peek{(ri_flags_curr_value & ri_flags_peek_value) != 0};
+                bool const want_waitall{(ri_flags_curr_value & ri_flags_waitall_value) != 0};
+
+                using wsabuf_t = ::fast_io::win32::wsabuf;
+                using wsabuf_may_alias UWVM_GNU_MAY_ALIAS = wsabuf_t*;
+
+                wsabuf_t* wsabufs;  // no initialize
+
+                struct wsabuf_allocator_guard_t
+                {
+                    using allocator = ::fast_io::native_typed_thread_local_allocator<wsabuf_t>;
+                    wsabuf_t* ptr{};
+
+                    inline constexpr ~wsabuf_allocator_guard_t() noexcept { allocator::deallocate(ptr); }
+                } wsabuf_guard{};
+
+                if(scatter_length < 1024uz / sizeof(wsabuf_t)) [[likely]]
+                {
+                    auto wsabuf_alloca_guaranteed_bytes_count{scatter_length * sizeof(wsabuf_t)};
+                    auto wsabuf_alloca_bytes_count{wsabuf_alloca_guaranteed_bytes_count + (alignof(wsabuf_t) - 1uz)};
+
+#  if UWVM_HAS_BUILTIN(__builtin_alloca)
+                    auto tmp_wsabuf_base_unaligned{__builtin_alloca(wsabuf_alloca_bytes_count)};
+                    wsabufs = reinterpret_cast<wsabuf_may_alias>(
+                        ::std::align(alignof(wsabuf_t), wsabuf_alloca_guaranteed_bytes_count, tmp_wsabuf_base_unaligned, wsabuf_alloca_bytes_count));
+#  elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
+                    auto tmp_wsabuf_base_unaligned{_alloca(wsabuf_alloca_bytes_count)};
+                    wsabufs = reinterpret_cast<wsabuf_may_alias>(
+                        ::std::align(alignof(wsabuf_t), wsabuf_alloca_guaranteed_bytes_count, tmp_wsabuf_base_unaligned, wsabuf_alloca_bytes_count));
+#  else
+                    auto tmp_wsabuf_base_unaligned{alloca(wsabuf_alloca_bytes_count)};
+                    wsabufs = reinterpret_cast<wsabuf_may_alias>(
+                        ::std::align(alignof(wsabuf_t), wsabuf_alloca_guaranteed_bytes_count, tmp_wsabuf_base_unaligned, wsabuf_alloca_bytes_count));
+#  endif
+
+                    if(wsabufs == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                }
+                else
+                {
+                    wsabufs = wsabuf_allocator_guard_t::allocator::allocate(scatter_length);
+                    wsabuf_guard.ptr = wsabufs;
+                }
+
+                for(::std::size_t i{}; i != scatter_length; ++i)
+                {
+                    auto const& sc{scatter_base[i]};
+                    wsabufs[i].buf = reinterpret_cast<char*>(sc.base);
+                    wsabufs[i].len = static_cast<::std::uint_least32_t>(sc.len);
+                }
+
+                ::std::uint_least32_t bytes_received{};
+                ::std::uint_least32_t wsa_flags{};
+
+                constexpr ::std::uint_least32_t wsa_msg_peek_bit{0x2u};
+                constexpr ::std::uint_least32_t wsa_msg_waitall_bit{0x8u};
+                constexpr ::std::uint_least32_t wsa_msg_trunc_bit{0x0100u};
+
+                if(want_peek) { wsa_flags |= wsa_msg_peek_bit; }
+                if(want_waitall) { wsa_flags |= wsa_msg_waitall_bit; }
+
+                auto const socket_handle{curr_fd_native_file.native_handle()};
+
+                auto const wsa_ret{::fast_io::win32::WSARecv(socket_handle,
+                                                             wsabufs,
+                                                             static_cast<::std::uint_least32_t>(scatter_length),
+                                                             ::std::addressof(bytes_received),
+                                                             ::std::addressof(wsa_flags),
+                                                             nullptr,
+                                                             nullptr)};
+
+                if(wsa_ret != 0) [[unlikely]]
+                {
+                    auto const wsa_err{static_cast<::std::uint_least32_t>(::fast_io::win32::WSAGetLastError())};
+
+                    switch(wsa_err)
+                    {
+                        // Winsock (WSA*) error codes mapping
+                        case 10004uz /*WSAEINTR*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
+                        // align with ebadf policy
+                        case 10009uz /*WSAEBADF*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10013uz /*WSAEACCES*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eacces;
+                        case 10014uz /*WSAEFAULT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::efault;
+                        case 10022uz /*WSAEINVAL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                        case 10024uz /*WSAEMFILE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emfile;
+                        case 10035uz /*WSAEWOULDBLOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
+                        case 10036uz /*WSAEINPROGRESS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einprogress;
+                        case 10037uz /*WSAEALREADY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ealready;
+                        case 10038uz /*WSAENOTSOCK*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                        case 10039uz /*WSAEDESTADDRREQ*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edestaddrreq;
+                        case 10040uz /*WSAEMSGSIZE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::emsgsize;
+                        case 10041uz /*WSAEPROTOTYPE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eprototype;
+                        case 10042uz /*WSAENOPROTOOPT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoprotoopt;
+                        case 10043uz /*WSAEPROTONOSUPPORT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eprotonosupport;
+                        case 10044uz /*WSAESOCKTNOSUPPORT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+                        case 10045uz /*WSAEOPNOTSUPP*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+                        case 10046uz /*WSAEPFNOSUPPORT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eafnosupport;
+                        case 10047uz /*WSAEAFNOSUPPORT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eafnosupport;
+                        case 10048uz /*WSAEADDRINUSE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eaddrinuse;
+                        case 10049uz /*WSAEADDRNOTAVAIL*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eaddrnotavail;
+                        case 10050uz /*WSAENETDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enetdown;
+                        case 10051uz /*WSAENETUNREACH*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enetunreach;
+                        case 10052uz /*WSAENETRESET*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enetreset;
+                        case 10053uz /*WSAECONNABORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnaborted;
+                        case 10054uz /*WSAECONNRESET*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnreset;
+                        case 10055uz /*WSAENOBUFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enobufs;
+                        case 10056uz /*WSAEISCONN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisconn;
+                        case 10057uz /*WSAENOTCONN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotconn;
+                        case 10058uz /*WSAESHUTDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotconn;
+                        case 10059uz /*WSAETOOMANYREFS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10060uz /*WSAETIMEDOUT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::etimedout;
+                        case 10061uz /*WSAECONNREFUSED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnrefused;
+                        case 10062uz /*WSAELOOP*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eloop;
+                        case 10063uz /*WSAENAMETOOLONG*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enametoolong;
+                        case 10064uz /*WSAEHOSTDOWN*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ehostunreach;
+                        case 10065uz /*WSAEHOSTUNREACH*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ehostunreach;
+                        case 10066uz /*WSAENOTEMPTY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotempty;
+                        case 10067uz /*WSAEPROCLIM*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
+                        case 10068uz /*WSAEUSERS*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
+                        case 10069uz /*WSAEDQUOT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
+                        case 10070uz /*WSAESTALE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::estale;
+                        case 10071uz /*WSAEREMOTE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10091uz /*WSASYSNOTREADY*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enetdown;
+                        case 10092uz /*WSAVERNOTSUPPORTED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+                        case 10093uz /*WSANOTINITIALISED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enosys;
+                        case 10101uz /*WSAEDISCON*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnreset;
+                        case 10102uz /*WSAENOMORE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10103uz /*WSAECANCELLED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ecanceled;
+                        case 10104uz /*WSAEINVALIDPROCTABLE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10105uz /*WSAEINVALIDPROVIDER*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10106uz /*WSAEPROVIDERFAILEDINIT*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10107uz /*WSASYSCALLFAILURE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10108uz /*WSASERVICE_NOT_FOUND*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent;
+                        case 10109uz /*WSATYPE_NOT_FOUND*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enoent;
+                        case 10110uz /*WSA_E_NO_MORE*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                        case 10111uz /*WSA_E_CANCELLED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ecanceled;
+                        case 10112uz /*WSAEREFUSED*/: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::econnrefused;
+                        default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                    }
+                }
+
+                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                    memory,
+                    ro_data_len_ptrsz,
+                    static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(bytes_received));
+
+                using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                roflags_underlying_t roflags_value{};
+
+                if((wsa_flags & wsa_msg_trunc_bit) != 0u)
+                {
+                    roflags_value |= static_cast<roflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated);
+                }
+
+                ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
+
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+            }
+# endif
         }
     }
 }
