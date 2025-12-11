@@ -412,6 +412,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(ENOTSOCK)
             case ENOTSOCK: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
 #  endif
+#  if defined(ENOTCONN)
+            case ENOTCONN: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotconn;
+#  endif
 #  if defined(EPIPE)
             case EPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::epipe;
 #  endif

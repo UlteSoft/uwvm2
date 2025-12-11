@@ -501,7 +501,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 using iovec_may_alias UWVM_GNU_MAY_ALIAS = struct ::iovec*;
                 static_assert(sizeof(struct ::iovec) == sizeof(::fast_io::io_scatter_t) && alignof(struct ::iovec) == alignof(::fast_io::io_scatter_t) &&
                               __builtin_offsetof(struct ::iovec, iov_base) == __builtin_offsetof(::fast_io::io_scatter_t, base) &&
-                              __builtin_offsetof(struct ::iovec, iov_len) == __builtin_offsetof(::fast_io::io_scatter_t, len));
+                              __builtin_offsetof(struct ::iovec, iov_len) == __builtin_offsetof(::fast_io::io_scatter_t, len) &&
+                              sizeof(decltype(::std::declval<struct ::iovec>().iov_base)) == sizeof(decltype(::std::declval<::fast_io::io_scatter_t>().base)) &&
+                              sizeof(decltype(::std::declval<struct ::iovec>().iov_len)) == sizeof(decltype(::std::declval<::fast_io::io_scatter_t>().len)));
 
                 if(is_datagram_socket)
                 {
@@ -530,6 +532,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  endif
 #  if defined(MSG_WAITALL)
                     if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
+#  else
+                    if((ri_flags_curr_value & ri_flags_waitall_value) != 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
 #  endif
 
                     auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
