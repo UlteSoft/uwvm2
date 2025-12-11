@@ -45,7 +45,7 @@ int main()
     wasip1_environment<native_memory_t> env{.wasip1_memory = ::std::addressof(memory),
                                             .argv = {},
                                             .envs = {},
-                                            .fd_storage = {},
+                                            .fd_storage = {.fd_limit = 64uz},
                                             .mount_dir_roots = {},
                                             .trace_wasip1_call = false};
 
@@ -127,6 +127,98 @@ int main()
             ::fast_io::fast_terminate();
         }
     }
+
+# if !defined(_WIN32)
+    // Case 5: real TCP accept on loopback
+    {
+        // Create listening socket on 127.0.0.1:ephemeral
+        int listen_fd{::socket(AF_INET, SOCK_STREAM, 0)};
+        if(listen_fd < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: failed to create listening socket");
+            ::fast_io::fast_terminate();
+        }
+
+        int optval{1};
+        ::setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
+        ::sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
+        addr.sin_port = 0;
+
+        if(::bind(listen_fd, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), static_cast<socklen_t>(sizeof(addr))) < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: bind failed");
+            ::fast_io::fast_terminate();
+        }
+
+        socklen_t addrlen{static_cast<socklen_t>(sizeof(addr))};
+        if(::getsockname(listen_fd, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), ::std::addressof(addrlen)) < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: getsockname failed");
+            ::fast_io::fast_terminate();
+        }
+
+        if(::listen(listen_fd, 1) < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: listen failed");
+            ::fast_io::fast_terminate();
+        }
+
+        // Put listening socket into WASI fd table (fd 0)
+        auto& fde_listen = *env.fd_storage.opens.index_unchecked(0uz).fd_p;
+        fde_listen.close_pos = static_cast<std::size_t>(-1);
+        fde_listen.rights_base = static_cast<rights_t>(-1);
+        fde_listen.rights_inherit = static_cast<rights_t>(-1);
+        fde_listen.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
+        fde_listen.wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::fast_io::native_file{listen_fd};
+
+        // Create a client socket and connect
+        int client_fd{::socket(AF_INET, SOCK_STREAM, 0)};
+        if(client_fd < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: failed to create client socket");
+            ::fast_io::fast_terminate();
+        }
+
+        if(::connect(client_fd, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), static_cast<socklen_t>(sizeof(addr))) < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: connect failed");
+            ::fast_io::fast_terminate();
+        }
+
+        // Accept via WASI sock_accept
+        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept(env,
+                                                                            static_cast<wasi_posix_fd_t>(0),
+                                                                            static_cast<fdflags_t>(0),
+                                                                            FD_PTR,
+                                                                            ADDR_PTR);
+        if(ret != errno_t::esuccess)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: expected esuccess for real TCP accept");
+            ::fast_io::fast_terminate();
+        }
+
+        auto const new_fd =
+            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_posix_fd_t>(memory, FD_PTR);
+        if(new_fd < 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: new fd should be non-negative");
+            ::fast_io::fast_terminate();
+        }
+
+        auto const new_fd_index{static_cast<std::size_t>(new_fd)};
+        if(new_fd_index >= env.fd_storage.opens.size() ||
+           env.fd_storage.opens.index_unchecked(new_fd_index).fd_p == nullptr)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept: new fd not recorded in fd table");
+            ::fast_io::fast_terminate();
+        }
+
+        ::close(client_fd);
+    }
+# endif
 
     return 0;
 }

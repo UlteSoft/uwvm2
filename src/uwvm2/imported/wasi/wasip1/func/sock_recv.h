@@ -278,9 +278,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         auto const scatter_length{static_cast<::std::size_t>(ri_data_len)};
 
-        // may alias
-        using fast_io_io_scatter_t_may_alias UWVM_GNU_MAY_ALIAS = ::fast_io::io_scatter_t*;
-
         // After checking all items, determine whether the result equals zero.
         if(scatter_length == 0uz)
         {
@@ -331,6 +328,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 if(scatter_length < 1024uz / sizeof(::fast_io::io_scatter_t)) [[likely]]
                 {
+                    // may alias
+                    using fast_io_io_scatter_t_may_alias UWVM_GNU_MAY_ALIAS = ::fast_io::io_scatter_t*;
+
                     // When the bytes count less than 1024, it exists on the stack and is highly efficient.
                     auto scatter_alloca_guaranteed_bytes_count{scatter_length * sizeof(::fast_io::io_scatter_t)};
                     auto scatter_alloca_bytes_count{scatter_alloca_guaranteed_bytes_count + (alignof(::fast_io::io_scatter_t) - 1uz)};
