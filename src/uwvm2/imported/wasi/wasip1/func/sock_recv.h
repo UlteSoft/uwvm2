@@ -666,10 +666,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
                 ::fast_io::win32_socket_io_observer curr_socket_observer{};
-
                 bool const is_socket_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
                                               ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer};
-
                 if(is_socket_observer)
                 {
                     auto& curr_socket_observer_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.socket_observer};
@@ -682,6 +680,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 auto const& curr_fd_native_file{curr_socket_observer};
+
+                // Full locking is required during writing.
+                [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
 
                 using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
                 auto const ri_flags_peek_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
@@ -703,6 +704,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     inline constexpr ~wsabuf_allocator_guard_t() noexcept { allocator::deallocate(ptr); }
                 } wsabuf_guard{};
+
+                if constexpr(::std::numeric_limits<::std::size_t>::max() > ::std::numeric_limits<::std::uint_least32_t>::max())
+                {
+                    if(scatter_length > ::std::numeric_limits<::std::uint_least32_t>::max()) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
 
                 if(scatter_length < 1024uz / sizeof(wsabuf_t)) [[likely]]
                 {
@@ -731,11 +740,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     wsabuf_guard.ptr = wsabufs;
                 }
 
+                auto iovs_curr{ri_data_ptrsz};
+
+                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t length_counter{};
+
                 for(::std::size_t i{}; i != scatter_length; ++i)
                 {
-                    auto const& sc{scatter_base[i]};
-                    wsabufs[i].buf = reinterpret_cast<char*>(sc.base);
-                    wsabufs[i].len = static_cast<::std::uint_least32_t>(sc.len);
+                    ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t wasm_base;  // no initialize
+                    ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t wasm_len;       // no initialize
+
+                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
+                    {
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
+
+                        ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm32_unchecked_unlocked(
+                            memory,
+                            iovs_curr,
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
+                        iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t;
+
+                        wasm_base = tmp_iovec.buf;
+                        wasm_len = tmp_iovec.buf_len;
+                    }
+                    else
+                    {
+                        wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                            ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(memory, iovs_curr);
+                        iovs_curr += sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t);
+
+                        wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(memory, iovs_curr);
+                        iovs_curr += sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_size_t);
+                    }
+
+                    ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, wasm_base, wasm_len);
+
+                    if(wasm_len > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() - length_counter) [[unlikely]]
+                    {
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                    }
+
+                    length_counter += wasm_len;
+
+                    if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() >
+                                 ::std::numeric_limits<::std::uint_least32_t>::max())
+                    {
+                        if(wasm_len > ::std::numeric_limits<::std::uint_least32_t>::max()) [[unlikely]]
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                        }
+                    }
+
+                    wsabufs[i].buf = reinterpret_cast<char*>(memory.memory_begin + wasm_base);
+                    wsabufs[i].len = static_cast<::std::uint_least32_t>(wasm_len);
                 }
 
                 ::std::uint_least32_t bytes_received{};
