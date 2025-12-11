@@ -67,7 +67,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             {
                 // acquire: establish exclusive lock ownership; prevent later accesses from moving before lock
                 // acquire: waiting must use acquire to see memory updates from grow operation
-                while(this->growing_flag_p->test_and_set(::std::memory_order_acquire)) { this->growing_flag_p->wait(true, ::std::memory_order_acquire); }
+
+                unsigned spin_count{};
+
+                for(;;)
+                {
+                    if(!this->growing_flag_p->test_and_set(::std::memory_order_acquire)) { break; }
+
+                    if(++spin_count > 1000u)
+                    {
+                        // Long-term contention: sleep until the grow flag is cleared.
+                        this->growing_flag_p->wait(true, ::std::memory_order_acquire);
+                        spin_count = 0u;
+                    }
+                    else
+                    {
+                        ::uwvm2::utils::mutex::rwlock_pause();
+                    }
+                }
             }
         }
 
@@ -167,13 +184,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             // Due to the inclusion of mobile semantics, null pointer checks must be performed.
             if(this->growing_flag_p == nullptr || this->active_ops_p == nullptr) [[unlikely]] { return; }
 
+            unsigned spin_count{};
+
             for(;;)
             {
                 // 1) Wait for grow operation to complete, must use acquire to see memory updates
-                while(this->growing_flag_p->test(::std::memory_order_acquire)) { this->growing_flag_p->wait(true, ::std::memory_order_acquire); }
+                while(this->growing_flag_p->test(::std::memory_order_acquire))
+                {
+                    if(++spin_count > 1000u)
+                    {
+                        this->growing_flag_p->wait(true, ::std::memory_order_acquire);
+                        spin_count = 0u;
+                    }
+                    else
+                    {
+                        ::uwvm2::utils::mutex::rwlock_pause();
+                    }
+                }
 
-                // 2) Declare entry into active region, use acq_rel for proper ordering
-                this->active_ops_p->fetch_add(1uz, ::std::memory_order_acq_rel);
+                // 2) Declare entry into active region; relaxed is sufficient for pure reference counting
+                this->active_ops_p->fetch_add(1uz, ::std::memory_order_relaxed);
 
                 // 3) Double-check that grow hasn't started after we "entered"
                 if(!this->growing_flag_p->test(::std::memory_order_acquire))
@@ -354,10 +384,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             // Wait for all existing memory read instructions to complete.
             // acquire: observe decrements published with release; ensures quiescence is visible
+            unsigned spin_count{};
+
             for(auto v{this->active_ops_p->load(::std::memory_order_acquire)}; v != 0uz; v = this->active_ops_p->load(::std::memory_order_acquire))
             {
-                // acquire: pair with operation's release decrement before proceeding after wake
-                this->active_ops_p->wait(v, ::std::memory_order_acquire);
+                if(++spin_count > 1000u)
+                {
+                    // acquire: pair with operation's release decrement before proceeding after wake
+                    this->active_ops_p->wait(v, ::std::memory_order_acquire);
+                    spin_count = 0u;
+                }
+                else
+                {
+                    ::uwvm2::utils::mutex::rwlock_pause();
+                }
             }
 
             if(this->memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
