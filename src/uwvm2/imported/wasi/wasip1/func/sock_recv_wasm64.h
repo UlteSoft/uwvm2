@@ -242,8 +242,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::enotcapable;
         }
 
-        // check overflow (wasi_iovec_t)
-        constexpr ::std::size_t max_iovs_len{::std::numeric_limits<::std::size_t>::max() / ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t};
+        // check overflow (wasi_iovec_wasm64_t)
+        constexpr ::std::size_t max_iovs_len{::std::numeric_limits<::std::size_t>::max() / ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t};
         if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>::max() > max_iovs_len)
         {
             if(ri_data_len > max_iovs_len) [[unlikely]]
@@ -253,11 +253,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
         }
 
-        // Additionally, ensure that the multiplication `ri_data_len * size_of_wasi_iovec_t` does not overflow within the wasi_size_wasm64_t domain itself.
-        // This prevents situations where, on 32‑bit wasm, the product would overflow wasi_size_wasm64_t even though it still fits in the host size_t.
+        // Additionally, ensure that the multiplication `ri_data_len * size_of_wasi_iovec_wasm64_t` does not overflow within the wasi_size_wasm64_t domain
+        // itself. This prevents situations where, on 32‑bit wasm, the product would overflow wasi_size_wasm64_t even though it still fits in the host size_t.
         constexpr auto max_iovs_len_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(
             ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>::max() /
-            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t))};
+            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t))};
         if(ri_data_len > max_iovs_len_wasi) [[unlikely]]
         {
             // Exceeding the wasi_size_wasm64_t domain uses overflow.
@@ -299,7 +299,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // check memory bounds
         ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm64(memory,
                                                                             ri_data_ptrsz,
-                                                                            ri_data_len * ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t);
+                                                                            ri_data_len * ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t);
 
         // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
         // being processed, making this a virtual machine implementation error.
@@ -384,17 +384,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t wasm_base;  // no initialize
                     ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t wasm_len;       // no initialize
 
-                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
+                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_wasm64_data_layout())
                     {
-                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_wasm64_t tmp_iovec;  // no initialize
 
                         // iovs_len has been checked.
                         ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm64_unchecked_unlocked(
                             memory,
                             iovs_curr,
                             reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
-                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
-                        iovs_curr += 8uz;
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_wasm64_t));
+                        iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t;
 
                         wasm_base = tmp_iovec.buf;
                         wasm_len = tmp_iovec.buf_len;
@@ -403,11 +403,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     {
                         wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<
                             ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t>(memory, iovs_curr);
-                        iovs_curr += 4uz;
+                        iovs_curr += sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t);
 
                         wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<
                             ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(memory, iovs_curr);
-                        iovs_curr += 4uz;
+                        iovs_curr += sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t);
                     }
 
                     // It is necessary to verify whether the memory referenced within the WASM is sufficient.
@@ -762,16 +762,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t wasm_base;  // no initialize
                     ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t wasm_len;       // no initialize
 
-                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
+                    if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_wasm64_data_layout())
                     {
-                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_wasm64_t tmp_iovec;  // no initialize
 
                         ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm64_unchecked_unlocked(
                             memory,
                             iovs_curr,
                             reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
-                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
-                        iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t;
+                            reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_wasm64_t));
+                        iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t;
 
                         wasm_base = tmp_iovec.buf;
                         wasm_len = tmp_iovec.buf_len;
