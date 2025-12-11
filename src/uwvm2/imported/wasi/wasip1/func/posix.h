@@ -175,6 +175,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             __asm__("_getsockopt")
 #  endif
                 ;
+
+        using ssize_t = ::std::make_signed_t<::std::size_t>;
+
+        extern ssize_t recvmsg(int, struct ::msghdr*, int) noexcept
+#  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("recvmsg")
+#  else
+            __asm__("_recvmsg")
+#  endif
+                ;
 # endif
 
 # if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
@@ -245,4 +255,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
-

@@ -1,1 +1,658 @@
 ﻿
+
+/*************************************************************
+ * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * Copyright (c) 2025-present UlteSoft. All rights reserved. *
+ * Licensed under the APL-2.0 License (see LICENSE file).    *
+ *************************************************************/
+
+/**
+ * @author      MacroModel
+ * @version     2.0.0
+ * @copyright   APL-2.0 License
+ */
+
+/****************************************
+ *  _   _ __        ____     __ __  __  *
+ * | | | |\ \      / /\ \   / /|  \/  | *
+ * | | | | \ \ /\ / /  \ \ / / | |\/| | *
+ * | |_| |  \ V  V /    \ V /  | |  | | *
+ *  \___/    \_/\_/      \_/   |_|  |_| *
+ *                                      *
+ ****************************************/
+
+#pragma once
+
+#ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <cstdint>
+# include <climits>
+# include <cstring>
+# include <limits>
+# include <concepts>
+# include <bit>
+# include <memory>
+# include <type_traits>
+// macro
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+// platform
+# if __has_include(<sys/fcntl.h>)
+#  include <sys/fcntl.h>
+# endif
+# if __has_include(<sys/socket.h>)
+#  include <sys/socket.h>
+# endif
+# if __has_include(<netinet/in.h>)
+#  include <netinet/in.h>
+# endif
+// import
+# include <fast_io.h>
+# include <fast_io_device.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
+# include <uwvm2/uwvm_predefine/io/impl.h>
+# include <uwvm2/utils/mutex/impl.h>
+# include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/object/memory/linear/impl.h>
+# include <uwvm2/imported/wasi/wasip1/abi/impl.h>
+# include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
+# include <uwvm2/imported/wasi/wasip1/memory/impl.h>
+# include <uwvm2/imported/wasi/wasip1/environment/impl.h>
+# include "base.h"
+# include "posix.h"
+#endif
+
+#ifndef UWVM_CPP_EXCEPTIONS
+# warning "Without enabling C++ exceptions, using this WASI function may cause termination."
+#endif
+
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+
+UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
+{
+
+    inline ::uwvm2::imported::wasi::wasip1::abi::errno_t sock_recv(
+        ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t sock_fd,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t ri_data_ptrsz,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t ri_data_len,
+        ::uwvm2::imported::wasi::wasip1::abi::riflags_t ri_flags,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t ro_data_len_ptrsz,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t ro_flags_ptrsz) noexcept
+    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        if(env.wasip1_memory == nullptr) [[unlikely]]
+        {
+            // Security issues inherent to virtual machines
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+# endif
+
+        auto& memory{*env.wasip1_memory};
+
+        auto const trace_wasip1_call{env.trace_wasip1_call};
+
+        if(trace_wasip1_call) [[unlikely]]
+        {
+# ifdef UWVM
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"wasip1: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"sock_recv",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"(",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                sock_fd,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::fast_io::mnp::addrvw(ri_data_ptrsz),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ri_data_len,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(ri_flags)>>>(ri_flags),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::fast_io::mnp::addrvw(ro_data_len_ptrsz),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                ::fast_io::mnp::addrvw(ro_flags_ptrsz),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8") ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(wasi-trace)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+# else
+            ::fast_io::io::perr(::fast_io::u8err(),
+                                u8"uwvm: [info]  wasip1: sock_recv(",
+                                sock_fd,
+                                u8", ",
+                                ::fast_io::mnp::addrvw(ri_data_ptrsz),
+                                u8", ",
+                                ri_data_len,
+                                u8", ",
+                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(ri_flags)>>>(ri_flags),
+                                u8", ",
+                                ::fast_io::mnp::addrvw(ro_data_len_ptrsz),
+                                u8", ",
+                                ::fast_io::mnp::addrvw(ro_flags_ptrsz),
+                                u8") (wasi-trace)\n");
+# endif
+        }
+
+        // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
+        if(sock_fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+
+        auto& wasm_fd_storage{env.fd_storage};
+
+        // The pointer to `wasm_fd` is fixed and remains unchanged even when the vector within `fd_manager` is resized.
+        ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t* curr_wasi_fd_t_p;  // no initialize
+
+        // Subsequent operations involving the file descriptor require locking. curr_fd_release_guard release when return.
+        ::uwvm2::utils::mutex::mutex_merely_release_guard_t curr_fd_release_guard{};
+
+        {
+            // Prevent operations to obtain the size or perform resizing at this time.
+            // Only a lock is required when acquiring the unique pointer for the file descriptor. The lock can be released once the acquisition is complete.
+            // Since the file descriptor's location is fixed and accessed via the unique pointer,
+
+            // Simply acquiring data using a shared_lock
+            ::uwvm2::utils::mutex::rw_fair_shared_guard_t fds_lock{wasm_fd_storage.fds_rwlock};
+
+            // Negative states have been excluded, so the conversion result will only be positive numbers.
+            using unsigned_fd_t = ::std::make_unsigned_t<::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t>;
+            auto const unsigned_fd{static_cast<unsigned_fd_t>(sock_fd)};
+
+            // On platforms where `size_t` is smaller than the `fd` type, this check must be added.
+            constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
+            if constexpr(::std::numeric_limits<unsigned_fd_t>::max() > size_t_max)
+            {
+                if(unsigned_fd > size_t_max) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+            }
+
+            auto const fd_opens_pos{static_cast<::std::size_t>(unsigned_fd)};
+
+            // The minimum value in rename_map is greater than opensize.
+            if(wasm_fd_storage.opens.size() <= fd_opens_pos)
+            {
+                // Possibly within the tree being renumbered
+                if(auto const renumber_map_iter{wasm_fd_storage.renumber_map.find(sock_fd)}; renumber_map_iter != wasm_fd_storage.renumber_map.end())
+                {
+                    curr_wasi_fd_t_p = renumber_map_iter->second.fd_p;
+                }
+                else [[unlikely]]
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf;
+                }
+            }
+            else
+            {
+                // The addition here is safe.
+                curr_wasi_fd_t_p = wasm_fd_storage.opens.index_unchecked(fd_opens_pos).fd_p;
+            }
+
+            // curr_wasi_fd_t_p never nullptr
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
+            {
+                // Security issues inherent to virtual machines
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
+# endif
+
+            // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
+            // is performing fdatasync, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
+            // acquiring the lock at this point is safe. However, the problem arises when, immediately after acquiring the lock and before releasing the manager
+            // lock and beginning fd operations, another thread executes a deletion that removes this fd. Subsequent operations by the current thread would then
+            // encounter issues. Thus, locking must occur before releasing fds_rwlock.
+            curr_fd_release_guard.device_p = ::std::addressof(curr_wasi_fd_t_p->fd_mutex);
+            curr_fd_release_guard.lock();
+
+            // After unlocking fds_lock, members within `wasm_fd_storage_t` can no longer be accessed or modified.
+        }
+
+        // curr_fd_uniptr is not null.
+        auto& curr_fd{*curr_wasi_fd_t_p};
+
+        // If obtained from the renumber map, it will always be the correct value. If obtained from the open vec, it requires checking whether it is closed.
+        // Therefore, a unified check is implemented.
+        if(curr_fd.close_pos != SIZE_MAX) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::ebadf; }
+
+        // Rights check: read uses read permission
+        if((curr_fd.rights_base & ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_read) !=
+           ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_read) [[unlikely]]
+        {
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotcapable;
+        }
+
+        // check overflow (wasi_iovec_t)
+        constexpr ::std::size_t max_iovs_len{::std::numeric_limits<::std::size_t>::max() / ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t};
+        if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > max_iovs_len)
+        {
+            if(ri_data_len > max_iovs_len) [[unlikely]]
+            {
+                // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+            }
+        }
+
+        // Additionally, ensure that the multiplication `ri_data_len * size_of_wasi_iovec_t` does not overflow within the wasi_size_t domain itself.
+        // This prevents situations where, on 32‑bit wasm, the product would overflow wasi_size_t even though it still fits in the host size_t.
+        constexpr auto max_iovs_len_wasi{static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(
+            ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() /
+            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t))};
+        if(ri_data_len > max_iovs_len_wasi) [[unlikely]]
+        {
+            // Exceeding the wasi_size_t domain uses overflow.
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+        }
+
+        // check size_t and get scatter length, the alignment portion also needs to be processed. (fast_io::io_scatter_t)
+        constexpr auto max_iovs_len2{(::std::numeric_limits<::std::size_t>::max() - (alignof(::fast_io::io_scatter_t) - 1uz)) /
+                                     sizeof(::fast_io::io_scatter_t)};
+        if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > max_iovs_len2)
+        {
+            if(ri_data_len > max_iovs_len2) [[unlikely]]
+            {
+                // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+            }
+        }
+
+        auto const scatter_length{static_cast<::std::size_t>(ri_data_len)};
+
+        // may alias
+        using fast_io_io_scatter_t_may_alias UWVM_GNU_MAY_ALIAS = ::fast_io::io_scatter_t*;
+
+        // After checking all items, determine whether the result equals zero.
+        if(scatter_length == 0uz)
+        {
+            // If the length of iovs is 0, the system call returns successfully with nread=0.
+            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
+                memory,
+                ro_data_len_ptrsz,
+                static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(0uz));
+
+            using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory, ro_flags_ptrsz, static_cast<roflags_underlying_t>(0u));
+
+            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+        }
+
+        // check memory bounds
+        ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32(memory,
+                                                                            ri_data_ptrsz,
+                                                                            ri_data_len * ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_t);
+
+        // If using reassignment
+        ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard tmp_allocator_guard{};
+
+        ::fast_io::io_scatter_t* scatter_base;  // no initialize
+
+        if(scatter_length < 1024uz / sizeof(::fast_io::io_scatter_t)) [[likely]]
+        {
+            // When the bytes count less than 1024, it exists on the stack and is highly efficient.
+            auto scatter_alloca_guaranteed_bytes_count{scatter_length * sizeof(::fast_io::io_scatter_t)};
+            auto scatter_alloca_bytes_count{scatter_alloca_guaranteed_bytes_count + (alignof(::fast_io::io_scatter_t) - 1uz)};
+
+# if UWVM_HAS_BUILTIN(__builtin_alloca)
+            auto tmp_scatter_base_unaligned{__builtin_alloca(scatter_alloca_bytes_count)};
+            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
+                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
+# elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
+            auto tmp_scatter_base_unaligned{_alloca(scatter_alloca_bytes_count)};
+            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
+                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
+# else
+            auto tmp_scatter_base_unaligned{alloca(scatter_alloca_bytes_count)};
+            scatter_base = reinterpret_cast<fast_io_io_scatter_t_may_alias>(
+                ::std::align(alignof(::fast_io::io_scatter_t), scatter_alloca_guaranteed_bytes_count, tmp_scatter_base_unaligned, scatter_alloca_bytes_count));
+# endif
+
+            // std::align may return nullptr
+            if(scatter_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        }
+        else
+        {
+            // When the bytes count is greater than 1024, it exists on the heap.
+            // The allocator crashes upon failure.
+            scatter_base = ::uwvm2::imported::wasi::wasip1::func::fast_io_io_scatter_t_allocator_guard::allocator::allocate(scatter_length);
+
+            // Start the raii guard to deallocate the memory.
+            tmp_allocator_guard.ptr = scatter_base;
+        }
+
+        // for nread
+        [[maybe_unused]] ::fast_io::intfpos_t total_bytes_read{};
+
+        {
+            // Full locking is required during writing.
+            [[maybe_unused]] auto const memory_locker_guard{::uwvm2::imported::wasi::wasip1::memory::lock_memory(memory)};
+
+            // get scatter base
+            auto iovs_curr{ri_data_ptrsz};
+
+            ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t length_counter{};
+
+            for(::std::size_t i{}; i != scatter_length; ++i)
+            {
+                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t wasm_base;  // no initialize
+                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t wasm_len;       // no initialize
+
+                if constexpr(::uwvm2::imported::wasi::wasip1::abi::is_default_wasi_iovec_data_layout())
+                {
+                    ::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t tmp_iovec;  // no initialize
+
+                    // iovs_len has been checked.
+                    ::uwvm2::imported::wasi::wasip1::memory::read_all_from_memory_wasm32_unchecked_unlocked(
+                        memory,
+                        iovs_curr,
+                        reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
+                        reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_t));
+                    iovs_curr += 8uz;
+
+                    wasm_base = tmp_iovec.buf;
+                    wasm_len = tmp_iovec.buf_len;
+                }
+                else
+                {
+                    wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t>(memory, iovs_curr);
+                    iovs_curr += 4uz;
+
+                    wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<
+                        ::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(memory, iovs_curr);
+                    iovs_curr += 4uz;
+                }
+
+                // It is necessary to verify whether the memory referenced within the WASM is sufficient.
+                ::uwvm2::imported::wasi::wasip1::memory::check_memory_bounds_wasm32_unlocked(memory, wasm_base, wasm_len);
+
+                auto& curr_tmp_scatter_base{scatter_base[i]};
+
+                // Already verified as legitimate
+                curr_tmp_scatter_base.base = memory.memory_begin + wasm_base;
+
+                // check counter
+                if(wasm_len > ::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() - length_counter) [[unlikely]]
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::einval;
+                }
+
+                length_counter += wasm_len;
+
+                if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() >
+                             ::std::numeric_limits<::fast_io::intfpos_t>::max())
+                {
+                    if(length_counter > ::std::numeric_limits<::fast_io::intfpos_t>::max()) [[unlikely]]
+                    {
+                        // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                // Conversion requires verification.
+                if constexpr(::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max() > ::std::numeric_limits<::std::size_t>::max())
+                {
+                    if(wasm_len > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]]
+                    {
+                        // Exceeding the platform's maximum limit but not exceeding the wasi limit uses overflow.
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eoverflow;
+                    }
+                }
+
+                curr_tmp_scatter_base.len = static_cast<::std::size_t>(wasm_len);
+            }
+
+            // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already prevents such closed files from
+            // being processed, making this a virtual machine implementation error.
+            if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
+            {
+// This will be checked at runtime.
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+
+            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+            {
+                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+                {
+# if defined(_WIN32) && !defined(__CYGWIN__)
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+# else
+                    // posix
+                    ::fast_io::native_io_observer curr_fd_native_observer{};
+
+                    bool const is_file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.type ==
+                                                ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer};
+                    if(is_file_observer)
+                    {
+                        auto& file_observer{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer};
+                        curr_fd_native_observer = file_observer;
+                    }
+                    else
+                    {
+                        auto& file_fd{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
+                        curr_fd_native_observer = file_fd;
+                    }
+
+                    auto const& curr_fd_native_file{curr_fd_native_observer};
+
+                    int const native_fd{curr_fd_native_file.native_handle()};
+
+                    bool is_datagram_socket{};
+
+#  if !defined(__MSDOS__) && !defined(__DJGPP__)
+                    {
+                        int sock_type{};
+                        ::socklen_t sock_type_len{static_cast<::socklen_t>(sizeof(sock_type))};
+
+                        auto const getsockopt_res{::uwvm2::imported::wasi::wasip1::func::posix::getsockopt(native_fd,
+                                                                                                           SOL_SOCKET,
+                                                                                                           SO_TYPE,
+                                                                                                           static_cast<void*>(::std::addressof(sock_type)),
+                                                                                                           ::std::addressof(sock_type_len))};
+
+                        if(getsockopt_res == 0)
+                        {
+#   if defined(SOCK_DGRAM)
+                            if(sock_type == SOCK_DGRAM) { is_datagram_socket = true; }
+#   endif
+                        }
+                        else
+                        {
+#   if defined(ENOTSOCK)
+                            if(errno == ENOTSOCK) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock; }
+#   endif
+                        }
+                    }
+#  endif
+
+                    if(is_datagram_socket)
+                    {
+                        struct ::msghdr msg{};
+                        msg.msg_iov = reinterpret_cast<struct ::iovec*>(scatter_base);
+                        msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(scatter_length);
+
+                        int recv_flags{};
+
+                        using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
+                        auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
+                        auto const ri_flags_waitall_value{
+                            static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
+                        auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
+
+#  if defined(MSG_PEEK)
+                        if((ri_flags_curr_value & ri_flags_value) != 0) { recv_flags |= MSG_PEEK; }
+#  endif
+#  if defined(MSG_WAITALL)
+                        if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
+#  endif
+
+                        auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
+
+                        if(recv_res < 0) [[unlikely]]
+                        {
+                            return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                                ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
+                        }
+
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                            memory,
+                            ro_data_len_ptrsz,
+                            static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(recv_res));
+
+                        using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                        roflags_underlying_t roflags_value{};
+
+#  if defined(MSG_TRUNC)
+                        if((msg.msg_flags & MSG_TRUNC) != 0)
+                        {
+                            roflags_value |= static_cast<roflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated);
+                        }
+#  endif
+
+                        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
+
+                        return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                    }
+                    else
+                    {
+                        using riflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::riflags_t>;
+                        auto const ri_flags_value{static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_peek)};
+                        auto const ri_flags_waitall_value{
+                            static_cast<riflags_underlying_t>(::uwvm2::imported::wasi::wasip1::abi::riflags_t::sock_recv_waitall)};
+                        auto const ri_flags_curr_value{static_cast<riflags_underlying_t>(ri_flags)};
+
+                        if((ri_flags_curr_value & ri_flags_value) != 0
+#  if defined(MSG_WAITALL)
+                           || (ri_flags_curr_value & ri_flags_waitall_value) != 0
+#  endif
+                        )
+                        {
+                            struct ::msghdr msg{};
+                            msg.msg_iov = reinterpret_cast<struct ::iovec*>(scatter_base);
+                            msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(scatter_length);
+
+                            int recv_flags{};
+
+#  if defined(MSG_PEEK)
+                            if((ri_flags_curr_value & ri_flags_value) != 0) { recv_flags |= MSG_PEEK; }
+#  endif
+#  if defined(MSG_WAITALL)
+                            if((ri_flags_curr_value & ri_flags_waitall_value) != 0) { recv_flags |= MSG_WAITALL; }
+#  else
+                            if((ri_flags_curr_value & ri_flags_waitall_value) != 0) [[unlikely]]
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
+                            }
+#  endif
+
+                            auto const recv_res{::uwvm2::imported::wasi::wasip1::func::posix::recvmsg(native_fd, ::std::addressof(msg), recv_flags)};
+
+                            if(recv_res < 0) [[unlikely]]
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
+                                    ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
+                            }
+
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                                memory,
+                                ro_data_len_ptrsz,
+                                static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(recv_res));
+
+                            using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                            roflags_underlying_t roflags_value{};
+
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory, ro_flags_ptrsz, roflags_value);
+
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        }
+                        else
+                        {
+                            ::fast_io::io_scatter_status_t scatter_status;  // no initialize
+
+#  ifdef UWVM_CPP_EXCEPTIONS
+                            try
+#  endif
+                            {
+                                scatter_status = ::fast_io::operations::scatter_read_some_bytes(curr_fd_native_file, scatter_base, scatter_length);
+                            }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                            catch(::fast_io::error e)
+                            {
+                                return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
+                            }
+#  endif
+
+                            total_bytes_read = ::fast_io::fposoffadd_scatters(0, scatter_base, scatter_status);
+
+                            // Verified: fposoffadd_scatters cannot produce negative values; it undergoes saturation handling during overflow.
+                            [[assume(total_bytes_read >= 0)]];
+
+                            constexpr auto max_val{::std::numeric_limits<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>::max()};
+                            if constexpr(max_val < ::std::numeric_limits<::fast_io::intfpos_t>::max()) { [[assume(total_bytes_read <= max_val)]]; }
+
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(
+                                memory,
+                                ro_data_len_ptrsz,
+                                static_cast<::uwvm2::imported::wasi::wasip1::abi::wasi_size_t>(total_bytes_read));
+
+                            using roflags_underlying_t = ::std::underlying_type_t<::uwvm2::imported::wasi::wasip1::abi::roflags_t>;
+                            ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32_unlocked(memory,
+                                                                                                                     ro_flags_ptrsz,
+                                                                                                                     static_cast<roflags_underlying_t>(0u));
+
+                            return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
+                        }
+                    }
+# endif
+                }
+                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                }
+# if defined(_WIN32) && !defined(__CYGWIN__)
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
+                {
+                    /// @todo
+                }
+# endif
+            }
+        }
+    }
+}
+
+#endif
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
+#endif
