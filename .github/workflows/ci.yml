@@ -159,7 +159,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-windows-gnu:
-    name: Windows MINGW ${{ matrix.env.name }}
+    name: Windows MINGW (x86_64) ${{ matrix.env.name }}
     strategy:
       matrix:
         env:
@@ -212,7 +212,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   i686-windows-gnu:
-    name: Windows MINGW ${{ matrix.env.name }}
+    name: Windows MINGW (i686) ${{ matrix.env.name }}
     strategy:
       matrix:
         env:
