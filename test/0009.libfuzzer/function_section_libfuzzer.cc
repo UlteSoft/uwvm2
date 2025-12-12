@@ -147,6 +147,139 @@ static inline std::vector<std::byte> make_code_section(std::uint32_t code_count)
     return p;
 }
 
+// Scalar correctness checker for function section type indices,
+// adapted from wasm1::features::check_function_section in function_section.h.
+template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+static inline void scalar_check_function_section(
+    [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+        ::uwvm2::parser::wasm::standard::wasm1::features::function_section_storage_t> sec_adl,
+    ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...>& module_storage,
+    ::std::byte const* const section_begin,
+    ::std::byte const* const section_end) noexcept
+{
+    // Note that section_begin may be equal to section_end
+    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+
+    using namespace ::uwvm2::parser::wasm::standard::wasm1;
+    using namespace ::uwvm2::parser::wasm::standard::wasm1::features;
+
+    // get function_section_storage_t from storages
+    auto const& functionsec{
+        ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<function_section_storage_t>(module_storage.sections)};
+
+    // check has typesec
+    auto const& typesec{
+        ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
+
+    auto section_curr{section_begin};
+
+    // [before_section ... ] | func_count typeidx1 ...
+    // [        safe       ] | unsafe (could be the section_end)
+    //                         ^^ section_curr
+
+    type::wasm_u32 func_count;  // No initialization necessary
+
+    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+    auto const [func_count_next, func_count_err]{::fast_io::parse_by_scan(
+        reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
+        reinterpret_cast<char8_t_const_may_alias_ptr>(section_end),
+        ::fast_io::mnp::leb128_get(func_count))};
+
+    if(func_count_err != ::fast_io::parse_code::ok) [[unlikely]]
+    {
+        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+    }
+
+    // [before_section ... | func_count ...] typeidx1 ...
+    // [             safe                  ] unsafe (could be the section_end)
+    //                       ^^ section_curr
+
+    type::wasm_u32 func_counter{};  // use for check
+
+    section_curr = reinterpret_cast<::std::byte const*>(func_count_next);  // never out of bounds
+
+    // [before_section ... | func_count ...] typeidx1 ...
+    // [              safe                 ] unsafe (could be the section_end)
+    //                                       ^^ section_curr
+
+    // handle it
+    auto const type_section_count{static_cast<type::wasm_u32>(typesec.types.size())};
+
+    ::std::size_t index{};
+
+    while(section_curr != section_end) [[likely]]
+    {
+        // Ensuring the existence of valid information
+
+        // [ ... typeidx1] ... typeidx2 ...
+        // [     safe    ] unsafe (could be the section_end)
+        //       ^^ section_curr
+
+        // check function counter
+        // Ensure content is available before counting (section_curr != section_end)
+
+        auto const func_counter_end{static_cast<type::wasm_u32>(func_counter + 1u)};
+
+        // check overflow
+        if(func_counter_end < func_counter) [[unlikely]]
+        {
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+
+        func_counter = func_counter_end;
+
+        if(func_counter > func_count) [[unlikely]]
+        {
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+
+        // [ ... typeidx1] ... typeidx2 ...
+        // [     safe    ] unsafe (could be the section_end)
+        //       ^^ section_curr
+
+        type::wasm_u32 typeidx;  // No initialization necessary
+
+        auto const [typeidx_next, typeidx_err]{::fast_io::parse_by_scan(
+            reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr),
+            reinterpret_cast<char8_t_const_may_alias_ptr>(section_end),
+            ::fast_io::mnp::leb128_get(typeidx))};
+
+        if(typeidx_err != ::fast_io::parse_code::ok) [[unlikely]]
+        {
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+
+        // [ ... typeidx1 ...] typeidx2 ...
+        // [      safe       ] unsafe (could be the section_end)
+        //       ^^ section_curr
+
+        // check: type_index should less than type_section_count
+        if(typeidx >= type_section_count) [[unlikely]]
+        {
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+
+        if(typeidx != functionsec.funcs.index_unchecked(index)) [[unlikely]]
+        {
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        }
+
+        section_curr = reinterpret_cast<::std::byte const*>(typeidx_next);
+
+        // [ ... typeidx1 ...] typeidx2 ...
+        // [      safe       ] unsafe (could be the section_end)
+        //                     ^^ section_curr
+
+        ++index;
+    }
+
+    // [before_section ... | func_count ... typeidx1 ... ...] (end)
+    // [                       safe                         ] unsafe (could be the section_end)
+    //                                                        ^^ section_curr
+}
+
 extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size)
 {
     std::size_t off = 0;
@@ -198,17 +331,38 @@ extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size
     }
     push_section(mod, 10, make_code_section(func_count));
 
-    // Parse
+    // Parse and run scalar correctness check on the decoded function section.
     try
     {
         using Feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
         ::uwvm2::parser::wasm::base::error_impl err{};
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Feature> fs_para{};
-        (void)::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Feature>(
+        auto module = ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_handle_func<Feature>(
             reinterpret_cast<::std::byte const*>(mod.data()),
             reinterpret_cast<::std::byte const*>(mod.data() + mod.size()),
             err,
             fs_para);
+
+        // If the function section was successfully parsed, verify that the
+        // scalar walk over its bytes matches the stored vectypeidx data.
+        auto const& functionsec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::function_section_storage_t>(module.sections)};
+
+        if(functionsec.sec_span.sec_begin && functionsec.sec_span.sec_end)
+        {
+            auto const* const sec_begin{
+                reinterpret_cast<::std::byte const*>(functionsec.sec_span.sec_begin)};
+            auto const* const sec_end{
+                reinterpret_cast<::std::byte const*>(functionsec.sec_span.sec_end)};
+
+            scalar_check_function_section(
+                ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<
+                    ::uwvm2::parser::wasm::standard::wasm1::features::function_section_storage_t>{},
+                module,
+                sec_begin,
+                sec_end);
+        }
     }
     catch(...)
     {
@@ -217,5 +371,4 @@ extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size
 
     return 0;
 }
-
 
