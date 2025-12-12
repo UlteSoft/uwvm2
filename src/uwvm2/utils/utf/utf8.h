@@ -1123,20 +1123,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
                 if(str_curr != str_begin)
                 {
                     auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
-                    ::std::size_t rewind{};  // 0..3
+                    unsigned rewind{};  // 0..3
 
-                    if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3uz)) >= static_cast<::std::uint8_t>(0b1111'0000u))
-                    {
-                        rewind = 3uz;
-                    }
-                    else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2uz)) >= static_cast<::std::uint8_t>(0b1110'0000u))
-                    {
-                        rewind = 2uz;
-                    }
-                    else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1uz)) >= static_cast<::std::uint8_t>(0b1100'0000u))
-                    {
-                        rewind = 1uz;
-                    }
+                    if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u)) { rewind = 3u; }
+                    else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u)) { rewind = 2u; }
+                    else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u)) { rewind = 1u; }
 
                     if(rewind) [[unlikely]]
                     {
@@ -1749,20 +1740,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             if(str_curr != str_begin)
             {
                 auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
-                ::std::size_t rewind{};  // 0..3
+                unsigned rewind{};  // 0..3
 
-                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3uz)) >= static_cast<::std::uint8_t>(0b1111'0000u))
-                {
-                    rewind = 3uz;
-                }
-                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2uz)) >= static_cast<::std::uint8_t>(0b1110'0000u))
-                {
-                    rewind = 2uz;
-                }
-                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1uz)) >= static_cast<::std::uint8_t>(0b1100'0000u))
-                {
-                    rewind = 1uz;
-                }
+                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u)) { rewind = 3u; }
+                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u)) { rewind = 2u; }
+                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u)) { rewind = 1u; }
 
                 str_curr -= rewind;
             }
@@ -2514,24 +2496,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
                 auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
                 unsigned rewind{};  // 0..3
 
-                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u))
-                {
-                    rewind = 3u;
-                }
-                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u))
-                {
-                    rewind = 2u;
-                }
-                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u))
-                {
-                    rewind = 1u;
-                }
+                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u)) { rewind = 3u; }
+                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u)) { rewind = 2u; }
+                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u)) { rewind = 1u; }
 
                 str_curr -= rewind;
             }
-
-            
-
 
             while(str_curr != str_end)
             {
