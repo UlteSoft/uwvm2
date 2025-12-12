@@ -1714,16 +1714,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
-            // Rewind a few bytes so that any multi-byte sequence that straddles
-            // the 64-byte SIMD block boundary gets re-validated by the scalar
-            // fallback logic.
-
-            auto const processed_bytes{static_cast<::std::size_t>(str_curr - str_begin)};
-            if(processed_bytes != 0uz)
-            {
-                auto const rewind_bytes{processed_bytes < 3uz ? processed_bytes : 3uz};
-                str_curr -= rewind_bytes;
-            }
+            // If the SIMD loop detected an error, or the last SIMD block ended
+            // with an incomplete multi-byte sequence, fall back to the scalar
+            // algorithm on the whole input to get the correct error position.
+            /// @todo
 
             while(str_curr != str_end)
             {
@@ -2464,15 +2458,71 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
-            // Rewind a few bytes so that any multi-byte sequence that straddles
-            // the 64-byte SIMD block boundary gets re-validated by the scalar
-            // fallback logic.
+            // If the last SIMD block ended with an incomplete multi-byte sequence,
+            // fall back to the scalar algorithm on the whole input to get the
+            // correct error position.
 
-            auto const processed_bytes{static_cast<::std::size_t>(str_curr - str_begin)};
-            if(processed_bytes != 0uz)
+            bool const has_error{static_cast<bool>(
+# if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz128)
+                !__builtin_ia32_ptestz128(::std::bit_cast<i64x2simd>(error), ::std::bit_cast<i64x2simd>(error))
+# elif defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)
+                __builtin_ia32_pmovmskb128(::std::bit_cast<c8x16simd>(error != static_cast<::std::uint8_t>(0u)))
+# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16)
+                !__builtin_wasm_all_true_i8x16(::std::bit_cast<i8x16simd>(~(error != static_cast<::std::uint8_t>(0u))))
+# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16)
+                __builtin_wasm_bitmask_i8x16(::std::bit_cast<i8x16simd>(error != static_cast<::std::uint8_t>(0u)))
+# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)                  // Only supported by clang
+                __builtin_neon_vmaxvq_u32(::std::bit_cast<u32x4simd>(error))
+# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)  // Only supported by GCC
+                __builtin_aarch64_reduc_umax_scal_v4si_uu(::std::bit_cast<u32x4simd>(error))
+# elif defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_bnz_v)
+                __builtin_lsx_bnz_v(::std::bit_cast<u8x16simd>(error))  /// @todo need check
+# else
+#  error "missing instructions"
+# endif
+                    )};
+
+            bool const has_prev_incomplete{static_cast<bool>(
+# if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz128)
+                !__builtin_ia32_ptestz128(::std::bit_cast<i64x2simd>(prev_incomplete), ::std::bit_cast<i64x2simd>(prev_incomplete))
+# elif defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)
+                __builtin_ia32_pmovmskb128(::std::bit_cast<c8x16simd>(prev_incomplete))
+# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16)
+                !__builtin_wasm_all_true_i8x16(::std::bit_cast<i8x16simd>(~prev_incomplete))
+# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16)
+                __builtin_wasm_bitmask_i8x16(::std::bit_cast<i8x16simd>(prev_incomplete))
+# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)                  // Only supported by clang
+                __builtin_neon_vmaxvq_u32(::std::bit_cast<u32x4simd>(prev_incomplete))
+# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)  // Only supported by GCC
+                __builtin_aarch64_reduc_umax_scal_v4si_uu(::std::bit_cast<u32x4simd>(prev_incomplete))
+# elif defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_bnz_v)
+                __builtin_lsx_bnz_v(::std::bit_cast<u8x16simd>(prev_incomplete))  /// @todo need check
+# else
+#  error "missing instructions"
+# endif
+                    )};
+
+            if(has_error || has_prev_incomplete)
             {
-                auto const rewind_bytes{processed_bytes < 3uz ? processed_bytes : 3uz};
-                str_curr -= rewind_bytes;
+                // Re-run the scalar checker from the beginning so that any
+                // multi-byte sequence that straddles the SIMD/tail boundary is
+                // handled correctly and the first error position matches the
+                // reference implementation.
+                str_curr = str_begin;
+            }
+            else
+            {
+                // Fast path: if the remaining tail contains any non-ASCII byte,
+                // fall back to the scalar checker on the whole input to keep
+                // behaviour identical to the reference implementation.
+                for(auto tail_it{str_curr}; tail_it != str_end; ++tail_it)
+                {
+                    if((*tail_it & static_cast<char8_t>(0b1000'0000u)) != static_cast<char8_t>(0))
+                    {
+                        str_curr = str_begin;
+                        break;
+                    }
+                }
             }
 
             while(str_curr != str_end)
