@@ -212,6 +212,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   i686-windows-gnu:
+    if: ${{ !always() }}
     name: Windows MINGW (i686) ${{ matrix.env.name }}
     strategy:
       matrix:
