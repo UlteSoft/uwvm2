@@ -21,7 +21,11 @@
 #include <cstddef>
 #include <cstdint>
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+#if defined(_WIN32) && !defined(__CYGWIN__) && !(defined(__clang__) && defined(__MINGW64__))
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# define UWVM_HAS_NATIVE_WIN32_WS2 1
 # include <winsock2.h>
 # include <ws2tcpip.h>
 #endif
@@ -223,7 +227,7 @@ int main()
 
         ::close(client_fd);
     }
-# elif defined(_WIN32) && !defined(__CYGWIN__)
+# elif defined(UWVM_HAS_NATIVE_WIN32_WS2)
     // Case 5: real TCP accept on loopback (WinSock2 / Win32 socket type)
     {
         WSADATA wsa_data{};
