@@ -494,7 +494,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 int send_flags{};
 
-                // No POSIX-level flags corresponding to WASI si_flags are defined yet.
+                // No POSIX-level flags corresponding to WASI si_flags are defined yet. However, to avoid delivering SIGPIPE
+                // to the host process when writing to a closed peer, use MSG_NOSIGNAL where available.
+#  ifdef MSG_NOSIGNAL
+                send_flags |= MSG_NOSIGNAL;
+#  endif
+
                 auto const send_res{::uwvm2::imported::wasi::wasip1::func::posix::sendmsg(native_fd, ::std::addressof(msg), send_flags)};
 
                 if(send_res < 0) [[unlikely]]

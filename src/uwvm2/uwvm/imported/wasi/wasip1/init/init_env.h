@@ -61,6 +61,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         /// @brief   Initialize socket
         /// @details First, sort the file descriptors. Non-contiguous file descriptors will be placed in the renumber_map.
+        /// @note    Socket descriptors are currently not auto-discovered or preconfigured here. In particular, this
+        ///          function does not modify the host's SIGPIPE handling or per-socket flags (such as SO_NOSIGPIPE).
+        ///          Instead, individual WASI socket operations (for example, sock_send via MSG_NOSIGNAL where supported)
+        ///          are responsible for preventing SIGPIPE from being delivered to the host process.
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 #  endif
