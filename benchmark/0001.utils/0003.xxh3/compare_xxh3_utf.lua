@@ -100,8 +100,16 @@ local root_dir = script_dir .. "/../../.."
 local output_dir = script_dir .. "/outputs"
 mkdir_p(output_dir)
 
-local bench_src = root_dir .. "/benchmark/0001.utils/0003.xxh3/Xxh3UtfBenchmark.cc"
-local bench_bin = output_dir .. "/Xxh3UtfBenchmark"
+local gen_src = root_dir .. "/benchmark/0001.utils/0003.xxh3/Xxh3UtfGen.cc"
+local gen_bin = output_dir .. "/Xxh3UtfGen"
+
+local xxhash_src = root_dir .. "/benchmark/0001.utils/0003.xxh3/Xxh3UtfXxhashBench.cc"
+local xxhash_bin = output_dir .. "/Xxh3UtfXxhashBench"
+
+local uwvm2_src = root_dir .. "/benchmark/0001.utils/0003.xxh3/Xxh3UtfUwvm2Bench.cc"
+local uwvm2_bin = output_dir .. "/Xxh3UtfUwvm2Bench"
+
+local data_file = output_dir .. "/xxh3_utf_data.bin"
 
 local bench_log = output_dir .. "/xxh3_utf_bench.log"
 local bench_summary = output_dir .. "/xxh3_utf_summary.txt"
@@ -131,7 +139,7 @@ end
 -- Build C++ benchmark --------------------------------------------------------
 
 local function build_xxh3_bench(xxhash_dir)
-    print("==> Building uwvm2 vs xxHash xxh3 UTF benchmark (C++)")
+    print("==> Building xxh3 UTF benchmarks (C++)")
 
     local cxx = os.getenv("CXX") or "clang++"
 
@@ -193,36 +201,46 @@ local function build_xxh3_bench(xxhash_dir)
         "-DXXH_STATIC_LINKING_ONLY",
     }
 
-    local cmd_parts = { cxx }
-    for _, f in ipairs(default_flags) do
-        table.insert(cmd_parts, f)
+    local function compile_one(src, bin, extra_defines)
+        local cmd_parts = { cxx }
+        for _, f in ipairs(default_flags) do
+            table.insert(cmd_parts, f)
+        end
+        for _, f in ipairs(extra_flags) do
+            table.insert(cmd_parts, f)
+        end
+        if extra_defines then
+            for _, f in ipairs(extra_defines) do
+                table.insert(cmd_parts, f)
+            end
+        end
+        for _, f in ipairs(include_flags) do
+            table.insert(cmd_parts, f)
+        end
+        table.insert(cmd_parts, src)
+        table.insert(cmd_parts, "-o")
+        table.insert(cmd_parts, bin)
+        run_or_die(join(cmd_parts, " "))
     end
-    for _, f in ipairs(extra_flags) do
-        table.insert(cmd_parts, f)
-    end
-    for _, f in ipairs(define_flags) do
-        table.insert(cmd_parts, f)
-    end
-    for _, f in ipairs(include_flags) do
-        table.insert(cmd_parts, f)
-    end
-    table.insert(cmd_parts, bench_src)
-    table.insert(cmd_parts, "-o")
-    table.insert(cmd_parts, bench_bin)
 
-    local cmd = join(cmd_parts, " ")
-    run_or_die(cmd)
+    -- Generator does not need xxHash defines, but using same flags is fine.
+    compile_one(gen_src, gen_bin, nil)
+    compile_one(xxhash_src, xxhash_bin, define_flags)
+    compile_one(uwvm2_src, uwvm2_bin, nil)
 end
 
 -- Run benchmark and capture output -------------------------------------------
 
 local function run_xxh3_bench()
-    print("==> Running xxh3 UTF benchmark")
+    print("==> Running xxh3 UTF benchmarks")
 
     local bytes = os.getenv("BYTES")
     local iters = os.getenv("ITERS")
 
-    local env_prefix = ""
+    -- Truncate previous log so summaries stay clean.
+    write_file(bench_log, "")
+
+    local env_prefix = "DATA_FILE=" .. data_file .. " "
     if bytes and #bytes > 0 then
         env_prefix = env_prefix .. "BYTES=" .. bytes .. " "
     end
@@ -230,8 +248,17 @@ local function run_xxh3_bench()
         env_prefix = env_prefix .. "ITERS=" .. iters .. " "
     end
 
-    local cmd = string.format("cd %q && %s%q > %q 2>&1", root_dir, env_prefix, bench_bin, bench_log)
-    run_or_die(cmd)
+    -- 1) Generate data file.
+    local gen_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, env_prefix, gen_bin, bench_log)
+    run_or_die(gen_cmd)
+
+    -- 2) Benchmark xxHash.
+    local xx_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, env_prefix, xxhash_bin, bench_log)
+    run_or_die(xx_cmd)
+
+    -- 3) Benchmark uwvm2.
+    local uw_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, env_prefix, uwvm2_bin, bench_log)
+    run_or_die(uw_cmd)
 
     local summary_lines = {}
     for line in io.lines(bench_log) do
@@ -313,4 +340,3 @@ local function main()
 end
 
 main()
-

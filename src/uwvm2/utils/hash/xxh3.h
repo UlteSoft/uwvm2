@@ -2182,7 +2182,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
         }
     }  // namespace details
 
-    inline constexpr ::std::uint_least64_t xxh3_64bits(::std::byte const* __restrict input, ::std::size_t len, ::std::uint_least64_t seed64 = 0u) noexcept
+    UWVM_GNU_PURE inline constexpr ::std::uint_least64_t xxh3_64bits(::std::byte const* __restrict input,
+                                                                     ::std::size_t len,
+                                                                     ::std::uint_least64_t seed64 = 0u) noexcept
     { return details::xxh3_64bits_internal(input, len, seed64, details::xxh3_kSecret, sizeof(details::xxh3_kSecret)); }
 
     /// @brief xxh3 context class for incremental hashing
