@@ -1116,6 +1116,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
                 str_curr += last_load_predicate_size;
             }
+            else
+            {
+                // No remainder: we must still check that the input did not end
+                // with an incomplete multi-byte sequence (simdutf-style EOF check).
+                if(str_curr != str_begin)
+                {
+                    auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
+                    ::std::size_t rewind{};  // 0..3
+
+                    if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3uz)) >= static_cast<::std::uint8_t>(0b1111'0000u))
+                    {
+                        rewind = 3uz;
+                    }
+                    else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2uz)) >= static_cast<::std::uint8_t>(0b1110'0000u))
+                    {
+                        rewind = 2uz;
+                    }
+                    else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1uz)) >= static_cast<::std::uint8_t>(0b1100'0000u))
+                    {
+                        rewind = 1uz;
+                    }
+
+                    if(rewind) [[unlikely]]
+                    {
+                        str_curr -= rewind;
+                        return general_algorithm();
+                    }
+                }
+            }
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
 
@@ -1714,10 +1743,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
-            // If the SIMD loop detected an error, or the last SIMD block ended
-            // with an incomplete multi-byte sequence, fall back to the scalar
-            // algorithm on the whole input to get the correct error position.
-            /// @todo
+            // If the previous SIMD block ended with an incomplete UTF-8 sequence,
+            // rewind so that the scalar loop validates it together with the
+            // remainder (simdutf-style).
+            if(str_curr != str_begin)
+            {
+                auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
+                ::std::size_t rewind{};  // 0..3
+
+                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3uz)) >= static_cast<::std::uint8_t>(0b1111'0000u))
+                {
+                    rewind = 3uz;
+                }
+                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2uz)) >= static_cast<::std::uint8_t>(0b1110'0000u))
+                {
+                    rewind = 2uz;
+                }
+                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1uz)) >= static_cast<::std::uint8_t>(0b1100'0000u))
+                {
+                    rewind = 1uz;
+                }
+
+                str_curr -= rewind;
+            }
 
             while(str_curr != str_end)
             {
@@ -2458,38 +2506,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
-            // If the last SIMD block ended with an incomplete multi-byte sequence,
-            // fall back to the scalar algorithm on the whole input to get the
-            // correct error position.
-
-            bool const has_prev_incomplete{static_cast<bool>(
-# if defined(__SSE4_1__) && UWVM_HAS_BUILTIN(__builtin_ia32_ptestz128)
-                !__builtin_ia32_ptestz128(::std::bit_cast<i64x2simd>(prev_incomplete), ::std::bit_cast<i64x2simd>(prev_incomplete))
-# elif defined(__SSE2__) && UWVM_HAS_BUILTIN(__builtin_ia32_pmovmskb128)
-                __builtin_ia32_pmovmskb128(::std::bit_cast<c8x16simd>(prev_incomplete != static_cast<::std::uint8_t>(0u)))
-# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_all_true_i8x16)
-                !__builtin_wasm_all_true_i8x16(::std::bit_cast<i8x16simd>(~(prev_incomplete != static_cast<::std::uint8_t>(0u))))
-# elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16)
-                __builtin_wasm_bitmask_i8x16(::std::bit_cast<i8x16simd>(prev_incomplete != static_cast<::std::uint8_t>(0u)))
-# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)                  // Only supported by clang
-                __builtin_neon_vmaxvq_u32(::std::bit_cast<u32x4simd>(prev_incomplete))
-# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)  // Only supported by GCC
-                __builtin_aarch64_reduc_umax_scal_v4si_uu(::std::bit_cast<u32x4simd>(prev_incomplete))
-# elif defined(__loongarch_sx) && UWVM_HAS_BUILTIN(__builtin_lsx_bnz_v)
-                __builtin_lsx_bnz_v(::std::bit_cast<u8x16simd>(prev_incomplete))  /// @todo need check
-# else
-#  error "missing instructions"
-# endif
-                    )};
-
-            if(has_prev_incomplete)
+            // If the previous SIMD block ended with an incomplete UTF-8 sequence,
+            // rewind so that the scalar loop validates it together with the
+            // remainder (simdutf-style).
+            if(str_curr != str_begin)
             {
-                for(unsigned back{}; back != 3u && str_curr != str_begin; ++back)
+                auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
+                unsigned rewind{};  // 0..3
+
+                if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u))
                 {
-                    if((*str_curr & static_cast<char8_t>(0b1100'0000u)) != static_cast<char8_t>(0b1000'0000u)) { break; }
-                    --str_curr;
+                    rewind = 3u;
                 }
+                else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u))
+                {
+                    rewind = 2u;
+                }
+                else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u))
+                {
+                    rewind = 1u;
+                }
+
+                str_curr -= rewind;
             }
+
+            
+
 
             while(str_curr != str_end)
             {
