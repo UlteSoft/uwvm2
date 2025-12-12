@@ -15,19 +15,31 @@ can be reproduced outside of the main build system.
 
 ## Files in this directory
 
+- `UtfGen.cc`  
+  C++ data generator. Produces per-scenario UTF-8 input files for the benches.
+
+- `UtfUwvm2Bench.cc`  
+  C++ benchmark binary for `uwvm2::utils::utf::check_legal_utf8_rfc3629_unchecked<false>`.
+
+- `UtfSimdutfBench.cc`  
+  C++ benchmark binary for `simdutf::validate_utf8`.
+
 - `UtfSimdUtf.cc`  
-  C++ benchmark binary. Generates test data, runs both implementations, and
-  prints machine-readable timing lines.
+  Legacy combined benchmark (both implementations in one process). Kept for
+  reference; the Lua driver uses the per-implementation binaries above.
 
 - `compare_utf_simdutf.lua`  
   Lua driver that:
   - locates or clones a `simdutf` checkout;
-  - compiles `UtfSimdUtf.cc` together with `simdutf/src/simdutf.cpp`;
-  - runs the benchmark; and
+  - builds one generator + two per-implementation benchmark binaries;
+  - generates per-scenario input files;
+  - runs each benchmark in a separate process; and
   - writes summaries under `outputs/`.
 
 - `outputs/` (ignored via `.gitignore`)  
-  - `UtfSimdUtf` – compiled benchmark binary  
+  - `UtfGen` – compiled data generator  
+  - `UtfUwvm2Bench` – compiled uwvm2 benchmark binary  
+  - `UtfSimdutfBench` – compiled simdutf benchmark binary  
   - `utf_bench.log` – full stdout/stderr from the benchmark run  
   - `utf_bench_summary.txt` – per-scenario `ns_per_byte` summary  
   - `simdutf/` – auto-cloned simdutf repository (if `SIMDUTF_DIR` is not set)
@@ -60,10 +72,12 @@ The Lua driver will:
 2. Determine the simdutf public headers:
    - If `<SIMDUTF_DIR>/singleheader/simdutf.h` exists, use `singleheader/`.
    - Otherwise, use `<SIMDUTF_DIR>/include`.
-3. Compile the C++ benchmark:
+3. Compile the C++ programs:
    - Sources:
-     - `UtfSimdUtf.cc`
-     - `<SIMDUTF_DIR>/src/simdutf.cpp`
+     - `UtfGen.cc`
+     - `UtfUwvm2Bench.cc`
+     - `UtfSimdutfBench.cc`
+     - `<SIMDUTF_DIR>/src/simdutf.cpp` (only for the simdutf bench)
    - Includes:
      - `-I <project-root>/src`
      - `-I <project-root>/third-parties/fast_io/include`
@@ -75,9 +89,11 @@ The Lua driver will:
    - raw log: `outputs/utf_bench.log`
    - summary: `outputs/utf_bench_summary.txt`
 
-The compiled binary is placed at:
+The compiled binaries are placed under:
 
-- `benchmark/0001.utils/0002.utf/outputs/UtfSimdUtf`
+- `benchmark/0001.utils/0002.utf/outputs/UtfGen`
+- `benchmark/0001.utils/0002.utf/outputs/UtfUwvm2Bench`
+- `benchmark/0001.utils/0002.utf/outputs/UtfSimdutfBench`
 
 ---
 
@@ -183,8 +199,7 @@ Metrics:
 
 ## Output format
 
-`UtfSimdUtf` prints one machine-readable line per (scenario, implementation)
-pair:
+The per-implementation benchmarks print one machine-readable line per scenario:
 
 ```text
 uwvm2_utf scenario=<name> impl=<uwvm2|simdutf> bytes=<N> total_ns=<T> \

@@ -4,7 +4,7 @@
 --
 -- Lua driver to:
 --   - locate or clone a simdutf checkout;
---   - build and run the uwvm2 vs simdutf UTF-8 verification benchmark;
+--   - build and run per-implementation UTF-8 verification benchmarks;
 --   - extract per-scenario timings and print simple ratios.
 --
 -- Usage (from project root):
@@ -25,8 +25,7 @@
 --   ITERS             : number of benchmark iterations (default: 20, in C++)
 --   WARMUP_ITERS      : warm-up iterations per implementation (not timed)
 --                        (default: 1, in C++)
---   TRIALS            : number of measurement trials; implementations alternate order
---                        each trial and results are averaged (default: 3, in C++)
+--   TRIALS            : number of measurement trials (default: 3, in C++)
 --   RUSTFLAGS         : preserved (not used directly here, but forwarded untouched)
 --   UWVM2_SIMD_LEVEL  : optional fixed SIMD level for C++.
 --                        Recognized values:
@@ -110,8 +109,15 @@ local root_dir = script_dir .. "/../../.."
 local output_dir = script_dir .. "/outputs"
 mkdir_p(output_dir)
 
-local bench_src = root_dir .. "/benchmark/0001.utils/0002.utf/UtfSimdUtf.cc"
-local bench_bin = output_dir .. "/UtfSimdUtf"
+local gen_src = root_dir .. "/benchmark/0001.utils/0002.utf/UtfGen.cc"
+local gen_bin = output_dir .. "/UtfGen"
+
+local uwvm2_src = root_dir .. "/benchmark/0001.utils/0002.utf/UtfUwvm2Bench.cc"
+local uwvm2_bin = output_dir .. "/UtfUwvm2Bench"
+
+local simdutf_src = root_dir .. "/benchmark/0001.utils/0002.utf/UtfSimdutfBench.cc"
+local simdutf_bin = output_dir .. "/UtfSimdutfBench"
+
 local bench_log = output_dir .. "/utf_bench.log"
 local bench_summary = output_dir .. "/utf_bench_summary.txt"
 
@@ -163,7 +169,7 @@ end
 -- Build C++ benchmark --------------------------------------------------------
 
 local function build_utf_bench(simdutf_dir)
-    print("==> Building uwvm2 vs simdutf UTF-8 benchmark (C++)")
+    print("==> Building uwvm2 vs simdutf UTF-8 benchmarks (C++)")
 
     local cxx = os.getenv("CXX") or "clang++"
 
@@ -227,27 +233,50 @@ local function build_utf_bench(simdutf_dir)
         "-I", root_dir .. "/third-parties/fast_io/include",
         "-I", root_dir .. "/third-parties/bizwen/include",
         "-I", root_dir .. "/third-parties/boost_unordered/include",
-        "-I", simdutf_inc,
-        "-I", simdutf_dir .. "/src",
     }
 
-    local cmd_parts = { cxx }
-    for _, f in ipairs(default_flags) do
-        table.insert(cmd_parts, f)
+    local function compile_one(src_list, bin, extra_includes)
+        local cmd_parts = { cxx }
+        for _, f in ipairs(default_flags) do
+            table.insert(cmd_parts, f)
+        end
+        for _, f in ipairs(extra_flags) do
+            table.insert(cmd_parts, f)
+        end
+        for _, f in ipairs(include_flags) do
+            table.insert(cmd_parts, f)
+        end
+        if extra_includes then
+            for _, f in ipairs(extra_includes) do
+                table.insert(cmd_parts, f)
+            end
+        end
+        for _, src in ipairs(src_list) do
+            table.insert(cmd_parts, src)
+        end
+        table.insert(cmd_parts, "-o")
+        table.insert(cmd_parts, bin)
+        run_or_die(join(cmd_parts, " "))
     end
-    for _, f in ipairs(extra_flags) do
-        table.insert(cmd_parts, f)
-    end
-    for _, f in ipairs(include_flags) do
-        table.insert(cmd_parts, f)
-    end
-    table.insert(cmd_parts, bench_src)
-    table.insert(cmd_parts, simdutf_impl)
-    table.insert(cmd_parts, "-o")
-    table.insert(cmd_parts, bench_bin)
 
-    local cmd = join(cmd_parts, " ")
-    run_or_die(cmd)
+    compile_one({ gen_src }, gen_bin, nil)
+    compile_one({ uwvm2_src }, uwvm2_bin, nil)
+
+    -- simdutf currently uses a "simdutf_constexpr" macro that expands to
+    -- constexpr for C++17+, and this can trip Clang's arm64 constexpr rules
+    -- in some simdutf versions. Force-disable simdutf's C++17/20/23 feature
+    -- toggles so simdutf_constexpr becomes empty (while we still compile with
+    -- a C++2c dialect for our own benchmark sources).
+    compile_one(
+        { simdutf_src, simdutf_impl },
+        simdutf_bin,
+        {
+            "-I", simdutf_inc,
+            "-I", simdutf_dir .. "/src",
+            "-DSIMDUTF_CPLUSPLUS17=0",
+            "-DSIMDUTF_CPLUSPLUS20=0",
+            "-DSIMDUTF_CPLUSPLUS23=0",
+        })
 end
 
 -- Run benchmark and capture output ------------------------------------------
@@ -257,6 +286,11 @@ local function run_utf_bench()
 
     local bench_bytes = os.getenv("UTF_BENCH_BYTES")
     local iters = os.getenv("ITERS")
+    local warmup = os.getenv("WARMUP_ITERS")
+    local trials = os.getenv("TRIALS")
+
+    -- Truncate previous log so summaries stay clean.
+    write_file(bench_log, "")
 
     local env_prefix = ""
     if bench_bytes and #bench_bytes > 0 then
@@ -265,6 +299,12 @@ local function run_utf_bench()
     if iters and #iters > 0 then
         env_prefix = env_prefix .. "ITERS=" .. iters .. " "
     end
+    if warmup and #warmup > 0 then
+        env_prefix = env_prefix .. "WARMUP_ITERS=" .. warmup .. " "
+    end
+    if trials and #trials > 0 then
+        env_prefix = env_prefix .. "TRIALS=" .. trials .. " "
+    end
 
     -- simdutf does runtime ISA dispatch via CPUID. When we pin UWVM2_SIMD_LEVEL
     -- to a lower SIMD tier (e.g. "sse2"), force simdutf to a comparable
@@ -272,6 +312,7 @@ local function run_utf_bench()
     -- setting SIMDUTF_FORCE_IMPLEMENTATION themselves.
     local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
     local forced_impl = os.getenv("SIMDUTF_FORCE_IMPLEMENTATION")
+    local simdutf_env_prefix = env_prefix
     if (not forced_impl or #forced_impl == 0) and simd_level ~= "native" then
         local map = {
             -- simdutf x86 implementations: fallback (scalar), westmere (SSE4.2),
@@ -280,20 +321,44 @@ local function run_utf_bench()
             sse3 = "fallback",
             ssse3 = "fallback",
             sse4 = "westmere",
-            avx = "haswell",
-            avx2 = "haswell",
+            avx = "westmere", 
+            avx2 = "haswell", -- haswell = avx2
             avx512bw = "icelake",
             avx512vbmi = "icelake",
         }
         local impl = map[simd_level]
         if impl then
-            env_prefix = env_prefix .. "SIMDUTF_FORCE_IMPLEMENTATION=" .. impl .. " "
+            simdutf_env_prefix = simdutf_env_prefix .. "SIMDUTF_FORCE_IMPLEMENTATION=" .. impl .. " "
             print(string.format("  forcing simdutf implementation=%s (UWVM2_SIMD_LEVEL=%s)", impl, simd_level))
         end
     end
 
-    local cmd = string.format("cd %q && %s%q > %q 2>&1", root_dir, env_prefix, bench_bin, bench_log)
-    run_or_die(cmd)
+    local scenarios = { "ascii_only", "latin_mixed", "emoji_mixed" }
+    for i, scenario in ipairs(scenarios) do
+        local data_file = output_dir .. "/utf_data_" .. scenario .. ".bin"
+
+        local common = env_prefix
+            .. "SCENARIO=" .. string.format("%q", scenario) .. " "
+            .. "DATA_FILE=" .. string.format("%q", data_file) .. " "
+        local gen_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, common, gen_bin, bench_log)
+        run_or_die(gen_cmd)
+
+        local uw_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, common, uwvm2_bin, bench_log)
+        local simd_env = simdutf_env_prefix
+            .. "SCENARIO=" .. string.format("%q", scenario) .. " "
+            .. "DATA_FILE=" .. string.format("%q", data_file) .. " "
+        local simd_cmd = string.format("cd %q && %s%q >> %q 2>&1", root_dir, simd_env, simdutf_bin, bench_log)
+
+        -- Alternate which implementation runs first per scenario to reduce
+        -- cross-process warm-cache ordering bias.
+        if (i % 2) == 1 then
+            run_or_die(uw_cmd)
+            run_or_die(simd_cmd)
+        else
+            run_or_die(simd_cmd)
+            run_or_die(uw_cmd)
+        end
+    end
 end
 
 -- Parse timing lines ---------------------------------------------------------
