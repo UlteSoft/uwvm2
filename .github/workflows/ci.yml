@@ -56,7 +56,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-sde-dmr:
-    name: Linux (x86_64, SDE DMR - AVX512 + AVX10 + APX)
+    name: Linux (x86_64, SDE DMR)
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -91,12 +91,42 @@ jobs:
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
         run: |
-          xmake b -rv
+          # Build all targets (including tests), but do not run them.
+          xmake b -rva
           export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
       - name: Check UWVM version (via SDE)
-        run: /opt/intel-sde/sde64 -dmr -- xmake run uwvm --version
-      - name: Unit tests (via SDE)
-        run: /opt/intel-sde/sde64 -dmr -- xmake test -v
+        run: |
+          BIN_DIR="build/linux/x86_64/${{ matrix.mode }}"
+          echo "Running uwvm from ${BIN_DIR} under SDE"
+          /opt/intel-sde/sde64 -dmr -- "${BIN_DIR}/uwvm" --version
+      - name: Run all test executables (via SDE)
+        run: |
+          BIN_DIR="build/linux/x86_64/${{ matrix.mode }}"
+          echo "Building done, scanning tests to run under SDE from ${BIN_DIR}"
+          if [ ! -d "${BIN_DIR}" ]; then
+            echo "Binary directory ${BIN_DIR} does not exist"
+            exit 1
+          fi
+
+          # Iterate over all unit-test sources and run corresponding executables via SDE.
+          # This mimics `xmake test` but avoids running through xmake/Lua itself.
+          find test -type f -name '*.cc' | while IFS= read -r src; do
+            # Skip libfuzzer tests; they are too heavy to fuzz under SDE.
+            case "${src}" in
+              *test/0009.libfuzzer/*) continue ;;
+            esac
+
+            name="$(basename "${src}" .cc)"
+            exe="${BIN_DIR}/${name}"
+
+            if [ -x "${exe}" ]; then
+              echo "::group::Running ${name} under SDE"
+              /opt/intel-sde/sde64 -dmr -- "${exe}"
+              echo "::endgroup::"
+            else
+              echo "Executable ${exe} not found or not executable, skipping"
+            fi
+          done
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-tsan:
@@ -109,6 +139,7 @@ jobs:
           [
             "build.sanitizer.thread",
           ]
+        cxx_flags: []
     steps:
       - uses: actions/checkout@v4
       - name: Setup
@@ -119,7 +150,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install clang clang-tools lld xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
+        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}"
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
