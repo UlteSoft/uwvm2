@@ -1714,6 +1714,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
+            // Rewind a few bytes so that any multi-byte sequence that straddles
+            // the 64-byte SIMD block boundary gets re-validated by the scalar
+            // fallback logic.
+
+            auto const processed_bytes{static_cast<::std::size_t>(str_curr - str_begin)};
+            if(processed_bytes != 0uz)
+            {
+                auto const rewind_bytes{processed_bytes < 3uz ? processed_bytes : 3uz};
+                str_curr -= rewind_bytes;
+            }
 
             while(str_curr != str_end)
             {
@@ -2454,6 +2464,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             }
 
             // tail handling
+            // Rewind a few bytes so that any multi-byte sequence that straddles
+            // the 64-byte SIMD block boundary gets re-validated by the scalar
+            // fallback logic.
+
+            auto const processed_bytes{static_cast<::std::size_t>(str_curr - str_begin)};
+            if(processed_bytes != 0uz)
+            {
+                auto const rewind_bytes{processed_bytes < 3uz ? processed_bytes : 3uz};
+                str_curr -= rewind_bytes;
+            }
 
             while(str_curr != str_end)
             {
