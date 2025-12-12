@@ -46,7 +46,9 @@ jobs:
       - name: Configure
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}"
       - name: Build
-        run: xmake b -rv
+        run: |
+          xmake b -rv
+          export UBSAN_OPTIONS=halt_on_error=1
       - name: Check UWVM version
         run: xmake run uwvm --version
       - name: Unit tests
@@ -104,7 +106,9 @@ jobs:
       - name: Configure
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
       - name: Build
-        run: xmake b -rv
+        run: | 
+          xmake b -rv
+          export UBSAN_OPTIONS=halt_on_error=1
       - name: Check UWVM version
         run: xmake run uwvm --version
 
@@ -217,5 +221,6 @@ jobs:
           version: ${{ env.version }}
           run: |
             xmake b -rv
+            export UBSAN_OPTIONS=halt_on_error=1
             xmake run uwvm --version
             xmake test -v
