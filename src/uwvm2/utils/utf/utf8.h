@@ -1328,7 +1328,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 #  error "missing instructions"
 # endif
 
-                    const auto prev1_andF{prev1 & static_cast<::std::uint8_t>(0x0Fu)};
+                    auto const prev1_andF{prev1 & static_cast<::std::uint8_t>(0x0Fu)};
 
                     u8x32simd b1l;
 
@@ -2045,7 +2045,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 #  error "missing instructions"
 # endif
 
-                    const auto prev1_andF{prev1 & static_cast<::std::uint8_t>(0x0Fu)};
+                    auto const prev1_andF{prev1 & static_cast<::std::uint8_t>(0x0Fu)};
 
                     u8x16simd b1l;
 
