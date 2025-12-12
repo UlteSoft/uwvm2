@@ -145,12 +145,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // The func_counter is exactly the right size
         // On platforms where CHAR_BIT is greater than 8, the func_counter that has been processed does not contain invalid high bit information at all and is
         // copied directly
-        ::std::memcpy(functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr,
-                      section_leb_begin,
-                      func_counter * sizeof(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8));
+        if(func_counter != static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(0u))
+        {
+            // When func_counter == 0: Do not call memcpy to avoid passing nullptr to functions marked with nonnull.
+            ::std::memcpy(functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr,
+                          section_leb_begin,
+                          static_cast<::std::size_t>(func_counter) * sizeof(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8));
 
-        // Addition doesn't overflow here.
-        functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr += func_counter;
+            // Addition doesn't overflow here.
+            functionsec.funcs.storage.typeidx_u8_vector.imp.curr_ptr += func_counter;
+        }
 
         // [typeidxbef ...] typeidx1 ... typeidx2 ...
         // [     safe     ] unsafe (could be the section_end)
