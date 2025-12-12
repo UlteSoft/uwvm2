@@ -120,6 +120,15 @@ The compiled binary is placed at:
   buffer).  
   Default: `20`.
 
+- `WARMUP_ITERS`  
+  Warm-up iterations per implementation (not timed) before each measured run.  
+  Default: `1`.
+
+- `TRIALS`  
+  Number of measurement trials per scenario. The benchmark alternates which
+  implementation runs first each trial and averages results.  
+  Default: `3`.
+
 ### SIMD configuration (uwvm2 side)
 
 - `UWVM2_SIMD_LEVEL`  
@@ -157,12 +166,12 @@ Each scenario constructs a small UTF-8 “chunk” and repeats it until the buff
 is larger than `UTF_BENCH_BYTES`. Chunks are never cut in the middle, so the
 resulting buffer stays valid UTF-8 by construction.
 
-For each scenario, the benchmark:
+For each scenario, the benchmark runs `TRIALS` trials. In each trial it:
 
-1. Runs `uwvm2::utils::utf::check_legal_utf8_rfc3629_unchecked<false>` over
-   the entire buffer `ITERS` times.
-2. Runs `simdutf::validate_utf8` over the same buffer `ITERS` times.
-3. Verifies that both implementations agree on validity.
+1. Warms up each implementation for `WARMUP_ITERS` iterations (not timed).
+2. Measures each implementation over the entire buffer `ITERS` times, with
+   the run order alternating per trial.
+3. Averages timing metrics across trials and verifies both implementations agree.
 
 Metrics:
 
@@ -242,4 +251,3 @@ runs without ARM64 SIMD acceleration.
 
 Once the underlying issue is resolved upstream, this macro can be removed to
 restore a fully SIMD-accelerated comparison on ARM64.
-

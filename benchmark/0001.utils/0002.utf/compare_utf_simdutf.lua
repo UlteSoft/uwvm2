@@ -23,6 +23,10 @@
 --                        (default: auto-detect singleheader/ or include/)
 --   UTF_BENCH_BYTES   : approximate bytes per scenario buffer (default: 16 MiB)
 --   ITERS             : number of benchmark iterations (default: 20, in C++)
+--   WARMUP_ITERS      : warm-up iterations per implementation (not timed)
+--                        (default: 1, in C++)
+--   TRIALS            : number of measurement trials; implementations alternate order
+--                        each trial and results are averaged (default: 3, in C++)
 --   RUSTFLAGS         : preserved (not used directly here, but forwarded untouched)
 --   UWVM2_SIMD_LEVEL  : optional fixed SIMD level for C++.
 --                        Recognized values:
@@ -35,6 +39,10 @@
 --                          "avx2"      : x86-64 + AVX2
 --                          "avx512bw"  : x86-64 + AVX2 + AVX-512BW
 --                          "avx512vbmi": x86-64 + AVX2 + AVX-512BW + AVX-512VBMI/VBMI2
+--   SIMDUTF_FORCE_IMPLEMENTATION : optional simdutf implementation name to force
+--                        (e.g. "fallback", "westmere", "haswell", "icelake").
+--                        If not set and UWVM2_SIMD_LEVEL is pinned, this script
+--                        will auto-force a comparable simdutf implementation.
 
 local function join(list, sep)
     sep = sep or " "
@@ -258,6 +266,32 @@ local function run_utf_bench()
         env_prefix = env_prefix .. "ITERS=" .. iters .. " "
     end
 
+    -- simdutf does runtime ISA dispatch via CPUID. When we pin UWVM2_SIMD_LEVEL
+    -- to a lower SIMD tier (e.g. "sse2"), force simdutf to a comparable
+    -- implementation so the benchmark stays fair. Users can override this by
+    -- setting SIMDUTF_FORCE_IMPLEMENTATION themselves.
+    local simd_level = os.getenv("UWVM2_SIMD_LEVEL") or "native"
+    local forced_impl = os.getenv("SIMDUTF_FORCE_IMPLEMENTATION")
+    if (not forced_impl or #forced_impl == 0) and simd_level ~= "native" then
+        local map = {
+            -- simdutf x86 implementations: fallback (scalar), westmere (SSE4.2),
+            -- haswell (AVX2), icelake (AVX-512).
+            sse2 = "fallback",
+            sse3 = "fallback",
+            ssse3 = "fallback",
+            sse4 = "westmere",
+            avx = "haswell",
+            avx2 = "haswell",
+            avx512bw = "icelake",
+            avx512vbmi = "icelake",
+        }
+        local impl = map[simd_level]
+        if impl then
+            env_prefix = env_prefix .. "SIMDUTF_FORCE_IMPLEMENTATION=" .. impl .. " "
+            print(string.format("  forcing simdutf implementation=%s (UWVM2_SIMD_LEVEL=%s)", impl, simd_level))
+        end
+    end
+
     local cmd = string.format("cd %q && %s%q > %q 2>&1", root_dir, env_prefix, bench_bin, bench_log)
     run_or_die(cmd)
 end
@@ -361,4 +395,3 @@ local function main()
 end
 
 main()
-
