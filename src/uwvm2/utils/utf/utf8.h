@@ -993,7 +993,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # else
 #  error "missing instruction"
 # endif
-                            )};
+                        )};
 
                 if(check_has_non_ascii)
                 {
@@ -1084,7 +1084,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # else
 #  error "missing instruction"
 # endif
-                            )};
+                    )};
 
                 if(check_has_non_ascii)
                 {
@@ -1672,7 +1672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # else
 #  error "missing instructions"
 # endif
-                            )};
+                        )};
 
                 if(check_has_non_ascii)
                 {
@@ -2398,7 +2398,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # else
 #  error "missing instructions"
 # endif
-                            )};
+                        )};
 
                 if(check_has_non_ascii)
                 {
