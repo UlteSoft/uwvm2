@@ -139,7 +139,6 @@ jobs:
           [
             "build.sanitizer.thread",
           ]
-        cxx_flags: []
     steps:
       - uses: actions/checkout@v4
       - name: Setup
@@ -150,7 +149,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install clang clang-tools lld xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}"
+        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
