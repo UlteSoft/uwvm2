@@ -64,6 +64,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::abi
     using wasi_size_wasm64_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
     using wasi_void_ptr_wasm64_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
 
+    inline constexpr ::std::size_t size_of_wasi_intptr_wasm64_t{8uz};
+    inline constexpr ::std::size_t size_of_wasi_uintptr_wasm64_t{8uz};
+    inline constexpr ::std::size_t size_of_wasi_size_wasm64_t{8uz};
+    inline constexpr ::std::size_t size_of_wasi_void_ptr_wasm64_t{8uz};
+
     using wasi_posix_fd_wasm64_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
 
     using advice_wasm64_t = ::uwvm2::imported::wasi::wasip1::abi::advice_t;

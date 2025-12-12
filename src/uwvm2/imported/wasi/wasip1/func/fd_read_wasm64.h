@@ -327,7 +327,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         iovs_curr,
                         reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)),
                         reinterpret_cast<::std::byte*>(::std::addressof(tmp_iovec)) + sizeof(::uwvm2::imported::wasi::wasip1::abi::wasi_iovec_wasm64_t));
-                    iovs_curr += 16uz;
+                    iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_iovec_wasm64_t;
 
                     wasm_base = tmp_iovec.buf;
                     wasm_len = tmp_iovec.buf_len;
@@ -336,11 +336,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     wasm_base = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<
                         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t>(memory, iovs_curr);
-                    iovs_curr += 8uz;
+                    iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_void_ptr_wasm64_t;
 
                     wasm_len = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<
                         ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t>(memory, iovs_curr);
-                    iovs_curr += 8uz;
+                    iovs_curr += ::uwvm2::imported::wasi::wasip1::abi::size_of_wasi_size_wasm64_t;
                 }
 
                 // It is necessary to verify whether the memory referenced within the WASM is sufficient.

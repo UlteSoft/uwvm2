@@ -185,6 +185,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             __asm__("_recvmsg")
 #  endif
                 ;
+
+        extern ssize_t sendmsg(int, struct ::msghdr const*, int) noexcept
+#  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("sendmsg")
+#  else
+            __asm__("_sendmsg")
+#  endif
+                ;
 # endif
 
 # if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))

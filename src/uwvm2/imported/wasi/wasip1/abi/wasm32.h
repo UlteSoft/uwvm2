@@ -58,6 +58,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::abi
     using wasi_size_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
     using wasi_void_ptr_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
 
+    inline constexpr ::std::size_t size_of_wasi_intptr_t{4uz};
+    inline constexpr ::std::size_t size_of_wasi_uintptr_t{4uz};
+    inline constexpr ::std::size_t size_of_wasi_size_t{4uz};
+    inline constexpr ::std::size_t size_of_wasi_void_ptr_t{4uz};
+
     using wasi_posix_fd_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
     enum class advice_t : ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8
