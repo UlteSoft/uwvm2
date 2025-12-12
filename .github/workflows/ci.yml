@@ -54,6 +54,51 @@ jobs:
       - name: Unit tests
         run: xmake test -v
 
+  # ---------------------------------------------------------------------------
+  x86_64-linux-gnu-sde-dmr:
+    name: Linux (x86_64, SDE DMR - AVX512 + AVX10 + APX)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode: ["debug"]
+        policies:
+          [
+            "build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined",
+          ]
+        # Build binaries that use AVX-512 so they can be executed via Intel SDE.
+        cxx_flags: [
+          "-mavx512bw -mbmi -mbmi2 -mprfchw",
+          "-mavx512vbmi -mavx512vbmi2 -mbmi -mbmi2 -mprfchw",
+          "-mavx10.2 -mbmi -mbmi2 -mprfchw",
+          "-mapxf -mavx10.2 -mbmi -mbmi2 -mprfchw",
+        ]
+        sde_url: ["https://github.com/MacroModel/sde-temp/releases/download/sde1/sde-external-9.58.0-2025-06-16-lin.tar.xz"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          CODENAME=$(lsb_release -cs)
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository ppa:xmake-io/xmake
+          sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
+          sudo apt-get install clang clang-tools lld xmake
+      - name: Download Intel SDE
+        run: |
+          mkdir -p /opt/intel-sde
+          curl -L "${{ matrix.sde_url }}" -o /tmp/sde.tar.xz
+          tar -xf /tmp/sde.tar.xz -C /opt/intel-sde --strip-components=1
+      - name: Configure
+        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
+      - name: Build
+        run: |
+          xmake b -rv
+          export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      - name: Check UWVM version (via SDE)
+        run: /opt/intel-sde/sde64 -dmr -- xmake run uwvm --version
+      - name: Unit tests (via SDE)
+        run: /opt/intel-sde/sde64 -dmr -- xmake test -v
+
+  # ---------------------------------------------------------------------------
   x86_64-linux-gnu-tsan:
     name: Linux (x86_64) with thread sanitizer
     runs-on: ubuntu-latest
@@ -164,6 +209,46 @@ jobs:
         run: xmake run uwvm --version
       - name: Unit tests
         run: xmake test -v
+
+  # ---------------------------------------------------------------------------
+  i686-windows-gnu:
+    name: Windows MINGW ${{ matrix.env.name }}
+    strategy:
+      matrix:
+        env:
+          - name: "CLANG64"
+            prefix: mingw-w64-clang-x86_64
+            os: windows-latest
+          #- name: "CLANGARM64"
+          #  prefix: mingw-w64-clang-aarch64
+          #  os: windows-11-arm
+        mode: ["debug"]
+        policies: ["build.sanitizer.address"]
+        winver: ["WIN10"]
+    runs-on: ${{ matrix.env.os }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.env.name }}
+          update: true
+          install: |
+            ${{ matrix.env.prefix }}-cc
+            ${{ matrix.env.prefix }}-xmake
+      - name: Configure
+        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} -a i686
+      - name: Build
+        run: xmake b -rv
+      - name: Check UWVM version
+        run: xmake run uwvm --version
+      - name: Unit tests
+        run: xmake test -v
+
+  # ---------------------------------------------------------------------------
+  # todo aarch64-windows-gnu
 
   # ---------------------------------------------------------------------------
   x86_64-freebsd:
