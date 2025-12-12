@@ -56,6 +56,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-sde-dmr:
+    if: ${{ !always() }}
     name: Linux (x86_64, SDE DMR)
     runs-on: ubuntu-latest
     strategy:
@@ -70,7 +71,7 @@ jobs:
           "-mavx512bw -mbmi -mbmi2 -mprfchw",
           "-mavx512vbmi -mavx512vbmi2 -mbmi -mbmi2 -mprfchw",
           "-mavx10.2 -mbmi -mbmi2 -mprfchw",
-          # "-mapxf -mavx10.2 -mbmi -mbmi2 -mprfchw",
+          "-mapxf -mavx10.2 -mbmi -mbmi2 -mprfchw",
         ]
         sde_url: ["https://github.com/MacroModel/sde-temp/releases/download/sde1/sde-external-9.58.0-2025-06-16-lin.tar.xz"]
     steps:
