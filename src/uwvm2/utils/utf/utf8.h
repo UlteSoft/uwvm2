@@ -964,12 +964,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 
             // Rewind so that scalar validation starts at (or before) the previous
             // leading byte, matching simdutf's error pinpointing strategy.
-            auto const rewind_for_scalar{[&]() UWVM_ALWAYS_INLINE constexpr noexcept
+            auto const rewind_for_scalar{[&] UWVM_ALWAYS_INLINE() constexpr noexcept
                                          {
                                              if(str_curr == str_begin) { return; }
 
                                              auto rewind_ptr{str_curr - 1uz};
-                                             for(::std::size_t i{}; i != 4uz && rewind_ptr != str_begin; ++i)
+                                             for(unsigned i{}; i != 4u && rewind_ptr != str_begin; ++i)
                                              {
                                                  auto const byte{static_cast<::std::uint8_t>(*rewind_ptr)};
                                                  if((byte & static_cast<::std::uint8_t>(0b1100'0000u)) != static_cast<::std::uint8_t>(0b1000'0000u)) { break; }
