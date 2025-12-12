@@ -1464,7 +1464,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # if UWVM_HAS_BUILTIN(__builtin_elementwise_sub_sat)  // Clang
                     prev2 = __builtin_elementwise_sub_sat(prev2, prev2_needsubs_simd);
 # elif defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_psubusb256)
-                    prev2 = __builtin_ia32_psubusb128(prev2, prev2_needsubs_simd);
+                    prev2 = __builtin_ia32_psubusb256(prev2, prev2_needsubs_simd);
 # elif defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvssub_bu)
                     prev2 = __builtin_lasx_xvssub_bu(prev2, prev2_needsubs_simd);  /// @todo need test
 # else
@@ -1510,7 +1510,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # if UWVM_HAS_BUILTIN(__builtin_elementwise_sub_sat)  // Clang
                     prev3 = __builtin_elementwise_sub_sat(prev3, prev3_needsubs_simd);
 # elif defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_psubusb256)
-                    prev3 = __builtin_ia32_psubusb128(prev3, prev3_needsubs_simd);
+                    prev3 = __builtin_ia32_psubusb256(prev3, prev3_needsubs_simd);
 # elif defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvssub_bu)
                     prev3 = __builtin_lasx_xvssub_bu(prev3, prev3_needsubs_simd);  /// @todo need test
 # else
@@ -1604,7 +1604,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
 # if UWVM_HAS_BUILTIN(__builtin_elementwise_sub_sat)  // Clang
                                              input = __builtin_elementwise_sub_sat(input, max_value);
 # elif defined(__AVX2__) && UWVM_HAS_BUILTIN(__builtin_ia32_psubusb256)
-                                             input = __builtin_ia32_psubusb128(input, max_value);
+                                             input = __builtin_ia32_psubusb256(input, max_value);
 # elif defined(__loongarch_asx) && UWVM_HAS_BUILTIN(__builtin_lasx_xvssub_bu)
                                              input = __builtin_lasx_xvssub_bu(input, max_value);  /// @todo need test
 # else
@@ -2389,6 +2389,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
                     __builtin_ia32_pmovmskb128(::std::bit_cast<c8x16simd>(check_or))
 # elif defined(__wasm_simd128__) && UWVM_HAS_BUILTIN(__builtin_wasm_bitmask_i8x16)
                     __builtin_wasm_bitmask_i8x16(::std::bit_cast<i8x16simd>(check_or))
+# elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u8)                   // Only supported by clang
+                    __builtin_neon_vmaxvq_u8(check_or) & static_cast<::std::uint8_t>(0x80u)
 # elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_neon_vmaxvq_u32)                  // Only supported by clang
                     __builtin_neon_vmaxvq_u32(::std::bit_cast<u32x4simd>(check_or) & static_cast<::std::uint32_t>(0x80808080u))
 # elif defined(__ARM_NEON) && UWVM_HAS_BUILTIN(__builtin_aarch64_reduc_umax_scal_v4si_uu)  // Only supported by GCC
