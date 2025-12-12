@@ -86,7 +86,7 @@ int main()
         }
     }
 
-# if !defined(_WIN32)
+#  if !defined(_WIN32)
     // Case 4: real TCP recv on loopback (POSIX)
     {
         native_memory_t memory2{};
@@ -179,10 +179,9 @@ int main()
 
         // Set up one iovec: { ptr = BUF_PTR, len = payload_size }
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory2, IOV_PTR, BUF_PTR);
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(
-            memory2,
-            static_cast<wasi_void_ptr_wasm64_t>(IOV_PTR + 8u),
-            payload_size_wasi);
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory2,
+                                                                                        static_cast<wasi_void_ptr_wasm64_t>(IOV_PTR + 8u),
+                                                                                        payload_size_wasi);
 
         // Send data from client
         auto const send_res = ::send(client_fd, payload, static_cast<int>(payload_size_host), 0);
@@ -194,20 +193,19 @@ int main()
 
         // Recv via WASI sock_recv_wasm64
         auto const ret2 = ::uwvm2::imported::wasi::wasip1::func::sock_recv_wasm64(env2,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(1),
-                                                                                   IOV_PTR,
-                                                                                   static_cast<wasi_size_wasm64_t>(1u),
-                                                                                   static_cast<riflags_wasm64_t>(0),
-                                                                                   NREAD2_PTR,
-                                                                                   ROFLAGS2_PTR);
+                                                                                  static_cast<wasi_posix_fd_wasm64_t>(1),
+                                                                                  IOV_PTR,
+                                                                                  static_cast<wasi_size_wasm64_t>(1u),
+                                                                                  static_cast<riflags_wasm64_t>(0),
+                                                                                  NREAD2_PTR,
+                                                                                  ROFLAGS2_PTR);
         if(ret2 != errno_wasm64_t::esuccess)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64: expected esuccess for real TCP recv");
             ::fast_io::fast_terminate();
         }
 
-        auto const nread2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory2, NREAD2_PTR);
+        auto const nread2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory2, NREAD2_PTR);
         if(nread2 != payload_size_wasi)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64: nread mismatch for real TCP recv");
@@ -215,10 +213,8 @@ int main()
         }
 
         using roflags_underlying_t2 = ::std::underlying_type_t<roflags_t>;
-        auto const roflags_val2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<roflags_underlying_t2>(memory2, ROFLAGS2_PTR);
-        if((roflags_val2 &
-            static_cast<roflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated)) != 0u)
+        auto const roflags_val2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<roflags_underlying_t2>(memory2, ROFLAGS2_PTR);
+        if((roflags_val2 & static_cast<roflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated)) != 0u)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64: unexpected truncation flag for real TCP recv");
             ::fast_io::fast_terminate();
@@ -232,7 +228,7 @@ int main()
 
         ::close(client_fd);
     }
-# elif defined(UWVM_HAS_NATIVE_WIN32_WS2)
+#  elif defined(UWVM_HAS_NATIVE_WIN32_WS2)
     // Case 4: real TCP recv on loopback (WinSock2 / Win32 socket type)
     {
         native_memory_t memory2{};
@@ -257,15 +253,13 @@ int main()
         SOCKET listen_socket{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
         if(listen_socket == INVALID_SOCKET)
         {
-            ::fast_io::io::perrln(::fast_io::u8err(),
-                                  u8"sock_recv_wasm64(win32): failed to create listening socket");
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): failed to create listening socket");
             ::WSACleanup();
             ::fast_io::fast_terminate();
         }
 
         BOOL optval{TRUE};
-        if(::setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char const*>(::std::addressof(optval)), sizeof(optval)) ==
-           SOCKET_ERROR)
+        if(::setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char const*>(::std::addressof(optval)), sizeof(optval)) == SOCKET_ERROR)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): setsockopt failed");
             ::closesocket(listen_socket);
@@ -307,8 +301,7 @@ int main()
         SOCKET client_socket{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
         if(client_socket == INVALID_SOCKET)
         {
-            ::fast_io::io::perrln(::fast_io::u8err(),
-                                  u8"sock_recv_wasm64(win32): failed to create client socket");
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): failed to create client socket");
             ::WSACleanup();
             ::fast_io::fast_terminate();
         }
@@ -338,8 +331,7 @@ int main()
         fde.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_fd_read;
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_fd_read;
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket);
-        fde.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd =
-            ::fast_io::win32_socket_file{static_cast<::std::size_t>(accepted_socket)};
+        fde.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::fast_io::win32_socket_file{static_cast<::std::size_t>(accepted_socket)};
 
         // Prepare payload
         constexpr char const payload[] = "hello_wasi_sock_recv";
@@ -353,10 +345,9 @@ int main()
 
         // Set up one iovec: { ptr = BUF_PTR, len = payload_size }
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory2, IOV_PTR, BUF_PTR);
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(
-            memory2,
-            static_cast<wasi_void_ptr_wasm64_t>(IOV_PTR + 8u),
-            payload_size_wasi);
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64(memory2,
+                                                                                        static_cast<wasi_void_ptr_wasm64_t>(IOV_PTR + 8u),
+                                                                                        payload_size_wasi);
 
         // Send data from client
         auto const send_res = ::send(client_socket, payload, static_cast<int>(payload_size_host), 0);
@@ -370,23 +361,21 @@ int main()
 
         // Recv via WASI sock_recv_wasm64
         auto const ret2 = ::uwvm2::imported::wasi::wasip1::func::sock_recv_wasm64(env2,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(1),
-                                                                                   IOV_PTR,
-                                                                                   static_cast<wasi_size_wasm64_t>(1u),
-                                                                                   static_cast<riflags_wasm64_t>(0),
-                                                                                   NREAD2_PTR,
-                                                                                   ROFLAGS2_PTR);
+                                                                                  static_cast<wasi_posix_fd_wasm64_t>(1),
+                                                                                  IOV_PTR,
+                                                                                  static_cast<wasi_size_wasm64_t>(1u),
+                                                                                  static_cast<riflags_wasm64_t>(0),
+                                                                                  NREAD2_PTR,
+                                                                                  ROFLAGS2_PTR);
         if(ret2 != errno_wasm64_t::esuccess)
         {
-            ::fast_io::io::perrln(::fast_io::u8err(),
-                                  u8"sock_recv_wasm64(win32): expected esuccess for real TCP recv");
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): expected esuccess for real TCP recv");
             ::closesocket(client_socket);
             ::WSACleanup();
             ::fast_io::fast_terminate();
         }
 
-        auto const nread2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory2, NREAD2_PTR);
+        auto const nread2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<wasi_size_wasm64_t>(memory2, NREAD2_PTR);
         if(nread2 != payload_size_wasi)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): nread mismatch for real TCP recv");
@@ -396,13 +385,10 @@ int main()
         }
 
         using roflags_underlying_t2 = ::std::underlying_type_t<roflags_t>;
-        auto const roflags_val2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<roflags_underlying_t2>(memory2, ROFLAGS2_PTR);
-        if((roflags_val2 &
-            static_cast<roflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated)) != 0u)
+        auto const roflags_val2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm64<roflags_underlying_t2>(memory2, ROFLAGS2_PTR);
+        if((roflags_val2 & static_cast<roflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated)) != 0u)
         {
-            ::fast_io::io::perrln(::fast_io::u8err(),
-                                  u8"sock_recv_wasm64(win32): unexpected truncation flag for real TCP recv");
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): unexpected truncation flag for real TCP recv");
             ::closesocket(client_socket);
             ::WSACleanup();
             ::fast_io::fast_terminate();
@@ -410,8 +396,7 @@ int main()
 
         if(::std::memcmp(memory2.memory_begin + BUF_PTR, payload, payload_size_host) != 0)
         {
-            ::fast_io::io::perrln(::fast_io::u8err(),
-                                  u8"sock_recv_wasm64(win32): payload mismatch for real TCP recv");
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv_wasm64(win32): payload mismatch for real TCP recv");
             ::closesocket(client_socket);
             ::WSACleanup();
             ::fast_io::fast_terminate();
@@ -420,7 +405,7 @@ int main()
         ::closesocket(client_socket);
         ::WSACleanup();
     }
-# endif
+#  endif
 
     // Case 1: closed descriptor (close_pos != SIZE_MAX) -> ebadf
     {
@@ -469,7 +454,14 @@ int main()
         fde.close_pos = static_cast<std::size_t>(-1);
         fde.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_fd_read;
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_fd_read;
-        fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
+        fde.wasi_fd.ptr->wasi_fd_storage.reset_type(
+#  ifdef _WIN32
+            ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket
+#  else
+            ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file
+#  endif
+
+        );
 
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_recv_wasm64(env,
                                                                                  static_cast<wasi_posix_fd_wasm64_t>(0),

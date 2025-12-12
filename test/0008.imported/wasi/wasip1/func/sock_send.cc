@@ -153,7 +153,13 @@ int main()
         fde.close_pos = static_cast<::std::size_t>(-1);
         fde.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_write;
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_write;
-        fde.wasi_fd.ptr->wasi_fd_storage.reset_type(wasi_fd_type_e::file);
+        fde.wasi_fd.ptr->wasi_fd_storage.reset_type(
+#  ifdef _WIN32
+            wasi_fd_type_e::socket
+#  else
+            wasi_fd_type_e::file
+#  endif
+        );
 
         auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_send(env,
                                                                           static_cast<wasi_posix_fd_t>(0),
@@ -167,8 +173,7 @@ int main()
             ::fast_io::fast_terminate();
         }
 
-        auto const n0 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory, NSENT_PTR);
+        auto const n0 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory, NSENT_PTR);
         if(n0 != static_cast<wasi_size_t>(0u))
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send: zero-iov nsent should be 0");
@@ -197,7 +202,7 @@ int main()
         }
     }
 
-# if !defined(_WIN32)
+#  if !defined(_WIN32)
     // Case 6: real TCP send on loopback (POSIX)
     {
         native_memory_t memory2{};
@@ -288,18 +293,14 @@ int main()
         constexpr wasi_void_ptr_t NSENT2_PTR{14336u};
 
         // Write payload into WASM memory
-        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32(
-            memory2,
-            BUF_PTR,
-            reinterpret_cast<::std::byte const*>(payload),
-            reinterpret_cast<::std::byte const*>(payload) + payload_size_host);
+        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32(memory2,
+                                                                            BUF_PTR,
+                                                                            reinterpret_cast<::std::byte const*>(payload),
+                                                                            reinterpret_cast<::std::byte const*>(payload) + payload_size_host);
 
         // Set up one ciovec: { buf = BUF_PTR, buf_len = payload_size }
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory2, IOV_PTR, BUF_PTR);
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
-            memory2,
-            static_cast<wasi_void_ptr_t>(IOV_PTR + 4u),
-            payload_size_wasi);
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory2, static_cast<wasi_void_ptr_t>(IOV_PTR + 4u), payload_size_wasi);
 
         // Send via WASI sock_send
         auto const ret2 = ::uwvm2::imported::wasi::wasip1::func::sock_send(env2,
@@ -314,8 +315,7 @@ int main()
             ::fast_io::fast_terminate();
         }
 
-        auto const nsent2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory2, NSENT2_PTR);
+        auto const nsent2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory2, NSENT2_PTR);
         if(nsent2 != payload_size_wasi)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send: nsent mismatch for real TCP send");
@@ -339,7 +339,7 @@ int main()
 
         ::close(accepted_fd);
     }
-# elif defined(UWVM_HAS_NATIVE_WIN32_WS2)
+#  elif defined(UWVM_HAS_NATIVE_WIN32_WS2)
     // Case 6: real TCP send on loopback (WinSock2 / Win32 socket type)
     {
         native_memory_t memory2{};
@@ -370,11 +370,7 @@ int main()
         }
 
         BOOL optval{TRUE};
-        if(::setsockopt(listen_socket,
-                        SOL_SOCKET,
-                        SO_REUSEADDR,
-                        reinterpret_cast<char const*>(::std::addressof(optval)),
-                        sizeof(optval)) == SOCKET_ERROR)
+        if(::setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char const*>(::std::addressof(optval)), sizeof(optval)) == SOCKET_ERROR)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send(win32): setsockopt failed");
             ::closesocket(listen_socket);
@@ -387,9 +383,7 @@ int main()
         addr.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
         addr.sin_port = 0;
 
-        if(::bind(listen_socket,
-                  reinterpret_cast<::sockaddr*>(::std::addressof(addr)),
-                  static_cast<int>(sizeof(addr))) == SOCKET_ERROR)
+        if(::bind(listen_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), static_cast<int>(sizeof(addr))) == SOCKET_ERROR)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send(win32): bind failed");
             ::closesocket(listen_socket);
@@ -398,9 +392,7 @@ int main()
         }
 
         int addrlen{static_cast<int>(sizeof(addr))};
-        if(::getsockname(listen_socket,
-                         reinterpret_cast<::sockaddr*>(::std::addressof(addr)),
-                         ::std::addressof(addrlen)) == SOCKET_ERROR)
+        if(::getsockname(listen_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), ::std::addressof(addrlen)) == SOCKET_ERROR)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send(win32): getsockname failed");
             ::closesocket(listen_socket);
@@ -426,9 +418,7 @@ int main()
             ::fast_io::fast_terminate();
         }
 
-        if(::connect(client_socket,
-                     reinterpret_cast<::sockaddr*>(::std::addressof(addr)),
-                     addrlen) == SOCKET_ERROR)
+        if(::connect(client_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), addrlen) == SOCKET_ERROR)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send(win32): connect failed");
             ::closesocket(client_socket);
@@ -455,8 +445,7 @@ int main()
         fde.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_write;
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_write;
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(wasi_fd_type_e::socket);
-        fde.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd =
-            ::fast_io::win32_socket_file{static_cast<::std::size_t>(client_socket)};
+        fde.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::fast_io::win32_socket_file{static_cast<::std::size_t>(client_socket)};
 
         // Prepare payload
         constexpr char const payload[] = "hello_wasi_sock_send";
@@ -468,18 +457,14 @@ int main()
         constexpr wasi_void_ptr_t NSENT2_PTR{14336u};
 
         // Write payload into WASM memory
-        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32(
-            memory2,
-            BUF_PTR,
-            reinterpret_cast<::std::byte const*>(payload),
-            reinterpret_cast<::std::byte const*>(payload) + payload_size_host);
+        ::uwvm2::imported::wasi::wasip1::memory::write_all_to_memory_wasm32(memory2,
+                                                                            BUF_PTR,
+                                                                            reinterpret_cast<::std::byte const*>(payload),
+                                                                            reinterpret_cast<::std::byte const*>(payload) + payload_size_host);
 
         // Set up one ciovec: { buf = BUF_PTR, buf_len = payload_size }
         ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory2, IOV_PTR, BUF_PTR);
-        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
-            memory2,
-            static_cast<wasi_void_ptr_t>(IOV_PTR + 4u),
-            payload_size_wasi);
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory2, static_cast<wasi_void_ptr_t>(IOV_PTR + 4u), payload_size_wasi);
 
         // Send via WASI sock_send
         auto const ret2 = ::uwvm2::imported::wasi::wasip1::func::sock_send(env2,
@@ -496,8 +481,7 @@ int main()
             ::fast_io::fast_terminate();
         }
 
-        auto const nsent2 =
-            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory2, NSENT2_PTR);
+        auto const nsent2 = ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory2, NSENT2_PTR);
         if(nsent2 != payload_size_wasi)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_send(win32): nsent mismatch for real TCP send");
@@ -528,7 +512,7 @@ int main()
         ::closesocket(accepted_socket);
         ::WSACleanup();
     }
-# endif
+#  endif
 
     return 0;
 }
