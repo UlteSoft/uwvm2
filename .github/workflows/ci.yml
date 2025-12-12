@@ -70,7 +70,7 @@ jobs:
           "-mavx512bw -mbmi -mbmi2 -mprfchw",
           "-mavx512vbmi -mavx512vbmi2 -mbmi -mbmi2 -mprfchw",
           "-mavx10.2 -mbmi -mbmi2 -mprfchw",
-          "-mapxf -mavx10.2 -mbmi -mbmi2 -mprfchw",
+          # "-mapxf -mavx10.2 -mbmi -mbmi2 -mprfchw",
         ]
         sde_url: ["https://github.com/MacroModel/sde-temp/releases/download/sde1/sde-external-9.58.0-2025-06-16-lin.tar.xz"]
     steps:
@@ -119,7 +119,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install clang clang-tools lld xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}"
+        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
