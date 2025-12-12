@@ -179,7 +179,7 @@ static inline void scalar_check_function_section(
 
     type::wasm_u32 func_count;  // No initialization necessary
 
-    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+    using char8_t_const_may_alias_ptr = char8_t const*;
 
     // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
     auto const [func_count_next, func_count_err]{::fast_io::parse_by_scan(
@@ -371,4 +371,3 @@ extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size
 
     return 0;
 }
-
