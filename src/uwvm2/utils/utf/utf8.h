@@ -962,6 +962,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
             u8x64simd prev_input_block{};
             u8x64simd prev_incomplete{};
 
+            // Rewind so that scalar validation starts at (or before) the previous
+            // leading byte, matching simdutf's error pinpointing strategy.
+            auto const rewind_for_scalar{[&]() UWVM_ALWAYS_INLINE constexpr noexcept
+                                         {
+                                             if(str_curr == str_begin) { return; }
+
+                                             auto rewind_ptr{str_curr - 1uz};
+                                             for(::std::size_t i{}; i != 4uz && rewind_ptr != str_begin; ++i)
+                                             {
+                                                 auto const byte{static_cast<::std::uint8_t>(*rewind_ptr)};
+                                                 if((byte & static_cast<::std::uint8_t>(0b1100'0000u)) != static_cast<::std::uint8_t>(0b1000'0000u)) { break; }
+                                                 --rewind_ptr;
+                                             }
+
+                                             str_curr = rewind_ptr;
+                                         }};
+
             while(static_cast<::std::size_t>(str_end - str_curr) >= sizeof(u8x64simd))
             {
                 u8x64simd curr0;
@@ -1020,6 +1037,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
                         ) [[unlikely]]
                 {
                     // Jump out to scalar processing
+                    rewind_for_scalar();
                     return general_algorithm();
                 }
 
@@ -1111,30 +1129,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::utf
                     ) [[unlikely]]
                 {
                     // Jump out to scalar processing
+                    rewind_for_scalar();
                     return general_algorithm();
                 }
 
                 str_curr += last_load_predicate_size;
             }
-            else
+
+            // simdutf-style EOF check: if the last processed block ended with an
+            // incomplete multibyte sequence, it is an error at the end of input.
+            error |= prev_incomplete;
+            if(
+# if defined(__AVX512BW__) && UWVM_HAS_BUILTIN(__builtin_ia32_ucmpb512_mask)
+                __builtin_ia32_ucmpb512_mask(error, u8x64simd{}, 0x04, UINT64_MAX)
+# else
+#  error "missing instruction"
+# endif
+                    ) [[unlikely]]
             {
-                // No remainder: we must still check that the input did not end
-                // with an incomplete multi-byte sequence (simdutf-style EOF check).
-                if(str_curr != str_begin)
-                {
-                    auto const processed{static_cast<::std::size_t>(str_curr - str_begin)};
-                    unsigned rewind{};  // 0..3
-
-                    if(processed >= 3uz && static_cast<::std::uint8_t>(*(str_curr - 3u)) >= static_cast<::std::uint8_t>(0b1111'0000u)) { rewind = 3u; }
-                    else if(processed >= 2uz && static_cast<::std::uint8_t>(*(str_curr - 2u)) >= static_cast<::std::uint8_t>(0b1110'0000u)) { rewind = 2u; }
-                    else if(processed >= 1uz && static_cast<::std::uint8_t>(*(str_curr - 1u)) >= static_cast<::std::uint8_t>(0b1100'0000u)) { rewind = 1u; }
-
-                    if(rewind) [[unlikely]]
-                    {
-                        str_curr -= rewind;
-                        return general_algorithm();
-                    }
-                }
+                rewind_for_scalar();
+                return general_algorithm();
             }
 
             return {str_curr, ::uwvm2::utils::utf::utf_error_code::success};
