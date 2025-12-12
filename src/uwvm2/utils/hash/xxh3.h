@@ -480,9 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
         }
 
         inline constexpr ::std::uint_least64_t xxh3_mix2_accs(::std::uint_least64_t const* __restrict acc, ::std::byte const* __restrict secret) noexcept
-        {
-            return xxh3_mul128_fold64(acc[0u] ^ xxh_readLE64(secret), acc[1u] ^ xxh_readLE64(secret + 8u));
-        }
+        { return xxh3_mul128_fold64(acc[0u] ^ xxh_readLE64(secret), acc[1u] ^ xxh_readLE64(secret + 8u)); }
 
         inline constexpr ::std::uint_least64_t
             xxh3_merge_accs(::std::uint_least64_t const* __restrict acc, ::std::byte const* __restrict secret, ::std::uint_least64_t start) noexcept
@@ -1170,6 +1168,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 #  error "missing instruction"
 # endif
 
+# if defined(__clang__)
+                // Clang guard: prevent slower reordering of NEON ops.
+                __asm__("" : "+w"(sum_1));
+                __asm__("" : "+w"(sum_2));
+# endif
+
                 xacc[i] = xacc[i] + sum_1;
                 xacc[i + 1] = xacc[i + 1] + sum_2;
             }
@@ -1218,6 +1222,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
                 sum = __builtin_aarch64_umlalv2si_uuuu(data_swap, data_key_lo, data_key_hi);
 # else
 #  error "missing instruction"
+# endif
+
+# if defined(__clang__)
+                // Clang guard: prevent slower reordering of NEON ops.
+                __asm__("" : "+w"(sum));
 # endif
 
                 xacc[i] = xacc[i] + sum;
@@ -1820,7 +1829,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 # endif
         };
 
-        *xacc =
+        auto tmp_xacc{
 # if UWVM_HAS_BUILTIN(__builtin_neon_vmull_v)              // Clang
             ::std::bit_cast<uint64x2_t>(prod_hi) +
             ::std::bit_cast<uint64x2_t>(__builtin_neon_vmull_v(::std::bit_cast<int8x8_t>(data_key_lo), ::std::bit_cast<int8x8_t>(kPrimeLo), 51))
@@ -1835,7 +1844,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
 # else
 #  error "missing instructions"
 # endif
-            ;
+        };
+
+# if defined(__clang__)
+        // Clang guard: prevent slower reordering of NEON ops.
+        __asm__("" : "+w"(tmp_xacc));
+# endif
+
+        *xacc = tmp_xacc;
 
         ++xacc;
     }
@@ -2167,9 +2183,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
     }  // namespace details
 
     inline constexpr ::std::uint_least64_t xxh3_64bits(::std::byte const* __restrict input, ::std::size_t len, ::std::uint_least64_t seed64 = 0u) noexcept
-    {
-        return details::xxh3_64bits_internal(input, len, seed64, details::xxh3_kSecret, sizeof(details::xxh3_kSecret));
-    }
+    { return details::xxh3_64bits_internal(input, len, seed64, details::xxh3_kSecret, sizeof(details::xxh3_kSecret)); }
 
     /// @brief xxh3 context class for incremental hashing
     struct xxh3_64bits_context
