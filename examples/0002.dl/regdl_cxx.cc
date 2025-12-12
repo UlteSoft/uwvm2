@@ -76,8 +76,20 @@ struct
 
 static void add_i32_impl(unsigned char* res_bytes, unsigned char* para_bytes)
 {
-    auto const* para = reinterpret_cast<add_i32_para_t const*>(para_bytes);
-    auto* res = reinterpret_cast<add_i32_res_t*>(res_bytes);
+    using add_i32_para_t_may_alias_ptr
+#if __has_cpp_attribute(__gnu__::__may_alias__)
+        [[__gnu__::__may_alias__]]
+#endif
+        = add_i32_para_t const*;
+
+    using add_i32_res_t_may_alias_ptr
+#if __has_cpp_attribute(__gnu__::__may_alias__)
+        [[__gnu__::__may_alias__]]
+#endif
+        = add_i32_res_t*;
+
+    auto const* para = reinterpret_cast<add_i32_para_t_may_alias_ptr>(para_bytes);
+    auto* res = reinterpret_cast<add_i32_res_t_may_alias_ptr>(res_bytes);
     res->sum = para->a + para->b;
 }
 
@@ -118,6 +130,7 @@ extern "C" capi_custom_handler_vec_t uwvm_get_custom_handler(void)
 
 extern "C" capi_function_vec_t uwvm_function(void)
 {
+    // clang-format off
     static capi_function_t const functions[] = {
         {func_add_i32_name,
          (std::size_t)(sizeof(func_add_i32_name) - 1u),
@@ -125,7 +138,7 @@ extern "C" capi_function_vec_t uwvm_function(void)
          (std::size_t)(sizeof(add_i32_para_types) / sizeof(add_i32_para_types[0])),
          add_i32_res_types,                                                                                                                     
          (std::size_t)(sizeof(add_i32_res_types) / sizeof(add_i32_res_types[0])),
-         (capi_wasm_function)&add_i32_impl                                                                                                                                                                                                                   
+         &add_i32_impl                                                                                                                                                                                                                   
         },
         {func_do_nothing_name,
          (std::size_t)(sizeof(func_do_nothing_name) - 1u),
@@ -133,8 +146,9 @@ extern "C" capi_function_vec_t uwvm_function(void)
          0u,                                                                                                      
          (std::uint_least8_t const*)0,
          0u,                                                                                                                                                                                                             
-         (capi_wasm_function)&do_nothing_impl},
+         &do_nothing_impl},
     };
+    // clang-format on
     capi_function_vec_t vec;
     vec.function_begin = functions;
     vec.function_size = (std::size_t)(sizeof(functions) / sizeof(functions[0]));

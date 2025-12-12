@@ -84,8 +84,20 @@ struct
 
 static void add_i32_impl(unsigned char* res_bytes, unsigned char* para_bytes)
 {
-    auto const* para = reinterpret_cast<add_i32_para_t const*>(para_bytes);
-    auto* res = reinterpret_cast<add_i32_res_t*>(res_bytes);
+    using add_i32_para_t_may_alias_ptr
+#if __has_cpp_attribute(__gnu__::__may_alias__)
+        [[__gnu__::__may_alias__]]
+#endif
+        = add_i32_para_t const*;
+
+    using add_i32_res_t_may_alias_ptr
+#if __has_cpp_attribute(__gnu__::__may_alias__)
+        [[__gnu__::__may_alias__]]
+#endif
+        = add_i32_res_t*;
+
+    auto const* para = reinterpret_cast<add_i32_para_t_may_alias_ptr>(para_bytes);
+    auto* res = reinterpret_cast<add_i32_res_t_may_alias_ptr>(res_bytes);
     res->sum = para->a + para->b;
 }
 
@@ -109,6 +121,7 @@ static capi_custom_handler_t const handlers[] = {
     {custom_name_demo, (std::size_t)(sizeof(custom_name_demo) - 1u), &demo_custom_handle},
 };
 
+// clang-format off
 static capi_function_t const functions[] = {
     {func_add_i32_name,
      (std::size_t)(sizeof(func_add_i32_name) - 1u),
@@ -116,7 +129,7 @@ static capi_function_t const functions[] = {
      (std::size_t)(sizeof(add_i32_para_types) / sizeof(add_i32_para_types[0])),
      add_i32_res_types,                                                                                                                     
      (std::size_t)(sizeof(add_i32_res_types) / sizeof(add_i32_res_types[0])),
-     (capi_wasm_function)&add_i32_impl                                                                                                                                                                                                                   
+     &add_i32_impl                                                                                                                                                                                                                   
     },
     {func_do_nothing_name,
      (std::size_t)(sizeof(func_do_nothing_name) - 1u),
@@ -124,8 +137,9 @@ static capi_function_t const functions[] = {
      0u,                                                                                                      
      (std::uint_least8_t const*)0,
      0u,                                                                                                                                                                                                             
-     (capi_wasm_function)&do_nothing_impl},
+     &do_nothing_impl},
 };
+// clang-format on
 
 extern "C" uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module(void)
 {
@@ -135,9 +149,6 @@ extern "C" uwvm_weak_symbol_module_vector_c const* uwvm_weak_symbol_module(void)
          capi_custom_handler_vec_t{handlers, (std::size_t)(sizeof(handlers) / sizeof(handlers[0]))},
          capi_function_vec_t{functions, (std::size_t)(sizeof(functions) / sizeof(functions[0]))}},
     };
-    static uwvm_weak_symbol_module_vector_c const vec = {
-        mods,
-        (std::size_t)(sizeof(mods) / sizeof(mods[0]))
-    };
+    static uwvm_weak_symbol_module_vector_c const vec = {mods, (std::size_t)(sizeof(mods) / sizeof(mods[0]))};
     return &vec;
 }
