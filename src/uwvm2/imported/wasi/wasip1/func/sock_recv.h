@@ -281,7 +281,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         // After checking all items, determine whether the result equals zero.
         if(scatter_length == 0uz)
         {
-            // If the length of iovs is 0, the system call returns successfully with nread=0.
+            // If ptr is null, it indicates an attempt to open a closed file. However, the preceding check for close pos already
+            // prevents such closed files from being processed, making this a virtual machine implementation error.
+            if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
+            {
+// This will be checked at runtime.
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
+
+            // For directory descriptors, WASI sock_recv must report ENOTSOCK even if the iov length is zero.
+            switch(curr_fd.wasi_fd.ptr->wasi_fd_storage.type)
+            {
+                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::null:
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+                }
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer:
+                {
+# if defined(_WIN32) && !defined(__CYGWIN__)
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+# else
+                    break;
+# endif
+                }
+                [[unlikely]] case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
+                {
+                    return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsock;
+                }
+# if defined(_WIN32) && !defined(__CYGWIN__)
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
+                case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
+                {
+                    break;
+                }
+# endif
+            }
+
+            // For other descriptor types, a zero-length recv is a successful no-op with nread=0 and roflags=0.
             ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
                 memory,
                 ro_data_len_ptrsz,

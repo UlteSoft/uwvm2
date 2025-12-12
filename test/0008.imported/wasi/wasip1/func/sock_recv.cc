@@ -22,6 +22,11 @@
 #include <cstdint>
 #include <cstring>
 
+#if defined(_WIN32) && !defined(__CYGWIN__)
+# include <winsock2.h>
+# include <ws2tcpip.h>
+#endif
+
 #include <fast_io.h>
 
 // keep tests minimal; avoid platform-specific headers
@@ -78,7 +83,7 @@ int main()
     }
 
 # if !defined(_WIN32)
-    // Case 4: real TCP recv on loopback
+    // Case 4: real TCP recv on loopback (POSIX)
     {
         native_memory_t memory2{};
         memory2.init_by_page_count(1uz);
@@ -105,7 +110,7 @@ int main()
 
         ::sockaddr_in addr{};
         addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
+        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         addr.sin_port = 0;
 
         if(::bind(listen_fd, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), static_cast<socklen_t>(sizeof(addr))) < 0)
@@ -222,6 +227,190 @@ int main()
         }
 
         ::close(client_fd);
+    }
+# elif defined(_WIN32) && !defined(__CYGWIN__)
+    // Case 4: real TCP recv on loopback (WinSock2 / Win32 socket type)
+    {
+        native_memory_t memory2{};
+        memory2.init_by_page_count(1uz);
+
+        wasip1_environment<native_memory_t> env2{.wasip1_memory = ::std::addressof(memory2),
+                                                 .argv = {},
+                                                 .envs = {},
+                                                 .fd_storage = {.fd_limit = 64uz},
+                                                 .mount_dir_roots = {},
+                                                 .trace_wasip1_call = false};
+
+        env2.fd_storage.opens.resize(2uz);
+
+        WSADATA wsa_data{};
+        if(::WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): WSAStartup failed");
+            ::fast_io::fast_terminate();
+        }
+
+        SOCKET listen_socket{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+        if(listen_socket == INVALID_SOCKET)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): failed to create listening socket");
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        BOOL optval{TRUE};
+        if(::setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char const*>(::std::addressof(optval)), sizeof(optval)) ==
+           SOCKET_ERROR)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): setsockopt failed");
+            ::closesocket(listen_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        ::sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
+        addr.sin_port = 0;
+
+        if(::bind(listen_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), static_cast<int>(sizeof(addr))) == SOCKET_ERROR)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): bind failed");
+            ::closesocket(listen_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        int addrlen{static_cast<int>(sizeof(addr))};
+        if(::getsockname(listen_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), ::std::addressof(addrlen)) == SOCKET_ERROR)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): getsockname failed");
+            ::closesocket(listen_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        if(::listen(listen_socket, 1) == SOCKET_ERROR)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): listen failed");
+            ::closesocket(listen_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        // Put accepted socket into WASI fd table (fd 1) as Win32 socket
+        SOCKET client_socket{::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+        if(client_socket == INVALID_SOCKET)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): failed to create client socket");
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        if(::connect(client_socket, reinterpret_cast<::sockaddr*>(::std::addressof(addr)), addrlen) == SOCKET_ERROR)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): connect failed");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        SOCKET accepted_socket{::accept(listen_socket, nullptr, nullptr)};
+        if(accepted_socket == INVALID_SOCKET)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): accept failed");
+            ::closesocket(client_socket);
+            ::closesocket(listen_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        ::closesocket(listen_socket);
+
+        auto& fde = *env2.fd_storage.opens.index_unchecked(1uz).fd_p;
+        fde.close_pos = static_cast<std::size_t>(-1);
+        fde.rights_base = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_read;
+        fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_t::right_fd_read;
+        fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket);
+        fde.wasi_fd.ptr->wasi_fd_storage.storage.socket_fd =
+            ::fast_io::win32_socket_file{static_cast<::std::size_t>(accepted_socket)};
+
+        // Prepare payload
+        constexpr char const payload[] = "hello_wasi_sock_recv";
+        constexpr std::size_t payload_size_host{sizeof(payload) - 1uz};
+        constexpr wasi_size_t payload_size_wasi{static_cast<wasi_size_t>(payload_size_host)};
+
+        constexpr wasi_void_ptr_t BUF_PTR{8192u};
+        constexpr wasi_void_ptr_t IOV_PTR{12288u};
+        constexpr wasi_void_ptr_t NREAD2_PTR{14336u};
+        constexpr wasi_void_ptr_t ROFLAGS2_PTR{16384u};
+
+        // Set up one iovec: { ptr = BUF_PTR, len = payload_size }
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(memory2, IOV_PTR, BUF_PTR);
+        ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm32(
+            memory2,
+            static_cast<wasi_void_ptr_t>(IOV_PTR + 4u),
+            payload_size_wasi);
+
+        // Send data from client
+        auto const send_res = ::send(client_socket, payload, static_cast<int>(payload_size_host), 0);
+        if(send_res != static_cast<int>(payload_size_host))
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): send failed");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        // Recv via WASI sock_recv
+        auto const ret2 = ::uwvm2::imported::wasi::wasip1::func::sock_recv(env2,
+                                                                           static_cast<wasi_posix_fd_t>(1),
+                                                                           IOV_PTR,
+                                                                           static_cast<wasi_size_t>(1u),
+                                                                           static_cast<riflags_t>(0),
+                                                                           NREAD2_PTR,
+                                                                           ROFLAGS2_PTR);
+        if(ret2 != errno_t::esuccess)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): expected esuccess for real TCP recv");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        auto const nread2 =
+            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<wasi_size_t>(memory2, NREAD2_PTR);
+        if(nread2 != payload_size_wasi)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): nread mismatch for real TCP recv");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        using roflags_underlying_t2 = ::std::underlying_type_t<roflags_t>;
+        auto const roflags_val2 =
+            ::uwvm2::imported::wasi::wasip1::memory::get_basic_wasm_type_from_memory_wasm32<roflags_underlying_t2>(memory2, ROFLAGS2_PTR);
+        if((roflags_val2 &
+            static_cast<roflags_underlying_t2>(::uwvm2::imported::wasi::wasip1::abi::roflags_t::sock_recv_data_truncated)) != 0u)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(),
+                                  u8"sock_recv(win32): unexpected truncation flag for real TCP recv");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        if(::std::memcmp(memory2.memory_begin + BUF_PTR, payload, payload_size_host) != 0)
+        {
+            ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_recv(win32): payload mismatch for real TCP recv");
+            ::closesocket(client_socket);
+            ::WSACleanup();
+            ::fast_io::fast_terminate();
+        }
+
+        ::closesocket(client_socket);
+        ::WSACleanup();
     }
 # endif
 
