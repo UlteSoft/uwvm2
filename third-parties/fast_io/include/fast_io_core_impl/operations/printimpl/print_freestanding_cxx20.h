@@ -289,13 +289,13 @@ inline constexpr void print_control_single(output outstm, T t)
 			{
 				::fast_io::io_scatter_t scatters[2]{
 					{scatter_res.base, scatter_res.len * sizeof(char_type)},
-					{__builtin_addressof(char_literal_v<u8'\n', char_type>), sizeof(char_type)}};
+					{&char_literal_v<u8'\n', char_type>, sizeof(char_type)}};
 				::fast_io::operations::decay::scatter_write_all_bytes_decay(outstm, scatters, 2);
 			}
 			else
 			{
 				::fast_io::basic_io_scatter_t<char_type> scatters[2]{
-					scatter_res, {__builtin_addressof(char_literal_v<u8'\n', char_type>), 1}};
+					scatter_res, {&char_literal_v<u8'\n', char_type>, 1}};
 				::fast_io::operations::decay::scatter_write_all_decay(outstm, scatters, 2);
 			}
 		}
