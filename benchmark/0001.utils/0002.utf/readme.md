@@ -246,6 +246,45 @@ Scenario: ascii_only
 
 ---
 
+## Sample results (aarch64-apple-darwin, Apple M4)
+
+Single run results (unit: `ns_per_byte`):
+
+| scenario | uwvm2 ns/byte | simdutf ns/byte | ratio (uwvm2/simdutf) |
+|----------|--------------:|----------------:|----------------------:|
+| ascii_only  | 0.018696 | 0.021644 | 0.864 |
+| emoji_mixed | 0.074537 | 0.065481 | 1.138 |
+| latin_mixed | 0.074210 | 0.070943 | 1.046 |
+
+---
+
+## Sample results (x86_64-linux, Intel Core i9-14900HK)
+
+Single run results across `UWVM2_SIMD_LEVEL` (unit: `ns_per_byte`):
+
+| UWVM2_SIMD_LEVEL | scenario | uwvm2 ns/byte | simdutf ns/byte | ratio (uwvm2/simdutf) |
+|------------------|----------|--------------:|----------------:|----------------------:|
+| sse2  | ascii_only  | 0.028489 | 0.022947 | 1.242 |
+| sse2  | emoji_mixed | 0.300820 | 0.316528 | 0.950 |
+| sse2  | latin_mixed | 0.188053 | 0.237135 | 0.793 |
+| sse3  | ascii_only  | 0.023575 | 0.022317 | 1.056 |
+| sse3  | emoji_mixed | 0.281868 | 0.304088 | 0.927 |
+| sse3  | latin_mixed | 0.184568 | 0.227135 | 0.813 |
+| ssse3 | ascii_only  | 0.022218 | 0.024373 | 0.912 |
+| ssse3 | emoji_mixed | 0.089772 | 0.303649 | 0.296 |
+| ssse3 | latin_mixed | 0.089216 | 0.227636 | 0.392 |
+| sse4  | ascii_only  | 0.024462 | 0.018325 | 1.335 |
+| sse4  | emoji_mixed | 0.088551 | 0.085584 | 1.035 |
+| sse4  | latin_mixed | 0.089386 | 0.088902 | 1.005 |
+| avx   | ascii_only  | 0.020854 | 0.017991 | 1.159 |
+| avx   | emoji_mixed | 0.087235 | 0.086666 | 1.007 |
+| avx   | latin_mixed | 0.088487 | 0.091145 | 0.971 |
+| avx2  | ascii_only  | 0.022570 | 0.018672 | 1.209 |
+| avx2  | emoji_mixed | 0.051944 | 0.046067 | 1.128 |
+| avx2  | latin_mixed | 0.049816 | 0.051097 | 0.975 |
+
+---
+
 ## Implementation notes and current workaround
 
 ### simdutf ARM64 implementation
