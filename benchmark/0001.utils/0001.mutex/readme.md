@@ -16,9 +16,11 @@
 ```bash
 cd benchmark/0001.utils/0001.mutex
 CXXFLAGS_EXTRA="--sysroot=$SYSROOT -fuse-ld=lld" lua compare_rwspinlock.lua
+# or (Python)
+CXXFLAGS_EXTRA="--sysroot=$SYSROOT -fuse-ld=lld" python3 compare_rwspinlock.py
 ```
 
-The Lua driver will:
+The driver script will:
 
 - Compile `RWSpinLock.cc` into `outputs/RWSpinLock`.
 - Run the benchmark and capture detailed output in `outputs/rwspinlock_bench.log`.

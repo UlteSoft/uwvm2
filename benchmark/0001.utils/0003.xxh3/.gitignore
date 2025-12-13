@@ -5,3 +5,5 @@ Xxh3UtfXxhashBench.exe
 Xxh3UtfUwvm2Bench
 Xxh3UtfUwvm2Bench.exe
 outputs
+__pycache__/
+*.pyc

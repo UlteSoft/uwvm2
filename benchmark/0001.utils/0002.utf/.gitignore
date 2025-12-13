@@ -1,4 +1,6 @@
 UtfSimdUtf
 UtfSimdUtf.exe
 outputs
+__pycache__/
+*.pyc
 

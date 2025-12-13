@@ -1,3 +1,5 @@
 outputs
 varint-simd-fair/target
 varint-simd-fair/Cargo.lock
+__pycache__/
+*.pyc

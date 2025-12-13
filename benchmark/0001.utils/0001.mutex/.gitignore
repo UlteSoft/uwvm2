@@ -1,3 +1,5 @@
 RWSpinLock
 RWSpinLock.exe
 outputs
+__pycache__/
+*.pyc

@@ -44,6 +44,10 @@ can be reproduced outside of the main build system.
   - `utf_bench_summary.txt` – per-scenario `ns_per_byte` summary  
   - `simdutf/` – auto-cloned simdutf repository (if `SIMDUTF_DIR` is not set)
 
+- `compare_utf_simdutf.py`  
+  Python driver equivalent to `compare_utf_simdutf.lua` (same behavior and
+  environment variables).
+
 ---
 
 ## Building and running
@@ -62,7 +66,15 @@ CXXFLAGS_EXTRA="--sysroot=$SYSROOT -fuse-ld=lld" \
 xmake lua benchmark/0001.utils/0002.utf/compare_utf_simdutf.lua
 ```
 
-The Lua driver will:
+Or using Python:
+
+```bash
+cd benchmark/0001.utils/0002.utf
+CXXFLAGS_EXTRA="--sysroot=$SYSROOT -fuse-ld=lld" \
+python3 compare_utf_simdutf.py
+```
+
+The driver will:
 
 1. Discover `simdutf`:
    - If `SIMDUTF_DIR` is set, use that directory (it must contain a simdutf

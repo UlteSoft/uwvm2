@@ -8,7 +8,9 @@ xxHash `XXH3_64bits` on the same UTF-8 style text buffer.
   - `Xxh3UtfGen.cc` (generate data into a file)
   - `Xxh3UtfXxhashBench.cc` (benchmark upstream xxHash)
   - `Xxh3UtfUwvm2Bench.cc` (benchmark uwvm2)
-- Lua driver   : `compare_xxh3_utf.lua`
+- Drivers:
+  - Lua   : `compare_xxh3_utf.lua`
+  - Python: `compare_xxh3_utf.py`
 
 The Lua script:
 
@@ -28,6 +30,8 @@ From the project root:
 lua benchmark/0001.utils/0003.xxh3/compare_xxh3_utf.lua
 # or
 xmake lua benchmark/0001.utils/0003.xxh3/compare_xxh3_utf.lua
+# or (Python)
+python3 benchmark/0001.utils/0003.xxh3/compare_xxh3_utf.py
 ```
 
 Environment variables:
