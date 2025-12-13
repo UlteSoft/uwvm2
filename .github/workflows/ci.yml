@@ -285,7 +285,6 @@ jobs:
   # ---------------------------------------------------------------------------
   x86_64-freebsd:
     name: FreeBSD (x86_64) ${{ matrix.compiler }}
-    if: ${{ !always() }}
     runs-on: ubuntu-latest
     env:
       version: "14.3"
