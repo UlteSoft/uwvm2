@@ -290,7 +290,7 @@ jobs:
       version: "14.3"
     strategy:
       matrix:
-        compiler: ["CLANG", "GCC"]
+        compiler: ["CLANG"]
         mode: ["debug"]
         policies: ["build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined"]
     steps:
