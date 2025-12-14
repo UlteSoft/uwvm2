@@ -193,6 +193,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             __asm__("_sendmsg")
 #  endif
                 ;
+
+        extern int shutdown(int, int) noexcept
+#  if !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("shutdown")
+#  else
+            __asm__("_shutdown")
+#  endif
+                ;
 # endif
 
 # if defined(__DragonFly__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || (defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
