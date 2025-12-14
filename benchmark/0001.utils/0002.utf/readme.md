@@ -8,6 +8,13 @@ This benchmark compares the performance of:
 on several representative, fully valid UTF-8 workloads. The primary metric is
 nanoseconds per byte (`ns_per_byte`), with derived throughput in GiB/s.
 
+For fairness and reproducibility, the results in this directory correspond to:
+
+- uwvm2 (this repo): `0c6692e2d48a0f065d51f52a3ede07b5b26e4edf`  
+  https://github.com/UlteSoft/uwvm2/commit/0c6692e2d48a0f065d51f52a3ede07b5b26e4edf
+- simdutf (upstream): `b34887b88794390adfa460f5d502a74d8b1f9cd1`  
+  https://github.com/simdutf/simdutf/commit/b34887b88794390adfa460f5d502a74d8b1f9cd1
+
 The benchmark is intentionally self-contained and driven from Lua so that it
 can be reproduced outside of the main build system.
 
