@@ -7531,40 +7531,62 @@ static inline std::uint64_t read_seed(std::uint8_t const* data, std::size_t size
     return seed;
 }
 
-extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size)
+static inline void check_xxh3_64(std::uint8_t const* data, std::size_t size, std::uint64_t seed)
 {
     auto const* b = reinterpret_cast<std::byte const*>(data);
+    auto const my = ::uwvm2::utils::hash::xxh3_64bits(b, size, seed);
+    auto const ref = XXH3_64bits_withSeed(data, size, seed);
+    if(my != ref) { __builtin_trap(); }
+}
+
+static inline void check_xxh3_64_with_secret(std::uint8_t const* data, std::size_t size, std::uint8_t const* secret, std::size_t secret_size)
+{
+    auto const* b = reinterpret_cast<std::byte const*>(data);
+    auto const* s = reinterpret_cast<std::byte const*>(secret);
+    auto const my = ::uwvm2::utils::hash::details::xxh3_64bits_internal(b, size, 0u, s, secret_size);
+    auto const ref = XXH3_64bits_withSecret(data, size, secret, secret_size);
+    if(my != ref) { __builtin_trap(); }
+}
+
+extern "C" int LLVMFuzzerTestOneInput(std::uint8_t const* data, std::size_t size)
+{
     std::uint64_t const seed = read_seed(data, size);
 
-    try
+    constexpr std::uint64_t k1 = 0x9E3779B185EBCA87ull;
+    constexpr std::uint64_t k2 = 0xC2B2AE3D27D4EB4Full;
+
+    std::uint64_t const seeds[3]{seed, seed ^ k1, seed + k2};
+
+    std::size_t const max_off = size < 8 ? size : 8;
+    for(std::size_t off{}; off <= max_off; ++off)
     {
-        auto const my_oneshot = ::uwvm2::utils::hash::xxh3_64bits(b, size, seed);
-        auto const ref_oneshot = XXH3_64bits_withSeed(data, size, seed);
-        if(my_oneshot != ref_oneshot) { __builtin_trap(); }
-
-        if(size > 0)
+        for(std::uint64_t s : seeds)
         {
-            auto const my_shifted = ::uwvm2::utils::hash::xxh3_64bits(b + 1, size - 1, seed ^ 0x9E3779B185EBCA87ull);
-            auto const ref_shifted = XXH3_64bits_withSeed(data + 1, size - 1, seed ^ 0x9E3779B185EBCA87ull);
-            if(my_shifted != ref_shifted) { __builtin_trap(); }
+            check_xxh3_64(data + off, size - off, s ^ static_cast<std::uint64_t>(off) * k1);
         }
-
-        ::uwvm2::utils::hash::xxh3_64bits_context ctx;
-        ctx.seed64 = seed;
-        ctx.reset();
-        ctx.update(b, b + size);
-        auto const my_stream = ctx.digest_value();
-
-        XXH3_state_t* const st = XXH3_createState();
-        if(!st) { __builtin_trap(); }
-        if(XXH3_64bits_reset_withSeed(st, seed) == XXH_ERROR) { __builtin_trap(); }
-        if(XXH3_64bits_update(st, data, size) == XXH_ERROR) { __builtin_trap(); }
-        auto const ref_stream = XXH3_64bits_digest(st);
-        XXH3_freeState(st);
-        if(my_stream != ref_stream) { __builtin_trap(); }
     }
-    catch(...){ }
+
+    std::size_t const short_len = size % 241;
+    for(std::uint64_t s : seeds) { check_xxh3_64(data, short_len, s ^ 0xD1B54A32D192ED03ull); }
+
+    alignas(64) std::uint8_t secret[XXH_SECRET_DEFAULT_SIZE];
+    XXH3_generateSecret_fromSeed(secret, seed ^ 0x165667B19E3779F9ull);
+    check_xxh3_64_with_secret(data, size, secret, sizeof(secret));
+
+    auto const* b = reinterpret_cast<std::byte const*>(data);
+    ::uwvm2::utils::hash::xxh3_64bits_context ctx;
+    ctx.seed64 = seed;
+    ctx.reset();
+    ctx.update(b, b + size);
+    auto const my_stream = ctx.digest_value();
+
+    XXH3_state_t* const st = XXH3_createState();
+    if(!st) { __builtin_trap(); }
+    if(XXH3_64bits_reset_withSeed(st, seed) == XXH_ERROR) { __builtin_trap(); }
+    if(XXH3_64bits_update(st, data, size) == XXH_ERROR) { __builtin_trap(); }
+    auto const ref_stream = XXH3_64bits_digest(st);
+    XXH3_freeState(st);
+    if(my_stream != ref_stream) { __builtin_trap(); }
 
     return 0;
 }
-
