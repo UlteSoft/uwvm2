@@ -371,6 +371,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 bool const is_nonblock_effective{is_nonblock || parent_is_nonblock};
 
+#  if !(defined(O_NONBLOCK) && O_NONBLOCK != 0)
+                if(is_nonblock) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup; }
+#  endif
+
                 struct ::sockaddr_storage addr{};
                 ::fast_io::native_socklen_t addrlen{static_cast<::fast_io::native_socklen_t>(sizeof(addr))};
 
@@ -391,6 +395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // set nonblock flag
 
+#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 auto flags{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(new_socket_file.native_handle(), F_GETFL, 0)};
 
                 if(flags == -1) [[unlikely]]
@@ -410,6 +415,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(
                         ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
                 }
+#  endif
 
                 using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
 
