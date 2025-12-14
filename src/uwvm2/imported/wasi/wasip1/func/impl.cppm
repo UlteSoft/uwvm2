@@ -49,6 +49,8 @@ export import :fd_fdstat_get_wasm64;
 export import :fd_fdstat_get;
 export import :fd_fdstat_set_flags_wasm64;
 export import :fd_fdstat_set_flags;
+export import :fd_fdstat_set_rights_wasm64;
+export import :fd_fdstat_set_rights;
 export import :fd_filestat_get_wasm64;
 export import :fd_filestat_get;
 export import :fd_filestat_set_size_wasm64;
@@ -59,6 +61,8 @@ export import :fd_prestat_dir_name_wasm64;
 export import :fd_prestat_dir_name;
 export import :fd_prestat_get_wasm64;
 export import :fd_prestat_get;
+export import :fd_pread_wasm64;
+export import :fd_pread;
 export import :fd_pwrite_wasm64;
 export import :fd_pwrite;
 export import :fd_read_wasm64;
@@ -101,6 +105,18 @@ export import :proc_exit_wasm64;
 export import :proc_exit;
 export import :proc_raise_wasm64;
 export import :proc_raise;
+export import :random_get_wasm64;
+export import :random_get;
+export import :sched_yield_wasm64;
+export import :sched_yield;
+export import :sock_accept_wasm64;
+export import :sock_accept;
+export import :sock_recv_wasm64;
+export import :sock_recv;
+export import :sock_send_wasm64;
+export import :sock_send;
+export import :sock_shutdown_wasm64;
+export import :sock_shutdown;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
