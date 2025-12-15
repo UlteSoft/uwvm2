@@ -79,22 +79,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
     {
-        auto const print_init_error{[](::uwvm2::utils::container::u8string_view msg) constexpr noexcept
-                                    {
-                                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                            u8"uwvm: ",
-                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                                            u8"[error] ",
-                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                            u8"Initialization error in the wasip1 environment: ",
-                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                            msg,
-                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
-                                                            u8"\n\n");
-                                    }};
+        [[maybe_unused]] auto const print_init_error{
+            [](::uwvm2::utils::container::u8string_view msg) constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    u8"[error] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Initialization error in the wasip1 environment: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    msg,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                    u8"\n\n");
+            }};
 
-        auto const print_init_error_with_fast_io_error{
+        [[maybe_unused]] auto const print_init_error_with_fast_io_error{
             [](::uwvm2::utils::container::u8string_view msg, ::fast_io::error e) constexpr noexcept
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -154,44 +155,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                 return true;
             }};
 
-        auto const init_stdio{
-            [](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd, ::fast_io::native_io_observer obs) constexpr noexcept -> bool
-            {
-                using rights_t = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
+        auto const init_stdio{[&print_init_error_with_fast_io_error](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd,
+                                                                     ::fast_io::native_io_observer obs) constexpr noexcept -> bool
+                              {
+                                  using rights_t = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
 
-                // Keep stdio permissive by default: OS-level capabilities are enforced by the host anyway.
-                new_fd_fd.rights_base = static_cast<rights_t>(-1);
-                new_fd_fd.rights_inherit = static_cast<rights_t>(-1);
+                                  // Keep stdio permissive by default: OS-level capabilities are enforced by the host anyway.
+                                  new_fd_fd.rights_base = static_cast<rights_t>(-1);
+                                  new_fd_fd.rights_inherit = static_cast<rights_t>(-1);
 
 #  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
-                // can dup
-                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
+                                  // can dup
+                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
 #   ifdef UWVM_CPP_EXCEPTIONS
-                try
+                                  try
 #   endif
-                {
+                                  {
 #   if defined(_WIN32) && !defined(__CYGWIN__)
-                    new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file = ::fast_io::native_file{::fast_io::io_dup, obs};
+                                      new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file = ::fast_io::native_file{::fast_io::io_dup, obs};
 #   else
-                    new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::fast_io::native_file{::fast_io::io_dup, obs};
+                                      new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::fast_io::native_file{::fast_io::io_dup, obs};
 #   endif
-                }
+                                  }
 #   ifdef UWVM_CPP_EXCEPTIONS
-                catch(::fast_io::error e)
-                {
-                    print_init_error_with_fast_io_error(u8"dup stdio failed", e);
-                    return false;
-                }
+                                  catch(::fast_io::error e)
+                                  {
+                                      print_init_error_with_fast_io_error(u8"dup stdio failed", e);
+                                      return false;
+                                  }
 #   endif
 #  else
-                // cannot dup, use observer
-                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer);
-                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer = obs;
+                                  // cannot dup, use observer
+                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer);
+                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer = obs;
 #  endif
 
-                return true;
-            }};
+                                  return true;
+                              }};
 
         // stdio (fd0, fd1, fd2)
         {
