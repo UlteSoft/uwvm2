@@ -198,7 +198,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                   return true;
                               }};
 
-        // stdio (fd0, fd1, fd2)
+        // native in out err
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Begin initializing the wasip1 standard I/O (in, out, err). ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t fd0{};
             if(!init_stdio(*fd0.fd_p, ::fast_io::in())) [[unlikely]] { return false; }
@@ -215,8 +229,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             if(!try_emplace_fd(static_cast<fd_t>(2), ::std::move(fd2))) [[unlikely]] { return false; }
         }
 
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         // preopened sockets
         // Note: This function does not modify the host's SIGPIPE handling; socket ops handle it (e.g. MSG_NOSIGNAL in sock_send).
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Begin initializing the wasip1 preopened sockets. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
         for(auto const& ps: env.preopen_sockets)
         {
             if(ps.fd < static_cast<fd_t>(0)) [[unlikely]]
@@ -230,15 +259,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             new_sock_fd.fd_p->rights_base = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
             new_sock_fd.fd_p->rights_inherit = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
 
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             try
-#  endif
+#   endif
             {
                 ::fast_io::native_socket_file sock{ps.sock_family, ps.sock_type, ::fast_io::open_mode{}, ps.sock_protocol};
 
                 if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local)
                 {
-#  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET) && __has_include(<sys/un.h>) && defined(AF_LOCAL)
+#   if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET) && __has_include(<sys/un.h>) && defined(AF_LOCAL)
                     auto const& local_path_u8{ps.local_unix_path};
                     if(local_path_u8.empty()) [[unlikely]]
                     {
@@ -252,13 +281,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     bool abstract_namespace{};
                     ::std::size_t copy_len{local_path_u8.size()};
 
-#   if defined(__linux__)
+#    if defined(__linux__)
                     if(local_path_u8.front() == u8'@') [[unlikely]]
                     {
                         abstract_namespace = true;
                         copy_len = local_path_u8.size() - 1uz;
                     }
-#   endif
+#    endif
 
                     if(abstract_namespace)
                     {
@@ -315,7 +344,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
                     if(ps.handle_type != ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect && !abstract_namespace)
                     {
-#   if __has_include(<unistd.h>)
+#    if __has_include(<unistd.h>)
                         errno = 0;
                         auto const unlink_ret{posix::unlink(un.sun_path)};
                         if(unlink_ret == -1 && errno != ENOENT) [[unlikely]]
@@ -323,7 +352,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                             print_init_error(u8"unlink existing unix socket file failed");
                             return false;
                         }
-#   endif
+#    endif
                     }
 
                     if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
@@ -335,10 +364,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                         ::fast_io::posix_bind(sock, ::std::addressof(un), addr_len);
                         if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
                     }
-#  else
+#   else
                     print_init_error(u8"local(unix) socket preopen unsupported on this platform");
                     return false;
-#  endif
+#   endif
                 }
                 else
                 {
@@ -356,11 +385,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     if(ps.ip.address.isv4)
                     {
                         ::fast_io::posix_sockaddr_in in{.sin_family =
-#  if defined(_WIN32)
+#   if defined(_WIN32)
                                                             2 /*AF_INET*/
-#  else
+#   else
                                                             AF_INET
-#  endif
+#   endif
                                                         ,
                                                         .sin_port = ::fast_io::big_endian(ps.ip.port),
                                                         .sin_addr = ps.ip.address.address.v4};
@@ -378,11 +407,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     else
                     {
                         ::fast_io::posix_sockaddr_in6 in6{.sin6_family =
-#  if defined(_WIN32)
+#   if defined(_WIN32)
                                                               23 /*AF_INET6*/
-#  else
+#   else
                                                               AF_INET6
-#  endif
+#   endif
                                                           ,
                                                           .sin6_port = ::fast_io::big_endian(ps.ip.port),
                                                           .sin6_flowinfo = 0,
@@ -401,27 +430,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     }
                 }
 
-#  if defined(_WIN32) && !defined(__CYGWIN__)
+#   if defined(_WIN32) && !defined(__CYGWIN__)
                 new_sock_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket);
                 new_sock_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.socket_fd = ::std::move(sock);
-#  else
+#   else
                 new_sock_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
                 new_sock_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::std::move(sock);
-#  endif
+#   endif
             }
-#  ifdef UWVM_CPP_EXCEPTIONS
+#   ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error e)
             {
                 print_init_error_with_fast_io_error(u8"preopen socket init failed", e);
                 return false;
             }
-#  endif
+#   endif
 
             if(!try_emplace_fd(ps.fd, ::std::move(new_sock_fd))) [[unlikely]] { return false; }
         }
+#  endif
 
         // preopened directories: assign from fd3, skipping occupied fds (including explicit socket fds)
         // Since they are all continuous (even if sockets are interspersed, they can still be scanned simultaneously by preopen)
+
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Begin initializing the wasip1 preopened directories. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
         ::std::size_t next_dir_fd_u{3uz};
         constexpr ::std::size_t fd_t_max_u{static_cast<::std::size_t>(::std::numeric_limits<fd_t>::max())};
         for(auto const& mr: env.mount_dir_roots)
@@ -482,6 +527,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
             if(!try_emplace_fd(next_dir_fd, ::std::move(new_dir_fd))) [[unlikely]] { return false; }
             ++next_dir_fd_u;
+
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Initialization wasip1 preopened directory successful: fd = ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    next_dir_fd,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", wasi dir path = \"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    new_entry.name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\". ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
         }
 
         // fd limit check

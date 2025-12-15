@@ -34,6 +34,7 @@
 # include <bit>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -115,6 +116,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
     using wasip1_proc_raise_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32) noexcept;
     using wasip1_sched_yield_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)() noexcept;
 
+#if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
     enum class handle_type_e : unsigned
     {
         listen,
@@ -143,6 +145,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         // wasi fd
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t fd{};
     };
+#endif
 
     /// @brief [singleton]
     template <wasip1_memory memory_type>
@@ -162,9 +165,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         /// @note  For platforms that support dup, use dup; for platforms that do not support dup, use observer.
         ::uwvm2::utils::container::vector<mount_dir_root_t> mount_dir_roots{};
 
+#if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         /// @brief Automatically binds during environment initialization
         /// @note  Begin initializing the socket during environment initialization.
         ::uwvm2::utils::container::vector<preopen_socket_t> preopen_sockets{};
+#endif
 
         /// @brief Custom process exit function pointer for WASI exit handling (No no-return operation is required, as plugin systems typically cannot operate
         ///        without returning.)
@@ -181,5 +186,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

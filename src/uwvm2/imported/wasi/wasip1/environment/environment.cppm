@@ -30,6 +30,9 @@ module;
 #include <limits>
 #include <concepts>
 #include <bit>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 
 export module uwvm2.imported.wasi.wasip1.environment:environment;
 
