@@ -290,7 +290,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     // For abstract namespace: `copy_len` excludes the leading '@', and the "+1" accounts for the leading NUL at `un.sun_path[0]`.
                     auto const addr_len{static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1u)};
 
-                    auto set_un_len{[addr_len]<typename T>(T& un) constexpr noexcept -> bool
+                    auto set_un_len{[addr_len, &print_init_error]<typename T>(T& un) constexpr noexcept -> bool
                                     {
                                         if constexpr(requires(T&& un_tmp) { un_tmp.sun_len; })
                                         {
