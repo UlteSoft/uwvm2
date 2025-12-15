@@ -290,19 +290,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     // For abstract namespace: `copy_len` excludes the leading '@', and the "+1" accounts for the leading NUL at `un.sun_path[0]`.
                     auto const addr_len{static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1u)};
 
-                    [addr_len]<typename T>(T& un) constexpr noexcept -> void
-                    {
-                        if constexpr(requires(T&& un_tmp) { un_tmp.sun_len; })
-                        {
-                            using sun_len_t = decltype(un.sun_len);
-                            if(addr_len > ::std::numeric_limits<sun_len_t>::max()) [[unlikely]]
-                            {
-                                print_init_error(u8"unix socket sockaddr too large");
-                                return false;
-                            }
-                            un.sun_len = static_cast<sun_len_t>(addr_len);
-                        }
-                    }(un);
+                    auto set_un_len{[addr_len]<typename T>(T& un) constexpr noexcept -> bool
+                                    {
+                                        if constexpr(requires(T&& un_tmp) { un_tmp.sun_len; })
+                                        {
+                                            using sun_len_t = decltype(un.sun_len);
+                                            if(addr_len > ::std::numeric_limits<sun_len_t>::max()) [[unlikely]]
+                                            {
+                                                print_init_error(u8"unix socket sockaddr too large");
+                                                return false;
+                                            }
+                                            un.sun_len = static_cast<sun_len_t>(addr_len);
+                                        }
+
+                                        return true;
+                                    }};
+
+                    if(!set_un_len(un)) [[unlikely]] { return false; }
 
                     if(ps.handle_type != ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect && !abstract_namespace)
                     {
