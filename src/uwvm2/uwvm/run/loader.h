@@ -115,15 +115,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
 
-        // Initialization must be performed to ensure successful verification.
-        if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env))
-            [[unlikely]]
-        {
-            return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
-        }
-
         if(::uwvm2::uwvm::wasm::storage::local_preload_wasip1)
         {
+            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env))
+                [[unlikely]]
+            {
+                return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
+            }
+
             // verbose
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {

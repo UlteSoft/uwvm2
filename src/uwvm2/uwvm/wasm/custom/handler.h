@@ -92,7 +92,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom
                                         cs.custom_name,
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                         u8"\" (",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                         ::fast_io::mnp::cond(curr_custom_handler->second.is_imported_c, u8"imported", u8"locale"),
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                         u8"). ",
