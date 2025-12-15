@@ -94,6 +94,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                                             u8"\n\n");
                                     }};
 
+        auto const print_init_error_with_fast_io_error{
+            [](::uwvm2::utils::container::u8string_view msg, ::fast_io::error e) constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    u8"[error] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Initialization error in the wasip1 environment: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    msg,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8" (",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    e,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8")\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }};
+
         /// @brief   Clear fd storage
         env.fd_storage.opens.clear();
         env.fd_storage.closes.clear();
@@ -104,6 +125,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
         using fd_map_t = ::uwvm2::utils::container::map<fd_t, ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t>;
         fd_map_t fd_map{};
+
+        // env.fd_storage.opens always contains at least stdio (fd0..fd2).
+        if(fd_limit < 3uz) [[unlikely]]
+        {
+            print_init_error(u8"fd_limit too small (need >= 3 for stdio)");
+            return false;
+        }
+
+        if constexpr(::std::numeric_limits<::std::size_t>::max() > static_cast<::std::size_t>(::std::numeric_limits<fd_t>::max()))
+        {
+            if(fd_limit > static_cast<::std::size_t>(::std::numeric_limits<fd_t>::max())) [[unlikely]]
+            {
+                print_init_error(u8"fd_limit exceeds fd_t maximum");
+                return false;
+            }
+        }
 
         auto const try_emplace_fd{
             [&fd_map, &print_init_error](fd_t fd, ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t&& p) constexpr noexcept -> bool
@@ -141,9 +178,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #   endif
                 }
 #   ifdef UWVM_CPP_EXCEPTIONS
-                catch(::fast_io::error)
+                catch(::fast_io::error e)
                 {
-                    print_init_error(u8"dup stdio failed");
+                    print_init_error_with_fast_io_error(u8"dup stdio failed", e);
                     return false;
                 }
 #   endif
@@ -177,6 +214,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         // Note: This function does not modify the host's SIGPIPE handling; socket ops handle it (e.g. MSG_NOSIGNAL in sock_send).
         for(auto const& ps: env.preopen_sockets)
         {
+            if(ps.fd < static_cast<fd_t>(0)) [[unlikely]]
+            {
+                print_init_error(u8"preopened socket fd is negative");
+                return false;
+            }
+
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t new_sock_fd{};
 
             new_sock_fd.fd_p->rights_base = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
@@ -335,9 +378,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
             }
 #  ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
-                print_init_error(u8"preopen socket init failed");
+                print_init_error_with_fast_io_error(u8"preopen socket init failed", e);
                 return false;
             }
 #  endif
@@ -346,17 +389,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         }
 
         // preopened directories: assign from fd3, skipping occupied fds (including explicit socket fds)
-        fd_t next_dir_fd{static_cast<fd_t>(3)};
+        // Since they are all continuous (even if sockets are interspersed, they can still be scanned simultaneously by preopen)
+        ::std::size_t next_dir_fd_u{3uz};
+        constexpr ::std::size_t fd_t_max_u{static_cast<::std::size_t>(::std::numeric_limits<fd_t>::max())};
         for(auto const& mr: env.mount_dir_roots)
         {
-            while(fd_map.find(next_dir_fd) != fd_map.end()) [[unlikely]]
+            fd_t next_dir_fd{};
+            for(;;)
             {
-                if(next_dir_fd == static_cast<fd_t>(::std::numeric_limits<fd_t>::max())) [[unlikely]]
+                if(next_dir_fd_u > fd_t_max_u) [[unlikely]]
                 {
                     print_init_error(u8"fd exhausted");
                     return false;
                 }
-                ++next_dir_fd;
+
+                next_dir_fd = static_cast<fd_t>(next_dir_fd_u);
+                if(fd_map.find(next_dir_fd) == fd_map.end()) { break; }
+                ++next_dir_fd_u;
             }
 
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t new_dir_fd{};
@@ -373,18 +422,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
             // can dup
-            new_entry.is_observer = false;
+
+            // default: new_entry.is_observer = false;
             new_entry.name = mr.preload_dir;
+
 #   ifdef UWVM_CPP_EXCEPTIONS
             try
 #   endif
             {
-                new_entry.storage.file = ::fast_io::dir_file{::fast_io::io_dup, mr.entry};
+                ::fast_io::native_file tmp{::fast_io::io_dup, mr.entry};
+                new_entry.storage.file = ::fast_io::dir_file{tmp.release()};
             }
 #   ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
+            catch(::fast_io::error e)
             {
-                print_init_error(u8"dup preopen dir failed");
+                print_init_error_with_fast_io_error(u8"dup preopen dir failed", e);
                 return false;
             }
 #   endif
@@ -397,7 +449,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
 
             if(!try_emplace_fd(next_dir_fd, ::std::move(new_dir_fd))) [[unlikely]] { return false; }
-            ++next_dir_fd;
+            ++next_dir_fd_u;
         }
 
         // fd limit check
@@ -420,12 +472,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         // materialize into opens + renumber_map (no holes in opens)
         fd_t fd_cursor{};
-        for(;; ++fd_cursor)
+        for(;;)
         {
             auto it{fd_map.find(fd_cursor)};
             if(it == fd_map.end()) { break; }
             env.fd_storage.opens.emplace_back(::std::move(it->second));
             fd_map.erase(it);
+
+            // Avoid signed overflow on fd_t (wasi_posix_fd_t is wasm_i32).
+            if(fd_cursor == ::std::numeric_limits<fd_t>::max()) { break; }
+            ++fd_cursor;
         }
 
         for(auto& [fd, uni]: fd_map) { env.fd_storage.renumber_map.emplace(fd, ::std::move(uni)); }
