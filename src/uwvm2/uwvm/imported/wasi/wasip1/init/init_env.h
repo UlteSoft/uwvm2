@@ -155,7 +155,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             }};
 
         auto const init_stdio{
-            [&print_init_error](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd, ::fast_io::native_io_observer obs) constexpr noexcept -> bool
+            [&print_init_error_with_fast_io_error](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd, ::fast_io::native_io_observer obs) constexpr noexcept -> bool
             {
                 using rights_t = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
 
