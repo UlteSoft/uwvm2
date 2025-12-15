@@ -48,6 +48,8 @@
 # include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/init/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include "retval.h"
 # include "weak_symbol.h"
 #endif
@@ -112,6 +114,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+
+        // Initialization must be performed to ensure successful verification.
+        ::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env);
+
         if(::uwvm2::uwvm::wasm::storage::local_preload_wasip1)
         {
             // verbose
