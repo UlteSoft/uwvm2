@@ -153,6 +153,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
         }
 
+        // limit == 0: unlimit
+        if(limit == 0uz) { limit = ::std::numeric_limits<::std::size_t>::max(); }
+
         ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.fd_storage.fd_limit = limit;
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
