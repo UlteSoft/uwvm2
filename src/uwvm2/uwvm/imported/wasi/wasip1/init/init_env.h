@@ -112,20 +112,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                     e,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8")\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
 
-        /// @brief   Clear fd storage
-        env.fd_storage.opens.clear();
-        env.fd_storage.closes.clear();
-        env.fd_storage.renumber_map.clear();
-
-        // fd_limit must be configured before initialization. If the caller didn't set it, use a sane default
-        // that can at least host stdio and common workloads.
-        // default = 1024, --wasip1-set-fd-limit 0 = fd_t maximum
-        if(env.fd_storage.fd_limit == 0uz) [[unlikely]] { env.fd_storage.fd_limit = 1024uz; }
-
-        ::std::size_t const fd_limit{env.fd_storage.fd_limit};
+        // ====== Stronger failure semantics (internal) ======
+        // Do not mutate `env.fd_storage` until we know initialization succeeds.
+        // Note: `--wasip1-set-fd-limit 0` is translated to `fd_t::max()` by the cmdline callback; here `0` means "unset".
+        auto const fd_limit_before{env.fd_storage.fd_limit};
+        ::std::size_t fd_limit{fd_limit_before};
+        if(fd_limit == 0uz) [[unlikely]] { fd_limit = 1024uz; }
 
         using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
         using fd_map_t = ::uwvm2::utils::container::map<fd_t, ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t>;
@@ -484,12 +479,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         }
 
         // materialize into opens + renumber_map (no holes in opens)
+        ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t> opens_new{};
+        ::uwvm2::utils::container::map<fd_t, ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t> renumber_map_new{};
+
         fd_t fd_cursor{};
         for(;;)
         {
             auto it{fd_map.find(fd_cursor)};
             if(it == fd_map.end()) { break; }
-            env.fd_storage.opens.emplace_back(::std::move(it->second));
+            opens_new.emplace_back(::std::move(it->second));
             fd_map.erase(it);
 
             // Avoid signed overflow on fd_t (wasi_posix_fd_t is wasm_i32).
@@ -497,7 +495,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             ++fd_cursor;
         }
 
-        for(auto& [fd, uni]: fd_map) { env.fd_storage.renumber_map.emplace(fd, ::std::move(uni)); }
+        for(auto& [fd, uni]: fd_map) { renumber_map_new.emplace(fd, ::std::move(uni)); }
+
+        // commit (swap destroys old state on success; env remains unchanged on failure)
+        env.fd_storage.opens.swap(opens_new);
+        env.fd_storage.renumber_map.swap(renumber_map_new);
+        env.fd_storage.closes.clear();
+        if(fd_limit_before == 0uz) [[unlikely]] { env.fd_storage.fd_limit = fd_limit; }
 
         return true;
     }
