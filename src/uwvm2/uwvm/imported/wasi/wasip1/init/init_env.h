@@ -252,7 +252,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     bool abstract_namespace{};
                     ::std::size_t copy_len{local_path_u8.size()};
 
-#   if defined(__linux__) || defined(__gnu_linux__)
+#   if defined(__linux__)
                     if(local_path_u8.front() == u8'@') [[unlikely]]
                     {
                         abstract_namespace = true;
