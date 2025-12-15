@@ -75,12 +75,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }  // namespace posix
 #  endif
 
-    namespace details
-    {
-        template <typename T>
-        concept sockaddr_un_has_sun_len = requires(T&& t) { t.sun_len; };
-    }  // namespace details
-
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
@@ -296,10 +290,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     // For abstract namespace: `copy_len` excludes the leading '@', and the "+1" accounts for the leading NUL at `un.sun_path[0]`.
                     auto const addr_len{static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1u)};
 
-                    [addr_len] template <typename T>
-                    (T & t) constexpr noexcept -> void
+                    [addr_len]<typename T>(T& t) constexpr noexcept -> void
                     {
-                        if constexpr(details::sockaddr_un_has_sun_len<T>)
+                        if constexpr(requires(T&& t) { t.sun_len; })
                         {
                             using sun_len_t = decltype(un.sun_len);
                             if(addr_len > ::std::numeric_limits<sun_len_t>::max()) [[unlikely]]
@@ -309,7 +302,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                             }
                             un.sun_len = static_cast<sun_len_t>(addr_len);
                         }
-                    }.template operator() (un);
+                    }(un);
 
                     if(ps.handle_type != ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect && !abstract_namespace)
                     {
