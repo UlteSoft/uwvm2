@@ -25,6 +25,8 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <cerrno>
 #include <limits>
 #include <type_traits>
 #include <utility>
@@ -33,6 +35,15 @@ module;
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+#endif
+// system
+#if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
+# if __has_include(<sys/un.h>)
+#  include <sys/un.h>
+# endif
+# if __has_include(<unistd.h>)
+#  include <unistd.h>
+# endif
 #endif
 
 export module uwvm2.uwvm.imported.wasi.wasip1.init:init_env;

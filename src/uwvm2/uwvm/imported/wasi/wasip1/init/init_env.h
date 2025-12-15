@@ -26,6 +26,8 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
+# include <cerrno>
 # include <limits>
 # include <type_traits>
 # include <utility>
@@ -34,6 +36,15 @@
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+# endif
+// system
+# if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
+#  if __has_include(<sys/un.h>)
+#   include <sys/un.h>
+#  endif
+#  if __has_include(<unistd.h>)
+#   include <unistd.h>
+#  endif
 # endif
 // import
 # include <fast_io.h>
@@ -50,6 +61,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+
+#  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET) && __has_include(<sys/un.h>) && defined(AF_LOCAL) && __has_include(<unistd.h>)
+    namespace posix
+    {
+        extern int unlink(char const* path) noexcept
+#   if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+            __asm__("unlink")
+#   else
+            __asm__("_unlink")
+#   endif
+                ;
+    }  // namespace posix
+#  endif
 
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
@@ -164,10 +188,83 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             {
                 ::fast_io::native_socket_file sock{ps.sock_family, ps.sock_type, ::fast_io::open_mode{}, ps.sock_protocol};
 
-                if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local) [[unlikely]]
+                if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::local)
                 {
-                    print_init_error(u8"local(unix) socket preopen not implemented in init");
+#  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET) && __has_include(<sys/un.h>) && defined(AF_LOCAL)
+                    auto const& local_path_u8{ps.local_unix_path};
+                    if(local_path_u8.empty()) [[unlikely]]
+                    {
+                        print_init_error(u8"unix socket path is empty");
+                        return false;
+                    }
+
+                    struct ::sockaddr_un un{};
+                    un.sun_family = static_cast<decltype(un.sun_family)>(AF_LOCAL);
+
+                    bool abstract_namespace{};
+                    ::std::size_t copy_len{local_path_u8.size()};
+
+#   if defined(__linux__) || defined(__gnu_linux__)
+                    if(local_path_u8.front() == u8'@') [[unlikely]]
+                    {
+                        abstract_namespace = true;
+                        copy_len = local_path_u8.size() - 1uz;
+                    }
+#   endif
+
+                    if(abstract_namespace)
+                    {
+                        if(copy_len + 1uz > sizeof(un.sun_path)) [[unlikely]]
+                        {
+                            print_init_error(u8"unix socket path too long");
+                            return false;
+                        }
+
+                        un.sun_path[0u] = '\0';
+                        if(copy_len != 0uz) { ::std::memcpy(un.sun_path + 1, reinterpret_cast<char const*>(local_path_u8.data() + 1u), copy_len); }
+                    }
+                    else
+                    {
+                        if(copy_len + 1uz > sizeof(un.sun_path)) [[unlikely]]
+                        {
+                            print_init_error(u8"unix socket path too long");
+                            return false;
+                        }
+
+                        ::std::memcpy(un.sun_path, reinterpret_cast<char const*>(local_path_u8.data()), copy_len);
+                        un.sun_path[copy_len] = '\0';
+                    }
+
+                    auto const base_len{static_cast<::fast_io::posix_socklen_t>(__builtin_offsetof(::sockaddr_un, sun_path))};
+                    auto const addr_len{abstract_namespace ? static_cast<::fast_io::posix_socklen_t>(base_len + 1 + copy_len)
+                                                           : static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1)};
+
+                    if(ps.handle_type != ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect && !abstract_namespace)
+                    {
+#   if __has_include(<unistd.h>)
+                        errno = 0;
+                        auto const unlink_ret{posix::unlink(un.sun_path)};
+                        if(unlink_ret == -1 && errno != ENOENT) [[unlikely]]
+                        {
+                            print_init_error(u8"unlink existing unix socket file failed");
+                            return false;
+                        }
+#   endif
+                    }
+
+                    if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
+                    {
+                        ::fast_io::posix_connect(sock, ::std::addressof(un), addr_len);
+                    }
+                    else
+                    {
+                        ::fast_io::posix_bind(sock, ::std::addressof(un), addr_len);
+                        if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
+                    }
+#  else
+                    print_init_error(u8"local(unix) socket preopen unsupported on this platform");
                     return false;
+#  endif
                 }
 
                 if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet && !ps.ip.address.isv4) [[unlikely]]
