@@ -117,59 +117,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                 return true;
             }};
 
-        auto const init_stdio{[&print_init_error](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd,
-                                                  ::fast_io::native_io_observer obs,
-                                                  bool writable) constexpr noexcept -> bool
-                              {
-                                  using rights_t = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
+        auto const init_stdio{
+            [&print_init_error](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd, ::fast_io::native_io_observer obs) constexpr noexcept -> bool
+            {
+                using rights_t = ::uwvm2::imported::wasi::wasip1::abi::rights_t;
 
-                                  new_fd_fd.rights_base = writable ? rights_t::right_fd_write : rights_t::right_fd_read;
-                                  new_fd_fd.rights_inherit = new_fd_fd.rights_base;
+                // Keep stdio permissive by default: OS-level capabilities are enforced by the host anyway.
+                new_fd_fd.rights_base = static_cast<rights_t>(-1);
+                new_fd_fd.rights_inherit = static_cast<rights_t>(-1);
 
 #  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
-                                  // can dup
-                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
+                // can dup
+                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
 #   ifdef UWVM_CPP_EXCEPTIONS
-                                  try
+                try
 #   endif
-                                  {
+                {
 #   if defined(_WIN32) && !defined(__CYGWIN__)
-                                      new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file = ::fast_io::native_file{::fast_io::io_dup, obs};
+                    new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file = ::fast_io::native_file{::fast_io::io_dup, obs};
 #   else
-                                      new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::fast_io::native_file{::fast_io::io_dup, obs};
+                    new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd = ::fast_io::native_file{::fast_io::io_dup, obs};
 #   endif
-                                  }
+                }
 #   ifdef UWVM_CPP_EXCEPTIONS
-                                  catch(::fast_io::error)
-                                  {
-                                      print_init_error(u8"dup stdio failed");
-                                      return false;
-                                  }
+                catch(::fast_io::error)
+                {
+                    print_init_error(u8"dup stdio failed");
+                    return false;
+                }
 #   endif
 #  else
-                                  // cannot dup, use observer
-                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer);
-                                  new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer = obs;
+                // cannot dup, use observer
+                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file_observer);
+                new_fd_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_observer = obs;
 #  endif
 
-                                  return true;
-                              }};
+                return true;
+            }};
 
         // stdio (fd0, fd1, fd2)
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t fd0{};
-            if(!init_stdio(*fd0.fd_p, ::fast_io::in(), false)) [[unlikely]] { return false; }
+            if(!init_stdio(*fd0.fd_p, ::fast_io::in())) [[unlikely]] { return false; }
             if(!try_emplace_fd(static_cast<fd_t>(0), ::std::move(fd0))) [[unlikely]] { return false; }
         }
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t fd1{};
-            if(!init_stdio(*fd1.fd_p, ::fast_io::out(), true)) [[unlikely]] { return false; }
+            if(!init_stdio(*fd1.fd_p, ::fast_io::out())) [[unlikely]] { return false; }
             if(!try_emplace_fd(static_cast<fd_t>(1), ::std::move(fd1))) [[unlikely]] { return false; }
         }
         {
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t fd2{};
-            if(!init_stdio(*fd2.fd_p, ::fast_io::err(), true)) [[unlikely]] { return false; }
+            if(!init_stdio(*fd2.fd_p, ::fast_io::err())) [[unlikely]] { return false; }
             if(!try_emplace_fd(static_cast<fd_t>(2), ::std::move(fd2))) [[unlikely]] { return false; }
         }
 
@@ -180,7 +180,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t new_sock_fd{};
 
             new_sock_fd.fd_p->rights_base = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
-            new_sock_fd.fd_p->rights_inherit = new_sock_fd.fd_p->rights_base;
+            new_sock_fd.fd_p->rights_inherit = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
 
 #  ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -239,6 +239,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     auto const addr_len{abstract_namespace ? static_cast<::fast_io::posix_socklen_t>(base_len + 1 + copy_len)
                                                            : static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1)};
 
+                    if constexpr(requires(::sockaddr_un tmp) { tmp.sun_len; })
+                    {
+                        using sun_len_t = decltype(un.sun_len);
+                        if(addr_len > ::std::numeric_limits<sun_len_t>::max()) [[unlikely]]
+                        {
+                            print_init_error(u8"unix socket sockaddr too large");
+                            return false;
+                        }
+                        un.sun_len = static_cast<sun_len_t>(addr_len);
+                    }
+
                     if(ps.handle_type != ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect && !abstract_namespace)
                     {
 #   if __has_include(<unistd.h>)
@@ -266,50 +277,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     return false;
 #  endif
                 }
-
-                if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet && !ps.ip.address.isv4) [[unlikely]]
-                {
-                    print_init_error(u8"socket family mismatch (inet but not ipv4)");
-                    return false;
-                }
-                if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet6 && ps.ip.address.isv4) [[unlikely]]
-                {
-                    print_init_error(u8"socket family mismatch (inet6 but ipv4)");
-                    return false;
-                }
-
-                if(ps.ip.address.isv4)
-                {
-                    ::fast_io::posix_sockaddr_in in{.sin_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet),
-                                                    .sin_port = ::fast_io::big_endian(ps.ip.port),
-                                                    .sin_addr = ps.ip.address.address.v4};
-
-                    if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
-                    {
-                        ::fast_io::posix_connect(sock, ::std::addressof(in), sizeof(in));
-                    }
-                    else
-                    {
-                        ::fast_io::posix_bind(sock, ::std::addressof(in), sizeof(in));
-                        if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
-                    }
-                }
                 else
                 {
-                    ::fast_io::posix_sockaddr_in6 in6{.sin6_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet6),
-                                                      .sin6_port = ::fast_io::big_endian(ps.ip.port),
-                                                      .sin6_flowinfo = 0,
-                                                      .sin6_addr = ps.ip.address.address.v6,
-                                                      .sin6_scoped_id = 0};
-
-                    if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
+                    if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet && !ps.ip.address.isv4) [[unlikely]]
                     {
-                        ::fast_io::posix_connect(sock, ::std::addressof(in6), sizeof(in6));
+                        print_init_error(u8"socket family mismatch (inet but not ipv4)");
+                        return false;
+                    }
+                    if(ps.sock_family == ::uwvm2::imported::wasi::wasip1::environment::sock_family_t::inet6 && ps.ip.address.isv4) [[unlikely]]
+                    {
+                        print_init_error(u8"socket family mismatch (inet6 but ipv4)");
+                        return false;
+                    }
+
+                    if(ps.ip.address.isv4)
+                    {
+                        ::fast_io::posix_sockaddr_in in{.sin_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet),
+                                                        .sin_port = ::fast_io::big_endian(ps.ip.port),
+                                                        .sin_addr = ps.ip.address.address.v4};
+
+                        if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
+                        {
+                            ::fast_io::posix_connect(sock, ::std::addressof(in), sizeof(in));
+                        }
+                        else
+                        {
+                            ::fast_io::posix_bind(sock, ::std::addressof(in), sizeof(in));
+                            if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
+                        }
                     }
                     else
                     {
-                        ::fast_io::posix_bind(sock, ::std::addressof(in6), sizeof(in6));
-                        if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
+                        ::fast_io::posix_sockaddr_in6 in6{.sin6_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet6),
+                                                          .sin6_port = ::fast_io::big_endian(ps.ip.port),
+                                                          .sin6_flowinfo = 0,
+                                                          .sin6_addr = ps.ip.address.address.v6,
+                                                          .sin6_scoped_id = 0};
+
+                        if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::connect)
+                        {
+                            ::fast_io::posix_connect(sock, ::std::addressof(in6), sizeof(in6));
+                        }
+                        else
+                        {
+                            ::fast_io::posix_bind(sock, ::std::addressof(in6), sizeof(in6));
+                            if(ps.handle_type == ::uwvm2::imported::wasi::wasip1::environment::handle_type_e::listen) { ::fast_io::posix_listen(sock, 128); }
+                        }
                     }
                 }
 
@@ -332,7 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             if(!try_emplace_fd(ps.fd, ::std::move(new_sock_fd))) [[unlikely]] { return false; }
         }
 
-        // preopened directories: assign from fd3, skipping occupied fds
+        // preopened directories: assign from fd3, skipping occupied fds (including explicit socket fds)
         fd_t next_dir_fd{static_cast<fd_t>(3)};
         for(auto const& mr: env.mount_dir_roots)
         {
@@ -348,7 +361,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
             ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_unique_ptr_t new_dir_fd{};
             new_dir_fd.fd_p->rights_base = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
-            new_dir_fd.fd_p->rights_inherit = new_dir_fd.fd_p->rights_base;
+            new_dir_fd.fd_p->rights_inherit = static_cast<::uwvm2::imported::wasi::wasip1::abi::rights_t>(-1);
 
             new_dir_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir);
 
@@ -357,12 +370,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             auto& new_entry_ref{dir_stack_vec.emplace_back()};
             auto& new_entry{new_entry_ref.ptr->dir_stack};
 
-            new_entry.name = mr.preload_dir;
-
 #  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
             // can dup
             new_entry.is_observer = false;
+            new_entry.name = mr.preload_dir;
 #   ifdef UWVM_CPP_EXCEPTIONS
             try
 #   endif
@@ -378,7 +390,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #   endif
 #  else
             // cannot dup, use observer
-            new_entry.is_observer = true;
+            // dir_stack_entry_t default-constructs the `file` union member; switch to observer safely.
+            new_entry = ::uwvm2::imported::wasi::wasip1::fd_manager::dir_stack_entry_t{true};
+            new_entry.name = mr.preload_dir;
             new_entry.storage.observer = ::fast_io::dir_io_observer{mr.entry};
 #  endif
 
