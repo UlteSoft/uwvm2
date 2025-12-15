@@ -76,6 +76,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
 
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
+    /// @note Socket descriptors are currently not auto-discovered or preconfigured here. In particular, this
+    ///       function does not modify the host's SIGPIPE handling or per-socket flags (such as SO_NOSIGPIPE).
+    ///       Instead, individual WASI socket operations (for example, sock_send via MSG_NOSIGNAL where supported)
+    ///       are responsible for preventing SIGPIPE from being delivered to the host process.
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
     {
@@ -231,7 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         // preopened sockets
-        // Note: This function does not modify the host's SIGPIPE handling; socket ops handle it (e.g. MSG_NOSIGNAL in sock_send).
+        // See init_wasip1_environment() @note about SIGPIPE handling.
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
