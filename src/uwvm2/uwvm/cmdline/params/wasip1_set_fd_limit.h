@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_set_fd_limit{
         .name{u8"--wasip1-set-fd-limit"},
-        .describe{u8"Set the WASI Preview 1 file descriptor limit (0 = unlimited)."},
+        .describe{u8"Set the WASI Preview 1 file descriptor limit (0 = fd_t maximum)."},
         .usage{u8"<limit:size_t>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_set_fd_limit_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_set_fd_limit_callback)},

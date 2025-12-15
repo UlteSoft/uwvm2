@@ -122,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         // fd_limit must be configured before initialization. If the caller didn't set it, use a sane default
         // that can at least host stdio and common workloads.
-        // default = 1024, --wasip1-set-fd-limit 0 = unlimited
+        // default = 1024, --wasip1-set-fd-limit 0 = fd_t maximum
         if(env.fd_storage.fd_limit == 0uz) [[unlikely]] { env.fd_storage.fd_limit = 1024uz; }
 
         ::std::size_t const fd_limit{env.fd_storage.fd_limit};
