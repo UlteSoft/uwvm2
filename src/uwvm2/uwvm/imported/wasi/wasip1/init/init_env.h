@@ -75,6 +75,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }  // namespace posix
 #  endif
 
+    namespace details
+    {
+        template <typename T>
+        concept sockaddr_un_has_sun_len = requires(T&& t) { t.sun_len; };
+    }  // namespace details
+
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
@@ -112,7 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                     e,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8")\n\n",
-                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
 
         // ====== Stronger failure semantics (internal) ======
@@ -290,7 +296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     // For abstract namespace: `copy_len` excludes the leading '@', and the "+1" accounts for the leading NUL at `un.sun_path[0]`.
                     auto const addr_len{static_cast<::fast_io::posix_socklen_t>(base_len + copy_len + 1u)};
 
-                    if constexpr(requires(::sockaddr_un tmp) { tmp.sun_len; })
+                    if constexpr(details::sockaddr_un_has_sun_len<struct ::sockaddr_un>)
                     {
                         using sun_len_t = decltype(un.sun_len);
                         if(addr_len > ::std::numeric_limits<sun_len_t>::max()) [[unlikely]]
@@ -343,7 +349,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
                     if(ps.ip.address.isv4)
                     {
-                        ::fast_io::posix_sockaddr_in in{.sin_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet),
+                        ::fast_io::posix_sockaddr_in in{.sin_family =
+#  if defined(_WIN32)
+                                                            2 /*AF_INET*/
+#  else
+                                                            AF_INET
+#  endif
+                                                        ,
                                                         .sin_port = ::fast_io::big_endian(ps.ip.port),
                                                         .sin_addr = ps.ip.address.address.v4};
 
@@ -359,7 +371,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     }
                     else
                     {
-                        ::fast_io::posix_sockaddr_in6 in6{.sin6_family = ::fast_io::to_posix_sock_family(::fast_io::sock_family::inet6),
+                        ::fast_io::posix_sockaddr_in6 in6{.sin6_family =
+#  if defined(_WIN32)
+                                                              23 /*AF_INET6*/
+#  else
+                                                              AF_INET6
+#  endif
+                                                          ,
                                                           .sin6_port = ::fast_io::big_endian(ps.ip.port),
                                                           .sin6_flowinfo = 0,
                                                           .sin6_addr = ps.ip.address.address.v6,
