@@ -120,6 +120,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         env.fd_storage.closes.clear();
         env.fd_storage.renumber_map.clear();
 
+        // fd_limit must be configured before initialization. If the caller didn't set it, use a sane default
+        // that can at least host stdio and common workloads.
+        if(env.fd_storage.fd_limit == 0uz) [[unlikely]] { env.fd_storage.fd_limit = 1024uz; }
+
         ::std::size_t const fd_limit{env.fd_storage.fd_limit};
 
         using fd_t = ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
@@ -257,7 +261,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
                     if(abstract_namespace)
                     {
-                        if(copy_len + 1uz > sizeof(un.sun_path)) [[unlikely]]
+                        if(copy_len >= sizeof(un.sun_path)) [[unlikely]]
                         {
                             print_init_error(u8"unix socket path too long");
                             return false;
@@ -268,9 +272,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     }
                     else
                     {
-                        if(copy_len + 1uz > sizeof(un.sun_path)) [[unlikely]]
+                        if(copy_len >= sizeof(un.sun_path)) [[unlikely]]
                         {
                             print_init_error(u8"unix socket path too long");
+                            return false;
+                        }
+
+                        // `unlink()` below treats `un.sun_path` as a C-string; reject embedded NULs to avoid truncation surprises.
+                        if(::std::memchr(local_path_u8.data(), 0, local_path_u8.size()) != nullptr) [[unlikely]]
+                        {
+                            print_init_error(u8"unix socket path contains NUL");
                             return false;
                         }
 
