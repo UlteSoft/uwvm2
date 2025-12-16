@@ -113,7 +113,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_import_function_result_tuple(import_function_return_type_t<Fs...> ret) noexcept
     {
-
+        (void)ret;
     }
 
     namespace details

@@ -449,7 +449,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         /// @brief      Grow the memory.
         /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
-        inline constexpr void grow(::std::size_t page_grow_size, ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        inline constexpr void grow_silently(::std::size_t page_grow_size,
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
         {
             if(page_grow_size == 0uz) [[unlikely]] { return; }
 
