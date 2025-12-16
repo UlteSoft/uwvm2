@@ -48,10 +48,10 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
+    // use for adl
     template <typename T>
     struct local_imported_module_reserve_type_t
     {
-        // use for adl
         static_assert(::std::is_same_v<::std::remove_cvref_t<T>, T>,
                       "local_imported_module_reserve_type_t: typename 'T' cannot have refer and const attributes");
         explicit constexpr local_imported_module_reserve_type_t() noexcept = default;
@@ -84,6 +84,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return true;
         }
     }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct import_function_parameter_type_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::features::vec_value_type<Fs...> parameter_types{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct import_function_return_type_t
+    {
+        /// @note Since the function type is fixed, checks must be performed during compilation. Without allowing `allow_multi_value`, only one return value is
+        /// permitted at most.
+        inline static constexpr bool allow_multi_value{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_result_vector<Fs...>()};
+
+        ::uwvm2::parser::wasm::standard::wasm1::features::vec_value_type<Fs...> return_types{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct import_function_type_t
+    {
+        import_function_parameter_type_t<Fs...> parameter_type{};
+        import_function_return_type_t<Fs...> return_type{};
+    };
 
     namespace details
     {
@@ -146,10 +169,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
         details::local_imported_module_base_impl* ptr{};
 
-        constexpr local_imported_module() noexcept = default;
+        inline constexpr local_imported_module() noexcept = default;
 
         template <is_local_imported_module T>
-        constexpr local_imported_module(T&& module) noexcept
+        inline constexpr local_imported_module(T&& module) noexcept
         {
 #if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
 # if __cpp_if_consteval >= 202106L
@@ -169,12 +192,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             }
         };
 
-        constexpr local_imported_module(local_imported_module const& other) noexcept
+        inline constexpr local_imported_module(local_imported_module const& other) noexcept
         {
             if(other.ptr) [[likely]] { this->ptr = other.ptr->clone(); }
         }
 
-        constexpr local_imported_module& operator= (local_imported_module const& other) noexcept
+        inline constexpr local_imported_module& operator= (local_imported_module const& other) noexcept
         {
             if(::std::addressof(other) == this) [[unlikely]] { return *this; }
 
@@ -207,7 +230,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         }
 
         // only copy node ptr
-        constexpr local_imported_module& copy_with_node_ptr(local_imported_module const& other) noexcept
+        inline constexpr local_imported_module& copy_with_node_ptr(local_imported_module const& other) noexcept
         {
             if(::std::addressof(other) == this) [[unlikely]] { return *this; }
 
@@ -239,9 +262,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return *this;
         }
 
-        constexpr local_imported_module(local_imported_module&& other) noexcept : ptr{other.ptr} { other.ptr = nullptr; }
+        inline constexpr local_imported_module(local_imported_module&& other) noexcept : ptr{other.ptr} { other.ptr = nullptr; }
 
-        constexpr local_imported_module& operator= (local_imported_module&& other) noexcept
+        inline constexpr local_imported_module& operator= (local_imported_module&& other) noexcept
         {
             if(::std::addressof(other) == this) [[unlikely]] { return *this; }
 
@@ -270,9 +293,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return *this;
         }
 
-        constexpr ~local_imported_module() { clear(); }
+        inline constexpr ~local_imported_module() { clear(); }
 
-        constexpr void clear() noexcept
+        inline constexpr void clear() noexcept
         {
             if(this->ptr != nullptr)
             {
