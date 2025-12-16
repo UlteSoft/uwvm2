@@ -159,7 +159,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 #endif
 
-        /// @todo local modules
+        // local modules
+        {
+            /// @todo
+        }
 
         // exec wasm
         {

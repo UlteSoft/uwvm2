@@ -72,7 +72,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         weak_symbol,  // wasm_weak_symbol
 #endif
 
-        /// @todo local_import
         // Local import, uwvm2 is a custom-built module that supports full WASM module functionality through conceptual implementation.
         // Enables custom functionality for complete WASM modules through the parser concept.
         local_import  // wasip1, wasip2, ...

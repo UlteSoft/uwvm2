@@ -26,6 +26,7 @@ export module uwvm2.uwvm.wasm.type;
 export import :cwrapper;
 export import :para;
 export import :file;
+export import :local_imported;
 export import :dl;
 export import :weak_symbol;
 export import :all_module;
