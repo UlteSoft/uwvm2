@@ -110,6 +110,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         import_function_return_type_t<Fs...> return_type{};
     };
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_import_function_result_tuple(import_function_return_type_t<Fs...> ret) noexcept
+    {
+
+    }
+
     namespace details
     {
         struct local_imported_module_base_impl
