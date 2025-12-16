@@ -85,6 +85,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         }
     }
 
+    /// @note Since the type section of WASM may contain numerous elements unrelated to functions, a separate function type system must be employed here.
+    ///       Concurrently, the function type system will only extend the base types, leaving all others unchanged.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct import_function_parameter_type_t
     {
@@ -130,17 +132,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual inline constexpr local_imported_module_base_impl* clone() const noexcept override
             {
                 using Alloc = ::fast_io::native_global_allocator;
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-                if consteval
-# else
-                if(__builtin_is_constant_evaluated())
-# endif
-                {
-                    return new local_imported_module_derv_impl<T>{*this};
-                }
+
+                if UWVM_IF_CONSTEVAL { return new local_imported_module_derv_impl<T>{*this}; }
                 else
-#endif
                 {
                     local_imported_module_base_impl* ptr{
                         reinterpret_cast<local_imported_module_base_impl*>(Alloc::allocate(sizeof(local_imported_module_derv_impl<T>)))};
@@ -174,17 +168,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         template <is_local_imported_module T>
         inline constexpr local_imported_module(T&& module) noexcept
         {
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-            if consteval
-# else
-            if(__builtin_is_constant_evaluated())
-# endif
-            {
-                this->ptr = new details::local_imported_module_derv_impl<T>{::std::forward<T>(module)};
-            }
+            if UWVM_IF_CONSTEVAL { this->ptr = new details::local_imported_module_derv_impl<T>{::std::forward<T>(module)}; }
             else
-#endif
             {
                 this->ptr =
                     reinterpret_cast<details::local_imported_module_derv_impl<T>*>(Alloc::allocate(sizeof(details::local_imported_module_derv_impl<T>)));
@@ -203,17 +188,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             if(this->ptr != nullptr)
             {
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-                if consteval
-# else
-                if(__builtin_is_constant_evaluated())
-# endif
-                {
-                    delete this->ptr;
-                }
+                if UWVM_IF_CONSTEVAL { delete this->ptr; }
                 else
-#endif
                 {
                     ::std::destroy_at(this->ptr);
                     Alloc::deallocate(this->ptr);
@@ -236,17 +212,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             if(this->ptr != nullptr)
             {
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-                if consteval
-# else
-                if(__builtin_is_constant_evaluated())
-# endif
-                {
-                    delete this->ptr;
-                }
+                if UWVM_IF_CONSTEVAL { delete this->ptr; }
                 else
-#endif
                 {
                     ::std::destroy_at(this->ptr);
                     Alloc::deallocate(this->ptr);
@@ -270,17 +237,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             if(this->ptr != nullptr)
             {
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-                if consteval
-# else
-                if(__builtin_is_constant_evaluated())
-# endif
-                {
-                    delete ptr;
-                }
+                if UWVM_IF_CONSTEVAL { delete this->ptr; }
                 else
-#endif
                 {
                     ::std::destroy_at(this->ptr);
                     Alloc::deallocate(this->ptr);
@@ -299,17 +257,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr != nullptr)
             {
-#if (__cpp_if_consteval >= 202106L || __cpp_lib_is_constant_evaluated >= 201811L) && __cpp_constexpr_dynamic_alloc >= 201907L
-# if __cpp_if_consteval >= 202106L
-                if consteval
-# else
-                if(__builtin_is_constant_evaluated())
-# endif
-                {
-                    delete this->ptr;
-                }
+                if UWVM_IF_CONSTEVAL { delete this->ptr; }
                 else
-#endif
                 {
                     ::std::destroy_at(this->ptr);
                     Alloc::deallocate(this->ptr);
