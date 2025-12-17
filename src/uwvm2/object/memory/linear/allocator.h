@@ -386,16 +386,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         {
             if(page_grow_size == 0uz) [[unlikely]] { return; }
 
-            // Prevent new memory operation instructions from being read for speculation
-            growing_flag_guard_t growing_flag_guard{this->growing_flag_p};
-
-            // Stop-the-world: wait for all in-flight operations to finish
-
-            if(this->active_ops_p == nullptr) [[unlikely]]
+            if(this->growing_flag_p == nullptr || this->active_ops_p == nullptr) [[unlikely]]
             {
                 // this is a bug
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
+
+            // Prevent new memory operation instructions from being read for speculation
+            growing_flag_guard_t growing_flag_guard{this->growing_flag_p};
+
+            // Stop-the-world: wait for all in-flight operations to finish
 
             // Wait for all existing memory read instructions to complete.
             // acquire: observe decrements published with release; ensures quiescence is visible
@@ -507,16 +507,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         {
             if(page_grow_size == 0uz) [[unlikely]] { return true; }
 
-            // Prevent new memory operation instructions from being read for speculation
-            growing_flag_guard_t growing_flag_guard{this->growing_flag_p};
-
-            // Stop-the-world: wait for all in-flight operations to finish
-
-            if(this->active_ops_p == nullptr) [[unlikely]]
+            if(this->growing_flag_p == nullptr || this->active_ops_p == nullptr) [[unlikely]]
             {
                 // this is a bug
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
+
+            // Prevent new memory operation instructions from being read for speculation
+            growing_flag_guard_t growing_flag_guard{this->growing_flag_p};
+
+            // Stop-the-world: wait for all in-flight operations to finish
 
             // Wait for all existing memory read instructions to complete.
             // acquire: observe decrements published with release; ensures quiescence is visible
