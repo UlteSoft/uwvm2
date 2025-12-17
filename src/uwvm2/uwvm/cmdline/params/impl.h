@@ -39,6 +39,7 @@
 # include "wasm_depend_recursion_limit.h"
 # include "wasm_set_parser_limit.h"
 # include "wasm_list_weak_symbol_module.h"
+# include "wasm_memory_grow_strict.h"
 
 // wasi
 # include "wasip1_set_fd_limit.h"
