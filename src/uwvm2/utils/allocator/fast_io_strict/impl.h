@@ -25,6 +25,7 @@
 #include <fast_io.h>
 
 /// @brief  This version provides a strict implementation of the fast_io allocator, which returns nullptr upon allocation failure.
+/// @note   To maintain compatibility with fast_io, the fast_io style of writing is adopted here.
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) && !defined(__WINE__)
 # include "nt_rtlheapalloc.h"

@@ -22,6 +22,7 @@
 
 module;
 
+/// @note   To maintain compatibility with fast_io, the fast_io style of writing is adopted here.
 #include "impl.h"
 
 export module uwvm2.utils.allocator.fast_io_strict;

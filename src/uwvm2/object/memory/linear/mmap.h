@@ -600,6 +600,204 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             return;
         }
 
+        /// @brief      Grow the memory (non-silent).
+        /// @return     true if the grow succeeds; false if the grow exceeds the limit or the platform refuses to commit/protect more pages.
+        /// @note       On overcommit-enabled systems, a successful grow does not guarantee future writes will not be OOM-killed; this API only reports the
+        ///             platform's immediate response to the commit/protection step.
+        /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
+        inline constexpr bool grow_strictly(::std::size_t page_grow_size,
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        {
+            if(page_grow_size == 0uz) [[unlikely]] { return true; }
+
+            if(this->memory_begin == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::fast_io::fast_terminate();
+            }
+
+            if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]]
+            {
+                // This situation cannot occur; it is due to user input error.
+                return false;
+            }
+
+            // Once initialized, the custom_page_size_log2 will not change.
+            auto const memory_grow_size{page_grow_size << this->custom_page_size_log2};
+
+            // Acquiring internal data requires locking.
+            if(this->growing_mutex_p == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::fast_io::fast_terminate();
+            }
+            ::uwvm2::utils::mutex::mutex_guard_t growing_mutex_guard_1{*this->growing_mutex_p};
+
+            if(this->memory_length_p == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::fast_io::fast_terminate();
+            }
+            auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};
+
+            ::std::size_t max_page_memory_length;  // No initlization is required
+
+            if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+            {
+                // 64bit platform
+                switch(this->status)
+                {
+                    case mmap_memory_status_t::wasm32:
+                    {
+                        constexpr auto max_full_protection_wasm32_length_half{max_full_protection_wasm32_length / 2u};
+                        max_page_memory_length = static_cast<::std::size_t>(max_full_protection_wasm32_length_half);
+                        break;
+                    }
+                    case mmap_memory_status_t::wasm64:
+                    {
+                        max_page_memory_length = static_cast<::std::size_t>(max_partial_protection_wasm64_length);
+                        break;
+                    }
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::std::unreachable();
+                    }
+                }
+            }
+            else if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least32_t))
+            {
+                // 32bit platform
+                max_page_memory_length = static_cast<::std::size_t>(max_partial_protection_wasm32_length);
+            }
+            else
+            {
+                static_assert(sizeof(::std::size_t) >= sizeof(::std::uint_least32_t), "mmap unsupported platform");
+            }
+
+            max_limit_memory_length = ::std::min(max_limit_memory_length, max_page_memory_length);
+
+            if(max_limit_memory_length < current_length) [[unlikely]]
+            {
+                // This situation cannot occur; it is due to user input error.
+                // this is a bug
+                ::fast_io::fast_terminate();
+            }
+
+            auto const left_memory_size{max_limit_memory_length - current_length};
+            if(memory_grow_size > left_memory_size) [[unlikely]] { return false; }
+
+            auto const grow_final_memory_length{current_length + memory_grow_size};
+
+# if defined(_WIN32) || defined(__CYGWIN__)  // windows
+            {
+                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
+                if(!success) [[unlikely]]
+                {
+                    // this never occurs; it is due to user input error.
+                    ::fast_io::fast_terminate();
+                }
+                if(page_size == 0uz) [[unlikely]]
+                {
+                    // this never occurs; it is due to user input error.
+                    ::fast_io::fast_terminate();
+                }
+
+                auto const page_size_minus_1{(page_size - 1uz)};
+
+                if(current_length > ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[unlikely]] { return false; }
+                auto const current_length_ceil{(current_length + page_size_minus_1) & ~page_size_minus_1};
+
+                if(grow_final_memory_length > ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[unlikely]] { return false; }
+                auto const grow_final_memory_length_ceil{(grow_final_memory_length + page_size_minus_1) & ~page_size_minus_1};
+
+                if(grow_final_memory_length_ceil > current_length_ceil)
+                {
+                    auto const commit_delta{grow_final_memory_length_ceil - current_length_ceil};
+                    auto const commit_begin{this->memory_begin + current_length_ceil};
+
+#  if !defined(__CYGWIN__) && !defined(__WINE__) && !defined(__BIONIC__) && defined(_WIN32_WINDOWS)  // win32
+                    auto const vamemory{reinterpret_cast<::std::byte*>(
+                        ::fast_io::win32::VirtualAlloc(commit_begin, commit_delta, 0x00001000u /*MEM_COMMIT*/, 0x04u /*PAGE_READWRITE*/))};
+                    if(vamemory != commit_begin) [[unlikely]] { return false; }
+#  else  // nt
+                    ::std::byte* vamemory{commit_begin};
+                    ::std::size_t commit_delta_tmp{commit_delta};
+                    constexpr bool zw{false};
+                    auto const status{::fast_io::win32::nt::nt_allocate_virtual_memory<zw>(reinterpret_cast<void*>(-1),
+                                                                                           reinterpret_cast<void**>(::std::addressof(vamemory)),
+                                                                                           0u,
+                                                                                           ::std::addressof(commit_delta_tmp),
+                                                                                           0x00001000u /*MEM_COMMIT*/,
+                                                                                           0x04u /*PAGE_READWRITE*/)};
+                    if(status || vamemory != commit_begin) [[unlikely]] { return false; }
+#  endif
+                }
+            }
+# elif !defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) && (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) &&   \
+     __has_include(<sys/mman.h>)  // posix
+            {
+                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
+                if(!success) [[unlikely]]
+                {
+                    // this never occurs; it is due to user input error.
+                    ::fast_io::fast_terminate();
+                }
+                if(page_size == 0uz) [[unlikely]]
+                {
+                    // this never occurs; it is due to user input error.
+                    ::fast_io::fast_terminate();
+                }
+
+                auto const page_size_minus_1{(page_size - 1uz)};
+
+                if(current_length > ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[unlikely]] { return false; }
+                auto const current_length_ceil{(current_length + page_size_minus_1) & ~page_size_minus_1};
+
+                if(grow_final_memory_length > ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[unlikely]] { return false; }
+                auto const grow_final_memory_length_ceil{(grow_final_memory_length + page_size_minus_1) & ~page_size_minus_1};
+
+                if(grow_final_memory_length_ceil > current_length_ceil)
+                {
+                    auto const protect_delta{grow_final_memory_length_ceil - current_length_ceil};
+                    auto const protect_begin{this->memory_begin + current_length_ceil};
+
+                    // sys_mprotect may throw ::fast_io::error
+#  ifdef UWVM_CPP_EXCEPTIONS
+                    try
+#  endif
+                    {
+                        ::fast_io::details::sys_mprotect(reinterpret_cast<void*>(protect_begin), protect_delta, PROT_READ | PROT_WRITE);
+                    }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                    catch(::fast_io::error)
+                    {
+#   ifdef UWVM_CPP_EXCEPTIONS
+                        try
+#   endif
+                        {
+                            // Ensure failure is not partially committed; otherwise, OOB may stop faulting in full-protection mode.
+                            ::fast_io::details::sys_mprotect(reinterpret_cast<void*>(protect_begin), protect_delta, PROT_NONE);
+                        }
+#   ifdef UWVM_CPP_EXCEPTIONS
+                        catch(::fast_io::error)
+                        {
+                            // do nothing
+                        }
+#   endif
+                        return false;
+                    }
+#  endif
+                }
+            }
+# endif
+
+            this->memory_length_p->store(grow_final_memory_length, ::std::memory_order_release);
+            return true;
+        }
+
         inline constexpr ::std::size_t get_page_size() const noexcept
         {
             if(this->memory_length_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
