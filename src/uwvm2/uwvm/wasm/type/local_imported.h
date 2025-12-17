@@ -23,7 +23,6 @@
 
 #ifndef UWVM_MODULE
 // std
-# include <array>
 # include <cstdint>
 # include <cstddef>
 # include <cstring>
@@ -118,7 +117,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         using element_type = feature_list_final_value_type_t<FeatureList>;
 
         inline static constexpr ::std::size_t length{sizeof...(vals)};
-        inline static constexpr ::std::array<element_type, sizeof...(vals)> values{vals...};
+        inline static constexpr element_type values[length]{vals...};
     };
 
     template <typename FeatureList, auto... vals>
