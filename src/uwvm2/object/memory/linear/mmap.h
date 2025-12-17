@@ -454,7 +454,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         {
             if(page_grow_size == 0uz) [[unlikely]] { return; }
 
-            if(this->memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(this->memory_begin == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
 
             if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]]
             {
@@ -466,10 +470,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             auto const memory_grow_size{page_grow_size << this->custom_page_size_log2};
 
             // Acquiring internal data requires locking.
-            if(this->growing_mutex_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(this->growing_mutex_p == nullptr || this->memory_length_p == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
+
             ::uwvm2::utils::mutex::mutex_guard_t growing_mutex_guard_1{*this->growing_mutex_p};
 
-            if(this->memory_length_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             // This atomic operation prevents the dynamic check from retrieving an erroneous value when reading the length.
             // Here, with the lock's support, memory access is already guaranteed to be relaxed. However, during dynamic checks, an acquire is still required.
             auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};
@@ -613,7 +621,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(this->memory_begin == nullptr) [[unlikely]]
             {
                 // this is a bug
-                ::fast_io::fast_terminate();
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
 
             if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]]
@@ -626,18 +634,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             auto const memory_grow_size{page_grow_size << this->custom_page_size_log2};
 
             // Acquiring internal data requires locking.
-            if(this->growing_mutex_p == nullptr) [[unlikely]]
+            if(this->growing_mutex_p == nullptr || this->memory_length_p == nullptr) [[unlikely]]
             {
                 // this is a bug
-                ::fast_io::fast_terminate();
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
+            
             ::uwvm2::utils::mutex::mutex_guard_t growing_mutex_guard_1{*this->growing_mutex_p};
 
-            if(this->memory_length_p == nullptr) [[unlikely]]
-            {
-                // this is a bug
-                ::fast_io::fast_terminate();
-            }
             auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};
 
             ::std::size_t max_page_memory_length;  // No initlization is required
@@ -800,7 +804,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         inline constexpr ::std::size_t get_page_size() const noexcept
         {
-            if(this->memory_length_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(this->memory_length_p == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
 
             // This can be used in the WASM runtime.
             auto const all_memory_length{this->memory_length_p->load(::std::memory_order_acquire)};
