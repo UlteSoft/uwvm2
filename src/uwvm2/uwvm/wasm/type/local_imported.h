@@ -23,12 +23,14 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <array>
 # include <cstdint>
 # include <cstddef>
 # include <cstring>
 # include <new>
 # include <memory>
 # include <type_traits>
+# include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import
@@ -88,33 +90,102 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     /// @note Since the type section of WASM may contain numerous elements unrelated to functions, a separate function type system must be employed here.
     ///       Concurrently, the function type system will only extend the base types, leaving all others unchanged.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct import_function_parameter_type_t
+    struct feature_list
     {
-        ::uwvm2::parser::wasm::standard::wasm1::features::vec_value_type<Fs...> parameter_types{};
     };
 
-    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct import_function_return_type_t
-    {
-        /// @note Since the function type is fixed, checks must be performed during compilation. Without allowing `allow_multi_value`, only one return value is
-        /// permitted at most.
-        inline static constexpr bool allow_multi_value{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_result_vector<Fs...>()};
+    template <typename FeatureList>
+    struct feature_list_traits;
 
-        ::uwvm2::parser::wasm::standard::wasm1::features::vec_value_type<Fs...> return_types{};
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct feature_list_traits<feature_list<Fs...>>
+    {
+        using final_value_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>;
+        inline static constexpr bool allow_multi_result_vector{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_result_vector<Fs...>()};
     };
 
-    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct import_function_type_t
+    template <typename FeatureList>
+    concept is_feature_list = requires { typename feature_list_traits<::std::remove_cvref_t<FeatureList>>::final_value_type; };
+
+    template <typename FeatureList>
+        requires is_feature_list<FeatureList>
+    using feature_list_final_value_type_t = typename feature_list_traits<::std::remove_cvref_t<FeatureList>>::final_value_type;
+
+    template <typename FeatureList, auto... vals>
+        requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
+    struct wasm_value_container
     {
-        import_function_parameter_type_t<Fs...> parameter_type{};
-        import_function_return_type_t<Fs...> return_type{};
+        using element_type = feature_list_final_value_type_t<FeatureList>;
+
+        inline static constexpr ::std::size_t length{sizeof...(vals)};
+        inline static constexpr ::std::array<element_type, sizeof...(vals)> values{vals...};
     };
 
-    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    inline consteval auto get_import_function_result_tuple(import_function_return_type_t<Fs...> ret) noexcept
+    template <typename FeatureList, auto... vals>
+        requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
+    inline consteval auto get_import_function_result_tuple(wasm_value_container<FeatureList, vals...>) noexcept
     {
-        (void)ret;
+        constexpr bool allow_multi_value{feature_list_traits<::std::remove_cvref_t<FeatureList>>::allow_multi_result_vector};
+
+        constexpr ::std::size_t tuple_size{sizeof...(vals)};
+        if constexpr(allow_multi_value)
+        {
+#if __cpp_contracts >= 202502L
+            contract_assert(tuple_size <= 1uz);
+#else
+            if(tuple_size > 1uz) { ::fast_io::fast_terminate(); }
+#endif
+        }
+
+        using final_value_type = feature_list_final_value_type_t<FeatureList>;
+
+        if constexpr(tuple_size == 0uz) { return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<>{}; }
+        else
+        {
+            return []<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
+            {
+                return (
+                    (
+                        []<final_value_type val>() constexpr noexcept
+                        {
+                            if constexpr(::std::same_as<final_value_type, ::uwvm2::parser::wasm::standard::wasm1::type::value_type>)
+                            {
+                                // wasm1.0: i32 i64 f32 f64
+                                if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>{};
+                                }
+                                else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>{};
+                                }
+                                else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>{};
+                                }
+                                else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>{};
+                                }
+                                else
+                                {
+                                    static_assert(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64, "invalid value type");
+                                }
+                            }
+                            else
+                            {
+                                /// @todo support v128
+                                static_assert(::std::same_as<final_value_type, ::uwvm2::parser::wasm::standard::wasm1::type::value_type>, "not supported yet");
+                            }
+                        }.template operator()<vals...[I]>()),  // This is an overloaded comma expression
+                    ...);
+            }(::std::make_index_sequence<tuple_size>{});
+        }
     }
+
+    template <typename FeatureList, auto... vals>
+        requires is_feature_list<FeatureList> && (::std::same_as<decltype(vals), feature_list_final_value_type_t<FeatureList>> && ...)
+    using import_function_result_tuple_t = decltype(get_import_function_result_tuple(wasm_value_container<FeatureList, vals...>{}))::Type;
 
     namespace details
     {
