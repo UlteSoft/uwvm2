@@ -57,7 +57,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         // The default allocator is unaligned.
         using allocator_t = Alloc;
-        using strict_allocator_t = ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict<typename Alloc::allocator_type>;
+        using strict_allocator_unadapted_t =
+            ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict<typename Alloc::allocator_type>;
+        using strict_allocator_t = ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_generic_allocator_adapter<strict_allocator_unadapted_t>;
 
         /// @brief Ensure alignment. Typically, the maximum allowed alignment size for WASM memory operation instructions is 16 (v128). Here, align to the size
         ///        of a cache line, which is usually 64.
@@ -158,10 +160,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if constexpr(allocator_t::has_reallocate_aligned_zero)
             {
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::reallocate_aligned_zero(this->memory_begin, alignment, new_memory_length));
+
+                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             }
             else if constexpr(allocator_t::has_reallocate_aligned)
             {
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::reallocate_aligned(this->memory_begin, alignment, new_memory_length));
+
+                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 // Manually clear the contents from the old boundary to the new boundary.
                 ::fast_io::freestanding::bytes_clear_n(temp_memory_begin + curr_memory_length, memory_grow_size);
@@ -173,6 +179,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 // Using `aligned zero` directly instead of `aligned` allocation followed by memory clearing leverages the platform's default page
                 // initialization mechanism, which sets all pages to zero.
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::allocate_aligned_zero(alignment, new_memory_length));
+
+                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 // Copy all old content to the new memory.
                 ::fast_io::freestanding::my_memcpy(temp_memory_begin, this->memory_begin, curr_memory_length);
@@ -228,10 +236,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             {
                 temp_memory_begin =
                     reinterpret_cast<::std::byte*>(strict_allocator_t::reallocate_aligned_zero(this->memory_begin, alignment, new_memory_length));
+
+                if(temp_memory_begin == nullptr) [[unlikely]] { return false; }
             }
             else if constexpr(strict_allocator_t::has_reallocate_aligned)
             {
                 temp_memory_begin = reinterpret_cast<::std::byte*>(strict_allocator_t::reallocate_aligned(this->memory_begin, alignment, new_memory_length));
+
+                if(temp_memory_begin == nullptr) [[unlikely]] { return false; }
 
                 // Manually clear the contents from the old boundary to the new boundary.
                 ::fast_io::freestanding::bytes_clear_n(temp_memory_begin + curr_memory_length, memory_grow_size);
@@ -244,14 +256,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 // initialization mechanism, which sets all pages to zero.
                 temp_memory_begin = reinterpret_cast<::std::byte*>(strict_allocator_t::allocate_aligned_zero(alignment, new_memory_length));
 
+                if(temp_memory_begin == nullptr) [[unlikely]] { return false; }
+
                 // Copy all old content to the new memory.
                 ::fast_io::freestanding::my_memcpy(temp_memory_begin, this->memory_begin, curr_memory_length);
 
                 // Deallocate the old memory.
                 strict_allocator_t::deallocate_aligned_n(this->memory_begin, alignment, curr_memory_length);
             }
-
-            if(temp_memory_begin == nullptr) [[unlikely]] { return false; }
 
             this->memory_begin = ::std::assume_aligned<alignment>(temp_memory_begin);
             this->memory_length = new_memory_length;

@@ -24,6 +24,8 @@
 
 #include <fast_io.h>
 
+#include "adapters.h"
+
 /// @brief  This version provides a strict implementation of the fast_io allocator, which returns nullptr upon allocation failure.
 /// @note   To maintain compatibility with fast_io, the fast_io style of writing is adopted here.
 
@@ -91,7 +93,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
     template <typename T>
     using fast_io_allocator_to_strict = decltype(fast_io_allocator_to_strict_impl<T>());
 
-    using native_strict_global_allocator = ::fast_io::generic_allocator_adapter<
+    using native_strict_global_allocator = ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_generic_allocator_adapter<
 #if defined(FAST_IO_USE_CUSTOM_GLOBAL_ALLOCATOR)
         ::fast_io::custom_global_allocator
 #elif defined(FAST_IO_USE_MIMALLOC) && (!defined(_MSC_VER) || defined(__clang__))
@@ -126,9 +128,10 @@ namespace uwvm2::utils::allocator::fast_io_strict
         >;
 
     template <typename T>
-    using native_strict_typed_global_allocator = ::fast_io::typed_generic_allocator_adapter<native_strict_global_allocator, T>;
+    using native_strict_typed_global_allocator =
+        ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_typed_generic_allocator_adapter<native_strict_global_allocator, T>;
 
-    using native_strict_thread_local_allocator = ::fast_io::generic_allocator_adapter<
+    using native_strict_thread_local_allocator = ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_generic_allocator_adapter<
 #if defined(FAST_IO_USE_CUSTOM_THREAD_LOCAL_ALLOCATOR)
         ::fast_io::custom_thread_local_allocator
 #else
@@ -137,6 +140,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         >;
 
     template <typename T>
-    using native_strict_typed_thread_local_allocator = ::fast_io::typed_generic_allocator_adapter<native_strict_thread_local_allocator, T>;
+    using native_strict_typed_thread_local_allocator =
+        ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_typed_generic_allocator_adapter<native_strict_thread_local_allocator, T>;
 
 }  // namespace uwvm2::utils::allocator::fast_io_strict
