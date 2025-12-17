@@ -122,3 +122,45 @@ This keeps the semantics of each individual memory consistent with the
 selected host model while allowing the object layer to scale to multiple
 memories when required by the WebAssembly module.
 
+---
+
+### 5. Command-line control (`uwvm`): strict `memory.grow`
+
+The object-layer memory backends provide both *fail-fast* (terminate on
+allocation failure) and *strict* growth
+paths. The `uwvm` CLI exposes a switch that selects the strict policy for
+WebAssembly `memory.grow`.
+
+#### 5.1 Parameter definition
+
+The option is defined as
+`uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict` in:
+
+- `src/uwvm2/uwvm/cmdline/params/wasm_memory_grow_strict.h`
+
+It registers:
+
+- Primary name: `--wasm-memory-grow-strict`
+- Alias: `-Wmemstrict`
+
+#### 5.2 Semantics
+
+When enabled, the runtime sets the global flag
+`uwvm2::object::memory::flags::grow_strict` (see
+`src/uwvm2/object/memory/flags/storage.h`), and the engine may choose a
+non-trapping growth path (for example, the `linear::*::grow_strictly(...)`
+APIs) so that a growth failure becomes a normal `memory.grow` failure result
+instead of a fatal trap or process termination.
+
+This is most meaningful on systems where overcommit is disabled (or where the
+platform provides a reliable commit/protection failure signal at grow time). On
+overcommit-enabled systems, `memory.grow` success still cannot guarantee that
+future writes will not trigger an out-of-memory kill; strict mode only affects
+how immediate growth failures are reported.
+
+#### 5.3 Usage
+
+Example:
+
+- `uwvm --wasm-memory-grow-strict ...`
+- `uwvm -Wmemstrict ...`

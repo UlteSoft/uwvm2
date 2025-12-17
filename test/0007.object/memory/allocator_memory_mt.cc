@@ -64,13 +64,13 @@ int main()
 
     std::atomic<unsigned> mismatch_count{0u};
 
-    // grow thread to interleave with reads
+    // grow_silently thread to interleave with reads
     fast_io::native_thread grow_thread{[&mem]()
                             {
                                 for(int k = 0; k < 4; ++k)
                                 {
                                     std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                                    mem.grow(1u);
+                                    mem.grow_silently(1u);
                                 }
                             }};
 

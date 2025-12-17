@@ -69,13 +69,13 @@ int main()
 
     std::atomic<unsigned> mismatch_count{0u};
 
-    // Two grow threads to create contention; each performs small grows with delays
+    // Two grow_silently threads to create contention; each performs small grows with delays
     fast_io::native_thread grow_a{[&mem]()
                                   {
                                       for(int k = 0; k < 4; ++k)
                                       {
                                           std::this_thread::sleep_for(std::chrono::milliseconds(3));
-                                          mem.grow(1u);
+                                          mem.grow_silently(1u);
                                       }
                                   }};
 
@@ -84,7 +84,7 @@ int main()
                                       for(int k = 0; k < 4; ++k)
                                       {
                                           std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                                          mem.grow(1u);
+                                          mem.grow_silently(1u);
                                       }
                                   }};
 
