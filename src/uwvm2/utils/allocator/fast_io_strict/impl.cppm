@@ -28,6 +28,7 @@ export module uwvm2.utils.allocator.fast_io_strict;
 
 export namespace uwvm2::utils::allocator::fast_io_strict
 {
+    using ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict;
     using ::uwvm2::utils::allocator::fast_io_strict::native_strict_global_allocator;
     using ::uwvm2::utils::allocator::fast_io_strict::native_strict_thread_local_allocator;
     using ::uwvm2::utils::allocator::fast_io_strict::native_strict_typed_global_allocator;

@@ -46,6 +46,50 @@
 
 namespace uwvm2::utils::allocator::fast_io_strict
 {
+    template <typename T>
+    inline constexpr auto fast_io_allocator_to_strict_impl() noexcept
+    {
+#if (defined(_WIN32) || defined(__CYGWIN__)) && !defined(__WINE__)
+        if constexpr(::std::same_as<T, ::fast_io::nt_rtlallocateheap_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_nt_rtlallocateheap_allocator{};
+        }
+        if constexpr(::std::same_as<T, ::fast_io::win32_heapalloc_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_win32_heapalloc_allocator{};
+        }
+#endif
+#if ((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING)) || defined(FAST_IO_ENABLE_HOSTED_FEATURES))
+        if constexpr(::std::same_as<T, ::fast_io::c_malloc_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_c_malloc_allocator{};
+        }
+# if defined(_DEBUG) && defined(_MSC_VER)
+        if constexpr(::std::same_as<T, ::fast_io::wincrt_malloc_dbg_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_wincrt_malloc_dbg_allocator{};
+        }
+# endif
+#endif
+#if (defined(__linux__) && defined(__KERNEL__)) || defined(FAST_IO_USE_LINUX_KERNEL_ALLOCATOR)
+        if constexpr(::std::same_as<T, ::fast_io::linux_kernel_kmalloc_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_linux_kmalloc_allocator{};
+        }
+#endif
+#if (defined(FAST_IO_ENABLE_MIMALLOC) || defined(FAST_IO_USE_MIMALLOC)) && (!defined(_MSC_VER) || defined(__clang__))
+
+        if constexpr(::std::same_as<T, ::fast_io::mimalloc_allocator>)
+        {
+            return ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_mimalloc_allocator{};
+        }
+#endif
+        ::fast_io::fast_terminate();
+    }
+
+    template <typename T>
+    using fast_io_allocator_to_strict = decltype(fast_io_allocator_to_strict_impl<T>());
+
     using native_strict_global_allocator = ::fast_io::generic_allocator_adapter<
 #if defined(FAST_IO_USE_CUSTOM_GLOBAL_ALLOCATOR)
         ::fast_io::custom_global_allocator
