@@ -57,8 +57,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         // The default allocator is unaligned.
         using allocator_t = Alloc;
-        using strict_allocator_unadapted_t =
-            ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict<typename Alloc::allocator_type>;
+        using strict_allocator_unadapted_t = ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict<typename Alloc::allocator_type>;
         using strict_allocator_t = ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_generic_allocator_adapter<strict_allocator_unadapted_t>;
 
         /// @brief Ensure alignment. Typically, the maximum allowed alignment size for WASM memory operation instructions is 16 (v128). Here, align to the size
@@ -124,13 +123,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         {
             if(page_grow_size == 0uz) [[unlikely]] { return; }
 
-            if(this->memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(this->memory_begin == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
 
             auto const this_custom_page_size_log2{this->custom_page_size_log2};
 
             if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this_custom_page_size_log2) [[unlikely]]
             {
                 // This situation cannot occur; it is due to user input error.
+                // slient
                 ::fast_io::fast_terminate();
             }
 
@@ -140,6 +144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(max_limit_memory_length < curr_memory_length) [[unlikely]]
             {
                 // This situation cannot occur; it is due to user input error.
+                // slient
                 ::fast_io::fast_terminate();
             }
 
@@ -148,6 +153,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(memory_grow_size > left_memory_size) [[unlikely]]
             {
                 // Exceeded the maximum allowed value, error reported.
+                // slient
                 ::fast_io::fast_terminate();
             }
 
@@ -161,13 +167,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             {
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::reallocate_aligned_zero(this->memory_begin, alignment, new_memory_length));
 
-                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                // fast_io::allocator is slient, nonecessary check
             }
             else if constexpr(allocator_t::has_reallocate_aligned)
             {
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::reallocate_aligned(this->memory_begin, alignment, new_memory_length));
 
-                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                // fast_io::allocator is slient, nonecessary check
 
                 // Manually clear the contents from the old boundary to the new boundary.
                 ::fast_io::freestanding::bytes_clear_n(temp_memory_begin + curr_memory_length, memory_grow_size);
@@ -180,7 +186,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 // initialization mechanism, which sets all pages to zero.
                 temp_memory_begin = reinterpret_cast<::std::byte*>(allocator_t::allocate_aligned_zero(alignment, new_memory_length));
 
-                if(temp_memory_begin == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                // fast_io::allocator is slient, nonecessary check
 
                 // Copy all old content to the new memory.
                 ::fast_io::freestanding::my_memcpy(temp_memory_begin, this->memory_begin, curr_memory_length);
@@ -199,7 +205,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         {
             if(page_grow_size == 0uz) [[unlikely]] { return true; }
 
-            if(this->memory_begin == nullptr) [[unlikely]] { return false; }
+            if(this->memory_begin == nullptr) [[unlikely]]
+            {
+                // this is a bug
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            }
 
             auto const this_custom_page_size_log2{this->custom_page_size_log2};
 
