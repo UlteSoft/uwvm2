@@ -1,5 +1,13 @@
 ﻿#pragma once
 
+#include <cstdlib>
+
+#if __has_include(<malloc.h>)
+# include <malloc.h>
+#elif __has_include(<malloc_np.h>)
+# include <malloc_np.h>
+#endif
+
 namespace uwvm2::utils::allocator::fast_io_strict
 {
     class fast_io_strict_c_malloc_allocator
@@ -27,21 +35,21 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 #if (__has_include(<malloc.h>) || __has_include(<malloc_np.h>)) && !defined(__MSDOS__) && !defined(__LLVM_LIBC__)
-        inline static allocation_least_result allocate_at_least(::std::size_t n) noexcept
+        inline static ::fast_io::allocation_least_result allocate_at_least(::std::size_t n) noexcept
         {
             auto p{allocate(n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {p, ::fast_io::details::c_malloc_usable_size_impl(p)};
         }
 
-        inline static allocation_least_result allocate_zero_at_least(::std::size_t n) noexcept
+        inline static ::fast_io::allocation_least_result allocate_zero_at_least(::std::size_t n) noexcept
         {
             auto p{allocate_zero(n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {p, ::fast_io::details::c_malloc_usable_size_impl(p)};
         }
 
-        inline static allocation_least_result reallocate_at_least(void* oldp, ::std::size_t n) noexcept
+        inline static ::fast_io::allocation_least_result reallocate_at_least(void* oldp, ::std::size_t n) noexcept
         {
             auto p{reallocate(oldp, n)};
             if(p == nullptr) [[unlikely]] { return {nullptr, 0}; }

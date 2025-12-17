@@ -38,6 +38,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         {
             auto processheap{::fast_io::win32::nt::rtl_get_process_heap()};
             auto ptr{details::nt_rtlallocate_heap_handle_common_impl(processheap, n, flag)};
+            if(ptr == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {ptr, ::fast_io::win32::nt::RtlSizeHeap(processheap, 0, ptr)};
         }
 
@@ -45,6 +46,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         {
             auto processheap{::fast_io::win32::nt::rtl_get_process_heap()};
             auto ptr{details::nt_rtlreallocate_heap_handle_common_impl(processheap, addr, n, flag)};
+            if(ptr == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {ptr, ::fast_io::win32::nt::RtlSizeHeap(processheap, 0, ptr)};
         }
 

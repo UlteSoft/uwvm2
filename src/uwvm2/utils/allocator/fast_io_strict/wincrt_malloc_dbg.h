@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <crtdbg.h>
+
 namespace uwvm2::utils::allocator::fast_io_strict
 {
     class fast_io_strict_wincrt_malloc_dbg_allocator

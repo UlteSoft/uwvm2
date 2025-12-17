@@ -66,6 +66,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         {
             auto processheap{details::win32_get_process_heap()};
             auto ptr{details::win32_heapalloc_handle_common_impl(processheap, n, flag)};
+            if(ptr == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {ptr, ::fast_io::win32::HeapSize(processheap, 0, ptr)};
         }
 
@@ -73,6 +74,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
         {
             auto processheap{details::win32_get_process_heap()};
             auto ptr{details::win32_heaprealloc_handle_common_impl(processheap, addr, n, flag)};
+            if(ptr == nullptr) [[unlikely]] { return {nullptr, 0}; }
             return {ptr, ::fast_io::win32::HeapSize(processheap, 0, ptr)};
         }
 
