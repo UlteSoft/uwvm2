@@ -5,30 +5,23 @@ namespace uwvm2::utils::allocator::fast_io_strict
     class fast_io_strict_wincrt_malloc_dbg_allocator
     {
     public:
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
-        static inline void* allocate(::std::size_t n) noexcept
+        inline static void* allocate(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::fast_io::noexcept_call(_malloc_dbg, n, 1, __FILE__, __LINE__);
 
             return p;
         }
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
-        static inline void* reallocate(void* p, ::std::size_t n) noexcept
+
+        inline static void* reallocate(void* p, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             p = ::fast_io::noexcept_call(_realloc_dbg, p, n, 1, __FILE__, __LINE__);
 
             return p;
         }
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
-        static inline void* allocate_zero(::std::size_t n) noexcept
+
+        inline static void* allocate_zero(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::fast_io::noexcept_call(_calloc_dbg, 1, n, 1, __FILE__, __LINE__);

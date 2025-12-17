@@ -4,9 +4,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
 {
     namespace details
     {
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
+
         inline void* nt_rtlallocate_heap_handle_common_impl(void* heaphandle, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         {
             if(n == 0) { n = 1; }
@@ -15,9 +13,6 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* nt_rtlreallocate_heap_handle_common_impl(void* heaphandle, void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         {
             if(n == 0) { n = 1; }
@@ -33,15 +28,9 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* nt_rtlallocate_heap_common_impl(::std::size_t n, ::std::uint_least32_t flag) noexcept
         { return details::nt_rtlallocate_heap_handle_common_impl(::fast_io::win32::nt::rtl_get_process_heap(), n, flag); }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* nt_rtlreallocate_heap_common_impl(void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         { return details::nt_rtlreallocate_heap_handle_common_impl(::fast_io::win32::nt::rtl_get_process_heap(), addr, n, flag); }
 

@@ -9,10 +9,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
     class fast_io_strict_linux_kmalloc_allocator
     {
     public:
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
-        static inline void* allocate(::std::size_t n) noexcept
+        inline static void* allocate(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::fast_io::linux_kernel_kmalloc(n, linux_kernel_gfp_kernel);

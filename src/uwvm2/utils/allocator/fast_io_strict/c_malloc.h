@@ -5,18 +5,13 @@ namespace uwvm2::utils::allocator::fast_io_strict
     class fast_io_strict_c_malloc_allocator
     {
     public:
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline static void* allocate(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
             void* p = ::std::malloc(n);
             return p;
         }
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
+
         inline static void* reallocate(void* p, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
@@ -24,9 +19,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             p = ::std::realloc(p, to_allocate);
             return p;
         }
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
+
         inline static void* allocate_zero(::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
@@ -54,9 +47,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
 #endif
 
 #if defined(_WIN32) && !defined(__WINE__) && !defined(__CYGWIN__)
-# if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-# endif
+
         inline static void* allocate_aligned(::std::size_t alignment, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }
@@ -68,9 +59,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
             return p;
         }
-# if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-# endif
+
         inline static void* reallocate_aligned(void* p, ::std::size_t alignment, ::std::size_t n) noexcept
         {
             if(n == 0) { n = 1; }

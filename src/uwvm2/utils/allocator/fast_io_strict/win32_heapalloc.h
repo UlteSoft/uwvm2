@@ -4,9 +4,7 @@ namespace uwvm2::utils::allocator::fast_io_strict
 {
     namespace details
     {
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
+
         inline void* win32_heapalloc_handle_common_impl(void* heaphandle, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         {
             if(n == 0) { n = 1; }
@@ -15,9 +13,6 @@ namespace uwvm2::utils::allocator::fast_io_strict
             return p;
         }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* win32_heaprealloc_handle_common_impl(void* heaphandle, void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         {
             if(n == 0) { n = 1; }
@@ -61,15 +56,9 @@ namespace uwvm2::utils::allocator::fast_io_strict
             }
         }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* win32_heapalloc_common_impl(::std::size_t n, ::std::uint_least32_t flag) noexcept
         { return details::win32_heapalloc_handle_common_impl(details::win32_get_process_heap(), n, flag); }
 
-#if __has_cpp_attribute(__gnu__::__returns_nonnull__)
-        [[__gnu__::__returns_nonnull__]]
-#endif
         inline void* win32_heaprealloc_common_impl(void* addr, ::std::size_t n, ::std::uint_least32_t flag) noexcept
         { return details::win32_heaprealloc_handle_common_impl(details::win32_get_process_heap(), addr, n, flag); }
 
