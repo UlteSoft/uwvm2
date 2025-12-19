@@ -103,6 +103,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         inline static constexpr bool allow_multi_result_vector{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_result_vector<Fs...>()};
     };
 
+    /// @brief   check if the type is a valid feature_list
+    /// @details The type must have a specialization of feature_list_traits<>.
     template <typename FeatureList>
     concept is_feature_list = requires { typename feature_list_traits<::std::remove_cvref_t<FeatureList>>::final_value_type; };
 
@@ -327,7 +329,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_function_name =
         requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingalFunction::function_name)>, ::uwvm2::utils::container::u8string_view>; };
 
-    /// @todo tuple<Function...>
+    /// @brief   check if the type is a local imported function
+    /// @details equivalent to `has_local_imported_function_type<SingalFunction> && has_function_name<SingalFunction> && has_function_call<SingalFunction>`
+    template <typename SingalFunction>
+    concept is_local_imported_function =
+        has_local_imported_function_type<SingalFunction> && has_function_name<SingalFunction> && has_function_call<SingalFunction>;
+
+    namespace details
+    {
+        template <typename T>
+        struct is_local_imported_function_tuple_impl : ::std::false_type
+        {
+        };
+
+        template <typename... Ts>
+        struct is_local_imported_function_tuple_impl<::uwvm2::utils::container::tuple<Ts...>> : ::std::bool_constant<(is_local_imported_function<Ts> && ...)>
+        {
+        };
+    }  // namespace details
+
+    /// @brief   check if the type is a local imported function tuple
+    /// @details This is a "tuple of functions" concept: all elements must satisfy is_local_imported_function.
+    /// @note    The tuple type is expected to be ::uwvm2::utils::container::tuple<...>.
+    template <typename T>
+    concept is_local_imported_function_tuple =
+        ::fast_io::is_tuple<::std::remove_cvref_t<T>> && details::is_local_imported_function_tuple_impl<::std::remove_cvref_t<T>>::value;
+
+    /// @brief   check if LocalImport provides a valid local function list
+    /// @details
+    /// ```cpp
+    /// struct my_local_import_module
+    /// {
+    ///     // A type alias (not a value) that lists all provided local imported functions.
+    ///     using local_function_tuple = ::uwvm2::utils::container::tuple<func_A, func_B, ...>;
+    /// };
+    /// ```
+    /// The tuple's element types must all satisfy is_local_imported_function.
+    template <typename LocalImport>
+    concept has_local_function_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_function_tuple; } &&
+                                       is_local_imported_function_tuple<typename ::std::remove_cvref_t<LocalImport>::local_function_tuple>;
 
     namespace details
     {
