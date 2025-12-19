@@ -62,6 +62,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<decltype(wasm_binfmt_ver1_storage)> &&
                           ::fast_io::freestanding::is_zero_default_constructible_v<decltype(wasm_binfmt_ver1_storage)>);
 
+            /// @todo wasm component module (storage)
+
             // Full occupancy is used to initialize the union, set the union to all zero.
             [[maybe_unused]] ::std::byte wasm_file_module_storage_u_reserve[sizeof_wasm_file_module_storage_u]{};
 
@@ -98,6 +100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::new(::std::addressof(this->wasm_module_storage.wasm_binfmt_ver1_storage)) decltype(this->wasm_module_storage.wasm_binfmt_ver1_storage){};
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -120,6 +123,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                         ::std::move(other.wasm_module_storage.wasm_binfmt_ver1_storage)};
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -141,6 +145,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::std::destroy_at(::std::addressof(this->wasm_module_storage.wasm_binfmt_ver1_storage));
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -163,6 +168,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                         ::std::move(other.wasm_module_storage.wasm_binfmt_ver1_storage)};
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -182,6 +188,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::std::destroy_at(::std::addressof(this->wasm_module_storage.wasm_binfmt_ver1_storage));
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -199,6 +206,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::std::destroy_at(::std::addressof(this->wasm_module_storage.wasm_binfmt_ver1_storage));
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -215,6 +223,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::new(::std::addressof(this->wasm_module_storage.wasm_binfmt_ver1_storage)) decltype(this->wasm_module_storage.wasm_binfmt_ver1_storage){};
                     break;
                 }
+                /// @todo wasm component module: judge
                 [[unlikely]] default:
                 {
                     static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
@@ -228,6 +237,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             static_assert(binfmt_ver == 1u, "Unsupported binfmt version");
             static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
+            /// @todo wasm component module: judge
             if constexpr(binfmt_ver == 1u) { return this->wasm_module_storage.wasm_binfmt_ver1_storage; }
         }
 
@@ -236,6 +246,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             static_assert(binfmt_ver == 1u, "Unsupported binfmt version");
             static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
+            /// @todo wasm component module: judge
             if constexpr(binfmt_ver == 1u) { return this->wasm_module_storage.wasm_binfmt_ver1_storage; }
         }
     };

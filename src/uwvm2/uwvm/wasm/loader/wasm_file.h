@@ -687,6 +687,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                 break;
             }
+            /// @todo wasm component module: 0x0001000d
             [[unlikely]] default:
             {
                 // [\0 a s m ?? ?? ?? ??]
