@@ -53,10 +53,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
     /// @param      y_length    second string length
 
     template <::std::size_t Stack_Len = 0, ::std::integral char_type>
-    UWVM_GNU_CONST inline constexpr ::std::size_t shortest_path(char_type const* x_str,
-                                                                ::std::size_t x_length,
-                                                                char_type const* y_str,
-                                                                ::std::size_t y_length) noexcept
+    UWVM_GNU_PURE inline constexpr ::std::size_t shortest_path(char_type const* x_str,
+                                                               ::std::size_t x_length,
+                                                               char_type const* y_str,
+                                                               ::std::size_t y_length) noexcept
     {
         using Alloc = ::fast_io::native_typed_thread_local_allocator<::std::size_t>;
 
