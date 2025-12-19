@@ -254,7 +254,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
     template <typename Res, typename Params>
         requires (::fast_io::is_tuple<Res> && ::fast_io::is_tuple<Params>)
-    struct local_imported_function_type
+    struct local_imported_function_type_t
     {
         using result_type = Res;
         using parameter_type = Params;
@@ -262,6 +262,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         result_type res{};
         parameter_type params{};
     };
+
+    /// @brief   check if the type is a local imported function type
+    /// @details T is local_imported_function_type_t<..., ...>
+    template <typename T>
+    concept is_local_imported_function_type_t =
+        requires {
+            typename ::std::remove_cvref_t<T>::result_type;
+            typename ::std::remove_cvref_t<T>::parameter_type;
+        } && ::fast_io::is_tuple<typename ::std::remove_cvref_t<T>::result_type> && ::fast_io::is_tuple<typename ::std::remove_cvref_t<T>::parameter_type> &&
+        ::std::same_as<::std::remove_cvref_t<T>,
+                       local_imported_function_type_t<typename ::std::remove_cvref_t<T>::result_type, typename ::std::remove_cvref_t<T>::parameter_type>>;
+
+    /// @brief   check if the type is a local imported function type
+    /// @details
+    /// ```cpp
+    ///
+    /// // external inline constexpr wasm_feature{wasip1{}, ...};
+    ///
+    /// template <typename FeatureList>
+    /// struct func_A
+    /// {
+    ///     using res_type = import_function_result_tuple_t<FeatureList, value_type::i32>;
+    ///     using para_type = import_function_result_tuple_t<FeatureList, value_type::i32, value_type::i64, value_type::i64, value_type::f32, value_type::i32>;
+    ///
+    ///     using local_imported_function_type = local_imported_function_type_t<res_type, para_type>; // check this
+    /// };
+    /// ```
+    template <typename SingalFunction>
+    concept has_local_imported_function_type = requires { typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type; } &&
+                                               is_local_imported_function_type_t<typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type>;
+
+    /// @brief   check if the type has a function call
+    /// @details
+    /// ```cpp
+    ///
+    /// // external inline constexpr wasm_feature{wasip1{}, ...};
+    ///
+    /// template <typename FeatureList>
+    /// struct func_A
+    /// {
+    ///     using res_type = import_function_result_tuple_t<FeatureList, value_type::i32>;
+    ///     using para_type = import_function_result_tuple_t<FeatureList, value_type::i32, value_type::i64, value_type::i64, value_type::f32, value_type::i32>;
+    ///     using local_imported_function_type = local_imported_function_type_t<res_type, para_type>;
+    ///
+    ///     inline static constexpr void call(local_imported_function_type& func_type) noexcept { ... } // check this
+    /// };
+    /// ```
+    template <typename SingalFunction>
+    concept has_function_call =
+        has_local_imported_function_type<SingalFunction> && requires(typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type& func_type) {
+            { ::std::remove_cvref_t<SingalFunction>::call(func_type) } -> ::std::same_as<void>;
+        };
+
+    /// @brief   check if the type has a function name
+    /// @details
+    /// ```cpp
+    /// struct func_A
+    /// {
+    ///     inline static constexpr ::uwvm2::utils::container::u8string_view function_name{"my_function"}; // check this
+    /// };
+    /// ```
+    template <typename SingalFunction>
+    concept has_function_name =
+        requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingalFunction::function_name)>, ::uwvm2::utils::container::u8string_view>; };
+
+    /// @todo tuple<Function...>
 
     namespace details
     {
