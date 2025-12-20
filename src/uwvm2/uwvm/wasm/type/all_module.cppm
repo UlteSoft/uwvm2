@@ -43,6 +43,7 @@ import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.feature;
 import :para;
 import :file;
+import :local_imported;
 import :dl;
 import :weak_symbol;
 

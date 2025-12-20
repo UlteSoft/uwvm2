@@ -96,6 +96,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     {
     };
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_feature_list_from_tuple_impl(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return feature_list<Fs...>{}; }
+
     template <typename FeatureList>
     struct feature_list_traits;
 
@@ -1720,6 +1724,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             this->ptr = nullptr;
         }
     };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_local_imported_module_from_feature_list(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return local_imported_module<Fs...>{}; }
 
 }  // namespace uwvm2::uwvm::wasm::type
 

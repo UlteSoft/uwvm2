@@ -54,6 +54,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::feature
     inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 max_binfmt_version{
         ::uwvm2::parser::wasm::concepts::operation::get_max_binfmt_version_from_tuple(all_features)};
 
+    /// @todo support component module (version = 0x0001000d)
     static_assert(max_binfmt_version == 1u, "missing implementation of other binfmt version");
 
     ////////////////////////////////////////
