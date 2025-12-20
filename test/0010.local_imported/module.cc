@@ -74,29 +74,102 @@ namespace
 
         {
             auto const r0{mod.get_function_information_from_index(0)};
-            if(!r0.successed) { return 1; }
-            if(r0.function_name != u8"add_i32") { return 2; }
-            if(r0.index != 0) { return 3; }
-            if(static_cast<::std::size_t>(r0.function_type.parameter.end - r0.function_type.parameter.begin) != 2uz) { return 4; }
-            if(static_cast<::std::size_t>(r0.function_type.result.end - r0.function_type.result.begin) != 1uz) { return 5; }
-            if(r0.function_type.parameter.begin[0] != value_type::i32) { return 6; }
-            if(r0.function_type.parameter.begin[1] != value_type::i32) { return 7; }
-            if(r0.function_type.result.begin[0] != value_type::i32) { return 8; }
+            if(!r0.successed)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_index(0) failed\n");
+                return 1;
+            }
+            if(r0.function_name != u8"add_i32")
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_index(0) function_name != u8\"add_i32\"\n");
+                return 2;
+            }
+            if(r0.index != 0)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_index(0) index != 0\n");
+                return 3;
+            }
+            if(static_cast<::std::size_t>(r0.function_type.parameter.end - r0.function_type.parameter.begin) != 2uz)
+            {
+                ::fast_io::io::panic(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    u8"test failed: get_function_information_from_index(0) function_type.parameter.end - function_type.parameter.begin != 2uz\n");
+                return 4;
+            }
+            if(static_cast<::std::size_t>(r0.function_type.result.end - r0.function_type.result.begin) != 1uz)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output,
+                                     u8"test failed: get_function_information_from_index(0) function_type.result.end - function_type.result.begin != 1uz\n");
+                return 5;
+            }
+            if(r0.function_type.parameter.begin[0] != value_type::i32)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output,
+                                     u8"test failed: get_function_information_from_index(0) function_type.parameter.begin[0] != value_type::i32\n");
+                return 6;
+            }
+            if(r0.function_type.parameter.begin[1] != value_type::i32)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output,
+                                     u8"test failed: get_function_information_from_index(0) function_type.parameter.begin[1] != value_type::i32\n");
+                return 7;
+            }
+            if(r0.function_type.result.begin[0] != value_type::i32)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output,
+                                     u8"test failed: get_function_information_from_index(0) function_type.result.begin[0] != value_type::i32\n");
+                return 8;
+            }
         }
 
         {
             auto const r2{mod.get_function_information_from_name(u8"f32_to_i32")};
-            if(!r2.successed) { return 9; }
-            if(r2.index != 2uz) { return 10; }
-            if(static_cast<::std::size_t>(r2.function_type.parameter.end - r2.function_type.parameter.begin) != 1uz) { return 11; }
-            if(static_cast<::std::size_t>(r2.function_type.result.end - r2.function_type.result.begin) != 1uz) { return 12; }
-            if(r2.function_type.parameter.begin[0] != value_type::f32) { return 13; }
-            if(r2.function_type.result.begin[0] != value_type::i32) { return 14; }
+            if(!r2.successed)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") failed\n");
+                return 9;
+            }
+            if(r2.index != 2uz)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") index != 2uz\n");
+                return 10;
+            }
+            if(static_cast<::std::size_t>(r2.function_type.parameter.end - r2.function_type.parameter.begin) != 1uz)
+            {
+                ::fast_io::io::panic(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") function_type.parameter.end - function_type.parameter.begin != 1uz\n");
+                return 11;
+            }
+            if(static_cast<::std::size_t>(r2.function_type.result.end - r2.function_type.result.begin) != 1uz)
+            {
+                ::fast_io::io::panic(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") function_type.result.end - function_type.result.begin != 1uz\n");
+                return 12;
+            }
+            if(r2.function_type.parameter.begin[0] != value_type::f32)
+            {
+                ::fast_io::io::panic(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") function_type.parameter.begin[0] != value_type::f32\n");
+                return 13;
+            }
+            if(r2.function_type.result.begin[0] != value_type::i32)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output,
+                                     u8"test failed: get_function_information_from_name(u8\"f32_to_i32\") function_type.result.begin[0] != value_type::i32\n");
+                return 14;
+            }
         }
 
         {
             auto const rx{mod.get_function_information_from_name(u8"no_such_func")};
-            if(rx.successed) { return 15; }
+            if(rx.successed)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_function_information_from_name(u8\"no_such_func\") successed\n");
+                return 15;
+            }
         }
 
         return 0;
