@@ -291,9 +291,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     ///     using local_imported_function_type = local_imported_function_type_t<res_type, para_type>; // check this
     /// };
     /// ```
-    template <typename SingalFunction>
-    concept has_local_imported_function_type = requires { typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type; } &&
-                                               is_local_imported_function_type_t<typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type>;
+    template <typename SingleFunction>
+    concept has_local_imported_function_type = requires { typename ::std::remove_cvref_t<SingleFunction>::local_imported_function_type; } &&
+                                               is_local_imported_function_type_t<typename ::std::remove_cvref_t<SingleFunction>::local_imported_function_type>;
 
     /// @brief   check if the type has a function call
     /// @details
@@ -311,10 +311,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     ///     inline static constexpr void call(local_imported_function_type& func_type) noexcept { ... } // check this
     /// };
     /// ```
-    template <typename SingalFunction>
+    template <typename SingleFunction>
     concept has_function_call =
-        has_local_imported_function_type<SingalFunction> && requires(typename ::std::remove_cvref_t<SingalFunction>::local_imported_function_type& func_type) {
-            { ::std::remove_cvref_t<SingalFunction>::call(func_type) } -> ::std::same_as<void>;
+        has_local_imported_function_type<SingleFunction> && requires(typename ::std::remove_cvref_t<SingleFunction>::local_imported_function_type& func_type) {
+            { ::std::remove_cvref_t<SingleFunction>::call(func_type) } -> ::std::same_as<void>;
         };
 
     /// @brief   check if the type has a function name
@@ -325,15 +325,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     ///     inline static constexpr ::uwvm2::utils::container::u8string_view function_name{"my_function"}; // check this
     /// };
     /// ```
-    template <typename SingalFunction>
+    template <typename SingleFunction>
     concept has_function_name =
-        requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingalFunction::function_name)>, ::uwvm2::utils::container::u8string_view>; };
+        requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleFunction::function_name)>, ::uwvm2::utils::container::u8string_view>; };
 
     /// @brief   check if the type is a local imported function
-    /// @details equivalent to `has_local_imported_function_type<SingalFunction> && has_function_name<SingalFunction> && has_function_call<SingalFunction>`
-    template <typename SingalFunction>
+    /// @details equivalent to `has_local_imported_function_type<SingleFunction> && has_function_name<SingleFunction> && has_function_call<SingleFunction>`
+    template <typename SingleFunction>
     concept is_local_imported_function =
-        has_local_imported_function_type<SingalFunction> && has_function_name<SingalFunction> && has_function_call<SingalFunction>;
+        has_local_imported_function_type<SingleFunction> && has_function_name<SingleFunction> && has_function_call<SingleFunction>;
 
     namespace details
     {
@@ -368,6 +368,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     template <typename LocalImport>
     concept has_local_function_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_function_tuple; } &&
                                        is_local_imported_function_tuple<typename ::std::remove_cvref_t<LocalImport>::local_function_tuple>;
+
+    /// @brief   check has memory name
+    /// @details
+    /// ```cpp
+    /// struct memory_1
+    /// {
+    ///     inline static constexpr ::uwvm2::utils::container::u8string_view memory_name{"my_memory"}; // check this
+    /// };
+    /// ```
+    template <typename SingleMemory>
+    concept has_memory_name =
+        requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::memory_name)>, ::uwvm2::utils::container::u8string_view>; };
+
+    /// @brief   check has page size
+    /// @note    If the concept is unsatisfied, the default assumption is 64Kib.
+    /// @note    The page size is 2 raised to the power of n.
+    /// @details
+    /// ```cpp
+    /// struct memory_1
+    /// {
+    ///     inline static constexpr ::std::uint_least64_t page_size{64 * 1024}; // check this
+    /// };
+    /// ```
+    template <typename SingleMemory>
+    concept has_page_size = requires {
+        requires ::std::same_as<::std::remove_cvref_t<decltype(SingleMemory::page_size)>, ::std::uint_least64_t>;
+        requires ::std::has_single_bit(SingleMemory::page_size);
+    };
+
+    template <typename SingleMemory>
+    concept can_manipulate_memory = requires(SingleMemory& mem, ::std::uint_least64_t grow_page_size) {
+        /// @brief   grow the memory
+        /// @details The memory will be grown by `grow_page_size` pages (delta), not to an absolute size.
+        /// @note    When `grow_page_size == 1`, this means growing by exactly one WASM page.
+        ///          The default WASM page size is 64KiB, but it can be customized via `SingleMemory::page_size` (see `has_page_size`).
+        { memory_grow(mem, grow_page_size) } -> ::std::same_as<bool>;
+        /// @brief   get the begin pointer of the memory
+        /// @details The begin pointer of the memory.
+        /// @note    The begin pointer is the first byte of the memory.
+        { memory_begin(mem) } -> ::std::same_as<::std::byte*>;
+        /// @brief   get the size of the memory
+        /// @details The size of the memory.
+        /// @note    The size is the number of pages in the memory. The byte size is `memory_size(mem) * page_size`.
+        { memory_size(mem) } -> ::std::same_as<::std::uint_least64_t>;
+    };
+
+    /// @brief   check if the type is a local imported memory
+    /// @details equivalent to `has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>`
+    /// @note    Non-mandatory has_page_size
+    template <typename SingleMemory>
+    concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>;
+
+    
 
     namespace details
     {
