@@ -176,7 +176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                             }
                             else
                             {
-                                // For all versions, only 132, 164, f32, f64, and f128 are supported.
+                                // For all versions, only i32, i64, f32, f64, and v128 are supported.
                                 if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32))
                                 {
                                     return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>{};
@@ -512,7 +512,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         }
         else
         {
-            // For all versions, only 132, 164, f32, f64, and f128 are supported.
+            // For all versions, only i32, i64, f32, f64, and v128 are supported.
             if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32))
             {
                 return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32{};
