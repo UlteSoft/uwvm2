@@ -656,18 +656,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     concept has_local_global_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_global_tuple; } &&
                                      is_local_imported_global_tuple<typename ::std::remove_cvref_t<LocalImport>::local_global_tuple>;
 
+    /// @brief   the result of getting a function type
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct function_get_result_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...> function_type{};
+        ::uwvm2::utils::container::u8string_view function_name{};
+        ::std::size_t index{};
+        bool successed{};
+    };
+
     namespace details
     {
+        template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         struct local_imported_module_base_impl
         {
             virtual inline constexpr ~local_imported_module_base_impl() noexcept = default;
             virtual inline constexpr local_imported_module_base_impl* clone() const noexcept = 0;
 
             virtual inline constexpr bool init_local_imported_module() noexcept = 0;
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> get_function_from_index(::std::size_t index) const noexcept = 0;
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+                get_function_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept = 0;
         };
 
-        template <is_local_imported_module T>
-        struct local_imported_module_derv_impl final : local_imported_module_base_impl
+        template <::uwvm2::uwvm::wasm::type::is_local_imported_module T, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        struct local_imported_module_derv_impl final : local_imported_module_base_impl<Fs...>
         {
             using rcvmod_type = ::std::remove_cvref_t<T>;
 
@@ -675,16 +690,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             inline constexpr local_imported_module_derv_impl(T&& input_module) noexcept : module{::std::forward<T>(input_module)} {}
 
-            virtual inline constexpr local_imported_module_base_impl* clone() const noexcept override
+            virtual inline constexpr local_imported_module_base_impl<Fs...>* clone() const noexcept override
             {
                 using Alloc = ::fast_io::native_global_allocator;
 
-                if UWVM_IF_CONSTEVAL { return new local_imported_module_derv_impl<T>{*this}; }
+                if UWVM_IF_CONSTEVAL { return new local_imported_module_derv_impl<T, Fs...>{*this}; }
                 else
                 {
-                    local_imported_module_base_impl* ptr{
-                        reinterpret_cast<local_imported_module_base_impl*>(Alloc::allocate(sizeof(local_imported_module_derv_impl<T>)))};
-                    ::new(ptr) local_imported_module_derv_impl<T>{*this};
+                    local_imported_module_base_impl<Fs...>* ptr{
+                        reinterpret_cast<local_imported_module_base_impl<Fs...>*>(Alloc::allocate(sizeof(local_imported_module_derv_impl<T, Fs...>)))};
+                    ::new(ptr) local_imported_module_derv_impl<T, Fs...>{*this};
                     return ptr;
                 }
             };
@@ -700,26 +715,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     return true;
                 }
             }
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+                get_function_from_index(::std::size_t index) const noexcept override
+            {
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    /// @todo
+                }
+                else
+                {
+                    return {};
+                }
+            }
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+                get_function_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept override
+            {
+            }
         };
     }  // namespace details
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct local_imported_module
     {
         using Alloc = ::fast_io::native_global_allocator;
 
-        details::local_imported_module_base_impl* ptr{};
+        details::local_imported_module_base_impl<Fs...>* ptr{};
 
         inline constexpr local_imported_module() noexcept = default;
 
         template <is_local_imported_module T>
         inline constexpr local_imported_module(T&& module) noexcept
         {
-            if UWVM_IF_CONSTEVAL { this->ptr = new details::local_imported_module_derv_impl<T>{::std::forward<T>(module)}; }
+            if UWVM_IF_CONSTEVAL { this->ptr = new details::local_imported_module_derv_impl<T, Fs...>{::std::forward<T>(module)}; }
             else
             {
-                this->ptr =
-                    reinterpret_cast<details::local_imported_module_derv_impl<T>*>(Alloc::allocate(sizeof(details::local_imported_module_derv_impl<T>)));
-                ::new(this->ptr) details::local_imported_module_derv_impl<T>{::std::forward<T>(module)};
+                this->ptr = reinterpret_cast<details::local_imported_module_derv_impl<T, Fs...>*>(
+                    Alloc::allocate(sizeof(details::local_imported_module_derv_impl<T, Fs...>)));
+                ::new(this->ptr) details::local_imported_module_derv_impl<T, Fs...>{::std::forward<T>(module)};
             }
         };
 
@@ -818,14 +852,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
 UWVM_MODULE_EXPORT namespace fast_io::freestanding
 {
-    template <>
-    struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::wasm::type::local_imported_module>
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::wasm::type::local_imported_module<Fs...>>
     {
         inline static constexpr bool value = true;
     };
 
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::wasm::type::local_imported_module>
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct is_zero_default_constructible<::uwvm2::uwvm::wasm::type::local_imported_module<Fs...>>
     {
         inline static constexpr bool value = true;
     };
