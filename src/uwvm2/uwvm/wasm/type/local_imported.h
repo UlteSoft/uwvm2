@@ -753,10 +753,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct global_get_result_t
+    {
+        ::uwvm2::utils::container::u8string_view global_name{};
+        ::std::size_t index{};
+        ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> value_type{};
+        bool is_mutable{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct memory_get_all_result_t
     {
         memory_get_result_t<Fs...> const* begin{};
         memory_get_result_t<Fs...> const* end{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct global_get_all_result_t
+    {
+        global_get_result_t<Fs...> const* begin{};
+        global_get_result_t<Fs...> const* end{};
     };
 
     namespace details
@@ -781,6 +797,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual inline constexpr bool memory_grow_from_index(::std::size_t index, ::std::uint_least64_t grow_page_size) noexcept = 0;
             virtual inline constexpr ::std::byte* memory_begin_from_index(::std::size_t index) noexcept = 0;
             virtual inline constexpr ::std::uint_least64_t memory_size_from_index(::std::size_t index) noexcept = 0;
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::global_get_all_result_t<Fs...> get_all_global_information() const noexcept = 0;
+            virtual inline constexpr ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
+                global_value_type_from_index(::std::size_t index) const noexcept = 0;
+            virtual inline constexpr bool global_is_mutable_from_index(::std::size_t index) const noexcept = 0;
+            virtual inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept = 0;
+            virtual inline constexpr bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept = 0;
         };
 
         template <typename>
@@ -930,6 +953,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 make_all_memory_information_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{})};
         };
 
+        template <typename Global>
+        inline consteval bool global_is_mutable() noexcept
+        {
+            if constexpr(::uwvm2::uwvm::wasm::type::has_global_mutable<Global>) { return Global::is_mutable; }
+            else
+            {
+                return false;
+            }
+        }
+
+        template <typename GlobalTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs, ::std::size_t... I>
+        inline consteval auto make_all_global_information_array_impl(::std::index_sequence<I...>) noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            return ::uwvm2::utils::container::array<::uwvm2::uwvm::wasm::type::global_get_result_t<Fs...>, sizeof...(I)>{
+                ::uwvm2::uwvm::wasm::type::global_get_result_t<Fs...>{
+                                                                      ::std::remove_cvref_t<decltype(::fast_io::get<I>(::std::declval<tuple_type&>()))>::global_name,
+                                                                      I, local_imported_storage_to_final_value_type<
+                        typename ::std::remove_cvref_t<decltype(::fast_io::get<I>(::std::declval<tuple_type&>()))>::value_type,
+                                                                      Fs...>(),
+                                                                      global_is_mutable<::std::remove_cvref_t<decltype(::fast_io::get<I>(::std::declval<tuple_type&>()))>>()}
+                ...
+            };
+        }
+
+        template <typename GlobalTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        struct all_global_information_cache
+        {
+            using tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            inline static constexpr ::std::size_t tuple_size{::fast_io::tuple_size<tuple_type>::value};
+            inline static constexpr auto global_information{
+                make_all_global_information_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{})};
+        };
+
         template <typename Tuple, ::std::size_t... I>
         inline constexpr void unpack_packed_to_tuple_impl(Tuple& dst, ::std::byte const* src, ::std::index_sequence<I...>) noexcept
         {
@@ -1010,6 +1067,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             { m.local_memory } -> ::std::same_as<typename ::std::remove_cvref_t<Module>::local_memory_tuple&>;
         };
 
+        template <typename Module>
+        concept has_local_global_storage = ::uwvm2::uwvm::wasm::type::has_local_global_tuple<Module> && requires(Module& m) {
+            { m.local_global } -> ::std::same_as<typename ::std::remove_cvref_t<Module>::local_global_tuple&>;
+        };
+
         template <::std::size_t N, typename MemTuple>
         inline constexpr ::std::uint_least64_t memory_page_size_from_index_impl(::std::size_t index) noexcept
         {
@@ -1065,6 +1127,88 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             {
                 if(index != N) { return memory_size_from_index_impl<N + 1uz, curr_tuple_type>(mems, index); }
                 return memory_size(::fast_io::get<N>(mems));
+            }
+        }
+
+        template <::std::size_t N, typename GlobalTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
+            global_value_type_from_index_impl(::std::size_t index) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return global_value_type_from_index_impl<N + 1uz, curr_tuple_type, Fs...>(index); }
+
+                using global_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return local_imported_storage_to_final_value_type<typename global_type::value_type, Fs...>();
+            }
+        }
+
+        template <::std::size_t N, typename GlobalTuple>
+        inline constexpr bool global_is_mutable_from_index_impl(::std::size_t index) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return global_is_mutable_from_index_impl<N + 1uz, curr_tuple_type>(index); }
+
+                using global_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return global_is_mutable<global_type>();
+            }
+        }
+
+        template <::std::size_t N, typename GlobalTuple>
+        inline constexpr void global_get_from_index_impl(GlobalTuple& globals, ::std::size_t index, ::std::byte* out) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return global_get_from_index_impl<N + 1uz, curr_tuple_type>(globals, index, out); }
+
+                using global_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                using value_type = typename global_type::value_type;
+                static_assert(::std::is_trivially_copyable_v<value_type>, "global get requires trivially copyable value types");
+
+                value_type const v{global_get(::fast_io::get<N>(globals))};
+                ::std::memcpy(out, ::std::addressof(v), sizeof(value_type));
+            }
+        }
+
+        template <::std::size_t N, typename GlobalTuple>
+        inline constexpr bool global_set_from_index_impl(GlobalTuple& globals, ::std::size_t index, ::std::byte const* in) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<GlobalTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return global_set_from_index_impl<N + 1uz, curr_tuple_type>(globals, index, in); }
+
+                using global_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+
+                if constexpr(::uwvm2::uwvm::wasm::type::can_set_global_value<global_type>)
+                {
+                    using value_type = typename global_type::value_type;
+                    static_assert(::std::is_trivially_copyable_v<value_type>, "global set requires trivially copyable value types");
+                    value_type v{};
+                    ::std::memcpy(::std::addressof(v), in, sizeof(value_type));
+                    global_set(::fast_io::get<N>(globals), v);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
         }
 
@@ -1279,6 +1423,81 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::fast_io::fast_terminate();
                 }
             }
+
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::global_get_all_result_t<Fs...> get_all_global_information() const noexcept override
+            {
+                if constexpr(::uwvm2::uwvm::wasm::type::has_local_global_tuple<rcvmod_type>)
+                {
+                    using curr_global_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_global_tuple;
+                    using cache = all_global_information_cache<curr_global_tuple_type, Fs...>;
+                    return {cache::global_information.data(), cache::global_information.data() + cache::global_information.size()};
+                }
+                else
+                {
+                    return {};
+                }
+            }
+
+            virtual inline constexpr ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
+                global_value_type_from_index(::std::size_t index) const noexcept override
+            {
+                if constexpr(::uwvm2::uwvm::wasm::type::has_local_global_tuple<rcvmod_type>)
+                {
+                    using curr_global_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_global_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_global_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return global_value_type_from_index_impl<0uz, curr_global_tuple_type, Fs...>(index);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr bool global_is_mutable_from_index(::std::size_t index) const noexcept override
+            {
+                if constexpr(::uwvm2::uwvm::wasm::type::has_local_global_tuple<rcvmod_type>)
+                {
+                    using curr_global_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_global_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_global_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return global_is_mutable_from_index_impl<0uz, curr_global_tuple_type>(index);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept override
+            {
+                if constexpr(has_local_global_storage<rcvmod_type>)
+                {
+                    using curr_global_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_global_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_global_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    global_get_from_index_impl<0uz>(module.local_global, index, out);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept override
+            {
+                if constexpr(has_local_global_storage<rcvmod_type>)
+                {
+                    using curr_global_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_global_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_global_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return global_set_from_index_impl<0uz>(module.local_global, index, in);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
         };
     }  // namespace details
 
@@ -1453,6 +1672,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return this->ptr->memory_size_from_index(index);
+        }
+
+        inline constexpr ::uwvm2::uwvm::wasm::type::global_get_all_result_t<Fs...> get_all_global_information() const noexcept
+        {
+            if(this->ptr == nullptr) { return {}; }
+            return this->ptr->get_all_global_information();
+        }
+
+        inline constexpr ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>
+            global_value_type_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->global_value_type_from_index(index);
+        }
+
+        inline constexpr bool global_is_mutable_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->global_is_mutable_from_index(index);
+        }
+
+        inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            this->ptr->global_get_from_index(index, out);
+        }
+
+        inline constexpr bool global_set_from_index(::std::size_t index, ::std::byte const* in) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->global_set_from_index(index, in);
         }
 
         inline constexpr void clear() noexcept
