@@ -27,6 +27,8 @@ module;
 #include <cstring>
 #include <new>
 #include <memory>
+#include <vector>
+#include <algorithm>
 #include <type_traits>
 #include <utility>
 // macro

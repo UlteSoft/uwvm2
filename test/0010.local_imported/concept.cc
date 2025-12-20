@@ -147,6 +147,28 @@ namespace
     };
 
     static_assert(!::uwvm2::uwvm::wasm::type::has_local_function_tuple<local_imported_module_with_non_tuple>);
+
+    struct dup_func_1
+    {
+        inline static constexpr ::uwvm2::utils::container::u8string_view function_name{u8"dup"};
+        using local_imported_function_type = li_sig0;
+        static void call(local_imported_function_type&) {}
+    };
+
+    struct dup_func_2
+    {
+        inline static constexpr ::uwvm2::utils::container::u8string_view function_name{u8"dup"};
+        using local_imported_function_type = li_sig0;
+        static void call(local_imported_function_type&) {}
+    };
+
+    struct module_with_duplicate_export_name
+    {
+        ::uwvm2::utils::container::u8string_view module_name{u8"dup_mod"};
+        using local_function_tuple = ::uwvm2::utils::container::tuple<dup_func_1, dup_func_2>;
+    };
+
+    static_assert(::uwvm2::uwvm::wasm::type::has_duplicate_exported_name_impl<module_with_duplicate_export_name>());
 }  // namespace
 
 int main() { return 0; }
