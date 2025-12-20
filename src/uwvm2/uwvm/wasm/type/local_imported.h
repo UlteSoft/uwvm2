@@ -759,6 +759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept = 0;
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept = 0;
+            virtual inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept = 0;
         };
 
         template <typename>
@@ -876,6 +877,81 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             inline static constexpr auto function_information{
                 make_all_function_information_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{})};
         };
+
+        template <typename Tuple, ::std::size_t... I>
+        inline constexpr void unpack_packed_to_tuple_impl(Tuple& dst, ::std::byte const* src, ::std::index_sequence<I...>) noexcept
+        {
+            ::std::size_t offset{};
+            ((
+                 [&] constexpr noexcept
+                 {
+                     using elem_type = ::std::remove_cvref_t<decltype(::fast_io::get<I>(dst))>;
+                     static_assert(::std::is_trivially_copyable_v<elem_type>, "packed unpack requires trivially copyable value types");
+                     ::std::memcpy(::std::addressof(::fast_io::get<I>(dst)), src + offset, sizeof(elem_type));
+                     offset += sizeof(elem_type);
+                 }()),
+             ...);
+        }
+
+        template <typename Tuple>
+        inline constexpr void unpack_packed_to_tuple(Tuple& dst, ::std::byte const* src) noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<Tuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<tuple_type>::value};
+            unpack_packed_to_tuple_impl(dst, src, ::std::make_index_sequence<tuple_size>{});
+        }
+
+        template <typename Tuple, ::std::size_t... I>
+        inline constexpr void pack_tuple_to_packed_impl(::std::byte* dst, Tuple const& src, ::std::index_sequence<I...>) noexcept
+        {
+            ::std::size_t offset{};
+            ((
+                 [&] constexpr noexcept
+                 {
+                     using elem_type = ::std::remove_cvref_t<decltype(::fast_io::get<I>(src))>;
+                     static_assert(::std::is_trivially_copyable_v<elem_type>, "packed pack requires trivially copyable value types");
+                     ::std::memcpy(dst + offset, ::std::addressof(::fast_io::get<I>(src)), sizeof(elem_type));
+                     offset += sizeof(elem_type);
+                 }()),
+             ...);
+        }
+
+        template <typename Tuple>
+        inline constexpr void pack_tuple_to_packed(::std::byte* dst, Tuple const& src) noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<Tuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<tuple_type>::value};
+            pack_tuple_to_packed_impl(dst, src, ::std::make_index_sequence<tuple_size>{});
+        }
+
+        template <typename SingleFunction>
+            requires ::uwvm2::uwvm::wasm::type::is_local_imported_function<SingleFunction>
+        inline constexpr void call_func_packed(::std::byte* res, ::std::byte const* para) noexcept
+        {
+            using func_type = ::std::remove_cvref_t<SingleFunction>;
+            using local_func_type = typename func_type::local_imported_function_type;
+
+            local_func_type sig{};
+            unpack_packed_to_tuple(sig.params, para);
+            func_type::call(sig);
+            pack_tuple_to_packed(res, sig.res);
+        }
+
+        template <::std::size_t N, typename FuncTuple>
+        inline constexpr void call_func_index_impl(::std::size_t index, ::std::byte* res, ::std::byte const* para) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return call_func_index_impl<N + 1uz, curr_tuple_type>(index, res, para); }
+
+                using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return call_func_packed<func_type>(res, para);
+            }
+        }
 
         template <::std::size_t N, typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
@@ -997,6 +1073,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 else
                 {
                     return {};
+                }
+            }
+
+            virtual inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept override
+            {
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_func_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    call_func_index_impl<0uz, curr_func_tuple_type>(index, res, para);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
                 }
             }
         };
@@ -1124,6 +1215,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return {}; }
             return this->ptr->get_all_function_information();
+        }
+
+        inline constexpr void call_func_index(::std::size_t index, ::std::byte* res, ::std::byte const* para) const noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            this->ptr->call_func_index(index, res, para);
         }
 
         inline constexpr void clear() noexcept

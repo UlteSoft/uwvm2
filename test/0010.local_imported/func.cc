@@ -19,6 +19,9 @@
  *                                      *
  ****************************************/
 
+#include <cstddef>
+#include <cstring>
+
 #include <uwvm2/uwvm/wasm/type/local_imported.h>
 
 namespace
@@ -111,6 +114,62 @@ namespace
 
     static_assert(::uwvm2::uwvm::wasm::type::is_local_imported_module<bad_module_with_bad_tuple>);
     static_assert(!::uwvm2::uwvm::wasm::type::has_local_function_tuple<bad_module_with_bad_tuple>);
+
+    inline int run_call_func_index_tests() noexcept
+    {
+        using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+        using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+        using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+
+        ::uwvm2::uwvm::wasm::type::local_imported_module<wasm1> mod{demo_local_import{}};
+
+        // add_i32: (i32,i32)->i32
+        {
+            ::std::byte params[sizeof(wasm_i32) * 2]{};
+            wasm_i32 const a{40};
+            wasm_i32 const b{2};
+            ::std::memcpy(params, ::std::addressof(a), sizeof(wasm_i32));
+            ::std::memcpy(params + sizeof(wasm_i32), ::std::addressof(b), sizeof(wasm_i32));
+
+            ::std::byte res[sizeof(wasm_i32)]{};
+            mod.call_func_index(0uz, res, params);
+
+            wasm_i32 out{};
+            ::std::memcpy(::std::addressof(out), res, sizeof(wasm_i32));
+            if(out != 42) { return 1; }
+        }
+
+        // log_i64: (i64)->()
+        {
+            log_i64::last = {};
+            log_i64::count = 0;
+
+            ::std::byte params[sizeof(wasm_i64)]{};
+            wasm_i64 const v{123};
+            ::std::memcpy(params, ::std::addressof(v), sizeof(wasm_i64));
+
+            mod.call_func_index(1uz, nullptr, params);
+
+            if(log_i64::count != 1uz) { return 2; }
+            if(log_i64::last != v) { return 3; }
+        }
+
+        // f32_to_i32: (f32)->i32
+        {
+            ::std::byte params[sizeof(wasm_f32)]{};
+            wasm_f32 const v{12.75f};
+            ::std::memcpy(params, ::std::addressof(v), sizeof(wasm_f32));
+
+            ::std::byte res[sizeof(wasm_i32)]{};
+            mod.call_func_index(2uz, res, params);
+
+            wasm_i32 out{};
+            ::std::memcpy(::std::addressof(out), res, sizeof(wasm_i32));
+            if(out != 12) { return 4; }
+        }
+
+        return 0;
+    }
 }  // namespace
 
-int main() { return 0; }
+int main() { return run_call_func_index_tests(); }
