@@ -172,9 +172,33 @@ namespace
             }
         }
 
+        {
+            auto const all{mod.get_all_function_information()};
+            auto const count{static_cast<::std::size_t>(all.end - all.begin)};
+            if(count != 3uz)
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_all_function_information() count != 3uz\n");
+                return 16;
+            }
+            if(all.begin[0].function_name != u8"add_i32")
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_all_function_information()[0].function_name != u8\"add_i32\"\n");
+                return 17;
+            }
+            if(all.begin[1].function_name != u8"log_i64")
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_all_function_information()[1].function_name != u8\"log_i64\"\n");
+                return 18;
+            }
+            if(all.begin[2].function_name != u8"f32_to_i32")
+            {
+                ::fast_io::io::panic(::uwvm2::uwvm::io::u8log_output, u8"test failed: get_all_function_information()[2].function_name != u8\"f32_to_i32\"\n");
+                return 19;
+            }
+        }
+
         return 0;
     }
 }  // namespace
 
 int main() { return run_lookup_tests(); }
-

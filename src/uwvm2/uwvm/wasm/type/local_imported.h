@@ -846,6 +846,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return result;
         }
 
+        template <typename SingleFunction, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            requires ::uwvm2::uwvm::wasm::type::is_local_imported_function<SingleFunction>
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> make_function_get_result_without_success(::std::size_t index) noexcept
+        {
+            using func_type = ::std::remove_cvref_t<SingleFunction>;
+            using local_func_type = typename func_type::local_imported_function_type;
+
+            ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> result{};
+            result.function_type = local_imported_function_signature_cache<local_func_type, Fs...>::function_type;
+            result.function_name = func_type::function_name;
+            result.index = index;
+            return result;
+        }
+
+        template <typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs, ::std::size_t... I>
+        inline consteval auto make_all_function_information_array_impl(::std::index_sequence<I...>) noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            return ::uwvm2::utils::container::array<::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>, sizeof...(I)>{
+                make_function_get_result_without_success<::std::remove_cvref_t<decltype(::fast_io::get<I>(::std::declval<tuple_type&>()))>, Fs...>(I)...};
+        }
+
+        template <typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        struct all_function_information_cache
+        {
+            using tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            inline static constexpr ::std::size_t tuple_size{::fast_io::tuple_size<tuple_type>::value};
+            inline static constexpr auto function_information{
+                make_all_function_information_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{})};
+        };
+
         template <::std::size_t N, typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
             get_function_information_from_index_impl(::std::size_t index) noexcept
@@ -954,8 +985,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept override 
             {
-                /// @todo
-                return {};
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    using cache = all_function_information_cache<curr_func_tuple_type, Fs...>;
+                    return {cache::function_information.data(), cache::function_information.data() + cache::function_information.size()};
+                }
+                else
+                {
+                    return {};
+                }
             }
         };
     }  // namespace details
@@ -1076,6 +1115,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return {}; }
             return this->ptr->get_function_information_from_name(function_name);
+        }
+
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept
+        {
+            if(this->ptr == nullptr) { return {}; }
+            return this->ptr->get_all_function_information();
         }
 
         inline constexpr void clear() noexcept
