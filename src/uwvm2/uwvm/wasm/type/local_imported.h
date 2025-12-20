@@ -974,6 +974,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             {
                 if constexpr(has_local_function_tuple<rcvmod_type>)
                 {
+                    /// @note On Clang/LLVM, this kind of index-based dispatcher is often optimized into a bounds-check + table lookup
+                    ///       (switch lowering / jump-or-lookup table style), so the runtime cost is typically O(1).
+                    ///       GCC currently may not produce the same optimization for this pattern.
                     using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
                     return get_function_information_from_name_impl<0uz, curr_func_tuple_type, Fs...>(function_name);
                 }
@@ -983,7 +986,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 }
             }
 
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept override 
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_all_result_t<Fs...> get_all_function_information() const noexcept override
             {
                 if constexpr(has_local_function_tuple<rcvmod_type>)
                 {
