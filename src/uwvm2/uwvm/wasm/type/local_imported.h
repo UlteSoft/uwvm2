@@ -420,7 +420,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     template <typename SingleMemory>
     concept is_local_imported_memory = has_memory_name<SingleMemory> && can_manipulate_memory<SingleMemory>;
 
-    
+    namespace details
+    {
+        template <typename T>
+        struct is_local_imported_memory_tuple_impl : ::std::false_type
+        {
+        };
+
+        template <typename... Ts>
+        struct is_local_imported_memory_tuple_impl<::uwvm2::utils::container::tuple<Ts...>> : ::std::bool_constant<(is_local_imported_memory<Ts> && ...)>
+        {
+        };
+    }  // namespace details
+
+    /// @brief   check if the type is a local imported memory tuple
+    /// @details This is a "tuple of functions" concept: all elements must satisfy is_local_imported_function.
+    /// @note    The tuple type is expected to be ::uwvm2::utils::container::tuple<...>.
+    template <typename T>
+    concept is_local_imported_memory_tuple =
+        ::fast_io::is_tuple<::std::remove_cvref_t<T>> && details::is_local_imported_memory_tuple_impl<::std::remove_cvref_t<T>>::value;
+
+    /// @brief   check if LocalImport provides a valid local memory list
+    /// @details
+    /// ```cpp
+    /// struct my_local_import_module
+    /// {
+    ///     // A type alias (not a value) that lists all provided local imported memories.
+    ///     using local_memory_tuple = ::uwvm2::utils::container::tuple<memory_A, memory_B, ...>;
+    /// };
+    /// ```
+    /// The tuple's element types must all satisfy is_local_imported_memory.
+    template <typename LocalImport>
+    concept has_local_memory_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple; } &&
+                                     is_local_imported_memory_tuple<typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple>;
 
     namespace details
     {
