@@ -676,10 +676,132 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             virtual inline constexpr bool init_local_imported_module() noexcept = 0;
 
-            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> get_function_from_index(::std::size_t index) const noexcept = 0;
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
-                get_function_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept = 0;
+                get_function_information_from_index(::std::size_t index) const noexcept = 0;
+            virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+                get_function_information_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept = 0;
         };
+
+        template <typename>
+        inline constexpr bool dependent_false_v{false};
+
+        template <typename T, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline consteval ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> local_imported_storage_to_final_value_type() noexcept
+        {
+            using final_value_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>;
+
+            if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64);
+            }
+            else if constexpr(::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>)
+            {
+                return static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128);
+            }
+            else
+            {
+                static_assert(dependent_false_v<T>, "unsupported local imported storage value type");
+            }
+        }
+
+        template <typename Tuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs, ::std::size_t... I>
+        inline consteval auto tuple_to_final_value_type_array_impl(::std::index_sequence<I...>) noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<Tuple>;
+            using final_value_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>;
+
+            return ::uwvm2::utils::container::array<final_value_type, sizeof...(I)>{
+                local_imported_storage_to_final_value_type<::std::remove_cvref_t<decltype(::fast_io::get<I>(::std::declval<tuple_type&>()))>, Fs...>()...};
+        }
+
+        template <typename Tuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline consteval auto tuple_to_final_value_type_array() noexcept
+        {
+            using tuple_type = ::std::remove_cvref_t<Tuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<tuple_type>::value};
+            return tuple_to_final_value_type_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{});
+        }
+
+        template <typename LocalImportedFunctionType, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        struct local_imported_function_signature_cache;
+
+        template <typename ResTuple, typename ParaTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        struct local_imported_function_signature_cache<::uwvm2::uwvm::wasm::type::local_imported_function_type_t<ResTuple, ParaTuple>, Fs...>
+        {
+            using final_value_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>;
+            using final_function_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...>;
+
+            inline static constexpr auto parameter_values{tuple_to_final_value_type_array<ParaTuple, Fs...>()};
+            inline static constexpr auto result_values{tuple_to_final_value_type_array<ResTuple, Fs...>()};
+
+            inline static constexpr final_function_type function_type{
+                {parameter_values.data(), parameter_values.data() + parameter_values.size()},
+                {result_values.data(),    result_values.data() + result_values.size()      }
+            };
+        };
+
+        template <typename SingleFunction, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+            requires ::uwvm2::uwvm::wasm::type::is_local_imported_function<SingleFunction>
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> make_function_get_result(::std::size_t index) noexcept
+        {
+            using func_type = ::std::remove_cvref_t<SingleFunction>;
+            using local_func_type = typename func_type::local_imported_function_type;
+
+            ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> result{};
+            result.function_type = local_imported_function_signature_cache<local_func_type, Fs...>::function_type;
+            result.function_name = func_type::function_name;
+            result.index = index;
+            result.successed = true;
+            return result;
+        }
+
+        template <::std::size_t N, typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> get_function_information_from_index_impl(::std::size_t index) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { return {}; }
+            else
+            {
+                if(index != N) { return get_function_information_from_index_impl<N + 1uz, curr_tuple_type, Fs...>(index); }
+
+                using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+                return make_function_get_result<func_type, Fs...>(N);
+            }
+        }
+
+        template <::std::size_t N, typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+            get_function_information_from_name_impl(::uwvm2::utils::container::u8string_view function_name) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<FuncTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { return {}; }
+            else
+            {
+                using func_type = ::std::remove_cvref_t<decltype(::fast_io::get<N>(::std::declval<curr_tuple_type&>()))>;
+
+                if(function_name == func_type::function_name) { return make_function_get_result<func_type, Fs...>(N); }
+                else
+                {
+                    return get_function_information_from_name_impl<N + 1uz, curr_tuple_type, Fs...>(function_name);
+                }
+            }
+        }
 
         template <::uwvm2::uwvm::wasm::type::is_local_imported_module T, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         struct local_imported_module_derv_impl final : local_imported_module_base_impl<Fs...>
@@ -717,11 +839,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             }
 
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
-                get_function_from_index(::std::size_t index) const noexcept override
+                get_function_information_from_index(::std::size_t index) const noexcept override
             {
                 if constexpr(has_local_function_tuple<rcvmod_type>)
                 {
-                    /// @todo
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_func_tuple_type>::value};
+                    if(index < tuple_size) { return get_function_information_from_index_impl<0uz, curr_func_tuple_type, Fs...>(index); }
+                    else
+                    {
+                        return {};
+                    }
                 }
                 else
                 {
@@ -730,8 +858,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             }
 
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
-                get_function_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept override
+                get_function_information_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept override
             {
+                if constexpr(has_local_function_tuple<rcvmod_type>)
+                {
+                    using curr_func_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_function_tuple;
+                    return get_function_information_from_name_impl<0uz, curr_func_tuple_type, Fs...>(function_name);
+                }
+                else
+                {
+                    return {};
+                }
             }
         };
     }  // namespace details
@@ -832,6 +969,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         }
 
         inline constexpr ~local_imported_module() { clear(); }
+
+        inline constexpr bool init_local_imported_module() noexcept
+        {
+            if(this->ptr == nullptr) { return true; }
+            return this->ptr->init_local_imported_module();
+        }
+
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...> get_function_information_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr) { return {}; }
+            return this->ptr->get_function_information_from_index(index);
+        }
+
+        inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_t<Fs...>
+            get_function_information_from_name(::uwvm2::utils::container::u8string_view function_name) const noexcept
+        {
+            if(this->ptr == nullptr) { return {}; }
+            return this->ptr->get_function_information_from_name(function_name);
+        }
 
         inline constexpr void clear() noexcept
         {
