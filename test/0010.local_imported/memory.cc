@@ -26,6 +26,8 @@
 
 namespace
 {
+    using wasm1 = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+
     struct local_imported_memory_good
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view memory_name{u8"mem"};
@@ -86,10 +88,36 @@ namespace
         (void)memory_size(bad);
         (void)memory_grow(bad, 0);
     }
+
+    struct demo_mem_import
+    {
+        ::uwvm2::utils::container::u8string_view module_name{u8"demo_mem"};
+        using local_memory_tuple = ::uwvm2::utils::container::tuple<local_imported_memory_good>;
+        local_memory_tuple local_memory{};
+    };
+
+    inline int run_memory_module_tests() noexcept
+    {
+        ::uwvm2::uwvm::wasm::type::local_imported_module<wasm1> mod{demo_mem_import{}};
+
+        auto const all{mod.get_all_memory_information()};
+        if(static_cast<::std::size_t>(all.end - all.begin) != 1uz) { return 1; }
+        if(all.begin[0].memory_name != u8"mem") { return 2; }
+        if(all.begin[0].index != 0uz) { return 3; }
+        if(all.begin[0].page_size != 64u * 1024u) { return 4; }
+
+        if(mod.memory_page_size_from_index(0uz) != 64u * 1024u) { return 5; }
+        if(mod.memory_size_from_index(0uz) != 1uz) { return 6; }
+        if(mod.memory_begin_from_index(0uz) == nullptr) { return 7; }
+        if(!mod.memory_grow_from_index(0uz, 2uz)) { return 8; }
+        if(mod.memory_size_from_index(0uz) != 3uz) { return 9; }
+
+        return 0;
+    }
 }  // namespace
 
 int main()
 {
     odr_use_memory_adl();
-    return 0;
+    return run_memory_module_tests();
 }
