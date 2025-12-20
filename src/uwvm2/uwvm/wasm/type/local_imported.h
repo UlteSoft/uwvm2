@@ -37,6 +37,7 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm_custom/customs/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
@@ -175,8 +176,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                             }
                             else
                             {
-                                /// @todo support v128
-                                static_assert(::std::same_as<final_value_type, ::uwvm2::parser::wasm::standard::wasm1::type::value_type>, "not supported yet");
+                                // For all versions, only 132, 164, f32, f64, and f128 are supported.
+                                if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>{};
+                                }
+                                else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128))
+                                {
+                                    return ::uwvm2::parser::wasm::concepts::operation::tuple_megger<
+                                        ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>{};
+                                }
+                                else
+                                {
+                                    static_assert(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                                                  "unsupported global value type");
+                                }
                             }
                         }.template operator()<vals...[I]>()),  // This is an overloaded comma expression
                     ...);
@@ -453,6 +479,182 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     template <typename LocalImport>
     concept has_local_memory_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple; } &&
                                      is_local_imported_memory_tuple<typename ::std::remove_cvref_t<LocalImport>::local_memory_tuple>;
+
+    template <typename FeatureList, auto val>
+        requires is_feature_list<FeatureList> && ::std::same_as<decltype(val), feature_list_final_value_type_t<FeatureList>>
+    inline consteval auto get_import_global_value_type(wasm_value_container<FeatureList, val>) noexcept
+    {
+        using final_value_type = feature_list_final_value_type_t<FeatureList>;
+
+        if constexpr(::std::same_as<final_value_type, ::uwvm2::parser::wasm::standard::wasm1::type::value_type>)
+        {
+            // wasm1.0: i32 i64 f32 f64
+            if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32{};
+            }
+            else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64{};
+            }
+            else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32{};
+            }
+            else if constexpr(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64{};
+            }
+            else
+            {
+                static_assert(val == ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64, "invalid value type");
+            }
+        }
+        else
+        {
+            // For all versions, only 132, 164, f32, f64, and f128 are supported.
+            if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32))
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32{};
+            }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64))
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64{};
+            }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32))
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32{};
+            }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64))
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64{};
+            }
+            else if constexpr(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128))
+            {
+                return ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128{};
+            }
+            else
+            {
+                static_assert(val == static_cast<final_value_type>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128),
+                              "unsupported global value type");
+            }
+        }
+    }
+
+    /// @brief   check has global name
+    /// @details
+    /// ```cpp
+    /// struct global_1
+    /// {
+    ///     inline static constexpr ::uwvm2::utils::container::u8string_view global_name{"my_global"}; // check this
+    /// };
+    /// ```
+    template <typename SingleGlobal>
+    concept has_global_name =
+        requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleGlobal::global_name)>, ::uwvm2::utils::container::u8string_view>; };
+
+    /// @brief   check has global mutable
+    /// @note    If not provided, it is assumed to be immutable by default.
+    /// @details
+    /// ```cpp
+    /// struct global_1
+    /// {
+    ///     inline static constexpr bool is_mutable{true}; // check this
+    /// };
+    /// ```
+    template <typename SingleGlobal>
+    concept has_global_mutable = requires { requires ::std::same_as<::std::remove_cvref_t<decltype(SingleGlobal::is_mutable)>, bool>; };
+
+    /// @brief   check is local imported global value type
+    template <typename T>
+    concept is_local_imported_global_value_type = ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
+                                                  ::std::same_as<::std::remove_cvref_t<T>, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>;
+
+    /// @brief   check has global value type
+    /// @details
+    /// ```cpp
+    /// struct global_1
+    /// {
+    ///     using value_type = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32; // check this
+    /// };
+    /// ```
+    template <typename SingleGlobal>
+    concept has_global_value_type = requires { typename ::std::remove_cvref_t<SingleGlobal>::value_type; } &&
+                                    is_local_imported_global_value_type<typename ::std::remove_cvref_t<SingleGlobal>::value_type>;
+
+    /// @brief   check has global get
+    /// @details
+    /// ```cpp
+    /// struct global_1
+    /// {
+    ///     using value_type = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+    ///     inline static constexpr value_type global_get(global_1& g) noexcept { ... } // check this (ADL)
+    /// };
+    template <typename SingleGlobal>
+    concept has_global_get = has_global_value_type<SingleGlobal> && requires(SingleGlobal& g) {
+        { global_get(g) } -> ::std::same_as<typename ::std::remove_cvref_t<SingleGlobal>::value_type>;
+    };
+
+    /// @brief   check has global set
+    /// @details
+    /// ```cpp
+    /// struct global_1
+    /// {
+    ///     using value_type = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+    ///     inline static constexpr void global_set(global_1& g, value_type v) noexcept { ... } // check this (ADL)
+    /// };
+    template <typename SingleGlobal>
+    concept has_global_set = has_global_value_type<SingleGlobal> && requires(SingleGlobal& g, typename ::std::remove_cvref_t<SingleGlobal>::value_type v) {
+        { global_set(g, v) } -> ::std::same_as<void>;
+    };
+
+    /// @brief   check can set global value
+    /// @details If the global is mutable, it can be set.
+    template <typename SingleGlobal>
+    concept can_set_global_value = has_global_set<SingleGlobal> && has_global_mutable<SingleGlobal> && requires { requires SingleGlobal::is_mutable == true; };
+
+    /// @brief   check if the type is a local imported global
+    /// @details equivalent to `has_global_name<SingleGlobal> && has_global_value_type<SingleGlobal> && has_global_get<SingleGlobal>`
+    /// @note    Non-mandatory can_set_global_value
+    template <typename SingleGlobal>
+    concept is_local_imported_global = has_global_name<SingleGlobal> && has_global_value_type<SingleGlobal> && has_global_get<SingleGlobal>;
+
+    namespace details
+    {
+        template <typename T>
+        struct is_local_imported_global_tuple_impl : ::std::false_type
+        {
+        };
+
+        template <typename... Ts>
+        struct is_local_imported_global_tuple_impl<::uwvm2::utils::container::tuple<Ts...>> : ::std::bool_constant<(is_local_imported_global<Ts> && ...)>
+        {
+        };
+    }  // namespace details
+
+    /// @brief   check if the type is a local imported global tuple
+    /// @details This is a "tuple of functions" concept: all elements must satisfy is_local_imported_function.
+    /// @note    The tuple type is expected to be ::uwvm2::utils::container::tuple<...>.
+    template <typename T>
+    concept is_local_imported_global_tuple =
+        ::fast_io::is_tuple<::std::remove_cvref_t<T>> && details::is_local_imported_global_tuple_impl<::std::remove_cvref_t<T>>::value;
+
+    /// @brief   check if LocalImport provides a valid local global list
+    /// @details
+    /// ```cpp
+    /// struct my_local_import_module
+    /// {
+    ///     // A type alias (not a value) that lists all provided local imported globals.
+    ///     using local_global_tuple = ::uwvm2::utils::container::tuple<global_A, global_B, ...>;
+    /// };
+    /// ```
+    /// The tuple's element types must all satisfy is_local_imported_global.
+    template <typename LocalImport>
+    concept has_local_global_tuple = requires { typename ::std::remove_cvref_t<LocalImport>::local_global_tuple; } &&
+                                     is_local_imported_global_tuple<typename ::std::remove_cvref_t<LocalImport>::local_global_tuple>;
 
     namespace details
     {

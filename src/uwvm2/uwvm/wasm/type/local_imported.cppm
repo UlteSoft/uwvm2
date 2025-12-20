@@ -38,6 +38,7 @@ import fast_io;
 import uwvm2.utils.container;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm_custom.customs;
 import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.feature;
