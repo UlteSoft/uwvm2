@@ -56,6 +56,7 @@ namespace
     struct local_imported_function_good
     {
         using local_imported_function_type = li_sig0;
+
         static void call(local_imported_function_type&) {}
     };
 
@@ -99,6 +100,7 @@ namespace
     struct local_imported_function_call_bad_param
     {
         using local_imported_function_type = li_sig0;
+
         static void call(local_imported_function_type&&) {}
     };
 
@@ -108,6 +110,7 @@ namespace
     struct local_imported_function_call_bad_ret
     {
         using local_imported_function_type = li_sig0;
+
         static int call(local_imported_function_type&) { return 0; }
     };
 
@@ -118,6 +121,7 @@ namespace
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view function_name{u8"good"};
         using local_imported_function_type = li_sig0;
+
         static void call(local_imported_function_type&) {}
     };
 
