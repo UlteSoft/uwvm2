@@ -43,10 +43,11 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
-# if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+    /// @note  Must remain unchanged before initialization (to prevent iterator invalidation).
     inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t>
         weak_symbol{};  // [global] No global variable dependencies from other translation units
-# endif
+#endif
 }  // namespace uwvm2::uwvm::wasm::storage
 
 #ifndef UWVM_MODULE

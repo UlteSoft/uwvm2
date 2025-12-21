@@ -43,6 +43,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
+    /// @note  Once any element address/reference/iterator is taken, this vector must not grow (no reallocation),
+    ///        otherwise previously stored pointers/references/iterators become dangling.
     inline ::uwvm2::utils::container::vector<::uwvm2::uwvm::wasm::type::local_imported_t> preload_local_imported{};  //[global]
 }  // namespace uwvm2::uwvm::wasm::storage
 
