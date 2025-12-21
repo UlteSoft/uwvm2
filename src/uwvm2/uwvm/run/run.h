@@ -127,7 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 // section details Occurs before dependency checks
                 break;
             }
-            /// @todo
+            /// @todo add more modes here
             [[unlikely]] default:
             {
                 /// @warning Maybe I forgot to realize it.

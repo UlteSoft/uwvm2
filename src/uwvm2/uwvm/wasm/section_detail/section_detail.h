@@ -1108,7 +1108,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
 #endif
             case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
             {
-                /// @todo
+                /// @todo local imported module section details
                 break;
             }
             [[unlikely]] default:

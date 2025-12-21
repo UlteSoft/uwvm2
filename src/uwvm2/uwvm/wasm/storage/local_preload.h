@@ -56,7 +56,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 #  endif
 # endif
 
-# if 0  /// @todo
+# if 0  /// @todo add more local imported modules here
     // wasip2
     inline bool local_preload_wasip2{true};  // [global]
     // wasip3
