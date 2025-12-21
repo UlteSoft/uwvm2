@@ -101,7 +101,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t const* wws;
 #endif
 
-        local_imported_t const* li;
+        // local_import
+        // note: This does not use a const pointer because partial member function calls can be made directly from it.
+        local_imported_t* li;
     };
 
     struct all_module_t
@@ -161,7 +163,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
     struct local_imported_export_t
     {
-        local_imported_t const* storage{};
+        // note: This does not use a const pointer because partial member function calls can be made directly from it.
+        local_imported_t* storage{};
         ::std::size_t index{};
         local_imported_export_type_t type{};
     };

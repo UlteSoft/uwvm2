@@ -1666,13 +1666,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return this->ptr->memory_grow_from_index(index, grow_page_size);
         }
 
+        inline constexpr ::std::byte const* memory_begin_from_index(::std::size_t index) const noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->memory_begin_from_index(index);
+        }
+
         inline constexpr ::std::byte* memory_begin_from_index(::std::size_t index) noexcept
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return this->ptr->memory_begin_from_index(index);
         }
 
-        inline constexpr ::std::uint_least64_t memory_size_from_index(::std::size_t index) noexcept
+        inline constexpr ::std::uint_least64_t memory_size_from_index(::std::size_t index) const noexcept
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return this->ptr->memory_size_from_index(index);
@@ -1697,7 +1703,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             return this->ptr->global_is_mutable_from_index(index);
         }
 
-        inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) noexcept
+        inline constexpr void global_get_from_index(::std::size_t index, ::std::byte* out) const noexcept
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             this->ptr->global_get_from_index(index, out);
