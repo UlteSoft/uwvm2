@@ -789,6 +789,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
             virtual inline constexpr bool init_local_imported_module() noexcept = 0;
 
+            virtual inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept = 0;
+
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_index(::std::size_t index) const noexcept = 0;
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
@@ -1289,6 +1291,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                 }
             }
 
+            virtual inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept override { return module.module_name; }
+
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_index(::std::size_t index) const noexcept override
             {
@@ -1620,6 +1624,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return true; }
             return this->ptr->init_local_imported_module();
+        }
+
+        inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept
+        {
+            if(this->ptr == nullptr) { return {}; }
+            return this->ptr->get_module_name();
         }
 
         inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>

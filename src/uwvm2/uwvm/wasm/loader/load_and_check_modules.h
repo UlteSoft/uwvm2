@@ -161,7 +161,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
         // local modules
         {
-            /// @todo
+            for(auto& lim: ::uwvm2::uwvm::wasm::storage::preload_local_imported)
+            {
+                auto const module_name{lim.get_module_name()};
+
+                if(!::uwvm2::uwvm::wasm::storage::all_module
+                        .try_emplace(module_name,
+                                     ::uwvm2::uwvm::wasm::type::all_module_t{.module_storage_ptr = {.li = ::std::addressof(lim)},
+                                                                             .type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import})
+                        .second) [[unlikely]]
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        u8"[error] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Duplicate WASM module names: \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    return load_and_check_modules_rtl::duplicate_module_name;
+                }
+            }
         }
 
         // exec wasm
@@ -464,7 +488,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     }
 #endif
 
-                                        /// @todo local_import
+                                    case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
+                                    {
+                                        auto const imported_local_ptr{imported_module.second.module_storage_ptr.li};
+
+                                        auto [curr_exported_module, inserted]{
+                                            ::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+
+                                        if(inserted) [[unlikely]]
+                                        {
+                                            auto const fn_all{imported_local_ptr->get_all_function_information()};
+                                            auto const gl_all{imported_local_ptr->get_all_global_information()};
+                                            auto const mem_all{imported_local_ptr->get_all_memory_information()};
+
+                                            auto const fn_count{static_cast<::std::size_t>(fn_all.end - fn_all.begin)};
+                                            auto const gl_count{static_cast<::std::size_t>(gl_all.end - gl_all.begin)};
+                                            auto const mem_count{static_cast<::std::size_t>(mem_all.end - mem_all.begin)};
+                                            curr_exported_module->second.reserve(fn_count + gl_count + mem_count);
+
+                                            for(auto const* it{fn_all.begin}; it != fn_all.end; ++it)
+                                            {
+                                                ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                                auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                                li_export.storage = imported_local_ptr;
+                                                li_export.index = it->index;
+                                                li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::func;
+                                                static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                                curr_exported_module->second.emplace(it->function_name, export_record);
+                                            }
+
+                                            for(auto const* it{gl_all.begin}; it != gl_all.end; ++it)
+                                            {
+                                                ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                                auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                                li_export.storage = imported_local_ptr;
+                                                li_export.index = it->index;
+                                                li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::global;
+                                                static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                                curr_exported_module->second.emplace(it->global_name, export_record);
+                                            }
+
+                                            for(auto const* it{mem_all.begin}; it != mem_all.end; ++it)
+                                            {
+                                                ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                                export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                                auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                                li_export.storage = imported_local_ptr;
+                                                li_export.index = it->index;
+                                                li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::memory;
+                                                static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                                curr_exported_module->second.emplace(it->memory_name, export_record);
+                                            }
+                                        }
+
+                                        curr_exported = curr_exported_module;
+
+                                        break;
+                                    }
 
                                     [[unlikely]] default:
                                     {
@@ -543,7 +625,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 }
 #endif
 
-                    /// @todo local_import
+                case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
+                {
+                    // Local imported modules (host-side) currently don't import other modules, so no dependency edges are added.
+                    // Construct export map on demand in import checks.
+                    break;
+                }
 
                 [[unlikely]] default:
                 {
