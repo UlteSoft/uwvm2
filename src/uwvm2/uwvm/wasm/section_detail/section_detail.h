@@ -315,7 +315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      "]:\n");
                 }
-                if constexpr(::std::same_as<char_type, wchar_t>)
+                else if constexpr(::std::same_as<char_type, wchar_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      L"======================\nPreloaded DL Module Name: ",
@@ -326,7 +326,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      L"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char8_t>)
+                else if constexpr(::std::same_as<char_type, char8_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      u8"======================\nPreloaded DL Module Name: ",
@@ -337,7 +337,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      u8"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char16_t>)
+                else if constexpr(::std::same_as<char_type, char16_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      u"======================\nPreloaded DL Module Name: ",
@@ -348,7 +348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      u"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char32_t>)
+                else if constexpr(::std::same_as<char_type, char32_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      U"======================\nPreloaded DL Module Name: ",
@@ -379,7 +379,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          "> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          L" - func[",
@@ -388,7 +388,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          L"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u8" - func[",
@@ -397,7 +397,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          func_name,
                                                                          u8"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u" - func[",
@@ -406,7 +406,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          u"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          U" - func[",
@@ -432,19 +432,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
                             }
-                            if constexpr(::std::same_as<char_type, wchar_t>)
+                            else if constexpr(::std::same_as<char_type, wchar_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
                             }
-                            if constexpr(::std::same_as<char_type, char8_t>)
+                            else if constexpr(::std::same_as<char_type, char8_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
                             }
-                            if constexpr(::std::same_as<char_type, char16_t>)
+                            else if constexpr(::std::same_as<char_type, char16_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
                             }
-                            if constexpr(::std::same_as<char_type, char32_t>)
+                            else if constexpr(::std::same_as<char_type, char32_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
                             }
@@ -457,19 +457,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     }
 
                     if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ") -> "); }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U") -> ");
                     }
@@ -484,19 +484,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"nil\n");
                         }
@@ -523,19 +523,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         // output "(i32, i32)"
 
                         if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "("); }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"(");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"(");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"(");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"(");
                         }
@@ -556,19 +556,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
                                 }
-                                if constexpr(::std::same_as<char_type, wchar_t>)
+                                else if constexpr(::std::same_as<char_type, wchar_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char8_t>)
+                                else if constexpr(::std::same_as<char_type, char8_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char16_t>)
+                                else if constexpr(::std::same_as<char_type, char16_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char32_t>)
+                                else if constexpr(::std::same_as<char_type, char32_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
                                 }
@@ -581,19 +581,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         }
 
                         if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ")\n"); }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U")\n");
                         }
@@ -616,19 +616,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Custom Handler[", handler_size, "]:\n");
                 }
-                if constexpr(::std::same_as<char_type, wchar_t>)
+                else if constexpr(::std::same_as<char_type, wchar_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Custom Handler[", handler_size, L"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char8_t>)
+                else if constexpr(::std::same_as<char_type, char8_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Custom Handler[", handler_size, u8"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char16_t>)
+                else if constexpr(::std::same_as<char_type, char16_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Custom Handler[", handler_size, u"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char32_t>)
+                else if constexpr(::std::same_as<char_type, char32_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Custom Handler[", handler_size, U"]:\n");
                 }
@@ -650,7 +650,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          ">\n");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          L" - custom[",
@@ -659,7 +659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          L">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u8" - custom[",
@@ -668,7 +668,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          custom_name,
                                                                          u8">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u" - custom[",
@@ -677,7 +677,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          u">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          U" - custom[",
@@ -733,7 +733,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      "]:\n");
                 }
-                if constexpr(::std::same_as<char_type, wchar_t>)
+                else if constexpr(::std::same_as<char_type, wchar_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      L"======================\nWeak Symbol Module Name: ",
@@ -742,7 +742,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      L"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char8_t>)
+                else if constexpr(::std::same_as<char_type, char8_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      u8"======================\nWeak Symbol Module Name: ",
@@ -751,7 +751,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      u8"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char16_t>)
+                else if constexpr(::std::same_as<char_type, char16_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      u"======================\nWeak Symbol Module Name: ",
@@ -760,7 +760,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                      func_size,
                                                                      u"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char32_t>)
+                else if constexpr(::std::same_as<char_type, char32_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                      U"======================\nWeak Symbol Module Name: ",
@@ -789,7 +789,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          "> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          L" - func[",
@@ -798,7 +798,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          L"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u8" - func[",
@@ -807,7 +807,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          func_name,
                                                                          u8"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u" - func[",
@@ -816,7 +816,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(func_name),
                                                                          u"> sig: (");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          U" - func[",
@@ -842,19 +842,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
                             }
-                            if constexpr(::std::same_as<char_type, wchar_t>)
+                            else if constexpr(::std::same_as<char_type, wchar_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
                             }
-                            if constexpr(::std::same_as<char_type, char8_t>)
+                            else if constexpr(::std::same_as<char_type, char8_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
                             }
-                            if constexpr(::std::same_as<char_type, char16_t>)
+                            else if constexpr(::std::same_as<char_type, char16_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
                             }
-                            if constexpr(::std::same_as<char_type, char32_t>)
+                            else if constexpr(::std::same_as<char_type, char32_t>)
                             {
                                 ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
                             }
@@ -867,19 +867,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     }
 
                     if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ") -> "); }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u") -> ");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U") -> ");
                     }
@@ -894,19 +894,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"nil\n");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"nil\n");
                         }
@@ -933,19 +933,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         // output "(i32, i32)"
 
                         if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "("); }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"(");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"(");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"(");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"(");
                         }
@@ -966,19 +966,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ", ");
                                 }
-                                if constexpr(::std::same_as<char_type, wchar_t>)
+                                else if constexpr(::std::same_as<char_type, wchar_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char8_t>)
+                                else if constexpr(::std::same_as<char_type, char8_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char16_t>)
+                                else if constexpr(::std::same_as<char_type, char16_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u", ");
                                 }
-                                if constexpr(::std::same_as<char_type, char32_t>)
+                                else if constexpr(::std::same_as<char_type, char32_t>)
                                 {
                                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U", ");
                                 }
@@ -991,19 +991,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                         }
 
                         if constexpr(::std::same_as<char_type, char>) { ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), ")\n"); }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u")\n");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U")\n");
                         }
@@ -1026,19 +1026,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Custom Handler[", handler_size, "]:\n");
                 }
-                if constexpr(::std::same_as<char_type, wchar_t>)
+                else if constexpr(::std::same_as<char_type, wchar_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Custom Handler[", handler_size, L"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char8_t>)
+                else if constexpr(::std::same_as<char_type, char8_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Custom Handler[", handler_size, u8"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char16_t>)
+                else if constexpr(::std::same_as<char_type, char16_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Custom Handler[", handler_size, u"]:\n");
                 }
-                if constexpr(::std::same_as<char_type, char32_t>)
+                else if constexpr(::std::same_as<char_type, char32_t>)
                 {
                     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Custom Handler[", handler_size, U"]:\n");
                 }
@@ -1060,7 +1060,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          ">\n");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          L" - custom[",
@@ -1069,7 +1069,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          L">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u8" - custom[",
@@ -1078,7 +1078,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          custom_name,
                                                                          u8">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          u" - custom[",
@@ -1087,7 +1087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                          ::fast_io::mnp::code_cvt(custom_name),
                                                                          u">\n");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                          U" - custom[",
@@ -1126,25 +1126,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                     "======================\nLocal Imported Module Name: ",
                                                                     ::fast_io::mnp::code_cvt(module_name));
                 }
-                if constexpr(::std::same_as<char_type, wchar_t>)
+                else if constexpr(::std::same_as<char_type, wchar_t>)
                 {
                     ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                     L"======================\nLocal Imported Module Name: ",
                                                                     ::fast_io::mnp::code_cvt(module_name));
                 }
-                if constexpr(::std::same_as<char_type, char8_t>)
+                else if constexpr(::std::same_as<char_type, char8_t>)
                 {
                     ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                     u8"======================\nLocal Imported Module Name: ",
                                                                     module_name);
                 }
-                if constexpr(::std::same_as<char_type, char16_t>)
+                else if constexpr(::std::same_as<char_type, char16_t>)
                 {
                     ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                     u"======================\nLocal Imported Module Name: ",
                                                                     ::fast_io::mnp::code_cvt(module_name));
                 }
-                if constexpr(::std::same_as<char_type, char32_t>)
+                else if constexpr(::std::same_as<char_type, char32_t>)
                 {
                     ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                     U"======================\nLocal Imported Module Name: ",
@@ -1157,19 +1157,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Function[", fn_count, "]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Function[", fn_count, L"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Function[", fn_count, u8"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Function[", fn_count, u"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Function[", fn_count, U"]:\n");
                     }
@@ -1189,7 +1189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             "> type: ",
                                                                             section_details_adl_caller(it_func_type));
                         }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             L" - func[",
@@ -1199,7 +1199,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             L"> type: ",
                                                                             section_details_adl_caller(it_func_type));
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             u8" - func[",
@@ -1209,7 +1209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             u8"> type: ",
                                                                             section_details_adl_caller(it_func_type));
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             u" - func[",
@@ -1219,7 +1219,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             u"> type: ",
                                                                             section_details_adl_caller(it_func_type));
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             U" - func[",
@@ -1238,19 +1238,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Global[", gl_count, "]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Global[", gl_count, L"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Global[", gl_count, u8"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Global[", gl_count, u"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Global[", gl_count, U"]:\n");
                     }
@@ -1272,7 +1272,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             ", type: ",
                                                                             section_details_adl_caller(it_global_type));
                         }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             L" - global[",
@@ -1284,7 +1284,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             L", type: ",
                                                                             section_details_adl_caller(it_global_type));
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             u8" - global[",
@@ -1296,7 +1296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             u8", type: ",
                                                                             section_details_adl_caller(it_global_type));
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             u" - global[",
@@ -1308,7 +1308,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                             u", type: ",
                                                                             section_details_adl_caller(it_global_type));
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
                                                                             U" - global[",
@@ -1329,19 +1329,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Memory[", mem_count, "]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    else if constexpr(::std::same_as<char_type, wchar_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Memory[", mem_count, L"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char8_t>)
+                    else if constexpr(::std::same_as<char_type, char8_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Memory[", mem_count, u8"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char16_t>)
+                    else if constexpr(::std::same_as<char_type, char16_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Memory[", mem_count, u"]:\n");
                     }
-                    if constexpr(::std::same_as<char_type, char32_t>)
+                    else if constexpr(::std::same_as<char_type, char32_t>)
                     {
                         ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Memory[", mem_count, U"]:\n");
                     }
@@ -1361,7 +1361,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                              it->page_size,
                                                                              " bytes\n");
                         }
-                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        else if constexpr(::std::same_as<char_type, wchar_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                              L" - memory[",
@@ -1372,7 +1372,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                              it->page_size,
                                                                              L" bytes\n");
                         }
-                        if constexpr(::std::same_as<char_type, char8_t>)
+                        else if constexpr(::std::same_as<char_type, char8_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                              u8" - memory[",
@@ -1383,7 +1383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                              it->page_size,
                                                                              u8" bytes\n");
                         }
-                        if constexpr(::std::same_as<char_type, char16_t>)
+                        else if constexpr(::std::same_as<char_type, char16_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                              u" - memory[",
@@ -1394,7 +1394,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
                                                                              it->page_size,
                                                                              u" bytes\n");
                         }
-                        if constexpr(::std::same_as<char_type, char32_t>)
+                        else if constexpr(::std::same_as<char_type, char32_t>)
                         {
                             ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
                                                                              U" - memory[",
