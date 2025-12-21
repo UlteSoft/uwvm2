@@ -492,8 +492,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     {
                                         auto const imported_local_ptr{imported_module.second.module_storage_ptr.li};
 
-                                        auto [curr_exported_module, inserted]{
-                                            ::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
+                                        auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(import_module_name)};
 
                                         if(inserted) [[unlikely]]
                                         {
@@ -501,12 +500,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                             auto const gl_all{imported_local_ptr->get_all_global_information()};
                                             auto const mem_all{imported_local_ptr->get_all_memory_information()};
 
-                                            auto const fn_count{static_cast<::std::size_t>(fn_all.end - fn_all.begin)};
-                                            auto const gl_count{static_cast<::std::size_t>(gl_all.end - gl_all.begin)};
-                                            auto const mem_count{static_cast<::std::size_t>(mem_all.end - mem_all.begin)};
-                                            curr_exported_module->second.reserve(fn_count + gl_count + mem_count);
+                                            // Total export count is known at compile-time for local imported modules
+                                            // (sum of function/global/memory tuples), so no runtime overflow checks are needed here.
+                                            curr_exported_module->second.reserve(imported_local_ptr->get_total_export_count());
 
-                                            for(auto const* it{fn_all.begin}; it != fn_all.end; ++it)
+                                            for(auto it{fn_all.begin}; it != fn_all.end; ++it)
                                             {
                                                 ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
                                                 export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
@@ -518,7 +516,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 curr_exported_module->second.emplace(it->function_name, export_record);
                                             }
 
-                                            for(auto const* it{gl_all.begin}; it != gl_all.end; ++it)
+                                            for(auto it{gl_all.begin}; it != gl_all.end; ++it)
                                             {
                                                 ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
                                                 export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
@@ -530,7 +528,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 curr_exported_module->second.emplace(it->global_name, export_record);
                                             }
 
-                                            for(auto const* it{mem_all.begin}; it != mem_all.end; ++it)
+                                            for(auto it{mem_all.begin}; it != mem_all.end; ++it)
                                             {
                                                 ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
                                                 export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
@@ -624,14 +622,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                     break;
                 }
 #endif
-
                 case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
                 {
                     // Local imported modules (host-side) currently don't import other modules, so no dependency edges are added.
                     // Construct export map on demand in import checks.
                     break;
                 }
-
                 [[unlikely]] default:
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

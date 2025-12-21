@@ -29,6 +29,7 @@
 # include <new>
 # include <memory>
 # include <vector>
+# include <limits>
 # include <algorithm>
 # include <type_traits>
 # include <utility>
@@ -790,6 +791,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual inline constexpr bool init_local_imported_module() noexcept = 0;
 
             virtual inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept = 0;
+            virtual inline constexpr ::std::size_t get_total_export_count() const noexcept = 0;
 
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_index(::std::size_t index) const noexcept = 0;
@@ -992,6 +994,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             inline static constexpr auto global_information{
                 make_all_global_information_array_impl<tuple_type, Fs...>(::std::make_index_sequence<tuple_size>{})};
         };
+
+        inline consteval ::std::size_t add_sizes_no_overflow(::std::size_t a, ::std::size_t b) noexcept
+        {
+            constexpr ::std::size_t max{(::std::numeric_limits<::std::size_t>::max)()};
+            if(a > max - b) { ::fast_io::fast_terminate(); }
+            return a + b;
+        }
+
+        template <typename Module>
+        inline consteval ::std::size_t local_imported_total_export_count() noexcept
+        {
+            using rcvmod_type = ::std::remove_cvref_t<Module>;
+
+            constexpr ::std::size_t func_count{[]() consteval noexcept -> ::std::size_t
+                                               {
+                                                   if constexpr(::uwvm2::uwvm::wasm::type::has_local_function_tuple<rcvmod_type>)
+                                                   {
+                                                       using tuple_type = typename rcvmod_type::local_function_tuple;
+                                                       return ::fast_io::tuple_size<::std::remove_cvref_t<tuple_type>>::value;
+                                                   }
+                                                   else
+                                                   {
+                                                       return 0uz;
+                                                   }
+                                               }()};
+
+            constexpr ::std::size_t global_count{[]() consteval noexcept -> ::std::size_t
+                                                 {
+                                                     if constexpr(::uwvm2::uwvm::wasm::type::has_local_global_tuple<rcvmod_type>)
+                                                     {
+                                                         using tuple_type = typename rcvmod_type::local_global_tuple;
+                                                         return ::fast_io::tuple_size<::std::remove_cvref_t<tuple_type>>::value;
+                                                     }
+                                                     else
+                                                     {
+                                                         return 0uz;
+                                                     }
+                                                 }()};
+
+            constexpr ::std::size_t mem_count{[]() consteval noexcept -> ::std::size_t
+                                              {
+                                                  if constexpr(::uwvm2::uwvm::wasm::type::has_local_memory_tuple<rcvmod_type>)
+                                                  {
+                                                      using tuple_type = typename rcvmod_type::local_memory_tuple;
+                                                      return ::fast_io::tuple_size<::std::remove_cvref_t<tuple_type>>::value;
+                                                  }
+                                                  else
+                                                  {
+                                                      return 0uz;
+                                                  }
+                                              }()};
+
+            constexpr ::std::size_t fg{add_sizes_no_overflow(func_count, global_count)};
+            constexpr ::std::size_t total{add_sizes_no_overflow(fg, mem_count)};
+            return total;
+        }
 
         template <typename Tuple, ::std::size_t... I>
         inline constexpr void unpack_packed_to_tuple_impl(Tuple& dst, ::std::byte const* src, ::std::index_sequence<I...>) noexcept
@@ -1292,6 +1350,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             }
 
             virtual inline constexpr ::uwvm2::utils::container::u8string_view get_module_name() const noexcept override { return module.module_name; }
+
+            virtual inline constexpr ::std::size_t get_total_export_count() const noexcept override { return local_imported_total_export_count<rcvmod_type>(); }
 
             virtual inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
                 get_function_information_from_index(::std::size_t index) const noexcept override
@@ -1630,6 +1690,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) { return {}; }
             return this->ptr->get_module_name();
+        }
+
+        inline constexpr ::std::size_t get_total_export_count() const noexcept
+        {
+            if(this->ptr == nullptr) { return 0uz; }
+            return this->ptr->get_total_export_count();
         }
 
         inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>

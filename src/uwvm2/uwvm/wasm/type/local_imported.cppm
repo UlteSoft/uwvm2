@@ -28,6 +28,7 @@ module;
 #include <new>
 #include <memory>
 #include <vector>
+#include <limits>
 #include <algorithm>
 #include <type_traits>
 #include <utility>
