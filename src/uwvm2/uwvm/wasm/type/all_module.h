@@ -78,8 +78,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         local_import  // wasip1, wasip2, ...
     };
 
-    // all module
+    // binfmt version 1
+    using binfmt_ver1_feature_list_t =
+        decltype(::uwvm2::uwvm::wasm::type::get_feature_list_from_tuple_impl(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+    using local_imported_t =
+        decltype(::uwvm2::uwvm::wasm::type::get_local_imported_module_from_feature_list(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    // all module
     union module_storage_ptr_u
     {
         // exec_wasm
@@ -96,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t const* wws;
 #endif
 
-        /// @todo local_import
+        local_imported_t const* li;
     };
 
     struct all_module_t
@@ -147,14 +152,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
     };
 #endif
 
-    using binfmt_ver1_feature_list_t =
-        decltype(::uwvm2::uwvm::wasm::type::get_feature_list_from_tuple_impl(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+    enum class local_imported_export_type_t : unsigned
+    {
+        func,
+        global,
+        memory
+    };
 
     struct local_imported_export_t
     {
-        using local_imported_export_storage_t =
-            decltype(::uwvm2::uwvm::wasm::type::get_local_imported_module_from_feature_list(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
-        local_imported_export_storage_t const* storage{};
+        local_imported_t const* storage{};
+        ::std::size_t index{};
+        local_imported_export_type_t type{};
     };
 
     struct all_module_export_t
