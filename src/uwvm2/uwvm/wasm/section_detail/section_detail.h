@@ -59,9 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
     };
 
     inline constexpr section_details_t section_details(::uwvm2::uwvm::wasm::type::all_module_t const& module_storage) noexcept
-    {
-        return {::std::addressof(module_storage)};
-    }
+    { return {::std::addressof(module_storage)}; }
 
     template <typename T>
     inline constexpr decltype(auto) section_details_adl_caller(T && t) noexcept
@@ -1108,7 +1106,311 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
 #endif
             case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
             {
-                /// @todo local imported module section details
+                auto const li_ptr{module_storage.module_storage_ptr.li};
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(li_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+
+                auto const module_name{li_ptr->get_module_name()};
+                auto const fn_all{li_ptr->get_all_function_information()};
+                auto const gl_all{li_ptr->get_all_global_information()};
+                auto const mem_all{li_ptr->get_all_memory_information()};
+
+                auto const fn_count{static_cast<::std::size_t>(fn_all.end - fn_all.begin)};
+                auto const gl_count{static_cast<::std::size_t>(gl_all.end - gl_all.begin)};
+                auto const mem_count{static_cast<::std::size_t>(mem_all.end - mem_all.begin)};
+
+                if constexpr(::std::same_as<char_type, char>)
+                {
+                    ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                    "======================\nLocal Imported Module Name: ",
+                                                                    ::fast_io::mnp::code_cvt(module_name));
+                }
+                if constexpr(::std::same_as<char_type, wchar_t>)
+                {
+                    ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                    L"======================\nLocal Imported Module Name: ",
+                                                                    ::fast_io::mnp::code_cvt(module_name));
+                }
+                if constexpr(::std::same_as<char_type, char8_t>)
+                {
+                    ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                    u8"======================\nLocal Imported Module Name: ",
+                                                                    module_name);
+                }
+                if constexpr(::std::same_as<char_type, char16_t>)
+                {
+                    ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                    u"======================\nLocal Imported Module Name: ",
+                                                                    ::fast_io::mnp::code_cvt(module_name));
+                }
+                if constexpr(::std::same_as<char_type, char32_t>)
+                {
+                    ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                    U"======================\nLocal Imported Module Name: ",
+                                                                    ::fast_io::mnp::code_cvt(module_name));
+                }
+
+                if(fn_count != 0uz)
+                {
+                    if constexpr(::std::same_as<char_type, char>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Function[", fn_count, "]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Function[", fn_count, L"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Function[", fn_count, u8"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Function[", fn_count, u"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Function[", fn_count, U"]:\n");
+                    }
+
+                    for(auto it{fn_all.begin}; it != fn_all.end; ++it)
+                    {
+                        auto const it_func_name{it->function_name};
+                        auto const it_func_type{it->function_type};
+
+                        if constexpr(::std::same_as<char_type, char>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            " - func[",
+                                                                            it->index,
+                                                                            "] <",
+                                                                            ::fast_io::mnp::code_cvt(it_func_name),
+                                                                            "> type: ",
+                                                                            section_details_adl_caller(it_func_type));
+                        }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            L" - func[",
+                                                                            it->index,
+                                                                            L"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_func_name),
+                                                                            L"> type: ",
+                                                                            section_details_adl_caller(it_func_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            u8" - func[",
+                                                                            it->index,
+                                                                            u8"] <",
+                                                                            it_func_name,
+                                                                            u8"> type: ",
+                                                                            section_details_adl_caller(it_func_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            u" - func[",
+                                                                            it->index,
+                                                                            u"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_func_name),
+                                                                            u"> type: ",
+                                                                            section_details_adl_caller(it_func_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            U" - func[",
+                                                                            it->index,
+                                                                            U"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_func_name),
+                                                                            U"> type: ",
+                                                                            section_details_adl_caller(it_func_type));
+                        }
+                    }
+                }
+
+                if(gl_count != 0uz)
+                {
+                    if constexpr(::std::same_as<char_type, char>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Global[", gl_count, "]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Global[", gl_count, L"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Global[", gl_count, u8"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Global[", gl_count, u"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Global[", gl_count, U"]:\n");
+                    }
+
+                    for(auto it{gl_all.begin}; it != gl_all.end; ++it)
+                    {
+                        auto const it_global_name{it->global_name};
+                        auto const it_global_type{it->value_type};
+
+                        if constexpr(::std::same_as<char_type, char>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            " - global[",
+                                                                            it->index,
+                                                                            "] <",
+                                                                            ::fast_io::mnp::code_cvt(it_global_name),
+                                                                            "> mutable: ",
+                                                                            ::fast_io::mnp::boolalpha(it->is_mutable),
+                                                                            ", type: ",
+                                                                            section_details_adl_caller(it_global_type));
+                        }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            L" - global[",
+                                                                            it->index,
+                                                                            L"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_global_name),
+                                                                            L"> mutable: ",
+                                                                            ::fast_io::mnp::boolalpha(it->is_mutable),
+                                                                            L", type: ",
+                                                                            section_details_adl_caller(it_global_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            u8" - global[",
+                                                                            it->index,
+                                                                            u8"] <",
+                                                                            it_global_name,
+                                                                            u8"> mutable: ",
+                                                                            ::fast_io::mnp::boolalpha(it->is_mutable),
+                                                                            u8", type: ",
+                                                                            section_details_adl_caller(it_global_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            u" - global[",
+                                                                            it->index,
+                                                                            u"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_global_name),
+                                                                            u"> mutable: ",
+                                                                            ::fast_io::mnp::boolalpha(it->is_mutable),
+                                                                            u", type: ",
+                                                                            section_details_adl_caller(it_global_type));
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream),
+                                                                            U" - global[",
+                                                                            it->index,
+                                                                            U"] <",
+                                                                            ::fast_io::mnp::code_cvt(it_global_name),
+                                                                            U"> mutable: ",
+                                                                            ::fast_io::mnp::boolalpha(it->is_mutable),
+                                                                            U", type: ",
+                                                                            section_details_adl_caller(it_global_type));
+                        }
+                    }
+                }
+
+                if(mem_count != 0uz)
+                {
+                    if constexpr(::std::same_as<char_type, char>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "Memory[", mem_count, "]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, wchar_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"Memory[", mem_count, L"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char8_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"Memory[", mem_count, u8"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char16_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"Memory[", mem_count, u"]:\n");
+                    }
+                    if constexpr(::std::same_as<char_type, char32_t>)
+                    {
+                        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"Memory[", mem_count, U"]:\n");
+                    }
+
+                    for(auto it{mem_all.begin}; it != mem_all.end; ++it)
+                    {
+                        auto const it_mem_name{it->memory_name};
+
+                        if constexpr(::std::same_as<char_type, char>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                             " - memory[",
+                                                                             it->index,
+                                                                             "] <",
+                                                                             ::fast_io::mnp::code_cvt(it_mem_name),
+                                                                             "> page_size: ",
+                                                                             it->page_size,
+                                                                             " bytes\n");
+                        }
+                        if constexpr(::std::same_as<char_type, wchar_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                             L" - memory[",
+                                                                             it->index,
+                                                                             L"] <",
+                                                                             ::fast_io::mnp::code_cvt(it_mem_name),
+                                                                             L"> page_size: ",
+                                                                             it->page_size,
+                                                                             L" bytes\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char8_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                             u8" - memory[",
+                                                                             it->index,
+                                                                             u8"] <",
+                                                                             it_mem_name,
+                                                                             u8"> page_size: ",
+                                                                             it->page_size,
+                                                                             u8" bytes\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char16_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                             u" - memory[",
+                                                                             it->index,
+                                                                             u"] <",
+                                                                             ::fast_io::mnp::code_cvt(it_mem_name),
+                                                                             u"> page_size: ",
+                                                                             it->page_size,
+                                                                             u" bytes\n");
+                        }
+                        if constexpr(::std::same_as<char_type, char32_t>)
+                        {
+                            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                             U" - memory[",
+                                                                             it->index,
+                                                                             U"] <",
+                                                                             ::fast_io::mnp::code_cvt(it_mem_name),
+                                                                             U"> page_size: ",
+                                                                             it->page_size,
+                                                                             U" bytes\n");
+                        }
+                    }
+                }
+
+                // print_freestanding<true> includes a newline
+                ::fast_io::operations::print_freestanding<true>(::std::forward<Stm>(stream));
+
                 break;
             }
             [[unlikely]] default:
