@@ -25,7 +25,33 @@
 
 #include <uwvm2/imported/wasi/wasip1/func/path_filestat_get_wasm64.h>
 #include <uwvm2/imported/wasi/wasip1/func/fd_filestat_get_wasm64.h>
+#ifdef UWVM_DLLIMPORT
+# error "UWVM_DLLIMPORT existed"
+#endif
 
+#ifdef UWVM_WASM_SUPPORT_WASM1
+# error "UWVM_WASM_SUPPORT_WASM1 existed"
+#endif
+
+#ifdef UWVM_AES_RST_ALL
+# error "UWVM_AES_RST_ALL existed"
+#endif
+
+#ifdef UWVM_COLOR_RST_ALL
+# error "UWVM_COLOR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
+# error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI
+# error "UWVM_IMPORT_WASI existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
+# error "UWVM_IMPORT_WASI_WASIP1 existed"
+#endif
 using ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t;
 using ::uwvm2::imported::wasi::wasip1::abi::filetype_wasm64_t;
 using ::uwvm2::imported::wasi::wasip1::abi::lookupflags_wasm64_t;

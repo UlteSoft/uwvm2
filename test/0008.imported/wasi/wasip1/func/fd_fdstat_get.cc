@@ -27,6 +27,33 @@
 #include <uwvm2/imported/wasi/wasip1/func/fd_close.h>
 #include <uwvm2/imported/wasi/wasip1/func/posix.h>
 #include <uwvm2/imported/wasi/wasip1/fd_manager/fd.h>
+#ifdef UWVM_DLLIMPORT
+# error "UWVM_DLLIMPORT existed"
+#endif
+
+#ifdef UWVM_WASM_SUPPORT_WASM1
+# error "UWVM_WASM_SUPPORT_WASM1 existed"
+#endif
+
+#ifdef UWVM_AES_RST_ALL
+# error "UWVM_AES_RST_ALL existed"
+#endif
+
+#ifdef UWVM_COLOR_RST_ALL
+# error "UWVM_COLOR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
+# error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI
+# error "UWVM_IMPORT_WASI existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
+# error "UWVM_IMPORT_WASI_WASIP1 existed"
+#endif
 #if defined(_WIN32) && !defined(__CYGWIN__)
 
 int main()

@@ -25,7 +25,33 @@
 #include <fast_io.h>
 
 #include <uwvm2/imported/wasi/wasip1/func/proc_raise_wasm64.h>
+#ifdef UWVM_DLLIMPORT
+# error "UWVM_DLLIMPORT existed"
+#endif
 
+#ifdef UWVM_WASM_SUPPORT_WASM1
+# error "UWVM_WASM_SUPPORT_WASM1 existed"
+#endif
+
+#ifdef UWVM_AES_RST_ALL
+# error "UWVM_AES_RST_ALL existed"
+#endif
+
+#ifdef UWVM_COLOR_RST_ALL
+# error "UWVM_COLOR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_WIN32_TEXTATTR_RST_ALL
+# error "UWVM_WIN32_TEXTATTR_RST_ALL existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI
+# error "UWVM_IMPORT_WASI existed"
+#endif
+
+#ifdef UWVM_IMPORT_WASI_WASIP1
+# error "UWVM_IMPORT_WASI_WASIP1 existed"
+#endif
 namespace
 {
     using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
