@@ -29,6 +29,7 @@ module;
 #include <concepts>
 #include <bit>
 // macro
+#include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/parser/wasm/feature/feature_push_macro.h>
 
 export module uwvm2.parser.wasm.standard.wasm1p1.type:value_type;

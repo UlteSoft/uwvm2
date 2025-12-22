@@ -26,6 +26,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+#include <bit>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 

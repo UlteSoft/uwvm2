@@ -43,7 +43,7 @@ module;
 # include <sys/stat.h>
 #endif
 
-export module uwvm2.imported.wasi.wasip1.func:fd_create_directory;
+export module uwvm2.imported.wasi.wasip1.func:path_filestat_get;
 
 import fast_io;
 import uwvm2.uwvm_predefine.utils.ansies;
@@ -66,5 +66,5 @@ import :fd_filestat_get;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "path_create_directory.h"
+#include "path_filestat_get.h"
 

@@ -23,9 +23,9 @@
 module;
 
 export module uwvm2.uwvm.imported.wasi.wasip1;
-export import uwvm2.uwvm.imported.wasi.wasip1:init;
-export import uwvm2.uwvm.imported.wasi.wasip1:storage;
-export import uwvm2.uwvm.imported.wasi.wasip1:local_imported;
+export import uwvm2.uwvm.imported.wasi.wasip1.init;
+export import uwvm2.uwvm.imported.wasi.wasip1.storage;
+export import uwvm2.uwvm.imported.wasi.wasip1.local_imported;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -43,7 +43,7 @@ module;
 # include <sys/stat.h>
 #endif
 
-export module uwvm2.imported.wasi.wasip1.func:fd_create_directory_wasm64;
+export module uwvm2.imported.wasi.wasip1.func:path_filestat_get_wasm64;
 
 import fast_io;
 import uwvm2.uwvm_predefine.utils.ansies;

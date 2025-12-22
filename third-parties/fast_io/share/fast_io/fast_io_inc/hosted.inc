@@ -128,4 +128,13 @@ using ::fast_io::posix_clock_getres;
 
 using ::fast_io::native_mutex;
 
+namespace this_thread
+{
+#if ((defined(_WIN32) && !defined(__WINE__)) && !defined(__CYGWIN__)) || (defined(__MSDOS__) || defined(__DJGPP__)) || defined(__wasi__) || (!defined(__SINGLE_THREAD__) && !defined(__NEWLIB__) && !defined(__MSDOS__) && __has_include(<pthread.h>))
+using ::fast_io::this_thread::get_id;
+using ::fast_io::this_thread::sleep_for;
+using ::fast_io::this_thread::sleep_until;
+using ::fast_io::this_thread::yield;
+#endif
+} // namespace this_thread
 } // namespace fast_io

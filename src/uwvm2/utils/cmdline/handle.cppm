@@ -30,8 +30,9 @@ module;
 #include <algorithm>
 #include <limits>
 #include <utility>
-// import
+// macro
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 
 export module uwvm2.utils.cmdline:handle;
 

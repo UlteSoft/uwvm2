@@ -2,6 +2,8 @@ export namespace fast_io
 {
 
 using ::fast_io::dir_file;
+using ::fast_io::dir_io_observer;
+
 using ::fast_io::basic_iobuf_pipe;
 using ::fast_io::basic_ibuf_file;
 using ::fast_io::basic_obuf_file;
