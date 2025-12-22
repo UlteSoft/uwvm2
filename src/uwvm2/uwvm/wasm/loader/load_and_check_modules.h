@@ -70,7 +70,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
     {
         ok,
         module_dependency_error,
-        duplicate_module_name
+        duplicate_module_name,
+        local_imported_module_init_error
     };
 
     inline load_and_check_modules_rtl construct_all_module_and_check_duplicate_module() noexcept
@@ -164,6 +165,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             for(auto& lim: ::uwvm2::uwvm::wasm::storage::preload_local_imported)
             {
                 auto const module_name{lim.get_module_name()};
+
+                // initialize local imported module
+                if(!lim.init_local_imported_module()) [[unlikely]]
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        u8"[error] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Initialize local imported module \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\" failed.\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    return load_and_check_modules_rtl::local_imported_module_init_error;
+                }
 
                 if(!::uwvm2::uwvm::wasm::storage::all_module
                         .try_emplace(module_name,

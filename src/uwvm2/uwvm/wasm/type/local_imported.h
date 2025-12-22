@@ -1680,6 +1680,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             // no necessary to set this->ptr = nullptr, mutiple call to destructor is ub
         }
 
+        // Called during the construct_all_module_and_check_duplicate_module() phase
         inline constexpr bool init_local_imported_module() noexcept
         {
             if(this->ptr == nullptr) { return true; }
