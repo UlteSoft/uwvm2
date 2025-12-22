@@ -49,7 +49,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasiu_wasip1_wasm64_disable_alias{u8"-Iui1w64disable"};
-        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type
             wasiu_wasip1_wasm64_disable_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;

@@ -47,7 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool wasm_list_weak_symbol_module_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view wasm_list_weak_symbol_module_alias{u8"-Wlsweak"};
-        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type
+        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type
             wasm_list_weak_symbol_module_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;

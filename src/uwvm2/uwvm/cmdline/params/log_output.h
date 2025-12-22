@@ -44,7 +44,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool log_output_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view log_output_alias{u8"-log"};
-        inline constexpr ::uwvm2::utils::cmdline::parameter_return_type log_output_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+        extern "C++"  ::uwvm2::utils::cmdline::parameter_return_type log_output_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
