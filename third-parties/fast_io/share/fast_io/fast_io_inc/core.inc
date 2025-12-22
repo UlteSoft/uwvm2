@@ -212,7 +212,13 @@ using ::fast_io::manipulators::ip_scan_generic;
 using ::fast_io::manipulators::cur_src_loc;
 
 using ::fast_io::manipulators::ip_scan_generic;
+using ::fast_io::manipulators::strvw;
 } // namespace manipulators
+
+namespace char_category
+{
+    using ::fast_io::char_category::is_dos_file_invalid_character;
+}
 
 namespace mnp = manipulators;
 

@@ -21,5 +21,7 @@ export namespace fast_io
 
     }
 
+    using ::fast_io::posix_socklen_t;
+
 #endif
 }
