@@ -177,5 +177,7 @@ using ::fast_io::ipv4;
 using ::fast_io::ipv6;
 
 using ::fast_io::native_dns_file;
+using ::fast_io::to_ip;
+using ::fast_io::to_ip_address;
 
 } // namespace fast_io
