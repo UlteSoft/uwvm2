@@ -31,5 +31,6 @@ export namespace fast_io
         using ::fast_io::win32::GetEnvironmentStringsA;
         using ::fast_io::win32::FreeEnvironmentStringsW;
         using ::fast_io::win32::FreeEnvironmentStringsA;
+
     } // namespace win32
 }

@@ -13,4 +13,5 @@ using ::fast_io::tuple;
 using ::fast_io::get;
 using ::fast_io::is_tuple;
 using ::fast_io::forward_as_tuple;
+using ::fast_io::tuple_size;
 } // namespace fast_io

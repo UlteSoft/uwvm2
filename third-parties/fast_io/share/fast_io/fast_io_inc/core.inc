@@ -252,6 +252,8 @@ using ::fast_io::operations::scatter_pread_some_bytes;
 
 using ::fast_io::operations::output_stream_ref;
 
+using ::fast_io::operations::io_stream_seek_bytes;
+
 namespace decay
 {
 using ::fast_io::operations::decay::scan_freestanding_decay;
@@ -328,6 +330,7 @@ using ::fast_io::bitops::rtz;
 } // namespace bitops
 
 // network
+using ::fast_io::ip;
 using ::fast_io::posix_empty_network_service;
 using ::fast_io::sock_family;
 using ::fast_io::sock_protocol;
@@ -346,6 +349,13 @@ using ::fast_io::ipv4_scan_state_t;
 using ::fast_io::ipv6_scan_state_t;
 using ::fast_io::ip_port_scan_state_t;
 #endif
+
+using ::fast_io::io_scatter_t;
+using ::fast_io::io_scatter_status_t;
+using ::fast_io::perms;
+using ::fast_io::intfpos_t;
+using ::fast_io::fposoffadd_scatters;
+using ::fast_io::seekdir;
 
 using ::fast_io::basic_timestamp;
 using ::fast_io::unix_timestamp;
