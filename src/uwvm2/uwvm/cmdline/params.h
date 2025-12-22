@@ -69,11 +69,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
 
-// wasi
+        // wasi
 #if defined(UWVM_IMPORT_WASI)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
 #endif
-// wasip1
+        // wasip1
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
@@ -85,6 +85,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_bind),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_udp_connect),
 #  endif
+            // wasi uextension: memory64
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasiu_wasip1_wasm64_disable),
 # endif
 #endif
 

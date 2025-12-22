@@ -52,7 +52,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
     // wasip1
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  if defined(UWVM_IMPORT_WASI_WASIP1)
-    inline bool local_preload_wasip1{true};  // [global]
+    // wasip1: WASI-Preview1
+    inline bool local_preload_wasip1{true};         // [global]
+    // wasip1: WASIU-WASI-Preview1-WASM64, Non-standard extension, but imported by default for security reasons.
+    inline bool local_preload_wasiu_wasip1_wasm64{true};  // [global]
 #  endif
 # endif
 

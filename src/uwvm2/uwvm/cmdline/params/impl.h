@@ -42,14 +42,15 @@
 # include "wasm_memory_grow_strict.h"
 
 // wasi
+# include "wasi_disable_utf8_check.h"
 # include "wasip1_set_fd_limit.h"
 # include "wasip1_mount_dir.h"
-# include "wasi_disable_utf8_check.h"
 # include "wasip1_disable.h"
 # include "wasip1_socket_tcp_listen.h"
 # include "wasip1_socket_tcp_connect.h"
 # include "wasip1_socket_udp_bind.h"
 # include "wasip1_socket_udp_connect.h"
+# include "wasiu_wasip1_wasm64_disable.h"
 
 // log
 # include "log_output.h"

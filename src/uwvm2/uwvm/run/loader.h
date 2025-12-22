@@ -114,6 +114,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
 
+        // This is solely for recording whether the wasip1 environment has been initialized. wasip1 and wasiu-wasip1-wasm64 share the same environment.
+        bool has_init_wasip1_environment{};
+
         if(::uwvm2::uwvm::wasm::storage::local_preload_wasip1)
         {
             // verbose
@@ -137,6 +140,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
             }
 
+            has_init_wasip1_environment = true;
+
             // verbose
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
@@ -158,6 +163,59 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             ::uwvm2::uwvm::wasm::storage::preload_local_imported.emplace_back(
                 ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module);
+        }
+
+        if(::uwvm2::uwvm::wasm::storage::local_preload_wasiu_wasip1_wasm64)
+        {
+            // This is solely for recording whether the wasip1 environment has been initialized. wasip1 and wasiu-wasip1-wasm64 share the same environment.
+
+            if(!has_init_wasip1_environment) [[unlikely]]
+            {
+                // verbose
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        u8"[info]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Initialize WASI-Preview1 environment. ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(verbose)\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                }
+
+                if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env))
+                    [[unlikely]]
+                {
+                    return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
+                }
+
+                has_init_wasip1_environment = true;
+            }
+
+            // verbose
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Loading local module \"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    u8"WASIU-WASI-Preview1-WASM64",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\". ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+
+            ::uwvm2::uwvm::wasm::storage::preload_local_imported.emplace_back(
+                ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_wasm64_local_imported_module);
         }
 # endif
 #endif

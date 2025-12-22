@@ -51,12 +51,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
 
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_disable_callback(
+    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasiu_wasip1_wasm64_disable_callback(
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
-        ::uwvm2::uwvm::wasm::storage::local_preload_wasip1 = false;
+        ::uwvm2::uwvm::wasm::storage::local_preload_wasiu_wasip1_wasm64 = false;
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }

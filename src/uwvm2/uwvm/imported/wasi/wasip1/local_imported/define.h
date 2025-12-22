@@ -163,6 +163,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             inline static constexpr ::uwvm2::utils::container::u8string_view function_name{Name};
         };
 
+        // wasi: WASI-Preview1
+
         inline constexpr char8_t name_args_get[] = u8"args_get";
         using args_get = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::args_get), name_args_get>;
 
@@ -311,6 +313,188 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
 
         inline constexpr char8_t name_sock_shutdown[] = u8"sock_shutdown";
         using sock_shutdown = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_shutdown), name_sock_shutdown>;
+
+        // wasi uextension: memory64. Non-standard extension, but imported by default for security reasons.
+
+        inline constexpr char8_t name_args_get_wasm64[] = u8"args_get_wasm64";
+        using args_get_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::args_get_wasm64), name_args_get_wasm64>;
+
+        inline constexpr char8_t name_args_sizes_get_wasm64[] = u8"args_sizes_get_wasm64";
+        using args_sizes_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::args_sizes_get_wasm64), name_args_sizes_get_wasm64>;
+
+        inline constexpr char8_t name_clock_res_get_wasm64[] = u8"clock_res_get_wasm64";
+        using clock_res_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_res_get_wasm64), name_clock_res_get_wasm64>;
+
+        inline constexpr char8_t name_clock_time_get_wasm64[] = u8"clock_time_get_wasm64";
+        using clock_time_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::clock_time_get_wasm64), name_clock_time_get_wasm64>;
+
+        inline constexpr char8_t name_environ_get_wasm64[] = u8"environ_get_wasm64";
+        using environ_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::environ_get_wasm64), name_environ_get_wasm64>;
+
+        inline constexpr char8_t name_environ_sizes_get_wasm64[] = u8"environ_sizes_get_wasm64";
+        using environ_sizes_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::environ_sizes_get_wasm64), name_environ_sizes_get_wasm64>;
+
+        inline constexpr char8_t name_fd_advise_wasm64[] = u8"fd_advise_wasm64";
+        using fd_advise_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_advise_wasm64), name_fd_advise_wasm64>;
+
+        inline constexpr char8_t name_fd_allocate_wasm64[] = u8"fd_allocate_wasm64";
+        using fd_allocate_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_allocate_wasm64), name_fd_allocate_wasm64>;
+
+        inline constexpr char8_t name_fd_close_wasm64[] = u8"fd_close_wasm64";
+        using fd_close_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_close_wasm64), name_fd_close_wasm64>;
+
+        inline constexpr char8_t name_fd_datasync_wasm64[] = u8"fd_datasync_wasm64";
+        using fd_datasync_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_datasync_wasm64), name_fd_datasync_wasm64>;
+
+        inline constexpr char8_t name_fd_fdstat_get_wasm64[] = u8"fd_fdstat_get_wasm64";
+        using fd_fdstat_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_fdstat_get_wasm64), name_fd_fdstat_get_wasm64>;
+
+        inline constexpr char8_t name_fd_fdstat_set_flags_wasm64[] = u8"fd_fdstat_set_flags_wasm64";
+        using fd_fdstat_set_flags_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_fdstat_set_flags_wasm64),
+                                                                          name_fd_fdstat_set_flags_wasm64>;
+
+        inline constexpr char8_t name_fd_fdstat_set_rights_wasm64[] = u8"fd_fdstat_set_rights_wasm64";
+        using fd_fdstat_set_rights_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_fdstat_set_rights_wasm64),
+                                                                           name_fd_fdstat_set_rights_wasm64>;
+
+        inline constexpr char8_t name_fd_filestat_get_wasm64[] = u8"fd_filestat_get_wasm64";
+        using fd_filestat_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_filestat_get_wasm64), name_fd_filestat_get_wasm64>;
+
+        inline constexpr char8_t name_fd_filestat_set_size_wasm64[] = u8"fd_filestat_set_size_wasm64";
+        using fd_filestat_set_size_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_filestat_set_size_wasm64),
+                                                                           name_fd_filestat_set_size_wasm64>;
+
+        inline constexpr char8_t name_fd_filestat_set_times_wasm64[] = u8"fd_filestat_set_times_wasm64";
+        using fd_filestat_set_times_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_filestat_set_times_wasm64),
+                                           name_fd_filestat_set_times_wasm64>;
+
+        inline constexpr char8_t name_fd_pread_wasm64[] = u8"fd_pread_wasm64";
+        using fd_pread_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_pread_wasm64), name_fd_pread_wasm64>;
+
+        inline constexpr char8_t name_fd_prestat_dir_name_wasm64[] = u8"fd_prestat_dir_name_wasm64";
+        using fd_prestat_dir_name_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_prestat_dir_name_wasm64),
+                                                                          name_fd_prestat_dir_name_wasm64>;
+
+        inline constexpr char8_t name_fd_prestat_get_wasm64[] = u8"fd_prestat_get_wasm64";
+        using fd_prestat_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_prestat_get_wasm64), name_fd_prestat_get_wasm64>;
+
+        inline constexpr char8_t name_fd_pwrite_wasm64[] = u8"fd_pwrite_wasm64";
+        using fd_pwrite_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_pwrite_wasm64), name_fd_pwrite_wasm64>;
+
+        inline constexpr char8_t name_fd_read_wasm64[] = u8"fd_read_wasm64";
+        using fd_read_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_read_wasm64), name_fd_read_wasm64>;
+
+        inline constexpr char8_t name_fd_readdir_wasm64[] = u8"fd_readdir_wasm64";
+        using fd_readdir_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_readdir_wasm64), name_fd_readdir_wasm64>;
+
+        inline constexpr char8_t name_fd_renumber_wasm64[] = u8"fd_renumber_wasm64";
+        using fd_renumber_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_renumber_wasm64), name_fd_renumber_wasm64>;
+
+        inline constexpr char8_t name_fd_seek_wasm64[] = u8"fd_seek_wasm64";
+        using fd_seek_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_seek_wasm64), name_fd_seek_wasm64>;
+
+        inline constexpr char8_t name_fd_sync_wasm64[] = u8"fd_sync_wasm64";
+        using fd_sync_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_sync_wasm64), name_fd_sync_wasm64>;
+
+        inline constexpr char8_t name_fd_tell_wasm64[] = u8"fd_tell_wasm64";
+        using fd_tell_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_tell_wasm64), name_fd_tell_wasm64>;
+
+        inline constexpr char8_t name_fd_write_wasm64[] = u8"fd_write_wasm64";
+        using fd_write_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::fd_write_wasm64), name_fd_write_wasm64>;
+
+        inline constexpr char8_t name_path_create_directory_wasm64[] = u8"path_create_directory_wasm64";
+        using path_create_directory_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_create_directory_wasm64),
+                                           name_path_create_directory_wasm64>;
+
+        inline constexpr char8_t name_path_filestat_get_wasm64[] = u8"path_filestat_get_wasm64";
+        using path_filestat_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_filestat_get_wasm64), name_path_filestat_get_wasm64>;
+
+        inline constexpr char8_t name_path_filestat_set_times_wasm64[] = u8"path_filestat_set_times_wasm64";
+        using path_filestat_set_times_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_filestat_set_times_wasm64),
+                                           name_path_filestat_set_times_wasm64>;
+
+        inline constexpr char8_t name_path_link_wasm64[] = u8"path_link_wasm64";
+        using path_link_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_link_wasm64), name_path_link_wasm64>;
+
+        inline constexpr char8_t name_path_open_wasm64[] = u8"path_open_wasm64";
+        using path_open_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_open_wasm64), name_path_open_wasm64>;
+
+        inline constexpr char8_t name_path_readlink_wasm64[] = u8"path_readlink_wasm64";
+        using path_readlink_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_readlink_wasm64), name_path_readlink_wasm64>;
+
+        inline constexpr char8_t name_path_remove_directory_wasm64[] = u8"path_remove_directory_wasm64";
+        using path_remove_directory_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_remove_directory_wasm64),
+                                           name_path_remove_directory_wasm64>;
+
+        inline constexpr char8_t name_path_rename_wasm64[] = u8"path_rename_wasm64";
+        using path_rename_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_rename_wasm64), name_path_rename_wasm64>;
+
+        inline constexpr char8_t name_path_symlink_wasm64[] = u8"path_symlink_wasm64";
+        using path_symlink_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_symlink_wasm64), name_path_symlink_wasm64>;
+
+        inline constexpr char8_t name_path_unlink_file_wasm64[] = u8"path_unlink_file_wasm64";
+        using path_unlink_file_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::path_unlink_file_wasm64), name_path_unlink_file_wasm64>;
+
+        inline constexpr char8_t name_poll_oneoff_wasm64[] = u8"poll_oneoff_wasm64";
+        using poll_oneoff_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::poll_oneoff_wasm64), name_poll_oneoff_wasm64>;
+
+        inline constexpr char8_t name_proc_exit_wasm64[] = u8"proc_exit_wasm64";
+        using proc_exit_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::proc_exit_wasm64), name_proc_exit_wasm64>;
+
+        inline constexpr char8_t name_proc_raise_wasm64[] = u8"proc_raise_wasm64";
+        using proc_raise_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::proc_raise_wasm64), name_proc_raise_wasm64>;
+
+        inline constexpr char8_t name_random_get_wasm64[] = u8"random_get_wasm64";
+        using random_get_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::random_get_wasm64), name_random_get_wasm64>;
+
+        inline constexpr char8_t name_sched_yield_wasm64[] = u8"sched_yield_wasm64";
+        using sched_yield_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sched_yield_wasm64), name_sched_yield_wasm64>;
+
+        inline constexpr char8_t name_sock_accept_wasm64[] = u8"sock_accept_wasm64";
+        using sock_accept_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64), name_sock_accept_wasm64>;
+
+        inline constexpr char8_t name_sock_recv_wasm64[] = u8"sock_recv_wasm64";
+        using sock_recv_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_recv_wasm64), name_sock_recv_wasm64>;
+
+        inline constexpr char8_t name_sock_send_wasm64[] = u8"sock_send_wasm64";
+        using sock_send_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_send_wasm64), name_sock_send_wasm64>;
+
+        inline constexpr char8_t name_sock_shutdown_wasm64[] = u8"sock_shutdown_wasm64";
+        using sock_shutdown_wasm64 =
+            wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_shutdown_wasm64), name_sock_shutdown_wasm64>;
     }  // namespace details
 
     struct wasip1_local_imported_module_t
@@ -367,12 +551,75 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
 
     static_assert(::uwvm2::uwvm::wasm::type::is_local_imported_module<wasip1_local_imported_module_t>);
     static_assert(::uwvm2::uwvm::wasm::type::has_local_function_tuple<wasip1_local_imported_module_t>);
+
+    /// @note This local_imported module only provides the WASI Preview1 importable function list.
+    ///       The runtime environment (`default_wasip1_env`, memory binding, argv/envp, fd table, etc.) is initialized by the loader
+    ///       (`init_wasip1_environment` inside `load_local_modules`) before any WASI function is invoked, so it is intentionally not modeled
+    ///       as a "local_imported function"/concept requirement here.
+
+    struct wasip1_wasm64_local_imported_module_t
+    {
+        // wasi uextension: memory64
+        // Since wasmp1 itself does not support memory64, the memory64 API is provided here.
+        inline static constexpr ::uwvm2::utils::container::u8string_view module_name{u8"wasiu_wasi_snapshot_preview1_wasm64"};
+
+        using local_function_tuple = ::uwvm2::utils::container::tuple<details::args_get_wasm64,
+                                                                      details::args_sizes_get_wasm64,
+                                                                      details::clock_res_get_wasm64,
+                                                                      details::clock_time_get_wasm64,
+                                                                      details::environ_get_wasm64,
+                                                                      details::environ_sizes_get_wasm64,
+                                                                      details::fd_advise_wasm64,
+                                                                      details::fd_allocate_wasm64,
+                                                                      details::fd_close_wasm64,
+                                                                      details::fd_datasync_wasm64,
+                                                                      details::fd_fdstat_get_wasm64,
+                                                                      details::fd_fdstat_set_flags_wasm64,
+                                                                      details::fd_fdstat_set_rights_wasm64,
+                                                                      details::fd_filestat_get_wasm64,
+                                                                      details::fd_filestat_set_size_wasm64,
+                                                                      details::fd_filestat_set_times_wasm64,
+                                                                      details::fd_pread_wasm64,
+                                                                      details::fd_prestat_dir_name_wasm64,
+                                                                      details::fd_prestat_get_wasm64,
+                                                                      details::fd_pwrite_wasm64,
+                                                                      details::fd_read_wasm64,
+                                                                      details::fd_readdir_wasm64,
+                                                                      details::fd_renumber_wasm64,
+                                                                      details::fd_seek_wasm64,
+                                                                      details::fd_sync_wasm64,
+                                                                      details::fd_tell_wasm64,
+                                                                      details::fd_write_wasm64,
+                                                                      details::path_create_directory_wasm64,
+                                                                      details::path_filestat_get_wasm64,
+                                                                      details::path_filestat_set_times_wasm64,
+                                                                      details::path_link_wasm64,
+                                                                      details::path_open_wasm64,
+                                                                      details::path_readlink_wasm64,
+                                                                      details::path_remove_directory_wasm64,
+                                                                      details::path_rename_wasm64,
+                                                                      details::path_symlink_wasm64,
+                                                                      details::path_unlink_file_wasm64,
+                                                                      details::poll_oneoff_wasm64,
+                                                                      details::proc_exit_wasm64,
+                                                                      details::proc_raise_wasm64,
+                                                                      details::random_get_wasm64,
+                                                                      details::sched_yield_wasm64,
+                                                                      details::sock_accept_wasm64,
+                                                                      details::sock_recv_wasm64,
+                                                                      details::sock_send_wasm64,
+                                                                      details::sock_shutdown_wasm64>;
+    };
+
+    static_assert(::uwvm2::uwvm::wasm::type::is_local_imported_module<wasip1_wasm64_local_imported_module_t>);
+    static_assert(::uwvm2::uwvm::wasm::type::has_local_function_tuple<wasip1_wasm64_local_imported_module_t>);
     /// @note This local_imported module only provides the WASI Preview1 importable function list.
     ///       The runtime environment (`default_wasip1_env`, memory binding, argv/envp, fd table, etc.) is initialized by the loader
     ///       (`init_wasip1_environment` inside `load_local_modules`) before any WASI function is invoked, so it is intentionally not modeled
     ///       as a "local_imported function"/concept requirement here.
 
     inline constexpr wasip1_local_imported_module_t wasip1_local_imported_module{};
+    inline constexpr wasip1_wasm64_local_imported_module_t wasip1_wasm64_local_imported_module{};
 
 # endif
 #endif
