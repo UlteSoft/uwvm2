@@ -11,6 +11,8 @@ using ::fast_io::containers::operator==;
 using ::fast_io::containers::operator<=>;
 using ::fast_io::containers::swap;
 using ::fast_io::containers::print_alias_define;
+
+using ::fast_io::containers::npos;
 } // namespace containers
 
 using ::fast_io::string_view;

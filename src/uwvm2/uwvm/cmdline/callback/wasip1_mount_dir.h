@@ -38,6 +38,7 @@
 # endif
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>

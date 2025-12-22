@@ -170,5 +170,12 @@ using ::fast_io::posix_file_status;
 using ::fast_io::truncate;
 
 using ::fast_io::native_white_hole;
+using ::fast_io::native_socket_file;
+using ::fast_io::native_socket_io_observer;
+using ::fast_io::posix_socklen_t;
+using ::fast_io::ipv4;
+using ::fast_io::ipv6;
+
+using ::fast_io::native_dns_file;
 
 } // namespace fast_io

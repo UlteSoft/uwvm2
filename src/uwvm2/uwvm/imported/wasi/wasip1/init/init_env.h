@@ -42,12 +42,18 @@
 #  if __has_include(<sys/un.h>)
 #   include <sys/un.h>
 #  endif
+#  if __has_include(<sys/socket.h>)
+#   include <sys/socket.h>
+#  endif
 #  if __has_include(<unistd.h>)
 #   include <unistd.h>
 #  endif
 # endif
 // import
 # include <fast_io.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
+# include <uwvm2/uwvm_predefine/io/impl.h>
+# include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>

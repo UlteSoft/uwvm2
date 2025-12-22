@@ -210,6 +210,8 @@ using ::fast_io::manipulators::ip_generic;
 using ::fast_io::manipulators::ip_scan_generic;
 #endif
 using ::fast_io::manipulators::cur_src_loc;
+
+using ::fast_io::manipulators::ip_scan_generic;
 } // namespace manipulators
 
 namespace mnp = manipulators;

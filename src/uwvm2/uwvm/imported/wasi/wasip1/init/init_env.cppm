@@ -41,6 +41,9 @@ module;
 # if __has_include(<sys/un.h>)
 #  include <sys/un.h>
 # endif
+# if __has_include(<sys/socket.h>)
+#  include <sys/socket.h>
+# endif
 # if __has_include(<unistd.h>)
 #  include <unistd.h>
 # endif
@@ -49,6 +52,9 @@ module;
 export module uwvm2.uwvm.imported.wasi.wasip1.init:init_env;
 
 import fast_io;
+import uwvm2.uwvm_predefine.utils.ansies;
+import uwvm2.uwvm_predefine.io;
+import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
 import uwvm2.imported.wasi.wasip1;
