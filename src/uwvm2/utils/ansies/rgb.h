@@ -77,7 +77,5 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::ansies
     template <::std::integral char_type>
         requires (sizeof(char_type) == sizeof(char8_t))
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, rgb>, char_type * iter, rgb color) noexcept
-    {
-        return details::rgb_print_reserve_impl(iter, color.r, color.g, color.b);
-    }
+    { return details::rgb_print_reserve_impl(iter, color.r, color.g, color.b); }
 }

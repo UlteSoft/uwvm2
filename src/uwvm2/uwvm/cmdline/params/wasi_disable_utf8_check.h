@@ -28,7 +28,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-# include <uwvm2/imported/wasi/feature/feature_push_macro.h> // wasi
+# include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -46,15 +46,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasi_disable_utf8_check_alias{u8"-Iu8relax"};
-        #if defined(UWVM_MODULE)
-extern "C++"
-#else
-inline constexpr
-#endif 
-  ::uwvm2::utils::cmdline::parameter_return_type
-            wasi_disable_utf8_check_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                             ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+# if defined(UWVM_MODULE)
+        extern "C++"
+# else
+        inline constexpr
+# endif
+            ::uwvm2::utils::cmdline::parameter_return_type wasi_disable_utf8_check_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 # if defined(__clang__)
@@ -77,7 +76,7 @@ inline constexpr
 
 #ifndef UWVM_MODULE
 // macro
-# include <uwvm2/imported/wasi/feature/feature_pop_macro.h> // wasi
+# include <uwvm2/imported/wasi/feature/feature_pop_macro.h>  // wasi
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

@@ -45,66 +45,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::feature
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::null>,  // [adl]
         char8_t const*,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::u8result{end, ::uwvm2::utils::utf::utf_error_code::success};
-    }
+    { return ::uwvm2::utils::utf::u8result{end, ::uwvm2::utils::utf::utf_error_code::success}; }
 
     inline constexpr ::uwvm2::utils::utf::u8result handle_text_format(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::zero_illegal>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_has_zero_illegal_unchecked(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_has_zero_illegal_unchecked(begin, end); }
 
     inline constexpr ::uwvm2::utils::utf::u8result handle_text_format(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::utf8_rfc3629>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(begin, end); }
 
     inline constexpr ::uwvm2::utils::utf::u8result handle_text_format(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::utf8_rfc3629_with_zero_illegal>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(begin, end); }
 
     // Used to warn about content that has not been checked for errors.
     inline constexpr ::uwvm2::utils::utf::u8result warn_unchecked_text_format_error(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::null>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629_and_zero_illegal>(begin, end); }
 
     inline constexpr ::uwvm2::utils::utf::u8result warn_unchecked_text_format_error(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::zero_illegal>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(begin, end); }
 
     inline constexpr ::uwvm2::utils::utf::u8result warn_unchecked_text_format_error(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::utf8_rfc3629>,  // [adl]
         char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::check_has_zero_illegal_unchecked(begin, end);
-    }
+    { return ::uwvm2::utils::utf::check_has_zero_illegal_unchecked(begin, end); }
 
     inline constexpr ::uwvm2::utils::utf::u8result warn_unchecked_text_format_error(
         ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::utf8_rfc3629_with_zero_illegal>,  // [adl]
         [[maybe_unused]] char8_t const* begin,
         char8_t const* end) noexcept
-    {
-        return ::uwvm2::utils::utf::u8result{end, ::uwvm2::utils::utf::utf_error_code::success};
-    }
+    { return ::uwvm2::utils::utf::u8result{end, ::uwvm2::utils::utf::utf_error_code::success}; }
 
     template <typename Wrp>
     concept can_handle_text_format = requires(Wrp wrapper_adl, char8_t const* begin, char8_t const* end) {

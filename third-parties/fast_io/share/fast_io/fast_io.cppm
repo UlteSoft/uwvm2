@@ -11,11 +11,11 @@
 #include <fast_io_dsal/queue.h>
 #include <fast_io_dsal/stack.h>
 
-#if !(((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING)) ||                                      \
-       defined(FAST_IO_ENABLE_HOSTED_FEATURES)))
-# ifndef FAST_IO_FREESTANDING
-#  define FAST_IO_FREESTANDING
-# endif
+#if !(((__STDC_HOSTED__ == 1 && (!defined(_GLIBCXX_HOSTED) || _GLIBCXX_HOSTED == 1) && !defined(_LIBCPP_FREESTANDING)) || \
+	   defined(FAST_IO_ENABLE_HOSTED_FEATURES)))
+#ifndef FAST_IO_FREESTANDING
+#define FAST_IO_FREESTANDING
+#endif
 #endif
 
 export module fast_io;
@@ -26,18 +26,18 @@ export module fast_io;
 #include "fast_io_inc/intrinsics.inc"
 
 #ifndef FAST_IO_FREESTANDING
-# include "fast_io_inc/hosted.inc"
+#include "fast_io_inc/hosted.inc"
 
-# include "fast_io_inc/host/posix.inc"
+#include "fast_io_inc/host/posix.inc"
 
-# if defined(_WIN32) || defined(__CYGWIN__)
-#  include "fast_io_inc/host/nt.inc"
-#  include "fast_io_inc/host/win32.inc"
-# endif
+#if defined(_WIN32) || defined(__CYGWIN__)
+#include "fast_io_inc/host/nt.inc"
+#include "fast_io_inc/host/win32.inc"
+#endif
 
-# include "fast_io_inc/legacy/c.inc"
-# include "fast_io_inc/device.inc"
-# include "fast_io_inc/io_buffer.inc"
+#include "fast_io_inc/legacy/c.inc"
+#include "fast_io_inc/device.inc"
+#include "fast_io_inc/io_buffer.inc"
 #endif
 
 /*

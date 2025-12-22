@@ -29,7 +29,7 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h> // wasip1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
 // platform
 # if defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
@@ -148,18 +148,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
     template <typename Stm, ::uwvm2::parser::wasm::concepts::has_feature_name... Fs>
     inline constexpr void version_u8print_wasm_feature_from_tuple(Stm && stm, ::uwvm2::utils::container::tuple<Fs...>) noexcept
-    {
-        version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm));
-    }
+    { version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm)); }
 
-    #if defined(UWVM_MODULE)
-extern "C++" UWVM_GNU_COLD
+#if defined(UWVM_MODULE)
+    extern "C++" UWVM_GNU_COLD
 #else
-UWVM_GNU_COLD inline constexpr
-#endif 
- ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                   ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
+    UWVM_GNU_COLD inline constexpr
+#endif
+        ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
         // No copies will be made here.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
@@ -962,30 +960,29 @@ UWVM_GNU_COLD inline constexpr
         version_u8print_wasm_feature_from_tuple(u8log_output_ul, ::uwvm2::uwvm::wasm::feature::all_features);
 
         // other features
-        ::fast_io::io::perr(u8log_output_ul,       
-            // version_u8print_wasm_feature_from_tuple already print '\n'                          
+        ::fast_io::io::perr(u8log_output_ul,
+        // version_u8print_wasm_feature_from_tuple already print '\n'
 #ifdef UWVM_SUPPORT_PRELOAD_DL
-            // Support Preload Dynamic Linking Module (--wasm-register-dl)
-            u8"  * Support Preload Dynamic Linking Module\n"
+                            // Support Preload Dynamic Linking Module (--wasm-register-dl)
+                            u8"  * Support Preload Dynamic Linking Module\n"
 #endif
 #ifdef UWVM_SUPPORT_WEAK_SYMBOL
-            // Support Weak Symbol Module (via link)
-            u8"  * Support Weak Symbol Module\n"
+                            // Support Weak Symbol Module (via link)
+                            u8"  * Support Weak Symbol Module\n"
 #endif
 
-            // Local Imported
+        // Local Imported
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # ifdef UWVM_IMPORT_WASI_WASIP1
-            // Support WASI WASIP1
-            u8"  * Support Imported WASI Preview 1\n"
+                            // Support WASI WASIP1
+                            u8"  * Support Imported WASI Preview 1\n"
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET
-            // Support WASI WASIP1 Socket: The wasip1 socket appears as an extension.
-            u8"      - Support Imported WASI Preview 1 Socket\n"
+                            // Support WASI WASIP1 Socket: The wasip1 socket appears as an extension.
+                            u8"      - Support Imported WASI Preview 1 Socket\n"
 #  endif
 # endif
 #endif
-            u8"\n"
-        );
+                            u8"\n");
 
         // Here, guard will perform destructors.
         return ::uwvm2::utils::cmdline::parameter_return_type::return_imme;
@@ -995,7 +992,7 @@ UWVM_GNU_COLD inline constexpr
 
 #ifndef UWVM_MODULE
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
-#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h> // wasip1
+#  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>

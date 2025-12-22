@@ -27,7 +27,7 @@
 #pragma push_macro("UWVM_IMPORT_WASI_WASIP1")
 #undef UWVM_IMPORT_WASI_WASIP1
 #if !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(__freestanding__)
-#define UWVM_IMPORT_WASI_WASIP1
+# define UWVM_IMPORT_WASI_WASIP1
 #endif
 
 #pragma push_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET")

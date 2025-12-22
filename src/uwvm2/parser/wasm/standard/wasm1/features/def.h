@@ -99,9 +99,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_text_format_wapper_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-    {
-        return final_text_format_wapper<Fs...>{};
-    }
+    { return final_text_format_wapper<Fs...>{}; }
 
     ////////////////////////////
     //      Type Section      //
@@ -199,9 +197,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr final_function_type_section_details_wrapper_t<Fs...> section_details(final_function_type<Fs...> const& function_type) noexcept
-    {
-        return {::std::addressof(function_type)};
-    }
+    { return {::std::addressof(function_type)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, final_function_type_section_details_wrapper_t<Fs...>>,
@@ -449,9 +445,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval bool has_feature_parameter_controllable_allow_multi_result_vector_from_paras(
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
-    {
-        return has_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(paras.parameters);
-    }
+    { return has_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(paras.parameters); }
 
     template <typename... Fs>
     concept has_feature_parameter_controllable_allow_multi_result_vector_from_paras_c =
@@ -484,17 +478,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <typename... Para>
     inline constexpr bool get_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(
         ::uwvm2::utils::container::tuple<Para...> const& paras) noexcept
-    {
-        return get_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters_impl<0uz>(paras);
-    }
+    { return get_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters_impl<0uz>(paras); }
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires (has_feature_parameter_controllable_allow_multi_result_vector_from_paras_c<Fs...>)
     inline constexpr bool get_feature_parameter_controllable_allow_multi_result_vector_from_paras(
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
-    {
-        return get_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(paras.parameters);
-    }
+    { return get_feature_parameter_controllable_allow_multi_result_vector_from_paras_parameters(paras.parameters); }
 
     /// @brief      Prohibit duplicate types
     /// @details    The WASM specification does not prohibit duplicate types; this is a reserved concept.
@@ -623,9 +613,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         final_import_type<Fs...> const& import_type,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections,
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32* importdesc_counter_ptr) noexcept
-    {
-        return {::std::addressof(import_type), ::std::addressof(all_sections), importdesc_counter_ptr};
-    }
+    { return {::std::addressof(import_type), ::std::addressof(all_sections), importdesc_counter_ptr}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, final_import_type_section_details_wrapper_t<Fs...>>,
@@ -832,9 +820,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval bool has_feature_parameter_controllable_check_duplicate_imports_from_paras(
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
-    {
-        return has_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters(paras.parameters);
-    }
+    { return has_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters(paras.parameters); }
 
     template <typename... Fs>
     concept has_feature_parameter_controllable_check_duplicate_imports_from_paras_c =
@@ -867,17 +853,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     template <typename... Para>
     inline constexpr bool get_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters(
         ::uwvm2::utils::container::tuple<Para...> const& paras) noexcept
-    {
-        return get_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters_impl<0uz>(paras);
-    }
+    { return get_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters_impl<0uz>(paras); }
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         requires (has_feature_parameter_controllable_check_duplicate_imports_from_paras_c<Fs...>)
     inline constexpr bool get_feature_parameter_controllable_check_duplicate_imports_from_paras(
         ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& paras) noexcept
-    {
-        return get_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters(paras.parameters);
-    }
+    { return get_feature_parameter_controllable_check_duplicate_imports_from_paras_parameters(paras.parameters); }
 
     /// @brief      has table_type
     /// @details
@@ -1199,9 +1181,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr final_export_type_section_details_wrapper_t<Fs...> section_details(
         final_wasm_export_type<Fs...> const& export_type,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(export_type), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(export_type), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, final_export_type_section_details_wrapper_t<Fs...>>,

@@ -74,9 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr wasm_binfmt_ver1_module_extensible_storage_section_details_wrapper_t<Fs...> section_details(
         wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage) noexcept
-    {
-        return {::std::addressof(module_storage)};
-    }
+    { return {::std::addressof(module_storage)}; }
 
     /// @brief Print the module section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream

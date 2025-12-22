@@ -813,9 +813,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr global_section_storage_section_details_wrapper_t<Fs...> section_details(
         global_section_storage_t<Fs...> const& global_section_storage,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(global_section_storage), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(global_section_storage), ::std::addressof(all_sections)}; }
 
     /// @brief Print the global section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream

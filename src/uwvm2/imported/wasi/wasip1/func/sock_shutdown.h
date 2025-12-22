@@ -38,9 +38,9 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
-#if __has_include(<errno.h>)
-# include <errno.h>
-#endif
+# if __has_include(<errno.h>)
+#  include <errno.h>
+# endif
 # if __has_include(<sys/fcntl.h>)
 #  include <sys/fcntl.h>
 # endif

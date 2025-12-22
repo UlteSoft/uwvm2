@@ -38,9 +38,9 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 // platform
-#if __has_include(<errno.h>)
-# include <errno.h>
-#endif
+# if __has_include(<errno.h>)
+#  include <errno.h>
+# endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -78,16 +78,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(env.wasip1_sched_yield_func_ptr != nullptr) { return env.wasip1_sched_yield_func_ptr(); }
         else
         {
-#if defined(_WIN32)
-# if defined(_WIN32_WINDOWS)
+# if defined(_WIN32)
+#  if defined(_WIN32_WINDOWS)
             ::fast_io::win32::SwitchToThread();
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-# else
+#  else
             constexpr bool zw{false};
             ::fast_io::win32::nt::nt_yield_execution<zw>();
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-# endif
-#else
+#  endif
+# else
             auto const ret{::uwvm2::imported::wasi::wasip1::func::posix::sched_yield()};
             if(ret == -1) [[unlikely]]
             {
@@ -95,7 +95,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     ::fast_io::error{::fast_io::posix_domain_value, static_cast<::fast_io::error::value_type>(static_cast<unsigned>(errno))});
             }
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-#endif
+# endif
         }
     }
 
@@ -106,7 +106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -121,9 +121,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [info]  wasip1: sched_yield() (wasi-trace)\n");
-#endif
+# endif
         }
 
         return sched_yield_impl(env);

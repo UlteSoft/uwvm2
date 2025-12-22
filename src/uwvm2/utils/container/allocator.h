@@ -78,9 +78,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
 
     template <typename U, typename V>
     inline constexpr bool operator== (fast_io_global_std_allocator<U> const&, fast_io_global_std_allocator<V> const&) noexcept
-    {
-        return true;
-    }
+    { return true; }
 
     template <typename T>
     struct fast_io_thread_local_std_allocator
@@ -121,7 +119,5 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
 
     template <typename U, typename V>
     inline constexpr bool operator== (fast_io_thread_local_std_allocator<U> const&, fast_io_thread_local_std_allocator<V> const&) noexcept
-    {
-        return true;
-    }
+    { return true; }
 }

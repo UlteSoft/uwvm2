@@ -45,14 +45,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool help_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view help_alias{u8"-h"};
-        #if defined(UWVM_MODULE)
-extern "C++"
+#if defined(UWVM_MODULE)
+        extern "C++"
 #else
-inline constexpr
-#endif 
-    ::uwvm2::utils::cmdline::parameter_return_type help_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+        inline constexpr
+#endif
+            ::uwvm2::utils::cmdline::parameter_return_type help_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

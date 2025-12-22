@@ -64,14 +64,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::wasm_page
     }
 
     inline constexpr unsigned get_wasm32_page_size_log2(::uwvm2::object::memory::wasm_page::wasm32_page_size_t page_size) noexcept
-    {
-        return ::uwvm2::object::memory::wasm_page::floor_log2(page_size);
-    }
+    { return ::uwvm2::object::memory::wasm_page::floor_log2(page_size); }
 
     inline constexpr unsigned get_wasm64_page_size_log2(::uwvm2::object::memory::wasm_page::wasm64_page_size_t page_size) noexcept
-    {
-        return ::uwvm2::object::memory::wasm_page::floor_log2(page_size);
-    }
+    { return ::uwvm2::object::memory::wasm_page::floor_log2(page_size); }
 
 }  // namespace uwvm2::object::memory::wasm_page
 

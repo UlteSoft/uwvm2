@@ -121,7 +121,5 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils
 
     template <::std::integral char_type>
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, version>, char_type * iter, version ver) noexcept
-    {
-        return details::version_print_reserve_impl(iter, ver.x, ver.y, ver.z, ver.state);
-    }
+    { return details::version_print_reserve_impl(iter, ver.x, ver.y, ver.z, ver.state); }
 }

@@ -190,9 +190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
 
     template <::std::integral char_type>
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, wasm_v128>, char_type * iter, wasm_v128 v128_val) noexcept
-    {
-        return details::print_reserve_v128_i8x16_impl(iter, v128_val);
-    }
+    { return details::print_reserve_v128_i8x16_impl(iter, v128_val); }
 }
 
 #ifndef UWVM_MODULE

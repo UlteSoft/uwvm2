@@ -49,15 +49,14 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-    #if defined(UWVM_MODULE)
-extern "C++" UWVM_GNU_COLD
-#else
-UWVM_GNU_COLD inline constexpr
-#endif 
- ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(
-        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
+# if defined(UWVM_MODULE)
+    extern "C++" UWVM_GNU_COLD
+# else
+    UWVM_GNU_COLD inline constexpr
+# endif
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
         // No copies will be made here.
         auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};

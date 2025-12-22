@@ -61,11 +61,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
         inline constexpr basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard const&) = delete;
 
         inline constexpr basic_mutex_merely_release_guard(basic_mutex_merely_release_guard&& other) noexcept : device_p{other.device_p}
-        {
-            other.device_p = nullptr;
-        }
+        { other.device_p = nullptr; }
 
-        inline constexpr basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard && other) noexcept
+        inline constexpr basic_mutex_merely_release_guard& operator= (basic_mutex_merely_release_guard&& other) noexcept
         {
             if(this != ::std::addressof(other)) [[likely]]
             {

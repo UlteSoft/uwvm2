@@ -44,15 +44,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasm_set_parser_limit_alias{u8"-Wplim"};
-        #if defined(UWVM_MODULE)
-extern "C++"
+#if defined(UWVM_MODULE)
+        extern "C++"
 #else
-inline constexpr
-#endif 
- ::uwvm2::utils::cmdline::parameter_return_type
-            wasm_set_parser_limit_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                           ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                           ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+        inline constexpr
+#endif
+            ::uwvm2::utils::cmdline::parameter_return_type wasm_set_parser_limit_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #if defined(__clang__)

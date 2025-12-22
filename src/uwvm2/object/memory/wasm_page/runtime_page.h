@@ -56,23 +56,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::wasm_page
     };
 
     inline constexpr runtime_wasm_page get_default_wasm32_runtime_wasm_page() noexcept
-    {
-        return {wasm32_wasm64_page_size_storage_u{.wasm32_page_size = ::uwvm2::object::memory::wasm_page::default_wasm32_page_size}, false};
-    }
+    { return {wasm32_wasm64_page_size_storage_u{.wasm32_page_size = ::uwvm2::object::memory::wasm_page::default_wasm32_page_size}, false}; }
 
     inline constexpr runtime_wasm_page get_default_wasm64_runtime_wasm_page() noexcept
-    {
-        return {wasm32_wasm64_page_size_storage_u{.wasm64_page_size = ::uwvm2::object::memory::wasm_page::default_wasm64_page_size}, true};
-    }
+    { return {wasm32_wasm64_page_size_storage_u{.wasm64_page_size = ::uwvm2::object::memory::wasm_page::default_wasm64_page_size}, true}; }
 
     inline constexpr runtime_wasm_page get_custom_wasm32_runtime_wasm_page(unsigned page_size_log2) noexcept
-    {
-        return {wasm32_wasm64_page_size_storage_u{.wasm32_page_size = ::uwvm2::object::memory::wasm_page::set_custom_wasm32_page_size(page_size_log2)}, false};
-    }
+    { return {wasm32_wasm64_page_size_storage_u{.wasm32_page_size = ::uwvm2::object::memory::wasm_page::set_custom_wasm32_page_size(page_size_log2)}, false}; }
 
     inline constexpr runtime_wasm_page get_custom_wasm64_runtime_wasm_page(unsigned page_size_log2) noexcept
-    {
-        return {wasm32_wasm64_page_size_storage_u{.wasm64_page_size = ::uwvm2::object::memory::wasm_page::set_custom_wasm64_page_size(page_size_log2)}, true};
-    }
+    { return {wasm32_wasm64_page_size_storage_u{.wasm64_page_size = ::uwvm2::object::memory::wasm_page::set_custom_wasm64_page_size(page_size_log2)}, true}; }
 }  // namespace uwvm2::object::memory::wasm_page
 

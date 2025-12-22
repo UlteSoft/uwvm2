@@ -63,9 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     ///             binary size does not inflate, and WASI does not impose excessive performance demands on memory access.
 
     inline constexpr auto lock_memory(::uwvm2::object::memory::linear::mmap_memory_t const&) noexcept
-    {
-        return ::uwvm2::object::memory::linear::dummy_memory_operation_guard_t{};
-    }
+    { return ::uwvm2::object::memory::linear::dummy_memory_operation_guard_t{}; }
 
     inline constexpr void check_memory_bounds_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                        ::std::size_t offset,
@@ -257,23 +255,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     inline constexpr void check_memory_bounds(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                               ::std::size_t offset,
                                               ::std::size_t wasm_bytes) noexcept
-    {
-        return check_memory_bounds_unlocked(memory, offset, wasm_bytes);
-    }
+    { return check_memory_bounds_unlocked(memory, offset, wasm_bytes); }
 
     inline constexpr void check_memory_bounds_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                      ::std::size_t wasm_bytes) noexcept
-    {
-        return check_memory_bounds_wasm32_unlocked(memory, offset, wasm_bytes);
-    }
+    { return check_memory_bounds_wasm32_unlocked(memory, offset, wasm_bytes); }
 
     inline constexpr void check_memory_bounds_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                      ::std::size_t wasm_bytes) noexcept
-    {
-        return check_memory_bounds_wasm64_unlocked(memory, offset, wasm_bytes);
-    }
+    { return check_memory_bounds_wasm64_unlocked(memory, offset, wasm_bytes); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
@@ -362,23 +354,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory(::uwvm2::object::memory::linear::mmap_memory_t const& memory, ::std::size_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_wasm32_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_wasm32_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_wasm64_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_wasm64_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
@@ -467,25 +453,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     inline constexpr void store_basic_wasm_type_to_memory(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                           ::std::size_t offset,
                                                           WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_unlocked<WasmType>(memory, offset, value); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                  ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                                  WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_wasm32_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_wasm32_unlocked<WasmType>(memory, offset, value); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                  ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                                  WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_wasm64_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_wasm64_unlocked<WasmType>(memory, offset, value); }
 
     inline constexpr void read_all_from_memory_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                         ::std::size_t offset,
@@ -563,25 +543,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                                                ::std::size_t offset,
                                                ::std::byte* begin,
                                                ::std::byte* end) noexcept
-    {
-        read_all_from_memory_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_unlocked(memory, offset, begin, end); }
 
     inline constexpr void read_all_from_memory_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                       ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                       ::std::byte* begin,
                                                       ::std::byte* end) noexcept
-    {
-        read_all_from_memory_wasm32_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_wasm32_unlocked(memory, offset, begin, end); }
 
     inline constexpr void read_all_from_memory_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                       ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                       ::std::byte* begin,
                                                       ::std::byte* end) noexcept
-    {
-        read_all_from_memory_wasm64_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_wasm64_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                        ::std::size_t offset,
@@ -659,25 +633,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                                               ::std::size_t offset,
                                               ::std::byte const* begin,
                                               ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                      ::std::byte const* begin,
                                                      ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_wasm32_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_wasm32_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                      ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                      ::std::byte const* begin,
                                                      ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_wasm64_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_wasm64_unlocked(memory, offset, begin, end); }
 
     inline constexpr void clear_memory_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory, ::std::size_t offset, ::std::size_t size) noexcept
     {
@@ -743,23 +711,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     }
 
     inline constexpr void clear_memory(::uwvm2::object::memory::linear::mmap_memory_t const& memory, ::std::size_t offset, ::std::size_t size) noexcept
-    {
-        clear_memory_unlocked(memory, offset, size);
-    }
+    { clear_memory_unlocked(memory, offset, size); }
 
     inline constexpr void clear_memory_wasm32(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                               ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                               ::std::size_t size) noexcept
-    {
-        clear_memory_wasm32_unlocked(memory, offset, size);
-    }
+    { clear_memory_wasm32_unlocked(memory, offset, size); }
 
     inline constexpr void clear_memory_wasm64(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                               ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                               ::std::size_t size) noexcept
-    {
-        clear_memory_wasm64_unlocked(memory, offset, size);
-    }
+    { clear_memory_wasm64_unlocked(memory, offset, size); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
@@ -846,23 +808,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                         ::std::size_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_unchecked_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_unchecked_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_wasm32_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_wasm32_unchecked_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr WasmType get_basic_wasm_type_from_memory_wasm64_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset) noexcept
-    {
-        return get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<WasmType>(memory, offset);
-    }
+    { return get_basic_wasm_type_from_memory_wasm64_unchecked_unlocked<WasmType>(memory, offset); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
@@ -947,25 +903,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     inline constexpr void store_basic_wasm_type_to_memory_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                     ::std::size_t offset,
                                                                     WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_unchecked_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_unchecked_unlocked<WasmType>(memory, offset, value); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_wasm32_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                            ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                                            WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_wasm32_unchecked_unlocked<WasmType>(memory, offset, value); }
 
     template <typename WasmType>
     inline constexpr void store_basic_wasm_type_to_memory_wasm64_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                            ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                                            WasmType value) noexcept
-    {
-        store_basic_wasm_type_to_memory_wasm64_unchecked_unlocked<WasmType>(memory, offset, value);
-    }
+    { store_basic_wasm_type_to_memory_wasm64_unchecked_unlocked<WasmType>(memory, offset, value); }
 
     inline constexpr void read_all_from_memory_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                   ::std::size_t offset,
@@ -1041,25 +991,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                                                          ::std::size_t offset,
                                                          ::std::byte* begin,
                                                          ::std::byte* end) noexcept
-    {
-        read_all_from_memory_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void read_all_from_memory_wasm32_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                 ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                                 ::std::byte* begin,
                                                                 ::std::byte* end) noexcept
-    {
-        read_all_from_memory_wasm32_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_wasm32_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void read_all_from_memory_wasm64_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                 ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                                 ::std::byte* begin,
                                                                 ::std::byte* end) noexcept
-    {
-        read_all_from_memory_wasm64_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { read_all_from_memory_wasm64_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                  ::std::size_t offset,
@@ -1135,32 +1079,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
                                                         ::std::size_t offset,
                                                         ::std::byte const* begin,
                                                         ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_wasm32_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                                ::std::byte const* begin,
                                                                ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_wasm32_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_wasm32_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void write_all_to_memory_wasm64_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                                ::std::byte const* begin,
                                                                ::std::byte const* end) noexcept
-    {
-        write_all_to_memory_wasm64_unchecked_unlocked(memory, offset, begin, end);
-    }
+    { write_all_to_memory_wasm64_unchecked_unlocked(memory, offset, begin, end); }
 
     inline constexpr void clear_memory_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                           ::std::size_t offset,
                                                           ::std::size_t size) noexcept
-    {
-        ::fast_io::freestanding::bytes_clear_n(memory.memory_begin + offset, size);
-    }
+    { ::fast_io::freestanding::bytes_clear_n(memory.memory_begin + offset, size); }
 
     inline constexpr void clear_memory_wasm32_unchecked_unlocked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                                  ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
@@ -1221,23 +1157,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
     inline constexpr void clear_memory_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                  ::std::size_t offset,
                                                  ::std::size_t size) noexcept
-    {
-        clear_memory_unchecked_unlocked(memory, offset, size);
-    }
+    { clear_memory_unchecked_unlocked(memory, offset, size); }
 
     inline constexpr void clear_memory_wasm32_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t offset,
                                                         ::std::size_t size) noexcept
-    {
-        clear_memory_wasm32_unchecked_unlocked(memory, offset, size);
-    }
+    { clear_memory_wasm32_unchecked_unlocked(memory, offset, size); }
 
     inline constexpr void clear_memory_wasm64_unchecked(::uwvm2::object::memory::linear::mmap_memory_t const& memory,
                                                         ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t offset,
                                                         ::std::size_t size) noexcept
-    {
-        clear_memory_wasm64_unchecked_unlocked(memory, offset, size);
-    }
+    { clear_memory_wasm64_unchecked_unlocked(memory, offset, size); }
 }  // namespace uwvm2::imported::wasi::wasip1::memory
 #endif
 

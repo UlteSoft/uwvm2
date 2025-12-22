@@ -161,9 +161,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
         /// @brief      Checking for duplicate binfmt version handler functions from tuple
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval void check_has_duplicate_binfmt_handler_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-        {
-            check_has_duplicate_binfmt_handler<Fs...>();
-        }
+        { check_has_duplicate_binfmt_handler<Fs...>(); }
 
         namespace details
         {
@@ -171,9 +169,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
             template <typename module_storage_t, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
             inline consteval binfmt_handle_version_func_p_type<module_storage_t, Fs...>
                 get_binfmt_handle_version_func_p_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-            {
-                return ::uwvm2::parser::wasm::concepts::binfmt_handle_version_func_p_type<module_storage_t, Fs...>{};
-            }
+            { return ::uwvm2::parser::wasm::concepts::binfmt_handle_version_func_p_type<module_storage_t, Fs...>{}; }
 
             /// @brief      Provide template meta to filter out different binfmt versions
             /// @details
@@ -289,9 +285,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval auto get_module_storage_type_from_tuple(::uwvm2::utils::container::tuple<Fs...> t) noexcept
-        {
-            return get_module_storage_type_from_singal_tuple<Fs...>(t);
-        }
+        { return get_module_storage_type_from_singal_tuple<Fs...>(t); }
 
         /// @brief      Get the handler function for the corresponding version of binfmt from a series of features
         /// @see        test\0001.parser\0001.concept\get_handler_funcp.cc
@@ -355,9 +349,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
         /// @details    You can pass values directly when passing registers.
         template <::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_version, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval auto get_binfmt_handler_func_p_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-        {
-            return get_binfmt_handler_func_p<binfmt_version, Fs...>();
-        }
+        { return get_binfmt_handler_func_p<binfmt_version, Fs...>(); }
 
         /// @brief      Get binfmt version tuple type
         template <::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_version, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -370,9 +362,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
         /// @brief      Get binfmt version tuple type from tuple
         template <::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_version, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval auto get_specified_binfmt_feature_tuple_from_all_features_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-        {
-            return get_specified_binfmt_feature_tuple_from_all_features<binfmt_version, Fs...>();
-        }
+        { return get_specified_binfmt_feature_tuple_from_all_features<binfmt_version, Fs...>(); }
 
         /// @brief      Structure Replacement
         /// @details    Input unordered typename Replace fixed structure with typename, must replace starting from specified type,
@@ -402,15 +392,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
             // Overloading commas for subsequent type calculations
             template <typename T>
             inline consteval type_wrapper<T> operator, (type_wrapper<T>, type_wrapper<void>) noexcept
-            {
-                return type_wrapper<T>{};
-            }
+            { return type_wrapper<T>{}; }
 
             template <typename T>
             inline consteval type_wrapper<T> operator, (type_wrapper<void>, type_wrapper<T>) noexcept
-            {
-                return type_wrapper<T>{};
-            }
+            { return type_wrapper<T>{}; }
 
             template <typename T1, typename T2>
             inline consteval void operator, (type_wrapper<T1>, type_wrapper<T2>) noexcept = delete;
@@ -527,9 +513,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
 
         template <typename... Fs>
         inline consteval tuple_megger<Fs...> get_tuple_megger_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-        {
-            return tuple_megger<Fs...>{};
-        }
+        { return tuple_megger<Fs...>{}; }
 
         /// @brief  get first type index in tuple
         /// @see    get_first_type_in_tuple
@@ -624,8 +608,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32
             get_max_binfmt_version_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-        {
-            return get_max_binfmt_version<Fs...>();
-        }
+        { return get_max_binfmt_version<Fs...>(); }
     }  // namespace operation
 }

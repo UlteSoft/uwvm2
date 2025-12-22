@@ -312,9 +312,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
 
     template <::std::integral char_type>
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, value_type>, char_type * iter, value_type valtype) noexcept
-    {
-        return details::print_reserve_value_type_impl(iter, valtype);
-    }
+    { return details::print_reserve_value_type_impl(iter, valtype); }
 }
 
 #ifndef UWVM_MODULE

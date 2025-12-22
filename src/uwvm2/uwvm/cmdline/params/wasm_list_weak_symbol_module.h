@@ -47,21 +47,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool wasm_list_weak_symbol_module_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view wasm_list_weak_symbol_module_alias{u8"-Wlsweak"};
-        #if defined(UWVM_MODULE)
-extern "C++"
-#else
-inline constexpr
-#endif 
- ::uwvm2::utils::cmdline::parameter_return_type
-            wasm_list_weak_symbol_module_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+# if defined(UWVM_MODULE)
+        extern "C++"
+# else
+        inline constexpr
+# endif
+            ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
-#if defined(__clang__)
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wbraced-scalar-init"
+# endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_list_weak_symbol_module{
         .name{u8"--wasm-list-weak-symbol-module"},
         .describe{u8"List all registered WASM weak-symbol modules."},
@@ -69,9 +68,9 @@ inline constexpr
         .handle{::std::addressof(details::wasm_list_weak_symbol_module_callback)},
         .is_exist{::std::addressof(details::wasm_list_weak_symbol_module_is_exist)},
         .cate{::uwvm2::utils::cmdline::categorization::wasm}};
-#if defined(__clang__)
-# pragma clang diagnostic pop
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# endif
 }
 #endif
 

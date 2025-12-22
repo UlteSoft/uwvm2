@@ -30,7 +30,7 @@ export module uwvm2.utils.allocator.fast_io_strict;
 export namespace uwvm2::utils::allocator::fast_io_strict
 {
     using ::uwvm2::utils::allocator::fast_io_strict::fast_io_allocator_to_strict;
-    
+
     using ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_generic_allocator_adapter;
     using ::uwvm2::utils::allocator::fast_io_strict::fast_io_strict_typed_generic_allocator_adapter;
 

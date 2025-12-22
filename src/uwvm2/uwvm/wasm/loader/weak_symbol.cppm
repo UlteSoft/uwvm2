@@ -59,4 +59,4 @@ import uwvm2.uwvm.wasm.custom;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "weak_symbol.h" 
+#include "weak_symbol.h"

@@ -639,7 +639,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 // this is a bug
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-            
+
             ::uwvm2::utils::mutex::mutex_guard_t growing_mutex_guard_1{*this->growing_mutex_p};
 
             auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};

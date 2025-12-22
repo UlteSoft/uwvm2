@@ -58,9 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
     {
         template <typename M>
         inline constexpr void lock_via_void_ptr(void* p) noexcept
-        {
-            static_cast<M*>(p)->lock();
-        }
+        { static_cast<M*>(p)->lock(); }
     }  // namespace detail
 
     template <typename... Mutexes>

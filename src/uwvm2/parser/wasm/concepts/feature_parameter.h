@@ -80,9 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto splice_splice_feature_parameter_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
-    {
-        return splice_feature_parameter<Fs...>();
-    }
+    { return splice_feature_parameter<Fs...>(); }
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval void check_has_duplicate_feature_parameter() noexcept

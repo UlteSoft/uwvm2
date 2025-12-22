@@ -269,9 +269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
             using is_transparent = void;  // enable heterogeneous lookup
 
             inline constexpr ::std::size_t operator() (::uwvm2::utils::container::basic_string_view<chartype> sv) const noexcept
-            {
-                return ::std::hash<::uwvm2::utils::container::basic_string_view<chartype>>{}(sv);
-            }
+            { return ::std::hash<::uwvm2::utils::container::basic_string_view<chartype>>{}(sv); }
 
             inline constexpr ::std::size_t operator() (::uwvm2::utils::container::basic_cstring_view<chartype> sv) const noexcept
             {

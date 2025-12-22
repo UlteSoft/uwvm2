@@ -135,13 +135,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
             }
 
             // curr_wasi_fd_t_p never nullptr
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(curr_wasi_fd_t_p == nullptr) [[unlikely]]
             {
                 // Security issues inherent to virtual machines
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
             }
-#endif
+# endif
 
             // Other threads will definitely lock fds_rwlock when performing close operations (since they need to access the fd vector). If the current thread
             // is performing fdstat_get, no other thread can be executing any close operations simultaneously, eliminating any destruction issues. Therefore,
@@ -172,9 +172,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(curr_fd.wasi_fd.ptr == nullptr) [[unlikely]]
         {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
             return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
         }
 
@@ -199,18 +199,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 else
                 {
                     auto& file_fd{
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                         curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd.file
-#else
+# else
                         curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd
-#endif
+# endif
                     };
                     curr_fd_native_observer = file_fd;
                 }
 
                 [[maybe_unused]] auto const file_fd_handle{curr_fd_native_observer.native_handle()};
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                 // Win32 only supports setting flags during creation.
                 if((flags & (::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync |
                              ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync |
@@ -222,10 +222,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && !(defined(__MSDOS__) || defined(__DJGPP__))
+# elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && !(defined(__MSDOS__) || defined(__DJGPP__))
 
                 // Preserve unrelated OS flags: read current flags first, then toggle only WASI-managed bits.
-# if defined(__linux__) && defined(__NR_fcntl)
+#  if defined(__linux__) && defined(__NR_fcntl)
                 int const curr_flags{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_GETFL)};
                 if(::fast_io::linux_system_call_fails(curr_flags)) [[unlikely]]
                 {
@@ -240,7 +240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 int new_oflags{curr_flags};
-# else
+#  else
                 // Although djgpp provides these flags, it only supports F_DUPFD, so it is prohibited here.
 
                 int const curr_flags{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(file_fd_handle, F_GETFL)};
@@ -256,10 +256,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 int new_oflags{curr_flags};
-# endif
+#  endif
 
                 // Toggle per-WASI bits only.
-# if defined(O_APPEND) && O_APPEND != 0
+#  if defined(O_APPEND) && O_APPEND != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
                 {
                     new_oflags |= O_APPEND;
@@ -268,14 +268,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_APPEND;
                 }
-# else
+#  else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-# endif
+#  endif
 
-# if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
                    ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock)
                 {
@@ -285,16 +285,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_NONBLOCK;
                 }
-# else
+#  else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
                    ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-# endif
+#  endif
 
-# if (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC) &&         \
-     (O_RSYNC == O_SYNC)
+#  if (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC) &&        \
+      (O_RSYNC == O_SYNC)
                 // On Android, O_SYNC is a superset of O_DSYNC, and O_RSYNC == O_SYNC. Requesting SYNC or RSYNC implies O_SYNC.
                 if(((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) ||
                    ((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync))
@@ -310,7 +310,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~(O_SYNC | O_DSYNC);
                 }
-# elif (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC)
+#  elif (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC)
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     new_oflags |= O_SYNC;
@@ -325,7 +325,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     new_oflags &= ~O_SYNC;
                 }
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     new_oflags |= O_RSYNC;
@@ -334,13 +334,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_RSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
-# elif (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && (O_RSYNC == O_SYNC)
+#   endif
+#  elif (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && (O_RSYNC == O_SYNC)
                 if(((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) ||
                    ((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync))
                 {
@@ -351,7 +351,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     new_oflags &= ~O_SYNC;
                 }
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     new_oflags |= O_DSYNC;
@@ -360,15 +360,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_DSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
-# else
+#   endif
+#  else
                 // default
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     new_oflags |= O_DSYNC;
@@ -377,14 +377,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_DSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     new_oflags |= O_RSYNC;
@@ -393,14 +393,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_RSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     new_oflags |= O_SYNC;
@@ -409,15 +409,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_SYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
+#   endif
 #  endif
-# endif
 
-# if defined(__linux__) && defined(__NR_fcntl)
+#  if defined(__linux__) && defined(__NR_fcntl)
                 int const set_res{::fast_io::system_call<__NR_fcntl, int>(file_fd_handle, F_SETFL, new_oflags)};
 
                 if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
@@ -455,30 +455,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 int wasi_managed_flags{};
                 int actual_wasi_flags{};
 
-#  if defined(O_APPEND) && O_APPEND != 0
+#   if defined(O_APPEND) && O_APPEND != 0
                 wasi_managed_flags |= (new_oflags & O_APPEND);
                 actual_wasi_flags |= (verify_flags & O_APPEND);
-#  endif
+#   endif
 
-#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#   if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 wasi_managed_flags |= (new_oflags & O_NONBLOCK);
                 actual_wasi_flags |= (verify_flags & O_NONBLOCK);
-#  endif
+#   endif
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_DSYNC);
                 actual_wasi_flags |= (verify_flags & O_DSYNC);
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_RSYNC);
                 actual_wasi_flags |= (verify_flags & O_RSYNC);
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 wasi_managed_flags |= (new_oflags & O_SYNC);
                 actual_wasi_flags |= (verify_flags & O_SYNC);
-#  endif
+#   endif
 
                 if(wasi_managed_flags != actual_wasi_flags) [[unlikely]]
                 {
@@ -497,7 +497,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                 }
 
-# else
+#  else
                 int const set_res{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(file_fd_handle, F_SETFL, new_oflags)};
 
                 if(set_res == -1) [[unlikely]]
@@ -525,30 +525,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 int wasi_managed_flags{};
                 int actual_wasi_flags{};
 
-#  if defined(O_APPEND) && O_APPEND != 0
+#   if defined(O_APPEND) && O_APPEND != 0
                 wasi_managed_flags |= (new_oflags & O_APPEND);
                 actual_wasi_flags |= (verify_flags & O_APPEND);
-#  endif
+#   endif
 
-#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#   if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 wasi_managed_flags |= (new_oflags & O_NONBLOCK);
                 actual_wasi_flags |= (verify_flags & O_NONBLOCK);
-#  endif
+#   endif
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_DSYNC);
                 actual_wasi_flags |= (verify_flags & O_DSYNC);
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_RSYNC);
                 actual_wasi_flags |= (verify_flags & O_RSYNC);
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 wasi_managed_flags |= (new_oflags & O_SYNC);
                 actual_wasi_flags |= (verify_flags & O_SYNC);
-#  endif
+#   endif
 
                 if(wasi_managed_flags != actual_wasi_flags) [[unlikely]]
                 {
@@ -567,9 +567,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                 }
 
-# endif
+#  endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-#else
+# else
                 // Systems that do not support modifying file attributes mid-process
 
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
@@ -600,7 +600,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // When the system does not support modifying file attributes at all, passing flags set to 0 indicates success.
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-#endif
+# endif
             }
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir:
             {
@@ -612,9 +612,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(curr_dir_stack_entry.ptr == nullptr) [[unlikely]]
                 {
 // This will be checked at runtime.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                 }
 
@@ -636,7 +636,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 auto const& curr_dir_file{curr_dir_io_observer};
                 [[maybe_unused]] auto const curr_dir_file_native_handle{curr_dir_file.native_handle()};
 
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
                 // Win32 only supports setting flags during creation.
                 if((flags & (::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync |
                              ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync | ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync |
@@ -648,10 +648,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
 
-#elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && !(defined(__MSDOS__) || defined(__DJGPP__))
+# elif (!defined(__NEWLIB__) || defined(__CYGWIN__)) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && !(defined(__MSDOS__) || defined(__DJGPP__))
 
                 // Preserve unrelated OS flags: read current flags first, then toggle only WASI-managed bits.
-# if defined(__linux__) && defined(__NR_fcntl)
+#  if defined(__linux__) && defined(__NR_fcntl)
                 int const curr_flags{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_GETFL)};
                 if(::fast_io::linux_system_call_fails(curr_flags)) [[unlikely]]
                 {
@@ -666,7 +666,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 int new_oflags{curr_flags};
-# else
+#  else
                 // Although djgpp provides these flags, it only supports F_DUPFD, so it is prohibited here.
 
                 int const curr_flags{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(curr_dir_file_native_handle, F_GETFL)};
@@ -682,10 +682,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 }
 
                 int new_oflags{curr_flags};
-# endif
+#  endif
 
                 // Toggle per-WASI bits only.
-# if defined(O_APPEND) && O_APPEND != 0
+#  if defined(O_APPEND) && O_APPEND != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
                 {
                     new_oflags |= O_APPEND;
@@ -694,14 +694,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_APPEND;
                 }
-# else
+#  else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-# endif
+#  endif
 
-# if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
                    ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock)
                 {
@@ -711,16 +711,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_NONBLOCK;
                 }
-# else
+#  else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock) ==
                    ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_nonblock)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-# endif
+#  endif
 
-# if (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC) &&         \
-     (O_RSYNC == O_SYNC)
+#  if (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC) &&        \
+      (O_RSYNC == O_SYNC)
                 // On Android, O_SYNC is a superset of O_DSYNC, and O_RSYNC == O_SYNC. Requesting SYNC or RSYNC implies O_SYNC.
                 if(((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) ||
                    ((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync))
@@ -736,7 +736,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~(O_SYNC | O_DSYNC);
                 }
-# elif (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC)
+#  elif (defined(O_DSYNC) && O_DSYNC != 0) && (defined(O_SYNC) && O_SYNC != 0) && ((O_SYNC | O_DSYNC) == O_SYNC)
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     new_oflags |= O_SYNC;
@@ -751,7 +751,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     new_oflags &= ~O_SYNC;
                 }
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     new_oflags |= O_RSYNC;
@@ -760,13 +760,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_RSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
-# elif (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && (O_RSYNC == O_SYNC)
+#   endif
+#  elif (defined(O_SYNC) && O_SYNC != 0) && (defined(O_RSYNC) && O_RSYNC != 0) && (O_RSYNC == O_SYNC)
                 if(((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) ||
                    ((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync))
                 {
@@ -777,7 +777,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     new_oflags &= ~O_SYNC;
                 }
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     new_oflags |= O_DSYNC;
@@ -786,15 +786,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_DSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
-# else
+#   endif
+#  else
                 // default
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     new_oflags |= O_DSYNC;
@@ -803,14 +803,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_DSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_dsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     new_oflags |= O_RSYNC;
@@ -819,14 +819,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_RSYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_rsync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     new_oflags |= O_SYNC;
@@ -835,15 +835,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 {
                     new_oflags &= ~O_SYNC;
                 }
-#  else
+#   else
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_sync)
                 {
                     return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
                 }
+#   endif
 #  endif
-# endif
 
-# if defined(__linux__) && defined(__NR_fcntl)
+#  if defined(__linux__) && defined(__NR_fcntl)
                 int const set_res{::fast_io::system_call<__NR_fcntl, int>(curr_dir_file_native_handle, F_SETFL, new_oflags)};
 
                 if(::fast_io::linux_system_call_fails(set_res)) [[unlikely]]
@@ -878,30 +878,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 int wasi_managed_flags{};
                 int actual_wasi_flags{};
 
-#  if defined(O_APPEND) && O_APPEND != 0
+#   if defined(O_APPEND) && O_APPEND != 0
                 wasi_managed_flags |= (new_oflags & O_APPEND);
                 actual_wasi_flags |= (verify_flags & O_APPEND);
-#  endif
+#   endif
 
-#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#   if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 wasi_managed_flags |= (new_oflags & O_NONBLOCK);
                 actual_wasi_flags |= (verify_flags & O_NONBLOCK);
-#  endif
+#   endif
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_DSYNC);
                 actual_wasi_flags |= (verify_flags & O_DSYNC);
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_RSYNC);
                 actual_wasi_flags |= (verify_flags & O_RSYNC);
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 wasi_managed_flags |= (new_oflags & O_SYNC);
                 actual_wasi_flags |= (verify_flags & O_SYNC);
-#  endif
+#   endif
 
                 if(wasi_managed_flags != actual_wasi_flags) [[unlikely]]
                 {
@@ -920,7 +920,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                 }
 
-# else
+#  else
                 int const set_res{::uwvm2::imported::wasi::wasip1::func::posix::fcntl(curr_dir_file_native_handle, F_SETFL, new_oflags)};
 
                 if(set_res == -1) [[unlikely]]
@@ -945,30 +945,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 int wasi_managed_flags{};
                 int actual_wasi_flags{};
 
-#  if defined(O_APPEND) && O_APPEND != 0
+#   if defined(O_APPEND) && O_APPEND != 0
                 wasi_managed_flags |= (new_oflags & O_APPEND);
                 actual_wasi_flags |= (verify_flags & O_APPEND);
-#  endif
+#   endif
 
-#  if defined(O_NONBLOCK) && O_NONBLOCK != 0
+#   if defined(O_NONBLOCK) && O_NONBLOCK != 0
                 wasi_managed_flags |= (new_oflags & O_NONBLOCK);
                 actual_wasi_flags |= (verify_flags & O_NONBLOCK);
-#  endif
+#   endif
 
-#  if defined(O_DSYNC) && O_DSYNC != 0
+#   if defined(O_DSYNC) && O_DSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_DSYNC);
                 actual_wasi_flags |= (verify_flags & O_DSYNC);
-#  endif
+#   endif
 
-#  if defined(O_RSYNC) && O_RSYNC != 0
+#   if defined(O_RSYNC) && O_RSYNC != 0
                 wasi_managed_flags |= (new_oflags & O_RSYNC);
                 actual_wasi_flags |= (verify_flags & O_RSYNC);
-#  endif
+#   endif
 
-#  if defined(O_SYNC) && O_SYNC != 0
+#   if defined(O_SYNC) && O_SYNC != 0
                 wasi_managed_flags |= (new_oflags & O_SYNC);
                 actual_wasi_flags |= (verify_flags & O_SYNC);
-#  endif
+#   endif
 
                 if(wasi_managed_flags != actual_wasi_flags) [[unlikely]]
                 {
@@ -987,9 +987,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                 }
 
-# endif
+#  endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-#else
+# else
                 // Systems that do not support modifying file attributes mid-process
 
                 if((flags & ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append) == ::uwvm2::imported::wasi::wasip1::abi::fdflags_t::fdflag_append)
@@ -1020,9 +1020,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 // When the system does not support modifying file attributes at all, passing flags set to 0 indicates success.
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
-#endif
+# endif
             }
-#if defined(_WIN32) && !defined(__CYGWIN__)
+# if defined(_WIN32) && !defined(__CYGWIN__)
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket: [[fallthrough]];
             case ::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::socket_observer:
             {
@@ -1071,12 +1071,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
             }
-#endif
+# endif
             [[unlikely]] default:
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
             }
         }
@@ -1093,7 +1093,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-#ifdef UWVM
+# ifdef UWVM
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                 u8"uwvm: ",
@@ -1116,14 +1116,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#else
+# else
             ::fast_io::io::perr(::fast_io::u8err(),
                                 u8"uwvm: [info]  wasip1: fd_fdstat_set_flags(",
                                 fd,
                                 u8", ",
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(flags)>>>(flags),
                                 u8") (wasi-trace)\n");
-#endif
+# endif
         }
 
         return fd_fdstat_set_flags_base(env, fd, flags);

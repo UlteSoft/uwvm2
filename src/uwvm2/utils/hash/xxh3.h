@@ -2232,7 +2232,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::hash
             else
             {
                 if(seed64 == 0u) { return xxh3_hash_long_64bits_internal(input, len, secret, secretLen); }
-                alignas(xxh3_max_align_len) ::std::byte custom_secret[sizeof(xxh3_kSecret)];
+                alignas(xxh3_max_align_len)::std::byte custom_secret[sizeof(xxh3_kSecret)];
                 xxh3_init_custom_secret(custom_secret, seed64);
                 return xxh3_hash_long_64bits_internal(input, len, custom_secret, sizeof(custom_secret));
             }

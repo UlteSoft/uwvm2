@@ -107,9 +107,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Features>
     inline consteval auto splice_section_storage_structure_from_tuple(::uwvm2::utils::container::tuple<Features...>) noexcept
-    {
-        return splice_section_storage_structure<Features...>();
-    }
+    { return splice_section_storage_structure<Features...>(); }
 
     /// @brief Wrapper for the section storage structure
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -121,9 +119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr splice_section_storage_structure_section_details_wrapper_t<Fs...> section_details(
         splice_section_storage_structure_t<Fs...> const& section_storage) noexcept
-    {
-        return {::std::addressof(section_storage)};
-    }
+    { return {::std::addressof(section_storage)}; }
 
     /// @brief Print the module section details
     /// @throws maybe throw fast_io::error, see the implementation of the stream

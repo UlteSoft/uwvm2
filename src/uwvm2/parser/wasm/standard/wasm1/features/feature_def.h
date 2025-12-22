@@ -118,14 +118,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     inline constexpr bool operator== (type_function_checker_base_t n1, type_function_checker_base_t n2) noexcept
-    {
-        return ::std::equal(n1.begin, n1.end, n2.begin, n2.end);
-    }
+    { return ::std::equal(n1.begin, n1.end, n2.begin, n2.end); }
 
     inline constexpr ::std::strong_ordering operator<=> (type_function_checker_base_t n1, type_function_checker_base_t n2) noexcept
-    {
-        return ::fast_io::freestanding::lexicographical_compare_three_way(n1.begin, n1.end, n2.begin, n2.end, ::std::compare_three_way{});
-    }
+    { return ::fast_io::freestanding::lexicographical_compare_three_way(n1.begin, n1.end, n2.begin, n2.end, ::std::compare_three_way{}); }
 
     struct type_function_checker
     {
@@ -134,9 +130,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     inline constexpr bool operator== (type_function_checker const& n1, type_function_checker const& n2) noexcept
-    {
-        return n1.parameter == n2.parameter && n1.result == n2.result;
-    }
+    { return n1.parameter == n2.parameter && n1.result == n2.result; }
 
     inline constexpr ::std::strong_ordering operator<=> (type_function_checker const& n1, type_function_checker const& n2) noexcept
     {
@@ -226,9 +220,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         wasm1_final_extern_type<Fs...> const& extern_type,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections,
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32* importdesc_counter_ptr) noexcept
-    {
-        return {::std::addressof(extern_type), ::std::addressof(all_sections), importdesc_counter_ptr};
-    }
+    { return {::std::addressof(extern_type), ::std::addressof(all_sections), importdesc_counter_ptr}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_final_extern_type_section_details_wrapper_t<Fs...>>,
@@ -561,9 +553,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     inline constexpr bool operator== (name_checker const& n1, name_checker const& n2) noexcept
-    {
-        return n1.module_name == n2.module_name && n1.extern_name == n2.extern_name;
-    }
+    { return n1.module_name == n2.module_name && n1.extern_name == n2.extern_name; }
 
     inline constexpr ::std::strong_ordering operator<=> (name_checker const& n1, name_checker const& n2) noexcept
     {
@@ -1325,9 +1315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr wasm1_final_export_type_section_details_wrapper_t<Fs...> section_details(
         wasm1_final_export_type<Fs...> const& export_type,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(export_type), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(export_type), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_final_export_type_section_details_wrapper_t<Fs...>>,
@@ -1520,9 +1508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr wasm1_elem_storage_t_section_details_wrapper_t<Fs...> section_details(
         wasm1_elem_storage_t<Fs...> const& element_storage,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(element_storage), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(element_storage), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_elem_storage_t_section_details_wrapper_t<Fs...>>,
@@ -1686,14 +1672,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline constexpr wasm1_element_t() noexcept { ::new(::std::addressof(this->storage.table_idx)) decltype(this->storage.table_idx){}; }
 
         inline constexpr wasm1_element_t(wasm1_element_t const& other) noexcept : type{other.type}
-        {
-            ::new(::std::addressof(this->storage.table_idx)) decltype(this->storage.table_idx){other.storage.table_idx};
-        }
+        { ::new(::std::addressof(this->storage.table_idx)) decltype(this->storage.table_idx){other.storage.table_idx}; }
 
         inline constexpr wasm1_element_t(wasm1_element_t&& other) noexcept : type{other.type}
-        {
-            ::new(::std::addressof(this->storage.table_idx)) decltype(this->storage.table_idx){::std::move(other.storage.table_idx)};
-        }
+        { ::new(::std::addressof(this->storage.table_idx)) decltype(this->storage.table_idx){::std::move(other.storage.table_idx)}; }
 
         inline constexpr wasm1_element_t& operator= (wasm1_element_t const& other) noexcept
         {
@@ -1736,9 +1718,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr wasm1_element_t_section_details_wrapper_t<Fs...> section_details(
         wasm1_element_t<Fs...> const& element,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(element), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(element), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_element_t_section_details_wrapper_t<Fs...>>,
@@ -1874,9 +1854,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr wasm1_data_storage_t_section_details_wrapper_t<Fs...> section_details(
         wasm1_data_storage_t<Fs...> const& data_storage,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(data_storage), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(data_storage), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_data_storage_t_section_details_wrapper_t<Fs...>>,
@@ -1991,14 +1969,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         inline constexpr wasm1_data_t() noexcept { ::new(::std::addressof(this->storage.memory_idx)) decltype(this->storage.memory_idx){}; }
 
         inline constexpr wasm1_data_t(wasm1_data_t const& other) noexcept : type{other.type}
-        {
-            ::new(::std::addressof(this->storage.memory_idx)) decltype(this->storage.memory_idx){other.storage.memory_idx};
-        }
+        { ::new(::std::addressof(this->storage.memory_idx)) decltype(this->storage.memory_idx){other.storage.memory_idx}; }
 
         inline constexpr wasm1_data_t(wasm1_data_t&& other) noexcept : type{other.type}
-        {
-            ::new(::std::addressof(this->storage.memory_idx)) decltype(this->storage.memory_idx){::std::move(other.storage.memory_idx)};
-        }
+        { ::new(::std::addressof(this->storage.memory_idx)) decltype(this->storage.memory_idx){::std::move(other.storage.memory_idx)}; }
 
         inline constexpr wasm1_data_t& operator= (wasm1_data_t const& other) noexcept
         {
@@ -2041,9 +2015,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     inline constexpr wasm1_data_t_section_details_wrapper_t<Fs...> section_details(
         wasm1_data_t<Fs...> const& data,
         ::uwvm2::parser::wasm::binfmt::ver1::splice_section_storage_structure_t<Fs...> const& all_sections) noexcept
-    {
-        return {::std::addressof(data), ::std::addressof(all_sections)};
-    }
+    { return {::std::addressof(data), ::std::addressof(all_sections)}; }
 
     template <::std::integral char_type, typename Stm, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, wasm1_data_t_section_details_wrapper_t<Fs...>>,

@@ -32,7 +32,7 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-#include <uwvm2/imported/wasi/feature/feature_push_macro.h> // wasi
+#include <uwvm2/imported/wasi/feature/feature_push_macro.h>  // wasi
 
 export module uwvm2.uwvm.cmdline.callback:wasi_disable_utf8_check;
 

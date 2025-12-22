@@ -49,16 +49,16 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-    /// @note Note that this option does not affect WASI's argv0, if you need to set WASI's argv0, use `--wasi-set-argv0` instead.
-    #if defined(UWVM_MODULE)
-extern "C++" UWVM_GNU_COLD
+/// @note Note that this option does not affect WASI's argv0, if you need to set WASI's argv0, use `--wasi-set-argv0` instead.
+#if defined(UWVM_MODULE)
+    extern "C++" UWVM_GNU_COLD
 #else
-UWVM_GNU_COLD inline constexpr
-#endif 
- ::uwvm2::utils::cmdline::parameter_return_type wasm_set_main_module_name_callback(
-        [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
-        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
+    UWVM_GNU_COLD inline constexpr
+#endif
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_set_main_module_name_callback(
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)

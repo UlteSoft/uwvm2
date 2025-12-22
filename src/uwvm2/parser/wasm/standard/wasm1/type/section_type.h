@@ -448,9 +448,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
 
     template <::std::integral char_type>
     inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, external_types>) noexcept
-    {
-        return 6u;
-    }
+    { return 6u; }
 
     namespace details
     {
@@ -517,9 +515,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
 
     template <::std::integral char_type>
     inline constexpr char_type* print_reserve_define(::fast_io::io_reserve_type_t<char_type, external_types>, char_type * iter, external_types exttype) noexcept
-    {
-        return details::print_reserve_extern_kind_impl(iter, exttype);
-    }
+    { return details::print_reserve_extern_kind_impl(iter, exttype); }
 }
 
 /// @brief Define container optimization operations for use with fast_io

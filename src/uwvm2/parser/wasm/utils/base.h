@@ -243,9 +243,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::utils
 #if defined(__ARM_FEATURE_SME)
         __arm_streaming_compatible
 #endif
-    {
-        return i = counter_add_throw_when_overflow(i, add, section_curr, err);
-    }
+    { return i = counter_add_throw_when_overflow(i, add, section_curr, err); }
 }
 
 #ifndef UWVM_MODULE

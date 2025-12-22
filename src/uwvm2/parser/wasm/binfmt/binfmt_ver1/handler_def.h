@@ -188,9 +188,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
         template <typename... Sec>
         inline consteval ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte
             generate_section_max_id_from_tuple(::uwvm2::utils::container::tuple<Sec...> const&) noexcept
-        {
-            return generate_section_max_id<Sec...>();
-        }
+        { return generate_section_max_id<Sec...>(); }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline consteval double generate_section_probability_from_Fs() noexcept

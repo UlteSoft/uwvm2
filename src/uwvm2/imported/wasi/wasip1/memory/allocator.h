@@ -65,9 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::memory
 
     template <typename Alloc>
     inline constexpr auto lock_memory(::uwvm2::object::memory::linear::basic_allocator_memory_t<Alloc> const& memory) noexcept
-    {
-        return ::uwvm2::object::memory::linear::memory_operation_guard_t{memory.growing_flag_p, memory.active_ops_p};
-    }
+    { return ::uwvm2::object::memory::linear::memory_operation_guard_t{memory.growing_flag_p, memory.active_ops_p}; }
 
     template <typename Alloc>
     inline constexpr void check_memory_bounds_unlocked(::uwvm2::object::memory::linear::basic_allocator_memory_t<Alloc> const& memory,

@@ -97,9 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
     }  // namespace details
 
     inline constexpr details::usage_printer print_usage(::uwvm2::utils::cmdline::parameter const& para) noexcept
-    {
-        return details::usage_printer{::std::addressof(para)};
-    }
+    { return details::usage_printer{::std::addressof(para)}; }
 }
 
 #ifndef UWVM_MODULE
