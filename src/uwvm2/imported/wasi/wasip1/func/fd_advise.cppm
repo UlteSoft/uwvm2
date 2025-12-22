@@ -39,6 +39,7 @@ module;
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 # include <unistd.h>
 # include <fcntl.h>
+# include <errno.h>
 #endif
 
 export module uwvm2.imported.wasi.wasip1.func:fd_advise;

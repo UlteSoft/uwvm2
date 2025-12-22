@@ -27,6 +27,7 @@
 #ifndef UWVM_MODULE
 # include "def.h"
 # include "feature_def.h"
+# include "parser_limit.h"
 # include "types.h"
 # include "custom_section.h"
 # include "type_section.h"

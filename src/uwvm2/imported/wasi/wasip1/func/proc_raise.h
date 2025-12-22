@@ -38,6 +38,10 @@
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+// platform
+#if __has_include(<errno.h>)
+# include <errno.h>
+#endif
 // import
 # include <fast_io.h>
 # include <fast_io_device.h>
@@ -45,6 +49,7 @@
 # include <uwvm2/uwvm_predefine/io/impl.h>
 # include <uwvm2/utils/mutex/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>
 # include <uwvm2/imported/wasi/wasip1/abi/impl.h>
 # include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>

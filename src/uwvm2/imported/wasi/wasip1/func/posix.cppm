@@ -37,6 +37,7 @@ module;
 // platform
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 # include <time.h>
+#  include <ctime>
 # include <fcntl.h>
 # include <sys/stat.h>
 # include <sys/time.h>

@@ -37,12 +37,16 @@ import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
+import uwvm2.parser.wasm.standard.wasm1.features;
+import uwvm2.parser.wasm.concepts;
+import uwvm2.parser.wasm_custom.customs;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.utils.depend;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.cmdline.params;
 import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.custom.customs;
 
 #ifndef UWVM_MODULE

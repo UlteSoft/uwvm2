@@ -41,6 +41,8 @@ module;
 # include <errno.h>
 # include <sys/stat.h>
 # include <sys/time.h>
+# include <time.h>
+#  include <ctime>
 #endif
 #if defined(__MSDOS__) || defined(__DJGPP__)
 # include <utime.h>

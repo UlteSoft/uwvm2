@@ -44,6 +44,7 @@ module;
 #if !defined(_WIN32)
 # include <errno.h>
 # include <unistd.h>
+# include <sys/stat.h>
 #endif
 
 export module uwvm2.imported.wasi.wasip1.func:fd_write;

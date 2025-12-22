@@ -40,6 +40,7 @@
 # if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__)
 #  include <unistd.h>
 #  include <fcntl.h>
+#  include <errno.h>
 # endif
 // import
 # include <fast_io.h>

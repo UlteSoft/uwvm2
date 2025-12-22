@@ -36,12 +36,16 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm_custom/customs/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/utils/depend/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/custom/customs/impl.h>
 #endif
 
