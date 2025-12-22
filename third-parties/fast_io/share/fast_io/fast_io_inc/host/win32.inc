@@ -57,4 +57,7 @@ export namespace fast_io
     using ::fast_io::win32_socket_file;
     using ::fast_io::win32_socket_io_observer;
     using ::fast_io::win32_socket_event_guard_t;
+
+    using ::fast_io::data_sync_flags;
+    using ::fast_io::data_sync;
 }

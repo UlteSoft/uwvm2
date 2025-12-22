@@ -182,8 +182,6 @@ using ::fast_io::to_ip_address;
 
 using ::fast_io::io_kernel;
 
-using ::fast_io::data_sync_flags;
-using ::fast_io::data_sync;
 using ::fast_io::flush;
 
 } // namespace fast_io
