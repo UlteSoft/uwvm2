@@ -25,5 +25,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "type/impl.h"
+# include <uwvm2/parser/wasm/proposal/custom_page_size/type/impl.h>
 #endif

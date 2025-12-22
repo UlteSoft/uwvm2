@@ -23,7 +23,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "customs/impl.h"
+# include <uwvm2/uwvm/wasm/custom/customs/impl.h>
 # include "storage.h"
 # include "handler.h"
 #endif

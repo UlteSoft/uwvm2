@@ -24,7 +24,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "relaxed_simd/impl.h"
-# include "half_precision/impl.h"
-# include "custom_page_size/impl.h"
+# include <uwvm2/parser/wasm/proposal/relaxed_simd/impl.h>
+# include <uwvm2/parser/wasm/proposal/half_precision/impl.h>
+# include <uwvm2/parser/wasm/proposal/custom_page_size/impl.h>
 #endif

@@ -23,11 +23,11 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "base/impl.h"
-# include "feature/impl.h"
-# include "type/impl.h"
-# include "section_detail/impl.h"
-# include "storage/impl.h"
-# include "custom/impl.h"
-# include "loader/impl.h"
+# include <uwvm2/uwvm/wasm/base/impl.h>
+# include <uwvm2/uwvm/wasm/feature/impl.h>
+# include <uwvm2/uwvm/wasm/type/impl.h>
+# include <uwvm2/uwvm/wasm/section_detail/impl.h>
+# include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/wasm/custom/impl.h>
+# include <uwvm2/uwvm/wasm/loader/impl.h>
 #endif

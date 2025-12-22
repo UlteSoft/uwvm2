@@ -24,8 +24,8 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "wasm1/impl.h"
-# include "wasm1p1/impl.h"
-# include "wasm2/impl.h"
-# include "wasm3/impl.h"
+# include <uwvm2/parser/wasm/standard/wasm1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm2/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm3/impl.h>
 #endif

@@ -25,9 +25,9 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "type/impl.h"
-# include "section/impl.h"
-# include "opcode/impl.h"
-# include "const_expr/impl.h"
-# include "features/impl.h"
+# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/section/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/opcode/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/const_expr/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
 #endif

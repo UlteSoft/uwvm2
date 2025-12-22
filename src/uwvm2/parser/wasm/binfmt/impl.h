@@ -25,6 +25,6 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "base/impl.h"
-# include "binfmt_ver1/impl.h"
+# include <uwvm2/parser/wasm/binfmt/base/impl.h>
+# include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 #endif

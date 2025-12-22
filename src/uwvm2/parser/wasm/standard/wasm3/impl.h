@@ -26,5 +26,5 @@
 
 #ifndef UWVM_MODULE
 # include <uwvm2/parser/wasm/standard/wasm2/impl.h>
-# include "type/impl.h"
+# include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
 #endif

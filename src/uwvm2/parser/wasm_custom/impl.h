@@ -23,5 +23,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "customs/impl.h"
+# include <uwvm2/parser/wasm_custom/customs/impl.h>
 #endif
