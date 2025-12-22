@@ -25,6 +25,7 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 #include <utility>
 // macro
@@ -40,6 +41,7 @@ import fast_io;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
 import uwvm2.imported.wasi.wasip1;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm.type;
 
 #ifndef UWVM_MODULE

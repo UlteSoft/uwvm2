@@ -127,7 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         using element_type = feature_list_final_value_type_t<FeatureList>;
 
         inline static constexpr ::std::size_t length{sizeof...(vals)};
-        inline static constexpr element_type values[length]{vals...};
+        inline static constexpr ::uwvm2::utils::container::array<element_type, length> values{vals...};
     };
 
     template <typename FeatureList, auto... vals>

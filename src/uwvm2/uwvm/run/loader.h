@@ -48,8 +48,7 @@
 # include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
-# include <uwvm2/uwvm/imported/wasi/wasip1/init/impl.h>
-# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/impl.h>
 # include "retval.h"
 # include "weak_symbol.h"
 #endif
@@ -156,7 +155,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     u8"(verbose)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
-            /// @todo preload wasi-preview1
+
+            ::uwvm2::uwvm::wasm::storage::preload_local_imported.emplace_back(
+                ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module_t{});
         }
 # endif
 #endif
