@@ -372,6 +372,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
     ///       (`init_wasip1_environment` inside `load_local_modules`) before any WASI function is invoked, so it is intentionally not modeled
     ///       as a "local_imported function"/concept requirement here.
 
+    inline constexpr wasip1_local_imported_module_t wasip1_local_imported_module{};
+
 # endif
 #endif
 }  // namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported

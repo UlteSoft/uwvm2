@@ -157,7 +157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
 
             ::uwvm2::uwvm::wasm::storage::preload_local_imported.emplace_back(
-                ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module_t{});
+                ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module);
         }
 # endif
 #endif
