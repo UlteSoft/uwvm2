@@ -58,26 +58,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         using feature_list = ::uwvm2::uwvm::wasm::type::binfmt_ver1_feature_list_t;
         using wasm_value_type = ::uwvm2::uwvm::wasm::type::feature_list_final_value_type_t<feature_list>;
 
-        template <typename T, bool IsEnum = ::std::is_enum_v<T>>
-        struct wasm_scalar_base_type
-        {
-            using type = T;
-        };
-
-        template <typename T>
-        struct wasm_scalar_base_type<T, true>
-        {
-            using type = ::std::underlying_type_t<T>;
-        };
-
-        template <typename T>
-        using wasm_scalar_base_type_t = typename wasm_scalar_base_type<T>::type;
-
         template <typename T>
         inline consteval wasm_value_type map_to_wasm_value_type() noexcept
         {
             using type = ::std::remove_cvref_t<T>;
-            using base_type = wasm_scalar_base_type_t<type>;
+            using base_type_holder = ::std::conditional_t<::std::is_enum_v<type>, ::std::underlying_type<type>, ::std::type_identity<type>>;
+            using base_type = typename base_type_holder::type;
 
             static_assert(::std::is_integral_v<base_type>, "WASI local_imported only supports integral/enum scalars");
 
@@ -92,16 +78,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         }
 
         template <typename Ret>
-        struct wasip1_result_tuple
+        struct wasip1_result_tuple_nonvoid
         {
             using type = ::uwvm2::uwvm::wasm::type::import_function_result_tuple_t<feature_list, map_to_wasm_value_type<Ret>()>;
         };
 
-        template <>
-        struct wasip1_result_tuple<void>
+        template <typename Ret>
+        struct wasip1_result_tuple
         {
-            using type = ::uwvm2::utils::container::tuple<>;
+            using clean_ret = ::std::remove_cvref_t<Ret>;
+            using holder = ::std::
+                conditional_t<::std::is_void_v<clean_ret>, ::std::type_identity<::uwvm2::utils::container::tuple<>>, wasip1_result_tuple_nonvoid<clean_ret>>;
+            using type = typename holder::type;
         };
+
+        template <typename Ret>
+        using wasip1_result_tuple_t = typename wasip1_result_tuple<Ret>::type;
 
         template <typename>
         struct wasip1_fn_traits;
@@ -139,11 +131,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
                           "WASI local_imported wrapper expects uwvm wasip1 env type");
 
             using value_type = wasm_value_type;
-
-            using res_tuple = typename wasip1_result_tuple<Ret>::type;
-
+            using res_tuple = wasip1_result_tuple_t<Ret>;
             using para_tuple = ::uwvm2::uwvm::wasm::type::import_function_parameter_tuple_t<feature_list, map_to_wasm_value_type<Args>()...>;
-
             using local_imported_function_type = ::uwvm2::uwvm::wasm::type::local_imported_function_type_t<res_tuple, para_tuple>;
 
             inline static constexpr void call(local_imported_function_type& func_type) noexcept
