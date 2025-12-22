@@ -46,7 +46,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasi_disable_utf8_check_alias{u8"-Iu8relax"};
-        extern "C++"  ::uwvm2::utils::cmdline::parameter_return_type
+        #if defined(UWVM_MODULE)
+extern "C++"
+#else
+inline constexpr
+#endif 
+  ::uwvm2::utils::cmdline::parameter_return_type
             wasi_disable_utf8_check_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                              ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                              ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;

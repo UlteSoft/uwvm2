@@ -49,7 +49,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasip1_socket_tcp_listen_alias{u8"-I1tcplisten"};
-        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type
+        #if defined(UWVM_MODULE)
+extern "C++"
+#else
+inline constexpr
+#endif 
+ ::uwvm2::utils::cmdline::parameter_return_type
             wasip1_socket_tcp_listen_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                               ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                               ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;

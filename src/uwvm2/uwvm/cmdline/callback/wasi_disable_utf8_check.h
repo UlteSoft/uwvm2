@@ -56,7 +56,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_IMPORT_WASI)
 
-    extern "C++" UWVM_GNU_COLD ::uwvm2::utils::cmdline::parameter_return_type wasi_disable_utf8_check_callback(
+    #if defined(UWVM_MODULE)
+extern "C++" UWVM_GNU_COLD
+#else
+UWVM_GNU_COLD inline constexpr
+#endif 
+ ::uwvm2::utils::cmdline::parameter_return_type wasi_disable_utf8_check_callback(
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept

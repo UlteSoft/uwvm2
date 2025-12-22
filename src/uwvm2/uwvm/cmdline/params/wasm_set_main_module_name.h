@@ -43,7 +43,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     {
         inline bool wasm_set_main_module_name_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::u8string_view wasm_set_main_module_name_alias{u8"-Wname"};
-        extern "C++" ::uwvm2::utils::cmdline::parameter_return_type
+        #if defined(UWVM_MODULE)
+extern "C++"
+#else
+inline constexpr
+#endif 
+ ::uwvm2::utils::cmdline::parameter_return_type
             wasm_set_main_module_name_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
