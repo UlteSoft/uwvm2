@@ -22,9 +22,10 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "abi/impl.h"
-# include "fd_manager/impl.h"
-# include "memory/impl.h"
-# include "environment/impl.h"
-# include "platform/impl.h"
+# include <uwvm2/imported/wasi/wasip1/abi/impl.h>
+# include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
+# include <uwvm2/imported/wasi/wasip1/memory/impl.h>
+# include <uwvm2/imported/wasi/wasip1/environment/impl.h>
+# include <uwvm2/imported/wasi/wasip1/platform/impl.h>
+# include <uwvm2/imported/wasi/wasip1/func/impl.h>
 #endif
