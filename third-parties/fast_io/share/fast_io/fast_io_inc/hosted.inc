@@ -182,5 +182,7 @@ using ::fast_io::to_ip_address;
 
 using ::fast_io::io_kernel;
 
-
+#if defined(__linux__)
+using ::fast_io::fast_exit;
+#endif
 } // namespace fast_io
