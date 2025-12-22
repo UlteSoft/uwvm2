@@ -59,7 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasip1_socket_tcp_listen_callback(
+    extern "C++" UWVM_GNU_COLD ::uwvm2::utils::cmdline::parameter_return_type wasip1_socket_tcp_listen_callback(
         [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept

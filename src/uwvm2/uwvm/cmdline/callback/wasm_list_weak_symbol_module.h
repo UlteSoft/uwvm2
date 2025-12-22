@@ -49,7 +49,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(
+    extern "C++" UWVM_GNU_COLD ::uwvm2::utils::cmdline::parameter_return_type wasm_list_weak_symbol_module_callback(
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*,
         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept

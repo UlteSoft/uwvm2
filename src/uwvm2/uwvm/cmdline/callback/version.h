@@ -152,7 +152,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm));
     }
 
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+    extern "C++" UWVM_GNU_COLD ::uwvm2::utils::cmdline::parameter_return_type version_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {

@@ -48,7 +48,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
-    UWVM_GNU_COLD inline constexpr ::uwvm2::utils::cmdline::parameter_return_type wasm_register_dl_callback(
+    extern "C++" UWVM_GNU_COLD ::uwvm2::utils::cmdline::parameter_return_type wasm_register_dl_callback(
         [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
