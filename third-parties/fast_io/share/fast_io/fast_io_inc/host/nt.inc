@@ -30,5 +30,12 @@ export namespace fast_io
         using ::fast_io::win32::nt::file_allocation_information;
         using ::fast_io::win32::nt::RtlGetSystemTimePrecise;
         using ::fast_io::win32::nt::file_standard_information;
+        using ::fast_io::win32::nt::nt_set_timer;
+        using ::fast_io::win32::nt::timer_type;
+        using ::fast_io::win32::nt::nt_close;
+        using ::fast_io::win32::nt::nt_wait_for_multiple_objects;
+        using ::fast_io::win32::nt::wait_type;
+        using ::fast_io::win32::nt::nt_delay_execution;
+        using ::fast_io::win32::nt::nt_wait_for_single_object;
     } // namespace win32::nt
 }

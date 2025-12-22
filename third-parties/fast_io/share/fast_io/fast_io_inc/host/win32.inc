@@ -46,6 +46,11 @@ export namespace fast_io
         using ::fast_io::win32::sockaddr_in;
         using ::fast_io::win32::sockaddr_storage;
         using ::fast_io::win32::sockaddr_in6;
+        using ::fast_io::win32::WSACreateEvent;
+        using ::fast_io::win32::WSACloseEvent;
+        using ::fast_io::win32::WSAEventSelect;
+        using ::fast_io::win32::wsanetworkevents;
+        using ::fast_io::win32::WSAEnumNetworkEvents;
 
     } // namespace win32
 
