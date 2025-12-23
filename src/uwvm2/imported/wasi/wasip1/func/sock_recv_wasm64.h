@@ -961,6 +961,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
             }
 # endif
+            [[unlikely]] default:
+            {
+                // This will be checked at runtime.
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
+            }
         }
     }
 }
