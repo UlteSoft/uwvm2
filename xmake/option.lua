@@ -327,7 +327,7 @@ end)
 option("test-libfuzzer", function()
     set_description
     (
-        "Test libfuzzer with fuzzing mode.",
+        "Test libfuzzer with fuzzing mode. (Currently only supports the LLVM environment.)",
         "default = false",
         [[    true: Test libfuzzer with fuzzing mode.]],
         [[    false: Don't test libfuzzer with fuzzing mode.]]
