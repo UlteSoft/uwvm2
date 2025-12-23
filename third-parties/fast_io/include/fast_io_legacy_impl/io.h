@@ -354,4 +354,10 @@ static_assert(device_error, "freestanding environment must provide IO device");
 
 } // namespace io
 
+namespace iomnp
+{
+using namespace ::fast_io::io;
+using namespace ::fast_io::mnp;
+} // namespace iomnp
+
 } // namespace fast_io

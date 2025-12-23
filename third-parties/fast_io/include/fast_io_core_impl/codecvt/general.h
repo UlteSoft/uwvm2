@@ -107,7 +107,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 		static_assert(src_encoding == encoding_scheme::utf_be || src_encoding == encoding_scheme::utf_le);
 		for (; src_first != src_last; ++src_first)
 		{
-			dst += get_utf_code_units<encoding>(static_cast<char32_t>(*src_first), dst);
+			dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(*src_first)), dst);
 		}
 		return {src_last, dst};
 	}
@@ -186,7 +186,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 				}
 				else
 				{
-					dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+					dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 				}
 			}
 		}
@@ -204,7 +204,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 				constexpr ::std::size_t m128i_size{16};
 				while (m128i_size < static_cast<::std::size_t>(src_last - src_first))
 				{
-					if (static_cast<char8_t>(*src_first) < 0x80)
+					if (static_cast<char8_t>(static_cast<::std::uint_least8_t>(*src_first)) < 0x80)
 					{
 						auto [new_src, new_dst] = convert_ascii_with_sse(src_first, dst);
 						src_first = new_src;
@@ -223,7 +223,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 							}
 							else
 							{
-								dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+								dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 							}
 						}
 						else
@@ -237,7 +237,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 							}
 							else
 							{
-								dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+								dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 							}
 						}
 					}
@@ -251,7 +251,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 			if constexpr (src_encoding == encoding_scheme::utf_ebcdic)
 			{
 				auto [code, adv] = general_advance<src_encoding>(src_first, src_last - src_first);
-				if (adv == static_cast<char8_t>(-1))
+				if (adv == static_cast<char8_t>(static_cast<::std::uint_least8_t>(-1)))
 				{
 					break;
 				}
@@ -267,12 +267,12 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 				}
 				else
 				{
-					dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+					dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 				}
 			}
 			else
 			{
-				if (static_cast<char8_t>(*src_first) < 0x80)
+				if (static_cast<char8_t>(static_cast<::std::uint_least8_t>(*src_first)) < 0x80)
 				{
 					if constexpr (encoding_scheme::utf_ebcdic == encoding)
 					{
@@ -280,7 +280,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 					}
 					else
 					{
-						*dst = static_cast<dest_char_type>(static_cast<char8_t>(*src_first));
+						*dst = static_cast<dest_char_type>(static_cast<char8_t>(static_cast<::std::uint_least8_t>(*src_first)));
 					}
 					if constexpr (sizeof(dest_char_type) != 1 && encoding_is_utf(encoding) &&
 								  !is_native_scheme(encoding))
@@ -295,7 +295,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 					if constexpr (src_encoding != encoding_scheme::utf)
 					{
 						auto [code, adv] = general_advance<src_encoding>(src_first, src_last - src_first);
-						if (adv == static_cast<char8_t>(-1))
+						if (adv == static_cast<char8_t>(static_cast<::std::uint_least8_t>(-1)))
 						{
 							break;
 						}
@@ -311,7 +311,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 						}
 						else
 						{
-							dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+							dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 						}
 					}
 					else
@@ -333,7 +333,7 @@ general_code_cvt(src_char_type const *src_first, src_char_type const *src_last, 
 						}
 						else
 						{
-							dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+							dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 						}
 					}
 				}
@@ -457,7 +457,7 @@ inline constexpr dest_char_type *general_code_cvt(state_type &__restrict state, 
 				if (failed)
 				{
 					non_overlapped_copy_n(bytes, state_bytesm1, state.bytes);
-					state.size = static_cast<char8_t>(total_bytes);
+					state.size = static_cast<char8_t>(static_cast<::std::uint_least8_t>(total_bytes));
 					return dst;
 				}
 				if constexpr (sizeof(dest_char_type) == 4)
@@ -471,17 +471,17 @@ inline constexpr dest_char_type *general_code_cvt(state_type &__restrict state, 
 				}
 				else
 				{
-					dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+					dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 				}
 				src_first += static_cast<::std::size_t>(bytes_src - bytes - state_size);
 			}
 			else
 			{
 				auto [code, adv] = general_advance<src_encoding>(bytes, total_bytes);
-				if (adv == static_cast<char8_t>(-1))
+				if (adv == static_cast<char8_t>(static_cast<::std::uint_least8_t>(-1)))
 				{
 					non_overlapped_copy_n(bytes, state_bytesm1, state.bytes);
-					state.size = static_cast<char8_t>(total_bytes);
+					state.size = static_cast<char8_t>(static_cast<::std::uint_least8_t>(total_bytes));
 					return dst;
 				}
 				if constexpr (sizeof(dest_char_type) == 4)
@@ -495,14 +495,14 @@ inline constexpr dest_char_type *general_code_cvt(state_type &__restrict state, 
 				}
 				else
 				{
-					dst += get_utf_code_units<encoding>(static_cast<char32_t>(code), dst);
+					dst += get_utf_code_units<encoding>(static_cast<char32_t>(static_cast<::std::uint_least32_t>(code)), dst);
 				}
 				src_first += static_cast<::std::size_t>(static_cast<::std::size_t>(adv) - state_size);
 			}
 		}
 		auto [new_src, new_dst] = general_code_cvt<src_encoding, encoding>(src_first, src_last, dst);
 		::std::size_t diff{static_cast<::std::size_t>(src_last - new_src)};
-		state.size = static_cast<char8_t>(diff);
+		state.size = static_cast<char8_t>(static_cast<::std::uint_least8_t>(diff));
 		non_overlapped_copy_n(new_src, diff, state.bytes);
 		return new_dst;
 	}

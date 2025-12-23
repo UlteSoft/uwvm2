@@ -633,7 +633,7 @@ template <::std::integral T>
 inline constexpr advance_with_big_table_unchecked_result<T> advance_with_big_table_unchecked(T const *it) noexcept
 {
 	char8_t const *info{first_unit_info[static_cast<char8_t>(*it)]};
-	char32_t cdpt{static_cast<char32_t>(*info)}; //- From it, get the initial code point value
+	char32_t cdpt{static_cast<char32_t>(static_cast<::std::uint_least32_t>(*info))}; //- From it, get the initial code point value
 	::std::int_least32_t curr{info[1]};          //- From it, get the second state
 	for (++it; 12 < curr;)
 	{
@@ -663,7 +663,7 @@ template <::std::integral T>
 inline constexpr advance_with_big_table_result<T> advance_with_big_table(T const *first, T const *last) noexcept
 {
 	char8_t const *info{first_unit_info[static_cast<char8_t>(*first)]};
-	char32_t cdpt{static_cast<char32_t>(*info)}; //- From it, get the initial code point value
+	char32_t cdpt{static_cast<char32_t>(static_cast<::std::uint_least32_t>(*info))}; //- From it, get the initial code point value
 	::std::int_least32_t curr{info[1]};          //- From it, get the second state
 	auto it{first};
 	for (++it; 12 < curr;)

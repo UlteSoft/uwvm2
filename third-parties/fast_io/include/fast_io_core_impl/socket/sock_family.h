@@ -89,6 +89,7 @@ enum class sock_family
 	wanpipe,   /* Wanpipe API sockets.  */
 	x25,       /* Reserved for X.25 project.  */
 	xdp,       /* XDP sockets.  */
+	quic,      /* QUIC */
 };
 
 } // namespace fast_io

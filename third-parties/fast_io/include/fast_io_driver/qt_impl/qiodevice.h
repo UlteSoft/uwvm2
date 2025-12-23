@@ -92,22 +92,18 @@ inline ::std::uintmax_t qio_device_seek_impl(QIODevice *__restrict qdevice, ::st
 
 } // namespace details
 
-template <::std::integral ch_type, typename T, ::std::contiguous_iterator Iter>
-inline Iter write(basic_general_qdevice_io_observer<ch_type, T> qiob, Iter begin, Iter end)
+template <::std::integral ch_type, typename T>
+inline ::std::byte const *write_some_bytes_define(basic_general_qdevice_io_observer<ch_type, T> qiob, ::std::byte const *begin, ::std::byte const *end)
 {
-	return begin + details::qio_device_write_impl(
-					   qiob.qdevice, ::std::to_address(begin),
-					   static_cast<::std::size_t>(::std::to_address(end) - ::std::to_address(begin)) * sizeof(*begin)) /
-					   sizeof(*begin);
+	return begin + ::fast_io::details::qio_device_write_impl(
+					   qiob.qdevice, begin, static_cast<::std::size_t>(end - begin));
 }
 
-template <::std::integral ch_type, typename T, ::std::contiguous_iterator Iter>
-inline Iter read(basic_general_qdevice_io_observer<ch_type, T> qiob, Iter begin, Iter end)
+template <::std::integral ch_type, typename T>
+inline ::std::byte *read_some_bytes_define(basic_general_qdevice_io_observer<ch_type, T> qiob, , ::std::byte *begin, ::std::byte *end)
 {
-	return begin + details::qio_device_read_impl(
-					   qiob.qdevice, ::std::to_address(begin),
-					   static_cast<::std::size_t>(::std::to_address(end) - ::std::to_address(begin)) * sizeof(*begin)) /
-					   sizeof(*begin);
+	return begin + ::fast_io::details::qio_device_read_impl(
+					   qiob.qdevice, begin, static_cast<::std::size_t>(end - begin));
 }
 
 template <::std::integral ch_type, typename T>
@@ -139,7 +135,7 @@ using basic_qt_io_observer = basic_general_qdevice_io_observer<char_type, QFile>
 
 template <::std::integral ch_type, typename T>
 inline constexpr basic_qiodevice_io_observer<ch_type>
-io_value_handle(basic_general_qdevice_io_observer<ch_type, T> gqiob) noexcept
+io_stream_ref_define(basic_general_qdevice_io_observer<ch_type, T> gqiob) noexcept
 {
 	return {gqiob.qdevice};
 }

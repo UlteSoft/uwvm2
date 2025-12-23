@@ -1556,7 +1556,7 @@ namespace details
 {
 inline constexpr char32_t to_c_upper_ascii_impl(char32_t ch) noexcept
 {
-	constexpr char32_t alphanum{static_cast<char32_t>(26u)};
+	constexpr char32_t alphanum{static_cast<char32_t>(static_cast<::std::uint_least32_t>(26u))};
 	char32_t res{ch - U'a'};
 	if (res < alphanum)
 	{
@@ -1567,7 +1567,7 @@ inline constexpr char32_t to_c_upper_ascii_impl(char32_t ch) noexcept
 
 inline constexpr char32_t to_c_lower_ascii_impl(char32_t ch) noexcept
 {
-	constexpr char32_t alphanum{static_cast<char32_t>(26u)};
+	constexpr char32_t alphanum{static_cast<char32_t>(static_cast<::std::uint_least32_t>(26u))};
 	char32_t res{ch - U'A'};
 	if (res < alphanum)
 	{
@@ -1797,7 +1797,7 @@ inline constexpr bool is_html_whitespace_wide_impl(wchar_t ch) noexcept
 
 inline constexpr bool is_dos_file_invalid_character_impl(char32_t ch) noexcept
 {
-	if (ch < static_cast<char32_t>(32u))
+	if (ch < static_cast<char32_t>(static_cast<::std::uint_least32_t>(32u)))
 	{
 		return true;
 	}
@@ -1865,7 +1865,7 @@ inline constexpr bool is_c_halfwidth(char_type ch) noexcept
 	}
 	else if constexpr (!::std::same_as<char_type, char32_t> && sizeof(char_type) == sizeof(char32_t))
 	{
-		return is_c_halfwidth(static_cast<char32_t>(ch));
+		return is_c_halfwidth(static_cast<char32_t>(static_cast<::std::uint_least32_t>(ch)));
 	}
 	else if constexpr (::std::signed_integral<char_type>)
 	{
@@ -1899,7 +1899,7 @@ inline constexpr bool is_c_fullwidth(char_type ch) noexcept
 	}
 	else if constexpr (!::std::same_as<char_type, char32_t> && sizeof(char_type) == sizeof(char32_t))
 	{
-		return is_c_fullwidth(static_cast<char32_t>(ch));
+		return is_c_fullwidth(static_cast<char32_t>(static_cast<::std::uint_least32_t>(ch)));
 	}
 	else if constexpr (::std::signed_integral<char_type>)
 	{
@@ -1928,14 +1928,7 @@ To do: to_c_fullwidth
 template <::std::integral T>
 inline constexpr bool is_dos_file_invalid_character(T ch) noexcept
 {
-	if constexpr (::std::signed_integral<T>)
-	{
-		return ::fast_io::char_category::details::is_dos_file_invalid_character_impl(static_cast<char32_t>(static_cast<::std::make_unsigned_t<T>>(ch)));
-	}
-	else
-	{
-		return ::fast_io::char_category::details::is_dos_file_invalid_character_impl(static_cast<char32_t>(ch));
-	}
+	return ::fast_io::char_category::details::is_dos_file_invalid_character_impl(static_cast<char32_t>(static_cast<::std::uint_least32_t>(static_cast<::std::make_unsigned_t<T>>(ch))));
 }
 
 template <::std::integral T>
@@ -1947,7 +1940,7 @@ inline constexpr bool is_dos_path_invalid_prefix_character(T ch) noexcept
 	}
 	else
 	{
-		return ::fast_io::char_category::details::is_dos_path_invalid_prefix_character_impl(static_cast<char32_t>(ch));
+		return ::fast_io::char_category::details::is_dos_path_invalid_prefix_character_impl(static_cast<char32_t>(static_cast<::std::uint_least32_t>(ch)));
 	}
 }
 

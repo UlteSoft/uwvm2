@@ -20,13 +20,13 @@ inline constexpr bool exec_charset_is_ebcdic() noexcept
 		}
 		else if constexpr (sizeof(wchar_t) == sizeof(char32_t))
 		{
-			constexpr char32_t value{static_cast<char32_t>(L'A')};
+			constexpr char32_t value{static_cast<char32_t>(static_cast<::std::uint_least32_t>(L'A'))};
 			constexpr char32_t swapped{::fast_io::byte_swap(value)};
 			return value != U'A' && swapped != U'A';
 		}
 		else
 		{
-			return static_cast<char32_t>(L'A') != U'A';
+			return static_cast<char32_t>(static_cast<::std::uint_least32_t>(L'A')) != U'A';
 		}
 	}
 	else
@@ -48,7 +48,7 @@ inline constexpr bool wexec_charset_is_utf_none_native_endian() noexcept
 	}
 	else
 	{
-		constexpr char32_t value{static_cast<char32_t>(L'A')};
+		constexpr char32_t value{static_cast<char32_t>(static_cast<::std::uint_least32_t>(L'A'))};
 		constexpr char32_t swapped{::fast_io::byte_swap(value)};
 		return value != U'A' && swapped == U'A';
 	}

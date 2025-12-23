@@ -73,42 +73,42 @@ inline constexpr ::std::size_t get_utf_ebcdic_code_units(char32_t code, T *dst) 
 	}
 	else if (code < 0x400)
 	{
-		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(0b11000000) | (code >> 5)]);
+		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11000000)) | (code >> 5)]);
 		dst[1] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | (code & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | (code & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		return 2;
 	}
 	else if (code < 0x4000)
 	{
-		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(0b11100000) | (code >> 10)]);
+		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11100000)) | (code >> 10)]);
 		dst[1] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 5) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 5) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[2] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | (code & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | (code & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		return 3;
 	}
 	else if (code < 0x40000)
 	{
-		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(0b11110000) | (code >> 15)]);
+		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11110000)) | (code >> 15)]);
 		dst[1] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 10) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 10) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[2] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 5) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 5) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[3] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | (code & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | (code & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		return 4;
 	}
 	else if (code < 0x110000)
 	{
-		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(0b11111000) | (code >> 20)]);
+		*dst = static_cast<T>(bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111000)) | (code >> 20)]);
 		dst[1] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 15) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 15) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[2] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 10) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 10) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[3] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | ((code >> 5) & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | ((code >> 5) & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		dst[4] = static_cast<T>(
-			bm_i8_to_ebcdic[static_cast<char32_t>(0b10100000) | (code & static_cast<char32_t>(0b11111))]);
+			bm_i8_to_ebcdic[static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b10100000)) | (code & static_cast<char32_t>(static_cast<::std::uint_least32_t>(0b11111)))]);
 		return 5;
 	}
 	return get_utf_ebcdic_invalid_code_units(dst);
@@ -124,11 +124,11 @@ template <::std::integral T>
 	requires(sizeof(T) == 1)
 inline constexpr from_ebcdic_result utf_ebcdic_advance(T *src_first, ::std::size_t sz) noexcept
 {
-	char8_t src0(static_cast<char8_t>(*src_first));
+	char8_t src0(static_cast<char8_t>(static_cast<::std::uint_least8_t>(*src_first)));
 	char8_t shadow{utfebcdic_shadow_flags[src0]};
 	if (shadow < 2)
 	{
-		return {static_cast<char32_t>(bm_ebcdic_to_i8[src0]), 1};
+		return {static_cast<char32_t>(static_cast<::std::uint_least32_t>(bm_ebcdic_to_i8[src0])), 1};
 	}
 	if (shadow == 9)
 	{
@@ -136,12 +136,12 @@ inline constexpr from_ebcdic_result utf_ebcdic_advance(T *src_first, ::std::size
 	}
 	if (sz < shadow)
 	{
-		return {0, static_cast<char8_t>(-1)};
+		return {0, static_cast<char8_t>(static_cast<::std::uint_least8_t>(-1))};
 	}
 	char32_t res{};
 	for (char8_t i{1}; i != shadow; ++i)
 	{
-		char8_t code(bm_ebcdic_to_i8[static_cast<char8_t>(src_first[i])]);
+		char8_t code(bm_ebcdic_to_i8[static_cast<char8_t>(static_cast<::std::uint_least8_t>(src_first[i]))]);
 		if ((code >> 5) != 0b101) [[unlikely]]
 		{
 			return {0xFFFD, i};
@@ -152,13 +152,13 @@ inline constexpr from_ebcdic_result utf_ebcdic_advance(T *src_first, ::std::size
 	switch (shadow)
 	{
 	case 2:
-		return {((static_cast<char32_t>(src0i18 & 0b11111)) << 5) | res, 2};
+		return {((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0i18 & 0b11111))) << 5) | res, 2};
 	case 3:
-		return {((static_cast<char32_t>(src0i18 & 0b1111)) << 10) | res, 3};
+		return {((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0i18 & 0b1111))) << 10) | res, 3};
 	case 4:
-		return {((static_cast<char32_t>(src0i18 & 0b111)) << 15) | res, 4};
+		return {((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0i18 & 0b111))) << 15) | res, 4};
 	case 5:
-		return {((static_cast<char32_t>(src0i18 & 0b1)) << 20) | res, 5};
+		return {((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0i18 & 0b1))) << 20) | res, 5};
 	default:
 		return {0xFFFD, shadow};
 	};

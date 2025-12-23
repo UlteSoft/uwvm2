@@ -493,7 +493,7 @@ struct to_c_common_fn_impl
 			}
 			else if constexpr (!::std::same_as<char_type, char32_t> && sizeof(char_type) == sizeof(char32_t))
 			{
-				return static_cast<char_type>(operator()(static_cast<char32_t>(ch)));
+				return static_cast<char_type>(operator()(static_cast<char32_t>(static_cast<::std::uint_least32_t>(ch))));
 			}
 			else if constexpr (::std::signed_integral<char_type>)
 			{

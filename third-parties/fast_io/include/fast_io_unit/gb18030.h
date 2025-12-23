@@ -14,7 +14,7 @@ namespace details::codecvt::gb18030
 
 inline constexpr char32_t linear_18030(char32_t a, char32_t b, char32_t c, char32_t d) noexcept
 {
-	return ((a * static_cast<char32_t>(10) + b) * static_cast<char32_t>(126) + c) * static_cast<char32_t>(10) + d;
+	return ((a * static_cast<char32_t>(static_cast<::std::uint_least32_t>(10)) + b) * static_cast<char32_t>(static_cast<::std::uint_least32_t>(126)) + c) * static_cast<char32_t>(static_cast<::std::uint_least32_t>(10))tic_cast<::std::uint_least32_t>(10)) + d;
 }
 
 inline constexpr char32_t linear_18030_base{linear_18030(0x81, 0x30, 0x81, 0x30)};
@@ -66,7 +66,7 @@ inline constexpr ::std::size_t lookup_uni_to_gb18030(char32_t cdpt, T *p_dst) no
 {
 	char32_t v{lookup_uni_to_gb18030_tb[cdpt]};
 	char16_t v2{static_cast<char16_t>(v)};
-	if (static_cast<char32_t>(v2) == v)
+	if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(v2)) == v)
 	{
 		if constexpr ((!::std::is_volatile_v<T>) && (::std::endian::native == ::std::endian::little ||
 													 ::std::endian::native == ::std::endian::big))
@@ -141,9 +141,9 @@ inline constexpr ::std::size_t get_gb18030_code_units_unhappy(char32_t cdpt, T *
 			auto const &e{gb18030_ranges[i]};
 			auto const e0{e[0]};
 			auto const e1{e[1]};
-			char32_t diff{static_cast<char32_t>(e1 - e0)};
+			char32_t diff{static_cast<char32_t>(static_cast<::std::uint_least32_t>(e1 - e0))};
 			sum += diff;
-			if (static_cast<char32_t>(cdpt - e0) < diff)
+			if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(cdpt - e0)) < diff)
 			{
 				char32_t e2{e[2]};
 				char32_t gb{cdpt - e0 + e2};
@@ -157,7 +157,7 @@ inline constexpr ::std::size_t get_gb18030_code_units_unhappy(char32_t cdpt, T *
 				*p_dst = static_cast<T>(0x81 + gb);
 				return 4;
 			}
-			else if (static_cast<char32_t>(cdpt - e1) < static_cast<char32_t>(gb18030_ranges[i + 1][0] - e1))
+			else if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(cdpt - e1)) < static_cast<char32_t>(static_cast<::std::uint_least32_t>(gb18030_ranges[i + 1][0] - e1)))
 			{
 				return lookup_uni_to_gb18030(cdpt - sum, p_dst);
 			}
@@ -172,7 +172,7 @@ inline constexpr ::std::size_t lookup_uni_to_gb18030_pdsz(char32_t cdpt, T *p_ds
 {
 	char32_t v{lookup_uni_to_gb18030_tb[cdpt]};
 	char16_t v2{static_cast<char16_t>(v)};
-	if (static_cast<char32_t>(v2) == v)
+	if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(v2)) == v)
 	{
 		if (pdstsz < 2)
 		{
@@ -254,9 +254,9 @@ inline constexpr ::std::size_t get_gb18030_code_units_unhappy_pdstsz(char32_t u3
 			auto const &e{gb18030_ranges[i]};
 			auto const e0{e[0]};
 			auto const e1{e[1]};
-			char32_t diff{static_cast<char32_t>(e1 - e0)};
+			char32_t diff{static_cast<char32_t>(static_cast<::std::uint_least32_t>(e1 - e0))};
 			sum += diff;
-			if (static_cast<char32_t>(u32 - e0) < diff)
+			if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(u32 - e0)) < diff)
 			{
 				char32_t e2{e[2]};
 				char32_t gb{u32 - e0 + e2};
@@ -274,7 +274,7 @@ inline constexpr ::std::size_t get_gb18030_code_units_unhappy_pdstsz(char32_t u3
 				*p_dst = static_cast<char>(0x81 + gb);
 				return 4;
 			}
-			else if (static_cast<char32_t>(u32 - e1) < static_cast<char32_t>(gb18030_ranges[i + 1][0] - e1))
+			else if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(u32 - e1)) < static_cast<char32_t>(static_cast<::std::uint_least32_t>(gb18030_ranges[i + 1][0] - e1)))
 			{
 				return lookup_uni_to_gb18030(u32 - sum, p_dst);
 			}
@@ -315,11 +315,11 @@ inline constexpr char32_t utf32cp_by_gb18030_index(char32_t index) noexcept
 		auto const &e{gb18030_ranges[i]};
 		auto const e0{e[0]};
 		auto const e1{e[1]};
-		sum += static_cast<char32_t>(e1 - e0);
+		sum += static_cast<char32_t>(static_cast<::std::uint_least32_t>(e1 - e0));
 		auto const e2{e[2]};
 		auto const e3{e[3]};
-		char32_t diff{static_cast<char32_t>(e3 - e2)};
-		if (static_cast<char32_t>(index - e2) <= diff)
+		char32_t diff{static_cast<char32_t>(static_cast<::std::uint_least32_t>(e3 - e2))};
+		if (static_cast<char32_t>(static_cast<::std::uint_least32_t>(index - e2)) <= diff)
 		{
 			return index - e[2] + e[0];
 		}
@@ -361,7 +361,7 @@ inline constexpr gb18030_advance_unchecked_result<T> gb18030_advance_unchecked(T
 			--c;
 		}
 		return {
-			lookup_gb18030_to_uni2_tb[static_cast<char32_t>((static_cast<char32_t>(src0) - 0x81) * 190u + (c - 0x40))],
+			lookup_gb18030_to_uni2_tb[static_cast<char32_t>((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0)) - 0x81) * 190u + (c - 0x40))],
 			2};
 	}
 	else if ((src1 < 0x30) | (src1 == 0xFF))
@@ -415,7 +415,7 @@ inline constexpr gb18030_advance_unchecked_result<T> gb18030_advance(T const *sr
 			--c;
 		}
 		return {
-			lookup_gb18030_to_uni2_tb[static_cast<char32_t>((static_cast<char32_t>(src0) - 0x81) * 190u + (c - 0x40))],
+			lookup_gb18030_to_uni2_tb[static_cast<char32_t>((static_cast<char32_t>(static_cast<::std::uint_least32_t>(src0)) - 0x81) * 190u + (c - 0x40))],
 			2};
 	}
 	else if ((src1 < 0x30) | (src1 == 0xFF))

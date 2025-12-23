@@ -32,7 +32,7 @@ struct basic_message_hdr
 	T const *control;                 /* Ancillary data, see below */
 	::std::size_t controllen;         /* Ancillary data buffer len */
 	int flags;                        /* Flags (unused) */
-	
+
 	inline operator basic_message_hdr<void>() const noexcept
 		requires(!::std::same_as<T, void>)
 	{
@@ -110,7 +110,7 @@ struct deco_result
 	out_char_type *output_result_ptr{};
 };
 
-enum class seekdir
+enum class seekdir : ::std::uint_least8_t
 {
 	beg = 0, // SEEK_SET
 	cur = 1, // SEEK_CUR
