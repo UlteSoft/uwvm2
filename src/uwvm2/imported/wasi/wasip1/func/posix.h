@@ -139,14 +139,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # endif
                 ;
 
+# if !(defined(__MSDOS__) || defined(__DJGPP__))
         // POSIX 2008
         extern int futimens(int fd, const struct ::timespec times[2]) noexcept
-# if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
+#  if !(defined(__MSDOS__) || defined(__DJGPP__)) && !(defined(__APPLE__) || defined(__DARWIN_C_LEVEL))
             __asm__("futimens")
-# else
+#  else
             __asm__("_futimens")
-# endif
+#  endif
                 ;
+# endif
 
         // POSIX 2001
         extern int utimes(char const* path, const struct ::timeval times[2]) noexcept
