@@ -150,6 +150,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             using para_tuple = ::uwvm2::uwvm::wasm::type::import_function_parameter_tuple_t<feature_list, map_to_wasm_value_type<Args>()...>;
             using local_imported_function_type = ::uwvm2::uwvm::wasm::type::local_imported_function_type_t<res_tuple, para_tuple>;
 
+            /// @note This wrapper is intended to be zero-overhead. With typical optimization levels (e.g. `-O2`/`-O3`),
+            ///       the `index_sequence` expansion and the generic lambda are fully inlined, so the generated code
+            ///       degenerates to: direct loads from `func_type.params`, a single call to `Fn`, then a direct store
+            ///       to `func_type.res` (when non-void). No extra helper calls or layers of indirection are expected.
             inline static constexpr void call(local_imported_function_type& func_type) noexcept
             {
                 auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
@@ -183,6 +187,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             using para_tuple = ::uwvm2::uwvm::wasm::type::import_function_parameter_tuple_t<feature_list, map_to_wasm_value_type<Args>()...>;
             using local_imported_function_type = ::uwvm2::uwvm::wasm::type::local_imported_function_type_t<res_tuple, para_tuple>;
 
+            /// @note This wrapper is intended to be zero-overhead. With typical optimization levels (e.g. `-O2`/`-O3`),
+            ///       the `index_sequence` expansion and the generic lambda are fully inlined, so the generated code
+            ///       degenerates to: direct loads from `func_type.params`, a single call to `Fn`, then a direct store
+            ///       to `func_type.res` (when non-void). No extra helper calls or layers of indirection are expected.
             inline static constexpr void call(local_imported_function_type& func_type) noexcept
             {
                 auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
