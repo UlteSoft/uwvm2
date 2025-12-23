@@ -134,7 +134,7 @@ inline
 #endif
 	void yield() noexcept
 {
-	::fast_io::noexcept_call(::__dpmi_yield());
+	::fast_io::noexcept_call(::__dpmi_yield);
 }
 
 } // namespace dos::this_thread
