@@ -3146,7 +3146,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
      (defined(BSD) || defined(_SYSTYPE_BSD) || defined(__BSD_VISIBLE)) || (defined(__MSDOS__) || defined(__DJGPP__))
             // POSIX or POSIX-like
 
-#  if !defined(_POSIX_C_SOURCE) || (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
+#  if (!defined(_POSIX_C_SOURCE) || (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)) && !(defined(__MSDOS__) || defined(__DJGPP__))
             // POSIX.1-2001
             // libc: poll()
 
