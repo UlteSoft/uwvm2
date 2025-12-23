@@ -1077,9 +1077,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         }
 
         template <typename Tuple, ::std::size_t... I>
-        inline constexpr void pack_tuple_to_packed_impl(::std::byte* dst, Tuple const& src, ::std::index_sequence<I...>) noexcept
+        inline constexpr void pack_tuple_to_packed_impl([[maybe_unused]] ::std::byte* dst, Tuple const& src, ::std::index_sequence<I...>) noexcept
         {
-            ::std::size_t offset{};
+            [[maybe_unused]] ::std::size_t offset{};
             ((
                  [&] constexpr noexcept
                  {
