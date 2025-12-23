@@ -108,6 +108,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             using arg_tuple = ::std::tuple<Args...>;
         };
 
+        template <typename Ret, typename Env, typename... Args>
+        struct wasip1_fn_traits<Ret (*)(Env&, Args...) noexcept>
+        {
+            using ret_type = Ret;
+            using env_type = Env;
+            using arg_tuple = ::std::tuple<Args...>;
+        };
+
         template <typename T, typename U>
         inline constexpr ::std::remove_cvref_t<T> cast_wasm_scalar(U v) noexcept
         {
@@ -123,11 +131,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             }
         }
 
+        template <typename Sig, Sig Fn>
+        struct wasip1_local_imported_function_base_impl;
+
         template <auto Fn>
-        struct wasip1_local_imported_function_base;
+        struct wasip1_local_imported_function_base : wasip1_local_imported_function_base_impl<decltype(Fn), Fn>
+        {
+        };
 
         template <typename Ret, typename Env, typename... Args, Ret (*Fn)(Env&, Args...)>
-        struct wasip1_local_imported_function_base<Fn>
+        struct wasip1_local_imported_function_base_impl<Ret (*)(Env&, Args...), Fn>
+        {
+            static_assert(::std::is_same_v<Env, ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_env_type>,
+                          "WASI local_imported wrapper expects uwvm wasip1 env type");
+
+            using value_type = wasm_value_type;
+            using res_tuple = wasip1_result_tuple_t<Ret>;
+            using para_tuple = ::uwvm2::uwvm::wasm::type::import_function_parameter_tuple_t<feature_list, map_to_wasm_value_type<Args>()...>;
+            using local_imported_function_type = ::uwvm2::uwvm::wasm::type::local_imported_function_type_t<res_tuple, para_tuple>;
+
+            inline static constexpr void call(local_imported_function_type& func_type) noexcept
+            {
+                auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
+
+                if constexpr(::std::is_void_v<Ret>)
+                {
+                    [&]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
+                    { Fn(env, cast_wasm_scalar<Args>(::uwvm2::utils::container::get<I>(func_type.params))...); }(::std::make_index_sequence<sizeof...(Args)>{});
+                }
+                else
+                {
+                    auto const retv{[&]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
+                                    {
+                                        return Fn(env, cast_wasm_scalar<Args>(::uwvm2::utils::container::get<I>(func_type.params))...);
+                                    }(::std::make_index_sequence<sizeof...(Args)>{})};
+
+                    using res0_type = ::std::remove_cvref_t<decltype(::uwvm2::utils::container::get<0>(func_type.res))>;
+                    ::uwvm2::utils::container::get<0>(func_type.res) = static_cast<res0_type>(retv);
+                }
+            }
+        };
+
+        template <typename Ret, typename Env, typename... Args, Ret (*Fn)(Env&, Args...) noexcept>
+        struct wasip1_local_imported_function_base_impl<Ret (*)(Env&, Args...) noexcept, Fn>
         {
             static_assert(::std::is_same_v<Env, ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_env_type>,
                           "WASI local_imported wrapper expects uwvm wasip1 env type");
