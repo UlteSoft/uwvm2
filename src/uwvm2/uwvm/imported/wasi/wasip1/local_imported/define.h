@@ -105,7 +105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         {
             using ret_type = Ret;
             using env_type = Env;
-            using arg_tuple = ::std::tuple<Args...>;
+            using arg_tuple = ::uwvm2::utils::container::tuple<Args...>;
         };
 
         template <typename Ret, typename Env, typename... Args>
@@ -113,7 +113,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         {
             using ret_type = Ret;
             using env_type = Env;
-            using arg_tuple = ::std::tuple<Args...>;
+            using arg_tuple = ::uwvm2::utils::container::tuple<Args...>;
         };
 
         template <typename T, typename U>

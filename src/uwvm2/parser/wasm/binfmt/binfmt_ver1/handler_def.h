@@ -154,6 +154,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
         template <typename... Sec>
         inline consteval void check_extensible_section_is_series() noexcept
         {
+            // use std vector for consteval environment
             ::std::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte> vec{};
             [&vec]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
             { ((vec.push_back(Sec...[I] ::section_id)), ...); }(::std::make_index_sequence<sizeof...(Sec)>{});
@@ -177,6 +178,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
         inline consteval ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte generate_section_max_id() noexcept
         {
             static_assert(sizeof...(Sec) != 0);
+            // use std vector for consteval environment
             ::std::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte> vec{};
             [&vec]<::std::size_t... I>(::std::index_sequence<I...>) constexpr noexcept
             { ((vec.push_back(Sec...[I] ::section_id)), ...); }(::std::make_index_sequence<sizeof...(Sec)>{});

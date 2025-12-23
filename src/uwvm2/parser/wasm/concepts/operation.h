@@ -98,6 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
             }(::std::make_index_sequence<sizeof...(Fs)>{});
 
             // Define the binfmt needed for the feature. Duplicates not eliminated.
+            // use std vector for consteval environment
             ::std::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> binfmt_vers_uneliminated{};
 
             // Get all required binfmt versions from the variant templates
@@ -108,6 +109,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
             ::std::ranges::sort(binfmt_vers_uneliminated);
 
             // Constructing a version that eliminates duplicates.
+            // use std vector for consteval environment
             ::std::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> binfmt_vers{};
             for(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 tmp{0u}; auto curr: binfmt_vers_uneliminated)
             {
@@ -117,6 +119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::concepts
             }
 
             // Define the binfmt needed to process the feature.
+            // use std vector for consteval environment
             ::std::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> binfmt_handlers{};
 
             // Cannot define a parsing policy that differs from your wasm version.

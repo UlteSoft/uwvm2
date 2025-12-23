@@ -92,7 +92,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
     namespace detail
     {
-        inline ::std::vector<protected_memory_segment_t> segments{};  // [global]
+        inline ::uwvm2::utils::container::vector<protected_memory_segment_t> segments{};  // [global]
 
         struct signal_handlers_t
         {
