@@ -83,8 +83,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::fast_io::native_file_loader wasm_file{};
         // Module parsing results
         wasm_file_module_storage_u wasm_module_storage{};
-        // wasm_parameter_u
-        ::uwvm2::uwvm::wasm::type::wasm_parameter_u wasm_parameter{};
+        // wasm_parameter_t
+        ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
         // (Optional) Module name + symbol name
         ::uwvm2::parser::wasm_custom::customs::name_storage_t wasm_custom_name{};
 

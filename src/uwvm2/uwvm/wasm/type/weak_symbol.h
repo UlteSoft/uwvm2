@@ -54,8 +54,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::utils::container::u8string_view module_name{};
         // weak symbol handler (same as DL handler)
         wasm_wws_storage_t wasm_wws_storage{};
-        // wasm_parameter_u
-        ::uwvm2::uwvm::wasm::type::wasm_parameter_u wasm_parameter{};
+        // wasm_parameter_t
+        ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
     };
 
     // Conversion from CAPI

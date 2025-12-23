@@ -69,7 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
     inline constexpr load_wasm_file_rtl load_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t & wf,
                                                        ::uwvm2::utils::container::u8cstring_view load_file_name,
                                                        ::uwvm2::utils::container::u8string_view rename_module_name,
-                                                       ::uwvm2::uwvm::wasm::type::wasm_parameter_u para) noexcept
+                                                       ::uwvm2::uwvm::wasm::type::wasm_parameter_t para) noexcept
     {
         wf.file_name = load_file_name;
 

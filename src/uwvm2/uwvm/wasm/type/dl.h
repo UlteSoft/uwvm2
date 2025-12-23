@@ -147,8 +147,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::fast_io::native_dll_file import_dll_file{};
         // DL handler
         wasm_dl_storage_t wasm_dl_storage{};
-        // wasm_parameter_u
-        ::uwvm2::uwvm::wasm::type::wasm_parameter_u wasm_parameter{};
+        // wasm_parameter_t
+        ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
     };
 }  // namespace uwvm2::uwvm::wasm::storage
 

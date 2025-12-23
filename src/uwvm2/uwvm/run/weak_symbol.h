@@ -87,7 +87,7 @@ UWVM_MODULE_EXPORT extern "C"
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
-    inline constexpr int load_weak_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_u const& para) noexcept
+    inline constexpr int load_weak_symbol_modules_details([[maybe_unused]] ::uwvm2::uwvm::wasm::type::wasm_parameter_t const& para) noexcept
     {
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
         auto const vec_ptr{uwvm_weak_symbol_module()};

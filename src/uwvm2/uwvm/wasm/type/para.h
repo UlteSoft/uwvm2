@@ -46,13 +46,13 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
-    union wasm_parameter_u
+    struct wasm_parameter_t
     {
-        ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t binfmt1_para;
+        ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t binfmt1_para{};
         static_assert(::std::is_trivially_copyable_v<decltype(binfmt1_para)> && ::std::is_trivially_destructible_v<decltype(binfmt1_para)>);
     };
 
-    static_assert(::std::is_trivially_copyable_v<wasm_parameter_u> && ::std::is_trivially_destructible_v<wasm_parameter_u>);
+    static_assert(::std::is_trivially_copyable_v<wasm_parameter_t> && ::std::is_trivially_destructible_v<wasm_parameter_t>);
 }  // namespace uwvm2::uwvm::wasm::storage
 
 #ifndef UWVM_MODULE

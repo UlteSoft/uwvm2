@@ -68,7 +68,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
     inline constexpr load_wws_rtl load_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws,
                                                    ::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t const& ws_module,
-                                                   ::uwvm2::uwvm::wasm::type::wasm_parameter_u para) noexcept
+                                                   ::uwvm2::uwvm::wasm::type::wasm_parameter_t para) noexcept
     {
         if(ws_module.module_name_ptr == nullptr)
         {
