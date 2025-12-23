@@ -3760,7 +3760,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                             auto& curr_file_ref{curr_fd.wasi_fd.ptr->wasi_fd_storage.storage.file_fd};
                             curr_io_observer = curr_file_ref;
                         }
-                        auto const& curr_fd_native_file{curr_io_observer};
+
+                        [[maybe_unused]] auto const& curr_fd_native_file{curr_io_observer};
 
                         int const native_fd{curr_fd_native_file.native_handle()};
 
