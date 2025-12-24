@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
  * @copyright   APL-2.0 License
  */
 
@@ -22,9 +21,24 @@
 
 module;
 
-export module uwvm2.uwvm.runtime.storage;
-export import :wasm_module;
-export import :storage;
+// std
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+
+export module uwvm2.uwvm.runtime.storage:storage;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.object;
+import uwvm2.uwvm.wasm;
+import :wasm_module;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -33,4 +47,5 @@ export import :storage;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "storage.h"
+

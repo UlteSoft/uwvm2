@@ -24,4 +24,5 @@
 
 #ifndef UWVM_MODULE
 # include "wasm_module.h" 
+# include "storage.h"
 #endif
