@@ -104,7 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         imported_function_storage_u storage{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
-        // Is the opposite side of this imported logo also imported or custom
+        // Is the opposite side of this imported function also imported or custom?
         bool is_opposite_side_imported{};
     };
 
@@ -200,13 +200,19 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>
     {
-        inline static constexpr bool value = true;
+        inline static constexpr bool value =
+            ::fast_io::freestanding::is_zero_default_constructible_v<
+                ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*>;
     };
 
     template <>
     struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>
     {
-        inline static constexpr bool value = true;
+        inline static constexpr bool value =
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*>;
     };
 
     template <>
@@ -525,13 +531,35 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
     {
-        inline static constexpr bool value = true;
+        inline static constexpr bool value =
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
     };
 
     template <>
     struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
     {
-        inline static constexpr bool value = true;
+        inline static constexpr bool value =
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
     };
 }
 
