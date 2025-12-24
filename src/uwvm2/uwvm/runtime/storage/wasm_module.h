@@ -261,6 +261,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         wasm_binfmt1_final_element_type_t const* element_type_ptr{};
     };
 
+    /// @brief Code section storage
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_code_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_code_t<Fs...>{}; }
+
+    using wasm_binfmt1_final_code_type_t = decltype(get_final_code_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    struct local_defined_code_storage_t
+    {
+        wasm_binfmt1_final_code_type_t const* code_type_ptr{};
+        local_defined_function_storage_t const* func_ptr{};
+
+        /// @todo non-image compiler
+    };
+
     /// @brief Data section storage
 
     // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
@@ -352,6 +367,12 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     };
 
     template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>
     {
         inline static constexpr bool value = true;
@@ -382,7 +403,7 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>);
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>);
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>);
-
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>);
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>);
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>);
 
@@ -414,6 +435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::uwvm2::utils::container::vector<local_defined_element_storage_t> local_defined_element_vec_storage{};
 
         // code
+        ::uwvm2::utils::container::vector<local_defined_code_storage_t> local_defined_code_vec_storage{};
 
         // data
         ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
