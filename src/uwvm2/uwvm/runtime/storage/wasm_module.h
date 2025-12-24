@@ -231,7 +231,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     struct local_defined_memory_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
     {
         ::uwvm2::object::memory::linear::native_memory_t memory{};
-        static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::object::memory::linear::native_memory_t>);
 
         wasm_binfmt1_final_memory_type_t const* memory_type_ptr{};
     };
@@ -257,15 +256,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 UWVM_MODULE_EXPORT namespace fast_io::freestanding
 {
     template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
     struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>
     {
-        inline static constexpr bool value = true;
+        // `native_memory_t` has a non-trivial default constructor (it may allocate).
+        // We only declare trivial relocatability when the selected backend is explicitly marked relocatable.
+        inline static constexpr bool value =
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::object::memory::linear::native_memory_t>;
     };
 
     template <>
@@ -273,8 +269,6 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     {
         inline static constexpr bool value = true;
     };
-
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>);
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
@@ -458,7 +452,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         wasm_data_segment_kind kind{wasm_data_segment_kind::active};
 
         // meaningful only for passive segments; when true the payload is not available.
-        // doop will not set byte_begin and byte_end to nullptr, making it easier to verify.
+        // `data.drop` will set `byte_begin`/`byte_end` to nullptr, making it easier to validate.
         bool dropped{};
     };
 
