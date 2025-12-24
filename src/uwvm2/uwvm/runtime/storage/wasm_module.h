@@ -88,11 +88,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         imported_function_storage_u storage{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
-        // Is the opposite side of this imported logo also imported or custom?
+        // Is the opposite side of this imported logo also imported or custom
         bool is_opposite_side_imported{};
     };
 
     using imported_function_vec_storage_t = ::uwvm2::utils::container::vector<imported_function_storage_t>;
+
+    enum class local_defined_table_elem_storage_type_t : unsigned
+    {
+        func_ref_imported,
+        func_ref_defined,
+    };
 
     struct local_defined_table_elem_storage_t
     {
@@ -101,16 +107,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             // For other uses of WASM, the prerequisite is that WASM must be initialized.
             imported_function_storage_t const* imported_ptr;
             local_defined_function_storage_t const* defined_ptr;
+
+            /// @todo Reference Types
         };
 
         imported_function_storage_u storage{};
 
-        bool is_imported{};
+        local_defined_table_elem_storage_type_t type{};
     };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_table_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_table_type<Fs...>{}; }
+
+    using wasm_binfmt1_final_table_type_t = decltype(get_final_table_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
     struct local_defined_table_storage_t
     {
         ::uwvm2::utils::container::vector<local_defined_table_elem_storage_t> elems{};
+
+        wasm_binfmt1_final_table_type_t const* table_type_ptr{};
+    };
+
+    struct imported_table_storage_t
+    {
+        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
+        union imported_table_storage_u
+        {
+            // For other uses of WASM, the prerequisite is that WASM must be initialized.
+            imported_table_storage_t const* imported_ptr;
+            local_defined_table_storage_t const* defined_ptr;
+        };
+
+        imported_table_storage_u storage{};
+        wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+
+        // Is the opposite side of this imported table also imported or custom?
+        bool is_opposite_side_imported{};
     };
 
     struct wasm_module_storage_t
@@ -120,6 +153,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::uwvm2::utils::container::vector<local_defined_function_storage_t> local_defined_function_vec_storage{};
 
         // table
+        ::uwvm2::utils::container::vector<imported_table_storage_t> imported_table_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_table_storage_t> local_defined_table_vec_storage{};
     };
 }
