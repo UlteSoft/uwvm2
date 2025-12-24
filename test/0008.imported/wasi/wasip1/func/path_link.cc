@@ -53,6 +53,8 @@
 #endif
 // NOLINTBEGIN
 
+#if !defined(__ANDROID__)
+
 using ::uwvm2::imported::wasi::wasip1::abi::lookupflags_t;
 using ::uwvm2::imported::wasi::wasip1::abi::rights_t;
 using ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_t;
@@ -1739,3 +1741,8 @@ int main()
 
 // NOLINTEND
 
+#else
+
+int main() {}
+
+#endif

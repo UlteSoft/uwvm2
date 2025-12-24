@@ -32,7 +32,7 @@
 
 #include <fast_io.h>
 
-#if (!defined(__NEWLIB__) || defined(__CYGWIN__))
+#if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(__ANDROID__)
 
 # include <uwvm2/imported/wasi/wasip1/func/sock_accept_wasm64.h>
 #ifdef UWVM_DLLIMPORT
