@@ -177,6 +177,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         bool is_opposite_side_imported{};
     };
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_global_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_global_type<Fs...>{}; }
+
+    using wasm_binfmt1_final_global_type_t = decltype(get_final_global_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    struct local_defined_global_storage_t
+    {
+        ::uwvm2::object::global::wasm_global_storage_t global{};
+
+        wasm_binfmt1_final_global_type_t const* global_type_ptr{};
+    };
+
+    struct imported_global_storage_t
+    {
+        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
+        union imported_global_storage_u
+        {
+            // For other uses of WASM, the prerequisite is that WASM must be initialized.
+            imported_global_storage_t const* imported_ptr;
+            local_defined_global_storage_t const* defined_ptr;
+        };
+
+        imported_global_storage_u storage{};
+        wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+
+        // Is the opposite side of this imported global also imported or custom?
+        bool is_opposite_side_imported{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_data_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_data_type_t<Fs...>{}; }
+
+    using wasm_binfmt1_final_data_type_t = decltype(get_final_data_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    struct local_defined_data_storage_t
+    {
+        ::uwvm2::object::data::wasm_data_storage_t data{};
+
+        wasm_binfmt1_final_data_type_t const* data_type_ptr{};
+    };
+
     struct wasm_module_storage_t
     {
         // func
@@ -190,6 +233,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // memory
         ::uwvm2::utils::container::vector<imported_memory_storage_t> imported_memory_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_memory_storage_t> local_defined_memory_vec_storage{};
+
+        // global
+        ::uwvm2::utils::container::vector<imported_global_storage_t> imported_global_vec_storage{};
+        ::uwvm2::utils::container::vector<local_defined_global_storage_t> local_defined_global_vec_storage{};
+
+        // data
+        ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
     };
 }
 
