@@ -27,5 +27,4 @@
 # include <uwvm2/object/table/impl.h>
 # include <uwvm2/object/memory/impl.h>
 # include <uwvm2/object/global/impl.h>
-# include <uwvm2/object/data/impl.h>
 #endif

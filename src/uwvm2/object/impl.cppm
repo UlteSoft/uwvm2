@@ -27,7 +27,6 @@ export module uwvm2.object;
 export import uwvm2.object.table;
 export import uwvm2.object.memory;
 export import uwvm2.object.global;
-export import uwvm2.object.data;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

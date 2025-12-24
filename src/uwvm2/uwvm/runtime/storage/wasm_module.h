@@ -45,6 +45,8 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    /// @brief Function section storage
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_function_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...>{}; }
@@ -93,6 +95,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     };
 
     using imported_function_vec_storage_t = ::uwvm2::utils::container::vector<imported_function_storage_t>;
+
+    /// @brief Table section storage
 
     enum class local_defined_table_elem_storage_type_t : unsigned
     {
@@ -147,6 +151,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         bool is_opposite_side_imported{};
     };
 
+    /// @brief Memory section storage
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_memory_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_memory_type<Fs...>{}; }
@@ -176,6 +182,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Is the opposite side of this imported memory also imported or custom?
         bool is_opposite_side_imported{};
     };
+
+    /// @brief Global section storage
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_global_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -207,6 +215,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         bool is_opposite_side_imported{};
     };
 
+    /// @brief Element section storage
+
+    
+
+    /// @brief Data section storage
+
+    // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
+    enum class wasm_data_segment_kind : ::std::uint_fast8_t
+    {
+        /// @brief Active segment: applied during instantiation (data section in wasm1 MVP).
+        active,
+        /// @brief Passive segment: retained for runtime `memory.init` / `data.drop` (bulk memory feature).
+        passive,
+    };
+
+    struct wasm_data_storage_t
+    {
+        using byte_type = ::std::byte;
+
+        byte_type const* byte_begin{};
+        byte_type const* byte_end{};
+
+        // target memory index
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_idx{};
+
+        // byte offset into target memory (valid only for active segments)
+        ::std::uint_least64_t offset{};
+
+        // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
+        wasm_data_segment_kind kind{wasm_data_segment_kind::active};
+
+        // meaningful only for passive segments; when true the payload is not available.
+        // doop will not set byte_begin and byte_end to nullptr, making it easier to verify.
+        bool dropped{};
+    };
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_data_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_data_type_t<Fs...>{}; }
@@ -215,11 +259,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct local_defined_data_storage_t
     {
-        ::uwvm2::object::data::wasm_data_storage_t data{};
+        wasm_data_storage_t data{};
 
         wasm_binfmt1_final_data_type_t const* data_type_ptr{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     struct wasm_module_storage_t
     {
         // func
