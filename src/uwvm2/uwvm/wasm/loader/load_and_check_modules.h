@@ -261,9 +261,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         adjacency_list_t adj;
     };
 
-    /// @brief      Build module dependency graph
-    /// @details    In the WASM standard, importing module A name B type C and importing module A name B type D simultaneously satisfies syntactic validity
-    ///             (binary format validity) but fails validation.
+    /// @brief      Build a *module-level* dependency graph from import declarations
+    /// @details    This graph models *declared module dependencies* only (edges are derived from `import.module_name`).
+    ///             It is used for early diagnostics such as:
+    ///             - missing imported modules,
+    ///             - duplicate/invalid export records for linking,
+    ///             - module-level dependency cycle discovery (warning-level).
+    ///
+    ///             Important: this is NOT an instantiation/initialization dependency analysis.
+    ///             A cycle in the module dependency graph does not necessarily imply an instantiation-time deadlock,
+    ///             because instantiation constraints depend on runtime semantics (import resolution, const-expr evaluation,
+    ///             start function execution, etc.).
+    ///
+    ///             Definitive instantiation-cycle detection and errors must therefore be handled by the initializer
+    ///             (instantiation stage), where the runtime can track `instantiating`/`instantiated` states and report
+    ///             semantic cycles precisely.
+    ///
+    ///             In the WASM standard, importing module A name B type C and importing module A name B type D simultaneously
+    ///             satisfies syntactic validity (binary format validity) but fails validation.
     /// @return     Adjacency list representation of the dependency graph
     inline constexpr build_dependency_graph_and_check_import_exist_ret_t
         build_dependency_graph_and_check_import_exist_and_construct_all_module_export() noexcept
@@ -682,7 +697,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
         if(ok != load_and_check_modules_rtl::ok) [[unlikely]] { return ok; }
 
-        // Detecting Cycle
+        // Detecting *module dependency* cycles (warning-level).
+        // Note: instantiation-cycle errors are handled in the instantiation/initializer stage.
         if(::uwvm2::uwvm::io::show_depend_warning)
         {
             // verbose
