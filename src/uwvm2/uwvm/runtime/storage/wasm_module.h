@@ -222,6 +222,7 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     };
 
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>);
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
@@ -236,6 +237,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct local_defined_memory_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
     {
+        // NOTE: `native_memory_t` is a real runtime object; its default constructor may allocate (e.g. mmap backend).
+        // If you need a "module record" that is cheap to construct (no allocations) before instantiation,
+        // store only `memory_type_ptr` here and move the actual memory objects into a separate instance storage.
         ::uwvm2::object::memory::linear::native_memory_t memory{};
 
         wasm_binfmt1_final_memory_type_t const* memory_type_ptr{};
@@ -275,6 +279,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     {
         inline static constexpr bool value = true;
     };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>);
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
