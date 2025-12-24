@@ -22,27 +22,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-// std
-# include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
-// macro
-# include <uwvm2/utils/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include "table.h"
-#endif
-
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT
-#endif
-
-UWVM_MODULE_EXPORT namespace uwvm2::object::table
-{ using multi_table_vec_t = ::uwvm2::utils::container::vector<::uwvm2::object::table::wasm_table_vec_t>; }  // namespace uwvm2::object::table
-
-#ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/pop_macros.h>
+# include "data.h"
 #endif

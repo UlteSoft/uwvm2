@@ -19,30 +19,30 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
 
-#ifndef UWVM_MODULE
 // std
-# include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
 // macro
-# include <uwvm2/utils/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include "table.h"
-#endif
+#include <uwvm2/utils/macro/push_macros.h>
 
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT
-#endif
+export module uwvm2.object.data:data;
 
-UWVM_MODULE_EXPORT namespace uwvm2::object::table
-{ using multi_table_vec_t = ::uwvm2::utils::container::vector<::uwvm2::object::table::wasm_table_vec_t>; }  // namespace uwvm2::object::table
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type;
 
 #ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/pop_macros.h>
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "data.h"
+

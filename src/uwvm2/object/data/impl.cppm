@@ -1,4 +1,5 @@
-﻿/*************************************************************
+﻿
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -19,30 +20,16 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+export module uwvm2.object.data;
+export import :data;
 
 #ifndef UWVM_MODULE
-// std
-# include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
-// macro
-# include <uwvm2/utils/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include "table.h"
+# define UWVM_MODULE
 #endif
-
 #ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::object::table
-{ using multi_table_vec_t = ::uwvm2::utils::container::vector<::uwvm2::object::table::wasm_table_vec_t>; }  // namespace uwvm2::object::table
-
-#ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/pop_macros.h>
-#endif
+#include "impl.h"
