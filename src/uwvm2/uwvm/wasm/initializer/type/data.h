@@ -39,7 +39,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::initializer::data
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::initializer::type
 {
     // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
     enum class wasm_data_segment_kind : ::std::uint_fast8_t
@@ -75,12 +75,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::initializer::data
 UWVM_MODULE_EXPORT namespace fast_io::freestanding
 {
     template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::wasm::initializer::data::wasm_data_storage_t>
+    struct is_zero_default_constructible<::uwvm2::uwvm::wasm::initializer::type::wasm_data_storage_t>
     {
         inline static constexpr bool value = true;
     };
 
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::wasm::initializer::data::wasm_data_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::wasm::initializer::type::wasm_data_storage_t>);
 }
 
 #ifndef UWVM_MODULE

@@ -22,18 +22,8 @@
 
 module;
 
-// std
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-
-export module uwvm2.uwvm.wasm.initializer.data:define;
-
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.parser.wasm.standard.wasm1.type;
+export module uwvm2.uwvm.wasm.initializer.type;
+export import :data;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -42,4 +32,4 @@ import uwvm2.parser.wasm.standard.wasm1.type;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "define.h"
+#include "impl.h"

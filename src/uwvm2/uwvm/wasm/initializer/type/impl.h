@@ -20,16 +20,8 @@
  *                                      *
  ****************************************/
 
-module;
-
-export module uwvm2.uwvm.wasm.initializer.data;
-export import :define;
+#pragma once
 
 #ifndef UWVM_MODULE
-# define UWVM_MODULE
+# include "data.h"
 #endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
-#endif
-
-#include "impl.h"
