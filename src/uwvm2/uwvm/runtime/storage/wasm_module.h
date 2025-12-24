@@ -35,6 +35,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
+# include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 #endif
 
@@ -81,7 +82,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         {
             // For other uses of WASM, the prerequisite is that WASM must be initialized.
             imported_function_storage_t const* imported_ptr;
-            // First expand the local_defined_function_vec_storage_t until its iterator becomes stable before using it.
             local_defined_function_storage_t const* defined_ptr;
         };
 
@@ -93,6 +93,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     };
 
     using imported_function_vec_storage_t = ::uwvm2::utils::container::vector<imported_function_storage_t>;
+
+    struct local_defined_table_elem_storage_t
+    {
+        union imported_function_storage_u
+        {
+            // For other uses of WASM, the prerequisite is that WASM must be initialized.
+            imported_function_storage_t const* imported_ptr;
+            local_defined_function_storage_t const* defined_ptr;
+        };
+
+        imported_function_storage_u storage{};
+
+        bool is_imported{};
+    };
+
+    struct local_defined_table_storage_t
+    {
+        ::uwvm2::utils::container::vector<local_defined_table_elem_storage_t> elems{};
+    };
+
+    struct wasm_module_storage_t
+    {
+        // func
+        ::uwvm2::utils::container::vector<imported_function_storage_t> imported_function_vec_storage{};
+        ::uwvm2::utils::container::vector<local_defined_function_storage_t> local_defined_function_vec_storage{};
+
+        // table
+        ::uwvm2::utils::container::vector<local_defined_table_storage_t> local_defined_table_vec_storage{};
+    };
 }
 
 #ifndef UWVM_MODULE
