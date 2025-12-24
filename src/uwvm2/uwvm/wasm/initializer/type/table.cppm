@@ -20,11 +20,26 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+
+export module uwvm2.uwvm.wasm.initializer.type:table;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1.type;
 
 #ifndef UWVM_MODULE
-# include "data.h"
-# include "func.h"
-# include "table.h"
-# include "global.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "table.h"

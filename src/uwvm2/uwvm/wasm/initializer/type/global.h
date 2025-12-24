@@ -23,8 +23,29 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "data.h"
-# include "func.h"
-# include "table.h"
-# include "global.h"
+// std
+# include <cstddef>
+# include <cstdint>
+# include <type_traits>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+// import
+# include <fast_io.h>
+# include <uwvm2/utils/container/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 #endif
+
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::initializer::type
+{
+    
+}
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif
+

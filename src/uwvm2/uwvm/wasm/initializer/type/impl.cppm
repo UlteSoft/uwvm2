@@ -24,6 +24,9 @@ module;
 
 export module uwvm2.uwvm.wasm.initializer.type;
 export import :data;
+export import :func;
+export import :table;
+export import :global;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
