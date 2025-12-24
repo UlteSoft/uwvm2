@@ -217,7 +217,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     /// @brief Element section storage
 
-    
+    // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
+    enum class wasm_element_segment_kind : ::std::uint_fast8_t
+    {
+        /// @brief Active segment: applied during instantiation (elem section in wasm1 MVP).
+        active,
+        /// @brief Passive segment: retained for runtime `table.init` / `elem.drop` (bulk memory + reference types).
+        passive,
+    };
+
+    struct wasm_element_storage_t
+    {
+        using func_idx_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+
+        // table index to initialize
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_idx{};
+
+        // element offset into the table (valid only for active segments)
+        ::std::uint_least64_t offset{};
+
+        // initializer function indices (module function index space)
+        func_idx_t const* funcidx_begin{};
+        func_idx_t const* funcidx_end{};
+
+        // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
+        wasm_element_segment_kind kind{wasm_element_segment_kind::active};
+
+        // meaningful only for passive segments; when true the payload is not available.
+        bool dropped{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_element_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_element_type_t<Fs...>{}; }
+
+    using wasm_binfmt1_final_element_type_t = decltype(get_final_element_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    // Keep a pointer to the parser's element record for now (not fully decayed).
+    struct local_defined_element_storage_t
+    {
+        wasm_element_storage_t element{};
+
+        wasm_binfmt1_final_element_type_t const* element_type_ptr{};
+    };
 
     /// @brief Data section storage
 
@@ -268,12 +310,84 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 UWVM_MODULE_EXPORT namespace fast_io::freestanding
 {
     template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>
     {
         inline static constexpr bool value = true;
     };
 
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>);
+
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>);
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>);
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>);
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
@@ -295,6 +409,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // global
         ::uwvm2::utils::container::vector<imported_global_storage_t> imported_global_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_global_storage_t> local_defined_global_vec_storage{};
+
+        // element
+        ::uwvm2::utils::container::vector<local_defined_element_storage_t> local_defined_element_vec_storage{};
+
+        // code
 
         // data
         ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
