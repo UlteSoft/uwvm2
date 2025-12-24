@@ -68,7 +68,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // No pointers to code storage are provided here. To prevent complications arising from broken bidirectional pointers and iterators, the code must be
         // fully constructed beforehand and remain unmodified.
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     using local_defined_function_vec_storage_t = ::uwvm2::utils::container::vector<local_defined_function_storage_t>;
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -95,7 +109,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     };
 
     using imported_function_vec_storage_t = ::uwvm2::utils::container::vector<imported_function_storage_t>;
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Table section storage
 
     enum class local_defined_table_elem_storage_type_t : unsigned
@@ -120,16 +148,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         local_defined_table_elem_storage_type_t type{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_table_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_table_type<Fs...>{}; }
 
     using wasm_binfmt1_final_table_type_t = decltype(get_final_table_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
-    struct local_defined_table_storage_t
+    struct local_defined_table_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
     {
         ::uwvm2::utils::container::vector<local_defined_table_elem_storage_t> elems{};
+        static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<local_defined_table_elem_storage_t>>);
 
         wasm_binfmt1_final_table_type_t const* table_type_ptr{};
     };
@@ -150,7 +193,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Is the opposite side of this imported table also imported or custom?
         bool is_opposite_side_imported{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Memory section storage
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -159,9 +228,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_memory_type_t = decltype(get_final_memory_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
-    struct local_defined_memory_storage_t
+    struct local_defined_memory_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
     {
         ::uwvm2::object::memory::linear::native_memory_t memory{};
+        static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::object::memory::linear::native_memory_t>);
 
         wasm_binfmt1_final_memory_type_t const* memory_type_ptr{};
     };
@@ -182,7 +252,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Is the opposite side of this imported memory also imported or custom?
         bool is_opposite_side_imported{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Global section storage
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -214,7 +310,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // Is the opposite side of this imported global also imported or custom?
         bool is_opposite_side_imported{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>);
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Element section storage
 
     // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
@@ -260,7 +378,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         wasm_binfmt1_final_element_type_t const* element_type_ptr{};
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>);
+
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Code section storage
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_code_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -275,7 +415,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         /// @todo non-image compiler
     };
+}
 
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>);
+}
+
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
+{
     /// @brief Data section storage
 
     // Here, `uint_fast8_t` is used to ensure alignment with `bool` for efficient access.
@@ -325,70 +479,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 UWVM_MODULE_EXPORT namespace fast_io::freestanding
 {
     template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>
     {
         inline static constexpr bool value = true;
     };
 
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
-
-    template <>
-    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>
-    {
-        inline static constexpr bool value = true;
-    };
+    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>);
 
     template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>
@@ -396,18 +492,6 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
         inline static constexpr bool value = true;
     };
 
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_data_storage_t>);
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_element_storage_t>);
-
-    static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>);
     static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>);
 }
 
@@ -439,6 +523,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
         // data
         ::uwvm2::utils::container::vector<local_defined_data_storage_t> local_defined_data_vec_storage{};
+    };
+}
+
+UWVM_MODULE_EXPORT namespace fast_io::freestanding
+{
+    template <>
+    struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
+    {
+        inline static constexpr bool value = true;
+    };
+
+    template <>
+    struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
+    {
+        inline static constexpr bool value = true;
     };
 }
 
