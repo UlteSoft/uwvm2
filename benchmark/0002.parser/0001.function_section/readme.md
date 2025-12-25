@@ -16,7 +16,7 @@ The benchmark:
     - 8-byte little-endian `u64`: number of encoded values (`FUNC_COUNT`)
     - raw LEB128 bytes for those values
 - decodes the entire buffer many times (scalar baseline and SIMD path) in the uwvm2 C++ benchmark, reading from the shared files into heap-allocated buffers (no mmap);
-- runs the Rust fair benchmark in `varint-simd-fair/`, which depends on the cloned `varint-simd` crate and decodes the **same** shared LEB128 streams (also reading from file into `Vec<u8>` / `Vec<u16>`, no mmap);
+- runs the Rust fair benchmark in `varint-simd-fair/`, which depends on the cloned `varint-simd` crate and decodes the **same** shared LEB128 streams (also reading from file into a heap-allocated `Vec<u8>`, no mmap);
 - reports average time per decoded value (ns/value) and throughput (GiB/s) for both uwvm2 and varint-simd on identical inputs.
 
 Unless otherwise noted, the example numbers in this file come from a single run on an Intel Core i9‑14900HK laptop (AVX2), with:
@@ -81,11 +81,11 @@ uwvm2_fs scenario=<...> impl=<scalar|simd> values=<...> total_ns=<...> \
 The scenarios are:
 
 - `u8_1b`  
-  typeidx `< 2^7`, always 1-byte LEB128 encodings; mapped to `scan_function_section_impl_u8_1b`.
+  `type_section_count = 100` (typeidx in `[0, 100)`), always 1-byte LEB128 encodings; mapped to `scan_function_section_impl_u8_1b`.
 - `u8_2b`  
-  `2^7 ≤ typeidx < 2^8`, 1–2 byte encodings; mapped to `scan_function_section_impl_u8_2b`.
+  `type_section_count = 200` (typeidx in `[0, 200)`), 1–2 byte encodings; mapped to `scan_function_section_impl_u8_2b`.
 - `u16_2b`  
-  `2^8 ≤ typeidx < 2^14`, 1–2 byte encodings decoded into a `u16` array; mapped to `scan_function_section_impl_u16_2b`.
+  `type_section_count = 2048` (typeidx in `[0, 2048)`), 1–2 byte encodings decoded as `u16`; mapped to `scan_function_section_impl_u16_2b`.
 
 Each scenario reports both the scalar baseline and the SIMD path.
 
@@ -99,7 +99,7 @@ The Lua script:
   - `RUSTFLAGS="-C target-cpu=native"`
   - `cargo run --release`
 - the Rust fair benchmark:
-  - reads `${FS_BENCH_DATA_DIR}/${scenario}.bin` into a `Vec<u8>` (for `u8_1b` / `u8_2b`) or `Vec<u16>` (for `u16_2b`), adding a small padding area required by `decode_unsafe`;
+  - reads `${FS_BENCH_DATA_DIR}/${scenario}.bin` into a `Vec<u8>`, adding a small padding area required by `decode_unsafe`;
   - decodes the LEB128 stream `ITERS` times using both `varint_simd::decode_unsafe` (unsafe) and `varint_simd::decode` (safe) with the same `FUNC_COUNT` and `ITERS` as the C++ benchmark;
   - prints machine-readable lines of the form:
 
@@ -217,9 +217,9 @@ Under this setup, the measured ratio of ≈ 0.363 (≈ 2.8× faster) reflects a 
 
 The `u16_2b` scenario decodes LEB128<u32> type indices into a `u16` array, using values in the range:
 
-- `2^8 ≤ typeidx < 2^14`
+- `0 ≤ typeidx < 2048` (uniformly sampled from `[0, type_section_count)` with `type_section_count = 2048`)
 
-This intentionally exercises 14‑bit indices that always fit into 1–2 LEB128 bytes. The top 2 bits of the 16‑bit domain are never used, so **3‑byte `u16` encodings do not occur** in this scenario.
+This intentionally exercises indices that always fit into 1–2 LEB128 bytes. Values are `< 2^11`, so **3‑byte `u16` encodings do not occur** in this scenario.
 
 By contrast, varint-simd’s `varint-u16/decode` benchmarks the full `u16` range `[0, 65535]`, which includes many values that require 3‑byte LEB128 encodings. A perfectly symmetric comparison against `varint-u16/decode` would therefore require a hypothetical `u16_3b` path in uwvm2 that also covers 3‑byte encodings.
 
@@ -235,10 +235,9 @@ The `u16_2b` scenario should thus be interpreted as:
 
 ## Summary of fairness
 
-- `u8_2b` is the main “fair” decoder comparison: both sides decode 1–2 byte LEB128<u32> values into a `u8` array, with only a minor difference in value distributions.
+- `u8_2b` is the main “fair” decoder comparison: both sides decode the exact same 1–2 byte LEB128<u32> byte stream as `u8` values (identical distribution by construction).
 - `u8_1b` is a specialized fast path (SIMD + zero-copy view) and should be viewed as an upper bound for a highly optimized validation path, not as a general varint-decoder comparison.
 - `u16_2b` is a practical stress/completeness scenario that intentionally ignores 3‑byte `u16` encodings; a fully symmetric comparison to `varint-u16/decode` would require a `u16_3b` path, which uwvm2 does not implement because real wasm function sections do not need that many distinct type indices.
-## Summary of fairness
 
 ## Performance Comparison of SIMD Implementations
 
