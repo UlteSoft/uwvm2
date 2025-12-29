@@ -2591,7 +2591,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                              u8"\": applied(elem/data)=",
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              elem_active_applied,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              data_active_applied,
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8". ");
