@@ -93,7 +93,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                         u8"[info]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                         u8"Start printing section details. ",
-                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                         u8"[",
                                         local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
                                         u8"] ",
