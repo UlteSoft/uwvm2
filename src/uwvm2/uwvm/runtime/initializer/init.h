@@ -155,7 +155,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             ::uwvm2::utils::container::unordered_flat_set<imported_global_ptr_t> visited{};
 
-            auto const* curr{imported_global_ptr};
+            auto curr{imported_global_ptr};
             for(;;)
             {
                 if(curr == nullptr) [[unlikely]]
@@ -234,7 +234,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     continue;
                 }
 
-                auto const* def{curr->defined_ptr};
+                auto const def{curr->defined_ptr};
                 if(def == nullptr) [[unlikely]]
                 {
                     if(curr->import_type_ptr == nullptr) [[unlikely]]
@@ -461,7 +461,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 auto const& imported_funcs{importsec.importdesc.index_unchecked(importdesc_func_index)};
                 out.imported_function_vec_storage.reserve(imported_funcs.size());
-                for(auto const* import_ptr: imported_funcs)
+                for(auto const import_ptr: imported_funcs)
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_function_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
@@ -471,7 +471,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 auto const& imported_tables{importsec.importdesc.index_unchecked(importdesc_table_index)};
                 out.imported_table_vec_storage.reserve(imported_tables.size());
-                for(auto const* import_ptr: imported_tables)
+                for(auto const import_ptr: imported_tables)
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_table_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
@@ -481,7 +481,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 auto const& imported_memories{importsec.importdesc.index_unchecked(importdesc_memory_index)};
                 out.imported_memory_vec_storage.reserve(imported_memories.size());
-                for(auto const* import_ptr: imported_memories)
+                for(auto const import_ptr: imported_memories)
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
@@ -491,7 +491,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             {
                 auto const& imported_globals{importsec.importdesc.index_unchecked(importdesc_global_index)};
                 out.imported_global_vec_storage.reserve(imported_globals.size());
-                for(auto const* import_ptr: imported_globals)
+                for(auto const import_ptr: imported_globals)
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_global_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
@@ -793,7 +793,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
 
-                    auto const* imported_global_ptr{::std::addressof(g.owner_module_rt_ptr->imported_global_vec_storage.index_unchecked(idx))};
+                    auto const imported_global_ptr{::std::addressof(g.owner_module_rt_ptr->imported_global_vec_storage.index_unchecked(idx))};
                     if(imported_global_ptr->import_type_ptr == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -984,38 +984,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
-                auto const resolve_exported_module_runtime =
+                auto const resolve_exported_module_runtime{
                     [](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const*
-                {
-                    if(import_ptr == nullptr) [[unlikely]] { return nullptr; }
-                    auto const it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(import_ptr->module_name)};
-                    if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return nullptr; }
-                    return ::std::addressof(it->second);
-                };
+                    {
+                        if(import_ptr == nullptr) [[unlikely]] { return nullptr; }
+                        auto const it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(import_ptr->module_name)};
+                        if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return nullptr; }
+                        return ::std::addressof(it->second);
+                    }};
 
-                auto const resolve_export_record = [](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::wasm::type::all_module_export_t const*
-                {
-                    if(import_ptr == nullptr) [[unlikely]] { return nullptr; }
+                auto const resolve_export_record{[](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::wasm::type::all_module_export_t const*
+                                                 {
+                                                     if(import_ptr == nullptr) [[unlikely]] { return nullptr; }
 
-                    auto const mod_it{::uwvm2::uwvm::wasm::storage::all_module_export.find(import_ptr->module_name)};
-                    if(mod_it == ::uwvm2::uwvm::wasm::storage::all_module_export.end()) [[unlikely]] { return nullptr; }
-                    auto const name_it{mod_it->second.find(import_ptr->extern_name)};
-                    if(name_it == mod_it->second.end()) [[unlikely]] { return nullptr; }
-                    return ::std::addressof(name_it->second);
-                };
+                                                     auto const mod_it{::uwvm2::uwvm::wasm::storage::all_module_export.find(import_ptr->module_name)};
+                                                     if(mod_it == ::uwvm2::uwvm::wasm::storage::all_module_export.end()) [[unlikely]] { return nullptr; }
+                                                     auto const name_it{mod_it->second.find(import_ptr->extern_name)};
+                                                     if(name_it == mod_it->second.end()) [[unlikely]] { return nullptr; }
+                                                     return ::std::addressof(name_it->second);
+                                                 }};
 
                 for(auto& imp: curr_rt.imported_function_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
-                    auto const* export_record{resolve_export_record(import_ptr)};
+                    auto const import_ptr{imp.import_type_ptr};
+                    auto const export_record{resolve_export_record(import_ptr)};
                     if(export_record == nullptr) [[unlikely]] { continue; }
                     if(export_record->type != module_type_t::exec_wasm && export_record->type != module_type_t::preloaded_wasm) { continue; }
                     if(export_record->storage.wasm_file_export_storage_ptr.binfmt_ver != 1u) [[unlikely]] { continue; }
 
-                    auto const* export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                    auto const export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
                     if(export_ptr == nullptr || export_ptr->type != external_types::func) [[unlikely]] { continue; }
 
-                    auto const* exported_rt{resolve_exported_module_runtime(import_ptr)};
+                    auto const exported_rt{resolve_exported_module_runtime(import_ptr)};
                     if(exported_rt == nullptr) [[unlikely]] { continue; }
 
                     auto const exported_idx{static_cast<::std::size_t>(export_ptr->storage.func_idx)};
@@ -1038,16 +1038,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 for(auto& imp: curr_rt.imported_table_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
-                    auto const* export_record{resolve_export_record(import_ptr)};
+                    auto const import_ptr{imp.import_type_ptr};
+                    auto const export_record{resolve_export_record(import_ptr)};
                     if(export_record == nullptr) [[unlikely]] { continue; }
                     if(export_record->type != module_type_t::exec_wasm && export_record->type != module_type_t::preloaded_wasm) { continue; }
                     if(export_record->storage.wasm_file_export_storage_ptr.binfmt_ver != 1u) [[unlikely]] { continue; }
 
-                    auto const* export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                    auto const export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
                     if(export_ptr == nullptr || export_ptr->type != external_types::table) [[unlikely]] { continue; }
 
-                    auto const* exported_rt{resolve_exported_module_runtime(import_ptr)};
+                    auto const exported_rt{resolve_exported_module_runtime(import_ptr)};
                     if(exported_rt == nullptr) [[unlikely]] { continue; }
 
                     auto const exported_idx{static_cast<::std::size_t>(export_ptr->storage.table_idx)};
@@ -1070,16 +1070,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 for(auto& imp: curr_rt.imported_memory_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
-                    auto const* export_record{resolve_export_record(import_ptr)};
+                    auto const import_ptr{imp.import_type_ptr};
+                    auto const export_record{resolve_export_record(import_ptr)};
                     if(export_record == nullptr) [[unlikely]] { continue; }
                     if(export_record->type != module_type_t::exec_wasm && export_record->type != module_type_t::preloaded_wasm) { continue; }
                     if(export_record->storage.wasm_file_export_storage_ptr.binfmt_ver != 1u) [[unlikely]] { continue; }
 
-                    auto const* export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                    auto const export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
                     if(export_ptr == nullptr || export_ptr->type != external_types::memory) [[unlikely]] { continue; }
 
-                    auto const* exported_rt{resolve_exported_module_runtime(import_ptr)};
+                    auto const exported_rt{resolve_exported_module_runtime(import_ptr)};
                     if(exported_rt == nullptr) [[unlikely]] { continue; }
 
                     auto const exported_idx{static_cast<::std::size_t>(export_ptr->storage.memory_idx)};
@@ -1102,16 +1102,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 for(auto& imp: curr_rt.imported_global_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
-                    auto const* export_record{resolve_export_record(import_ptr)};
+                    auto const import_ptr{imp.import_type_ptr};
+                    auto const export_record{resolve_export_record(import_ptr)};
                     if(export_record == nullptr) [[unlikely]] { continue; }
                     if(export_record->type != module_type_t::exec_wasm && export_record->type != module_type_t::preloaded_wasm) { continue; }
                     if(export_record->storage.wasm_file_export_storage_ptr.binfmt_ver != 1u) [[unlikely]] { continue; }
 
-                    auto const* export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                    auto const export_ptr{export_record->storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
                     if(export_ptr == nullptr || export_ptr->type != external_types::global) [[unlikely]] { continue; }
 
-                    auto const* exported_rt{resolve_exported_module_runtime(import_ptr)};
+                    auto const exported_rt{resolve_exported_module_runtime(import_ptr)};
                     if(exported_rt == nullptr) [[unlikely]] { continue; }
 
                     auto const exported_idx{static_cast<::std::size_t>(export_ptr->storage.global_idx)};
