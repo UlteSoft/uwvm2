@@ -102,6 +102,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             ::uwvm2::uwvm::wasm::storage::execute_wasm_mode = ::uwvm2::uwvm::wasm::base::mode::section_details;
         }
+        else if(auto const currp1_str{currp1->str}; currp1_str == u8"run")
+        {
+            ::uwvm2::uwvm::wasm::storage::execute_wasm_mode = ::uwvm2::uwvm::wasm::base::mode::run;
+        }
         else [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

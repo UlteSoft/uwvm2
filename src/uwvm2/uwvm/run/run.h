@@ -129,6 +129,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 // section details Occurs before dependency checks
                 break;
             }
+            case ::uwvm2::uwvm::wasm::base::mode::run:
+            {
+                // non-img mode
+                /// @todo run interpreter
+                break;
+            }
             /// @todo add more modes here
             [[unlikely]] default:
             {
