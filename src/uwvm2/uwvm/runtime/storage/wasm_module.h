@@ -312,6 +312,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
             imported_memory_storage_t const* imported_ptr;
             local_defined_memory_storage_t* defined_ptr;
             local_imported_target_t local_imported;
+            static_assert(::std::is_trivially_copyable_v<local_imported_target_t> && ::std::is_trivially_destructible_v<local_imported_target_t>);
         };
 
         // If unresolved, `link_kind == unresolved` and `target.imported_ptr == nullptr`.

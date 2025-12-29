@@ -73,7 +73,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         }
 
-        inline ::uwvm2::utils::container::u8string_view current_initializing_module_name{};
+        // use for verbose output
+        inline ::uwvm2::utils::container::u8string_view current_initializing_module_name{};  // [global]
 
         template <typename... Args>
         inline constexpr void verbose_module_info(Args&&... args) noexcept
@@ -96,7 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         inline constexpr ::std::size_t importdesc_table_index{1uz};
         inline constexpr ::std::size_t importdesc_memory_index{2uz};
         inline constexpr ::std::size_t importdesc_global_index{3uz};
-        inline constexpr ::std::size_t importdesc_tag_index{4uz};
+        inline constexpr ::std::size_t importdesc_tag_index{4uz};  /// @todo not supported tag yet
 
         // this is an adl function
         inline constexpr ::uwvm2::object::global::global_type
@@ -241,7 +242,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 if(curr->is_opposite_side_imported)
                 {
-                    auto const* next{curr->target.imported_ptr};
+                    auto const next{curr->target.imported_ptr};
                     if(next == nullptr) [[unlikely]]
                     {
                         if(curr->import_type_ptr == nullptr) [[unlikely]]
@@ -281,7 +282,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     // Resolve leaf to a local-imported global (host global).
                     auto const idx{curr->target.local_imported.index};
-                    auto* const li{curr->target.local_imported.module_ptr};
+                    auto const li{curr->target.local_imported.module_ptr};
                     if(li == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -329,7 +330,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
 
-                auto* const def{curr->target.defined_ptr};
+                auto const def{curr->target.defined_ptr};
                 if(def == nullptr) [[unlikely]]
                 {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -440,7 +441,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             ::uwvm2::utils::container::unordered_flat_set<imported_table_ptr_t> visited{};
 
-            auto const* curr{imported_table_ptr};
+            auto curr{imported_table_ptr};
             for(;;)
             {
                 if(curr == nullptr) [[unlikely]]
@@ -485,7 +486,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 if(curr->is_opposite_side_imported)
                 {
-                    auto const* next{curr->target.imported_ptr};
+                    auto const next{curr->target.imported_ptr};
                     if(next == nullptr) [[unlikely]] { return false; }
                     curr = next;
                     continue;
@@ -494,7 +495,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 using table_link_kind = ::uwvm2::uwvm::runtime::storage::imported_table_storage_t::imported_table_link_kind;
                 if(curr->link_kind != table_link_kind::defined) [[unlikely]] { return false; }
 
-                auto* def{curr->target.defined_ptr};
+                auto def{curr->target.defined_ptr};
                 if(def == nullptr) [[unlikely]] { return false; }
 
                 out = def;
@@ -509,7 +510,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             ::uwvm2::utils::container::unordered_flat_set<imported_memory_ptr_t> visited{};
 
-            auto const* curr{imported_memory_ptr};
+            auto curr{imported_memory_ptr};
             for(;;)
             {
                 if(curr == nullptr) [[unlikely]]
@@ -554,7 +555,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 if(curr->is_opposite_side_imported)
                 {
-                    auto const* next{curr->target.imported_ptr};
+                    auto const next{curr->target.imported_ptr};
                     if(next == nullptr) [[unlikely]] { return false; }
                     curr = next;
                     continue;
@@ -563,7 +564,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 using memory_link_kind = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t::imported_memory_link_kind;
                 if(curr->link_kind != memory_link_kind::defined) [[unlikely]] { return false; }
 
-                auto* def{curr->target.defined_ptr};
+                auto def{curr->target.defined_ptr};
                 if(def == nullptr) [[unlikely]] { return false; }
 
                 out = def;
@@ -585,7 +586,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             ::uwvm2::utils::container::unordered_flat_set<imported_memory_ptr_t> visited{};
 
-            auto const* curr{imported_memory_ptr};
+            auto curr{imported_memory_ptr};
             for(;;)
             {
                 if(curr == nullptr) [[unlikely]]
@@ -627,7 +628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 if(curr->is_opposite_side_imported)
                 {
-                    auto const* next{curr->target.imported_ptr};
+                    auto const next{curr->target.imported_ptr};
                     if(next == nullptr) [[unlikely]] { return false; }
                     curr = next;
                     continue;
@@ -766,7 +767,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 // func imports
                 for(auto const& imp: curr_rt.imported_function_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
+                    auto const import_ptr{imp.import_type_ptr};
                     if(import_ptr == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -787,7 +788,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
 
-                    auto const* expected_type{import_ptr->imports.storage.function};
+                    auto const expected_type{import_ptr->imports.storage.function};
                     if(expected_type == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -798,7 +799,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     if(imp.link_kind == func_link_kind::imported)
                     {
-                        auto const* imported_target{imp.target.imported_ptr};
+                        auto const imported_target{imp.target.imported_ptr};
                         if(imported_target == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -807,7 +808,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             ::fast_io::fast_terminate();
                         }
 
-                        auto const* target_import_ptr{imported_target->import_type_ptr};
+                        auto const target_import_ptr{imported_target->import_type_ptr};
                         if(target_import_ptr == nullptr || target_import_ptr->imports.type != external_types::func ||
                            target_import_ptr->imports.storage.function == nullptr) [[unlikely]]
                         {
@@ -817,7 +818,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             ::fast_io::fast_terminate();
                         }
 
-                        auto const* actual_type{target_import_ptr->imports.storage.function};
+                        auto const actual_type{target_import_ptr->imports.storage.function};
                         if(!wasm1_function_type_equal(expected_type, actual_type)) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -849,7 +850,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                     else if(imp.link_kind == func_link_kind::defined)
                     {
-                        auto const* def{imp.target.defined_ptr};
+                        auto const def{imp.target.defined_ptr};
                         if(def == nullptr || def->function_type_ptr == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -858,7 +859,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             ::fast_io::fast_terminate();
                         }
 
-                        auto const* actual_type{def->function_type_ptr};
+                        auto const actual_type{def->function_type_ptr};
                         if(!wasm1_function_type_equal(expected_type, actual_type)) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -891,7 +892,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                     else if(imp.link_kind == func_link_kind::dl)
                     {
-                        auto const* dl_ptr{imp.target.dl_ptr};
+                        auto const dl_ptr{imp.target.dl_ptr};
                         if(dl_ptr == nullptr) [[unlikely]]
                         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -935,7 +936,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
                     else if(imp.link_kind == func_link_kind::weak_symbol)
                     {
-                        auto const* weak_ptr{imp.target.weak_symbol_ptr};
+                        auto const weak_ptr{imp.target.weak_symbol_ptr};
                         if(weak_ptr == nullptr) [[unlikely]]
                         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -996,7 +997,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             ::fast_io::fast_terminate();
                         }
 
-                        auto const* actual_type{::std::addressof(info.function_type)};
+                        auto const actual_type{::std::addressof(info.function_type)};
                         if(!wasm1_function_type_equal(expected_type, actual_type)) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -1038,7 +1039,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 // table imports
                 for(auto const& imp: curr_rt.imported_table_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
+                    auto const import_ptr{imp.import_type_ptr};
                     if(import_ptr == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1109,7 +1110,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 // memory imports
                 for(auto const& imp: curr_rt.imported_memory_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
+                    auto const import_ptr{imp.import_type_ptr};
                     if(import_ptr == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1268,7 +1269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 // global imports
                 for(auto const& imp: curr_rt.imported_global_vec_storage)
                 {
-                    auto const* import_ptr{imp.import_type_ptr};
+                    auto const import_ptr{imp.import_type_ptr};
                     if(import_ptr == nullptr) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1295,7 +1296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     if(imp.link_kind == global_link_kind::imported)
                     {
-                        auto const* imported_target{imp.target.imported_ptr};
+                        auto const imported_target{imp.target.imported_ptr};
                         if(imported_target == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1304,7 +1305,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             ::fast_io::fast_terminate();
                         }
 
-                        auto const* target_import_ptr{imported_target->import_type_ptr};
+                        auto const target_import_ptr{imported_target->import_type_ptr};
                         if(target_import_ptr == nullptr || target_import_ptr->imports.type != external_types::global) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1316,7 +1317,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                     else if(imp.link_kind == global_link_kind::defined)
                     {
-                        auto const* def{imp.target.defined_ptr};
+                        auto const def{imp.target.defined_ptr};
                         if(def == nullptr || def->global_type_ptr == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2155,7 +2156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t* target_table{};
                     if(table_idx < imported_table_count)
                     {
-                        auto const* imported_table_ptr{::std::addressof(curr_rt.imported_table_vec_storage.index_unchecked(table_idx))};
+                        auto const imported_table_ptr{::std::addressof(curr_rt.imported_table_vec_storage.index_unchecked(table_idx))};
                         if(!maybe_resolve_wasm1_imported_table_defined(imported_table_ptr, target_table) || target_table == nullptr) [[unlikely]]
                         {
                             if(imported_table_ptr == nullptr || imported_table_ptr->import_type_ptr == nullptr) [[unlikely]]
@@ -2213,8 +2214,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const offset{safe_u64_to_size_t(elem.offset)};
 
                     // funcidx payload length
-                    auto const* funcidx_begin{elem.funcidx_begin};
-                    auto const* funcidx_end{elem.funcidx_end};
+                    auto const funcidx_begin{elem.funcidx_begin};
+                    auto const funcidx_end{elem.funcidx_end};
                     if((funcidx_begin == nullptr) != (funcidx_end == nullptr)) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2297,7 +2298,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t* target_memory{};
                     if(mem_idx < imported_mem_count)
                     {
-                        auto const* imported_memory_ptr{::std::addressof(curr_rt.imported_memory_vec_storage.index_unchecked(mem_idx))};
+                        auto const imported_memory_ptr{::std::addressof(curr_rt.imported_memory_vec_storage.index_unchecked(mem_idx))};
                         if(!maybe_resolve_wasm1_imported_memory_defined(imported_memory_ptr, target_memory) || target_memory == nullptr) [[unlikely]]
                         {
                             if(imported_memory_ptr == nullptr || imported_memory_ptr->import_type_ptr == nullptr) [[unlikely]]
@@ -2354,8 +2355,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     auto const offset{safe_u64_to_size_t(data.offset)};
 
-                    auto const* byte_begin{data.byte_begin};
-                    auto const* byte_end{data.byte_end};
+                    auto const byte_begin{data.byte_begin};
+                    auto const byte_end{data.byte_end};
                     if((byte_begin == nullptr) != (byte_end == nullptr)) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2523,7 +2524,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                         case module_type_t::preloaded_dl:
                         {
-                            auto const* dl_ptr{export_record->storage.wasm_dl_export_storage_ptr.storage};
+                            auto const dl_ptr{export_record->storage.wasm_dl_export_storage_ptr.storage};
                             if(dl_ptr == nullptr) [[unlikely]] { continue; }
                             using func_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
                             imp.target.dl_ptr = dl_ptr;
@@ -2535,7 +2536,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
                         case module_type_t::weak_symbol:
                         {
-                            auto const* weak_ptr{export_record->storage.wasm_weak_symbol_export_storage_ptr.storage};
+                            auto const weak_ptr{export_record->storage.wasm_weak_symbol_export_storage_ptr.storage};
                             if(weak_ptr == nullptr) [[unlikely]] { continue; }
                             using func_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
                             imp.target.weak_symbol_ptr = weak_ptr;
