@@ -122,6 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const)
             {
                 out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(op.storage.i32));
+                return;
             }
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -138,7 +139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::fast_io::fast_terminate();
         }
 
-        inline bool try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
+        inline void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
                                                                 ::std::uint_least64_t& out) noexcept
         {
             using imported_global_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_global_storage_t const*;
@@ -224,8 +225,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
 
-                out = static_cast<::std::uint_least64_t>(def->global.storage.i32);
+                out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(def->global.storage.i32));
+                return;
             }
+
+            // unreachable
+            ::std::unreachable();
         }
 
         inline void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
@@ -249,7 +254,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             auto const& op{expr.opcodes.front_unchecked()};
 
-            if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const) { out = static_cast<::std::uint_least64_t>(op.storage.i32); }
+            if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const)
+            {
+                out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(op.storage.i32));
+                return;
+            }
             else if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
             {
                 auto const idx{static_cast<::std::size_t>(op.storage.imported_global_idx)};
@@ -277,6 +286,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
 
                 try_resolve_wasm1_imported_global_i32_value(::std::addressof(curr_rt.imported_global_vec_storage.index_unchecked(idx)), out);
+
+                return;
             }
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -479,8 +490,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t rec{};
                     rec.element_type_ptr = ::std::addressof(elem);
                     rec.element.table_idx = elem.storage.table_idx.table_idx;
-                    rec.element.funcidx_begin = elem.storage.table_idx.vec_funcidx.data();
-                    rec.element.funcidx_end = elem.storage.table_idx.vec_funcidx.data() + elem.storage.table_idx.vec_funcidx.size();
+                    auto const funcidx_size{elem.storage.table_idx.vec_funcidx.size()};
+                    if(funcidx_size == 0uz)
+                    {
+                        rec.element.funcidx_begin = nullptr;
+                        rec.element.funcidx_end = nullptr;
+                    }
+                    else
+                    {
+                        rec.element.funcidx_begin = elem.storage.table_idx.vec_funcidx.data();
+                        rec.element.funcidx_end = rec.element.funcidx_begin + funcidx_size;
+                    }
                     rec.element.kind = ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active;
                     rec.element.dropped = false;
                     try_eval_wasm1_const_expr_offset(elem.storage.table_idx.expr, rec.element.offset);
