@@ -31,7 +31,7 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.runtime.storage:storage;
+export module uwvm2.uwvm.runtime.initializer:init;
 
 import fast_io;
 import uwvm2.utils.container;
@@ -51,5 +51,4 @@ import uwvm2.uwvm.runtime.storage;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "storage.h"
-
+#include "init.h"
