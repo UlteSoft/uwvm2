@@ -1137,6 +1137,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
     inline void initialize_runtime() noexcept
     {
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Initialize the runtime environment for the WASM module. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(::uwvm2::uwvm::wasm::storage::all_module.size());
 

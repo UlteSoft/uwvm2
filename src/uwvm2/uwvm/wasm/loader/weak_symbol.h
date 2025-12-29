@@ -109,6 +109,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 wws.module_name,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\". ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[",
+                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                u8"] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -245,6 +249,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     u8"custom_handler_vec.custom_handler_begin",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"\". ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[",
+                                    local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                    u8"] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -590,6 +598,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     u8"function_vec.function_begin",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"\". ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[",
+                                    local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                    u8"] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));

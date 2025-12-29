@@ -93,6 +93,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                         u8"[info]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                         u8"Start printing section details. ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        u8"[",
+                                        local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                        u8"] ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                         u8"(verbose)\n",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -118,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
         }
 
-        
+        // initialize runtime
         ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
 
         // run vm
