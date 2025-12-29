@@ -2314,7 +2314,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             switch(mod.type)
             {
-                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
+                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm: [[fallthrough]];
                 case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
                 {
                     if(mod.module_storage_ptr.wf == nullptr) [[unlikely]]
