@@ -337,7 +337,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_function_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
-                    out.imported_function_vec_storage.push_back(::std::move(rec));
+                    out.imported_function_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
             {
@@ -347,7 +347,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_table_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
-                    out.imported_table_vec_storage.push_back(::std::move(rec));
+                    out.imported_table_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
             {
@@ -357,7 +357,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
-                    out.imported_memory_vec_storage.push_back(::std::move(rec));
+                    out.imported_memory_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
             {
@@ -367,7 +367,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::imported_global_storage_t rec{};
                     rec.import_type_ptr = import_ptr;
-                    out.imported_global_vec_storage.push_back(::std::move(rec));
+                    out.imported_global_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
 
@@ -399,12 +399,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t f{};
                     f.function_type_ptr = ::std::addressof(typesec.types.index_unchecked(type_idx));
                     f.wasm_code_ptr = ::std::addressof(codesec.codes.index_unchecked(i));
-                    out.local_defined_function_vec_storage.push_back(f);
+                    out.local_defined_function_vec_storage.push_back_unchecked(f);
 
                     ::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t c{};
                     c.code_type_ptr = ::std::addressof(codesec.codes.index_unchecked(i));
                     c.func_ptr = ::std::addressof(out.local_defined_function_vec_storage.back());
-                    out.local_defined_code_vec_storage.push_back(c);
+                    out.local_defined_code_vec_storage.push_back_unchecked(c);
                 }
             }
 
@@ -416,7 +416,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t rec{};
                     rec.table_type_ptr = ::std::addressof(table_type);
                     rec.elems.resize(static_cast<::std::size_t>(table_type.limits.min));
-                    out.local_defined_table_vec_storage.push_back(::std::move(rec));
+                    out.local_defined_table_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
 
@@ -478,7 +478,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         }
                     }
 
-                    out.local_defined_global_vec_storage.push_back(::std::move(rec));
+                    out.local_defined_global_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
 
@@ -504,7 +504,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     rec.element.kind = ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active;
                     rec.element.dropped = false;
                     try_eval_wasm1_const_expr_offset(elem.storage.table_idx.expr, rec.element.offset);
-                    out.local_defined_element_vec_storage.push_back(::std::move(rec));
+                    out.local_defined_element_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
 
@@ -521,7 +521,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     rec.data.byte_begin = reinterpret_cast<::std::byte const*>(data.storage.memory_idx.byte.begin);
                     rec.data.byte_end = reinterpret_cast<::std::byte const*>(data.storage.memory_idx.byte.end);
                     try_eval_wasm1_const_expr_offset(data.storage.memory_idx.expr, rec.data.offset);
-                    out.local_defined_data_vec_storage.push_back(::std::move(rec));
+                    out.local_defined_data_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
         }
