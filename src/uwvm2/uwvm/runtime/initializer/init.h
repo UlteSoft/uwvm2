@@ -2342,6 +2342,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                           rt.local_defined_data_vec_storage.size(),
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8". ");
+
+                    // no necessary to check, When constructing the all_module, duplicate names have already been excluded.
+                    ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.try_emplace(module_name, ::std::move(rt));
+
                     break;
                 }
                 default:
@@ -2355,9 +2359,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     break;
                 }
             }
-
-            ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.try_emplace(module_name, ::std::move(rt));
-            // no necessary to check, When constructing the all_module, duplicate names have already been excluded.
         }
 
         // Best-effort linking between wasm file modules.
