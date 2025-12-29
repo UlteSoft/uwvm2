@@ -186,7 +186,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // If unresolved, both pointers are null.
         // If resolved, exactly one of the pointers is non-null.
         imported_table_storage_t const* imported_ptr{};
-        local_defined_table_storage_t const* defined_ptr{};
+        local_defined_table_storage_t* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported table also imported or custom?
@@ -249,7 +249,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // If unresolved, both pointers are null.
         // If resolved, exactly one of the pointers is non-null.
         imported_memory_storage_t const* imported_ptr{};
-        local_defined_memory_storage_t const* defined_ptr{};
+        local_defined_memory_storage_t* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported memory also imported or custom?
@@ -310,7 +310,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // If unresolved, both pointers are null.
         // If resolved, exactly one of the pointers is non-null.
         imported_global_storage_t const* imported_ptr{};
-        local_defined_global_storage_t const* defined_ptr{};
+        local_defined_global_storage_t* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported global also imported or custom?

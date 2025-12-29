@@ -265,10 +265,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
 
-                auto& def_mut{*const_cast<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t*>(def)};
-                ensure_wasm1_local_defined_global_initialized(def_mut);
+                ensure_wasm1_local_defined_global_initialized(*def);
 
-                out = ::std::addressof(def_mut.global);
+                out = ::std::addressof(def->global);
                 return;
             }
 
@@ -359,6 +358,513 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(resolved_global->storage.i32));
             return;
+        }
+
+        inline bool maybe_resolve_wasm1_imported_table_defined(::uwvm2::uwvm::runtime::storage::imported_table_storage_t const* imported_table_ptr,
+                                                               ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*& out) noexcept
+        {
+            using imported_table_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_table_storage_t const*;
+
+            ::uwvm2::utils::container::unordered_flat_set<imported_table_ptr_t> visited{};
+
+            auto const* curr{imported_table_ptr};
+            for(;;)
+            {
+                if(curr == nullptr) [[unlikely]]
+                {
+                    // vm bug
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::fast_io::fast_terminate();
+                }
+
+                // Detect reference cycles in imported tables.
+                if(!visited.emplace(curr).second) [[unlikely]]
+                {
+                    if(curr->import_type_ptr == nullptr) [[unlikely]]
+                    {
+                        // vm bug
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Table \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8".",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->extern_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\" encountered a circular dependency during import resolution.\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+
+                if(curr->is_opposite_side_imported)
+                {
+                    if(curr->imported_ptr == nullptr) [[unlikely]] { return false; }
+                    curr = curr->imported_ptr;
+                    continue;
+                }
+
+                auto* def{curr->defined_ptr};
+                if(def == nullptr) [[unlikely]] { return false; }
+
+                out = def;
+                return true;
+            }
+        }
+
+        inline bool maybe_resolve_wasm1_imported_memory_defined(::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const* imported_memory_ptr,
+                                                                ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t*& out) noexcept
+        {
+            using imported_memory_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const*;
+
+            ::uwvm2::utils::container::unordered_flat_set<imported_memory_ptr_t> visited{};
+
+            auto const* curr{imported_memory_ptr};
+            for(;;)
+            {
+                if(curr == nullptr) [[unlikely]]
+                {
+                    // vm bug
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::fast_io::fast_terminate();
+                }
+
+                // Detect reference cycles in imported memories.
+                if(!visited.emplace(curr).second) [[unlikely]]
+                {
+                    if(curr->import_type_ptr == nullptr) [[unlikely]]
+                    {
+                        // vm bug
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Memory \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8".",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->extern_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\" encountered a circular dependency during import resolution.\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+
+                if(curr->is_opposite_side_imported)
+                {
+                    if(curr->imported_ptr == nullptr) [[unlikely]] { return false; }
+                    curr = curr->imported_ptr;
+                    continue;
+                }
+
+                auto* def{curr->defined_ptr};
+                if(def == nullptr) [[unlikely]] { return false; }
+
+                out = def;
+                return true;
+            }
+        }
+
+        inline constexpr bool wasm1_limits_match(::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& expected,
+                                                 ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& actual) noexcept
+        {
+            if(actual.min < expected.min) { return false; }
+
+            if(expected.present_max)
+            {
+                if(!actual.present_max) { return false; }
+                if(actual.max > expected.max) { return false; }
+            }
+
+            return true;
+        }
+
+        template <typename ValueType>
+        inline constexpr ::std::size_t safe_ptr_range_size(ValueType const* begin, ValueType const* end) noexcept
+        {
+            if(begin == end) { return 0uz; }
+            if(begin == nullptr || end == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            auto const diff{end - begin};
+            if(diff < 0) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+            return static_cast<::std::size_t>(diff);
+        }
+
+        inline constexpr bool wasm1_function_type_equal(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* expected,
+                                                        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* actual) noexcept
+        {
+            if(expected == actual) { return true; }
+            if(expected == nullptr || actual == nullptr) { return false; }
+
+            auto const expected_para_len{safe_ptr_range_size(expected->parameter.begin, expected->parameter.end)};
+            auto const actual_para_len{safe_ptr_range_size(actual->parameter.begin, actual->parameter.end)};
+            if(expected_para_len != actual_para_len) { return false; }
+
+            for(::std::size_t i{}; i != expected_para_len; ++i)
+            {
+                if(expected->parameter.begin[i] != actual->parameter.begin[i]) { return false; }
+            }
+
+            auto const expected_res_len{safe_ptr_range_size(expected->result.begin, expected->result.end)};
+            auto const actual_res_len{safe_ptr_range_size(actual->result.begin, actual->result.end)};
+            if(expected_res_len != actual_res_len) { return false; }
+
+            for(::std::size_t i{}; i != expected_res_len; ++i)
+            {
+                if(expected->result.begin[i] != actual->result.begin[i]) { return false; }
+            }
+
+            return true;
+        }
+
+        inline void validate_wasm_file_module_import_types_after_linking() noexcept
+        {
+            using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+
+            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            {
+                // func imports
+                for(auto const& imp: curr_rt.imported_function_vec_storage)
+                {
+                    auto const* import_ptr{imp.import_type_ptr};
+                    if(import_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+
+                    if(import_ptr->imports.type != external_types::func) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const* expected_type{import_ptr->imports.storage.function};
+                    if(expected_type == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* actual_type{};
+                    if(imp.imported_ptr != nullptr)
+                    {
+                        auto const* target_import_ptr{imp.imported_ptr->import_type_ptr};
+                        if(target_import_ptr == nullptr || target_import_ptr->imports.type != external_types::func ||
+                           target_import_ptr->imports.storage.function == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        actual_type = target_import_ptr->imports.storage.function;
+                    }
+                    else
+                    {
+                        if(imp.defined_ptr == nullptr || imp.defined_ptr->function_type_ptr == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        actual_type = imp.defined_ptr->function_type_ptr;
+                    }
+
+                    if(!wasm1_function_type_equal(expected_type, actual_type)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", imported function \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->extern_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\" has a type mismatch.\n    expected: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::features::section_details(*expected_type),
+                                            u8"\n    got: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::features::section_details(*actual_type),
+                                            u8"\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                // table imports
+                for(auto const& imp: curr_rt.imported_table_vec_storage)
+                {
+                    auto const* import_ptr{imp.import_type_ptr};
+                    if(import_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+
+                    if(import_ptr->imports.type != external_types::table) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t* resolved_table{};
+                    if(!maybe_resolve_wasm1_imported_table_defined(::std::addressof(imp), resolved_table)) { continue; }
+
+                    if(resolved_table == nullptr || resolved_table->table_type_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const& expected_table{import_ptr->imports.storage.table};
+                    auto const& actual_table{*resolved_table->table_type_ptr};
+                    if(!wasm1_limits_match(expected_table.limits, actual_table.limits)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", imported table \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->extern_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\" has a type mismatch.\n    expected: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(expected_table),
+                                            u8"\n    got: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(actual_table),
+                                            u8"\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                // memory imports
+                for(auto const& imp: curr_rt.imported_memory_vec_storage)
+                {
+                    auto const* import_ptr{imp.import_type_ptr};
+                    if(import_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+
+                    if(import_ptr->imports.type != external_types::memory) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t* resolved_memory{};
+                    if(!maybe_resolve_wasm1_imported_memory_defined(::std::addressof(imp), resolved_memory)) { continue; }
+
+                    if(resolved_memory == nullptr || resolved_memory->memory_type_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const& expected_memory{import_ptr->imports.storage.memory};
+                    auto const& actual_memory{*resolved_memory->memory_type_ptr};
+                    if(!wasm1_limits_match(expected_memory.limits, actual_memory.limits)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", imported memory \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->extern_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\" has a type mismatch.\n    expected: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(expected_memory),
+                                            u8"\n    got: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(actual_memory),
+                                            u8"\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                // global imports
+                for(auto const& imp: curr_rt.imported_global_vec_storage)
+                {
+                    auto const* import_ptr{imp.import_type_ptr};
+                    if(import_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+
+                    if(import_ptr->imports.type != external_types::global) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const& expected_global{import_ptr->imports.storage.global};
+                    ::uwvm2::parser::wasm::standard::wasm1::type::global_type const* actual_global_ptr{};
+
+                    if(imp.imported_ptr != nullptr)
+                    {
+                        auto const* target_import_ptr{imp.imported_ptr->import_type_ptr};
+                        if(target_import_ptr == nullptr || target_import_ptr->imports.type != external_types::global) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        actual_global_ptr = ::std::addressof(target_import_ptr->imports.storage.global);
+                    }
+                    else
+                    {
+                        if(imp.defined_ptr == nullptr || imp.defined_ptr->global_type_ptr == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        actual_global_ptr = imp.defined_ptr->global_type_ptr;
+                    }
+
+                    if(actual_global_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const& actual_global{*actual_global_ptr};
+                    if(expected_global.type != actual_global.type || expected_global.is_mutable != actual_global.is_mutable) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", imported global \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            import_ptr->extern_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\" has a type mismatch.\n    expected: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(expected_global),
+                                            u8"\n    got: ",
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(actual_global),
+                                            u8"\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
         }
 
         inline void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
@@ -953,6 +1459,317 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
+        inline constexpr ::std::size_t safe_u32_to_size_t(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 v) noexcept
+        {
+            constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
+            constexpr auto wasm_u32_max{::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max()};
+            if constexpr(size_t_max < wasm_u32_max)
+            {
+                if(v > size_t_max) [[unlikely]]
+                {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::fast_io::fast_terminate();
+                }
+            }
+            return static_cast<::std::size_t>(v);
+        }
+
+        inline constexpr ::std::size_t safe_u64_to_size_t(::std::uint_least64_t v) noexcept
+        {
+            constexpr auto size_t_max{::std::numeric_limits<::std::size_t>::max()};
+            if(v > size_t_max) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+            return static_cast<::std::size_t>(v);
+        }
+
+        template <typename NativeMemory>
+        inline constexpr ::std::size_t get_native_memory_length_bytes(NativeMemory const& memory) noexcept
+        {
+            // All supported backends expose `get_page_size()` and `custom_page_size_log2`.
+            return memory.get_page_size() << memory.custom_page_size_log2;
+        }
+
+        inline void apply_wasm1_active_element_and_data_segments_after_linking() noexcept
+        {
+            using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
+
+            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            {
+                // element (wasm1: active segments)
+                for(auto const& elem_seg: curr_rt.local_defined_element_vec_storage)
+                {
+                    auto const& elem{elem_seg.element};
+                    if(elem.kind != ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active || elem.dropped) { continue; }
+
+                    auto const table_idx{safe_u32_to_size_t(elem.table_idx)};
+                    auto const imported_table_count{curr_rt.imported_table_vec_storage.size()};
+
+                    ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t* target_table{};
+                    if(table_idx < imported_table_count)
+                    {
+                        auto const* imported_table_ptr{::std::addressof(curr_rt.imported_table_vec_storage.index_unchecked(table_idx))};
+                        if(!maybe_resolve_wasm1_imported_table_defined(imported_table_ptr, target_table) || target_table == nullptr) [[unlikely]]
+                        {
+                            if(imported_table_ptr == nullptr || imported_table_ptr->import_type_ptr == nullptr) [[unlikely]]
+                            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                ::fast_io::fast_terminate();
+                            }
+
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"initializer: In module \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                curr_module_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\", element segment requires an unresolved imported table \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                imported_table_ptr->import_type_ptr->module_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8".",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                imported_table_ptr->import_type_ptr->extern_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+                    else
+                    {
+                        auto const local_idx{table_idx - imported_table_count};
+                        if(local_idx >= curr_rt.local_defined_table_vec_storage.size()) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        target_table = ::std::addressof(curr_rt.local_defined_table_vec_storage.index_unchecked(local_idx));
+                    }
+
+                    if(target_table == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const offset{safe_u64_to_size_t(elem.offset)};
+
+                    // funcidx payload length
+                    auto const* funcidx_begin{elem.funcidx_begin};
+                    auto const* funcidx_end{elem.funcidx_end};
+                    if((funcidx_begin == nullptr) != (funcidx_end == nullptr)) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+                    auto const func_count{safe_ptr_range_size(funcidx_begin, funcidx_end)};
+
+                    auto const table_size{target_table->elems.size()};
+                    if(offset > table_size || func_count > (table_size - offset)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", element segment initialization would write past table bounds (offset=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            offset,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", count=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            func_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", table_size=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            table_size,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8").\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const imported_func_count{curr_rt.imported_function_vec_storage.size()};
+                    auto const local_func_count{curr_rt.local_defined_function_vec_storage.size()};
+                    auto const all_func_count{imported_func_count + local_func_count};
+
+                    for(::std::size_t i{}; i != func_count; ++i)
+                    {
+                        auto& slot{target_table->elems.index_unchecked(offset + i)};
+                        auto const func_idx{safe_u32_to_size_t(funcidx_begin[i])};
+                        if(func_idx >= all_func_count) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+
+                        if(func_idx < imported_func_count)
+                        {
+                            slot.storage.imported_ptr = ::std::addressof(curr_rt.imported_function_vec_storage.index_unchecked(func_idx));
+                            slot.type = table_elem_type::func_ref_imported;
+                        }
+                        else
+                        {
+                            auto const local_idx{func_idx - imported_func_count};
+                            slot.storage.defined_ptr = ::std::addressof(curr_rt.local_defined_function_vec_storage.index_unchecked(local_idx));
+                            slot.type = table_elem_type::func_ref_defined;
+                        }
+                    }
+                }
+
+                // data (wasm1: active segments)
+                for(auto const& data_seg: curr_rt.local_defined_data_vec_storage)
+                {
+                    auto const& data{data_seg.data};
+                    if(data.kind != ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::active || data.dropped) { continue; }
+
+                    auto const mem_idx{safe_u32_to_size_t(data.memory_idx)};
+                    auto const imported_mem_count{curr_rt.imported_memory_vec_storage.size()};
+
+                    ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t* target_memory{};
+                    if(mem_idx < imported_mem_count)
+                    {
+                        auto const* imported_memory_ptr{::std::addressof(curr_rt.imported_memory_vec_storage.index_unchecked(mem_idx))};
+                        if(!maybe_resolve_wasm1_imported_memory_defined(imported_memory_ptr, target_memory) || target_memory == nullptr) [[unlikely]]
+                        {
+                            if(imported_memory_ptr == nullptr || imported_memory_ptr->import_type_ptr == nullptr) [[unlikely]]
+                            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                ::fast_io::fast_terminate();
+                            }
+
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"initializer: In module \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                curr_module_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\", data segment requires an unresolved imported memory \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                imported_memory_ptr->import_type_ptr->module_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8".",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                imported_memory_ptr->import_type_ptr->extern_name,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+                    else
+                    {
+                        auto const local_idx{mem_idx - imported_mem_count};
+                        if(local_idx >= curr_rt.local_defined_memory_vec_storage.size()) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        target_memory = ::std::addressof(curr_rt.local_defined_memory_vec_storage.index_unchecked(local_idx));
+                    }
+
+                    if(target_memory == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const offset{safe_u64_to_size_t(data.offset)};
+
+                    auto const* byte_begin{data.byte_begin};
+                    auto const* byte_end{data.byte_end};
+                    if((byte_begin == nullptr) != (byte_end == nullptr)) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const byte_count{safe_ptr_range_size(byte_begin, byte_end)};
+
+                    auto const mem_length{get_native_memory_length_bytes(target_memory->memory)};
+                    if(offset > mem_length || byte_count > (mem_length - offset)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr_module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", data segment initialization would write past memory bounds (offset=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            offset,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", size=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            byte_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", memory_size=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            mem_length,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8").\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(byte_count != 0uz)
+                    {
+                        if(target_memory->memory.memory_begin == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+
+                        ::fast_io::freestanding::my_memcpy(target_memory->memory.memory_begin + offset, byte_begin, byte_count);
+                    }
+                }
+            }
+        }
+
         inline void initialize_from_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf,
                                               ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept
         {
@@ -985,7 +1802,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
                 auto const resolve_exported_module_runtime{
-                    [](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const*
+                    [](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t*
                     {
                         if(import_ptr == nullptr) [[unlikely]] { return nullptr; }
                         auto const it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(import_ptr->module_name)};
@@ -1191,8 +2008,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         // Best-effort linking between wasm file modules.
         details::resolve_imports_for_wasm_file_modules();
+        details::validate_wasm_file_module_import_types_after_linking();
         details::finalize_wasm1_globals_after_linking();
         details::finalize_wasm1_offsets_after_linking();
+        details::apply_wasm1_active_element_and_data_segments_after_linking();
     }
 }
 
