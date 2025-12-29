@@ -2409,10 +2409,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         details::verbose_info(u8"initializer: Runtime initialization done. (time=",
-                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                               end_time - start_time,
                               ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                              u8"). ");
+                              u8"s). ");
     }
 }
 
