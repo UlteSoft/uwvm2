@@ -242,6 +242,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"All modules have been loaded. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[",
+                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                u8"] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -688,6 +692,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 u8"[info]  ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Start checking whether the import exists. ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[",
+                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                u8"] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -711,6 +719,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     u8"[info]  ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Start Detecting Cycles. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[",
+                                    local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                    u8"] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                     u8"(verbose)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
