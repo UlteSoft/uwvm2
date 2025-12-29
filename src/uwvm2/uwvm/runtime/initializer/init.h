@@ -124,6 +124,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(op.storage.i32));
                 return;
             }
+            else if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
+            {
+                // wasm1.0 allows `global.get` (imported immutable globals only), but evaluation requires import-linking.
+                // Keep a placeholder here; `finalize_wasm1_offsets_after_linking()` will evaluate the real value.
+                out = 0u;
+                return;
+            }
 
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -139,8 +146,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::fast_io::fast_terminate();
         }
 
-        inline void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
-                                                                ::std::uint_least64_t& out) noexcept
+        inline void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept;
+
+        inline void try_resolve_wasm1_imported_global_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
+                                                            ::uwvm2::object::global::wasm_global_storage_t const*& out) noexcept
         {
             using imported_global_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_global_storage_t const*;
 
@@ -192,45 +201,164 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 if(curr->is_opposite_side_imported)
                 {
-                    curr = curr->storage.imported_ptr;
+                    if(curr->imported_ptr == nullptr) [[unlikely]]
+                    {
+                        if(curr->import_type_ptr == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: Unresolved imported global \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr->import_type_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            curr->import_type_ptr->extern_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    curr = curr->imported_ptr;
                     continue;
                 }
 
-                auto const* def{curr->storage.defined_ptr};
+                auto const* def{curr->defined_ptr};
                 if(def == nullptr) [[unlikely]]
                 {
-                    // vm bug
+                    if(curr->import_type_ptr == nullptr) [[unlikely]]
+                    {
+                        // vm bug
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Unresolved imported global \"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8".",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        curr->import_type_ptr->extern_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     ::fast_io::fast_terminate();
                 }
 
-                if(def->global.kind != ::uwvm2::object::global::global_type::wasm_i32) [[unlikely]]
-                {
-                    ::fast_io::io::perr(
-                        ::uwvm2::uwvm::io::u8log_output,
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                        u8"uwvm: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                        u8"[fatal] ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8"initializer: In wasm1.0, constant expressions retrieve offsets from imported globals, where the global type is not i32: ",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                        ::uwvm2::object::global::get_global_type_name(def->global.kind),
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                        u8".\n\n",
-                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                    // terminate
-                    ::fast_io::fast_terminate();
-                }
+                auto& def_mut{*const_cast<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t*>(def)};
+                ensure_wasm1_local_defined_global_initialized(def_mut);
 
-                out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(def->global.storage.i32));
+                out = ::std::addressof(def_mut.global);
                 return;
             }
 
             // unreachable
             ::std::unreachable();
+        }
+
+        inline void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
+                                                                ::std::uint_least64_t& out) noexcept
+        {
+            using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+
+            if(imported_global_ptr == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            if(imported_global_ptr->import_type_ptr == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            if(imported_global_ptr->import_type_ptr->imports.type != external_types::global) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            // wasm1.0: offsets can only read imported *immutable* globals via `global.get`.
+            if(imported_global_ptr->import_type_ptr->imports.storage.global.is_mutable) [[unlikely]]
+            {
+                ::fast_io::io::perr(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                    u8"[fatal] ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8"initializer: In wasm1.0, constant expressions may only use `global.get` on imported immutable globals; got mutable global \"",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                    imported_global_ptr->import_type_ptr->module_name,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8".",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                    imported_global_ptr->import_type_ptr->extern_name,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8"\".\n\n",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::object::global::wasm_global_storage_t const* resolved_global{};
+            try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global);
+
+            if(resolved_global == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            if(resolved_global->kind != ::uwvm2::object::global::global_type::wasm_i32) [[unlikely]]
+            {
+                ::fast_io::io::perr(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                    u8"[fatal] ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8"initializer: In wasm1.0, constant expressions retrieve offsets from imported globals, where the global type is not i32: ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                    ::uwvm2::object::global::get_global_type_name(resolved_global->kind),
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8".\n\n",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            out = static_cast<::std::uint_least64_t>(static_cast<::std::uint_least32_t>(resolved_global->storage.i32));
+            return;
         }
 
         inline void try_eval_wasm1_const_expr_offset_after_linking(::uwvm2::parser::wasm::standard::wasm1::const_expr::wasm1_const_expr_storage_t const& expr,
@@ -439,42 +567,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t rec{};
                     rec.global_type_ptr = ::std::addressof(local_global.global);
+                    rec.local_global_type_ptr = ::std::addressof(local_global);
                     rec.global.kind = details::to_object_global_type(local_global.global.type);
                     rec.global.is_mutable = local_global.global.is_mutable;
 
-                    if(!local_global.expr.opcodes.empty())
+                    if(local_global.expr.opcodes.size() != 1uz) [[unlikely]]
                     {
-                        auto const& op{local_global.expr.opcodes.front()};
-                        switch(op.opcode)
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: wasm1.0 global initializer const expr must contain exactly one opcode; got ",
+                                            local_global.expr.opcodes.size(),
+                                            u8".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const& op{local_global.expr.opcodes.front_unchecked()};
+                    switch(op.opcode)
+                    {
+                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const:
                         {
-                            case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const:
-                            {
-                                rec.global.storage.i32 = op.storage.i32;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const:
-                            {
-                                rec.global.storage.i64 = op.storage.i64;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const:
-                            {
-                                rec.global.storage.f32 = op.storage.f32;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const:
-                            {
-                                rec.global.storage.f64 = op.storage.f64;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get:
-                            {
-                                [[fallthrough]];
-                            }
-                            default:
-                            {
-                                break;
-                            }
+                            rec.global.storage.i32 = op.storage.i32;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const:
+                        {
+                            rec.global.storage.i64 = op.storage.i64;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const:
+                        {
+                            rec.global.storage.f32 = op.storage.f32;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const:
+                        {
+                            rec.global.storage.f64 = op.storage.f64;
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+                            break;
+                        }
+                        case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get:
+                        {
+                            // Requires import-linking; evaluated in `finalize_wasm1_globals_after_linking()`.
+                            rec.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::uninitialized;
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            ::fast_io::io::perr(
+                                ::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                u8"[fatal] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"initializer: wasm1.0 global initializer const expr encountered an invalid instruction: ",
+                                ::fast_io::mnp::hex0x<true>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode)),
+                                u8".\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
                         }
                     }
 
@@ -523,6 +681,254 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     try_eval_wasm1_const_expr_offset(data.storage.memory_idx.expr, rec.data.offset);
                     out.local_defined_data_vec_storage.push_back_unchecked(::std::move(rec));
                 }
+            }
+        }
+
+        inline void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept
+        {
+            using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+
+            switch(g.init_state)
+            {
+                case ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized:
+                {
+                    return;
+                }
+                case ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initializing:
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: Global initialization encountered a circular dependency.\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+                case ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::uninitialized:
+                {
+                    break;
+                }
+                [[unlikely]] default:
+                {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            if(g.owner_module_rt_ptr == nullptr || g.local_global_type_ptr == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            g.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initializing;
+
+            auto const& expr{g.local_global_type_ptr->expr};
+            if(expr.opcodes.size() != 1uz) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"initializer: wasm1.0 global initializer const expr must contain exactly one opcode; got ",
+                                    expr.opcodes.size(),
+                                    u8".\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            auto const& op{expr.opcodes.front_unchecked()};
+            switch(op.opcode)
+            {
+                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i32_const:
+                {
+                    g.global.storage.i32 = op.storage.i32;
+                    break;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::i64_const:
+                {
+                    g.global.storage.i64 = op.storage.i64;
+                    break;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f32_const:
+                {
+                    g.global.storage.f32 = op.storage.f32;
+                    break;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::f64_const:
+                {
+                    g.global.storage.f64 = op.storage.f64;
+                    break;
+                }
+                case ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get:
+                {
+                    auto const idx{static_cast<::std::size_t>(op.storage.imported_global_idx)};
+                    auto const imported_count{g.owner_module_rt_ptr->imported_global_vec_storage.size()};
+                    if(idx >= imported_count) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In wasm1.0, global initializer refers to an imported global index that is out of bounds: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            idx,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8" >= ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            imported_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    auto const* imported_global_ptr{::std::addressof(g.owner_module_rt_ptr->imported_global_vec_storage.index_unchecked(idx))};
+                    if(imported_global_ptr->import_type_ptr == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(imported_global_ptr->import_type_ptr->imports.type != external_types::global) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    // wasm1.0: global initializers may only use `global.get` on imported immutable globals.
+                    if(imported_global_ptr->import_type_ptr->imports.storage.global.is_mutable) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(
+                            ::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"initializer: In wasm1.0, global initializers may only use `global.get` on imported immutable globals; got mutable global \"",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            imported_global_ptr->import_type_ptr->module_name,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8".",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            imported_global_ptr->import_type_ptr->extern_name,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"\".\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::uwvm2::object::global::wasm_global_storage_t const* resolved_global{};
+                    try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global);
+
+                    if(resolved_global == nullptr) [[unlikely]]
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+
+                    if(resolved_global->kind != g.global.kind) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"initializer: In wasm1.0, global initializer type mismatch: expected ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            ::uwvm2::object::global::get_global_type_name(g.global.kind),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", got ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                            ::uwvm2::object::global::get_global_type_name(resolved_global->kind),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
+
+                    switch(g.global.kind)
+                    {
+                        case ::uwvm2::object::global::global_type::wasm_i32:
+                        {
+                            g.global.storage.i32 = resolved_global->storage.i32;
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_i64:
+                        {
+                            g.global.storage.i64 = resolved_global->storage.i64;
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_f32:
+                        {
+                            g.global.storage.f32 = resolved_global->storage.f32;
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_f64:
+                        {
+                            g.global.storage.f64 = resolved_global->storage.f64;
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+
+                    break;
+                }
+                [[unlikely]] default:
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"initializer: wasm1.0 global initializer const expr encountered an invalid instruction: ",
+                                        ::fast_io::mnp::hex0x<true>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::op_basic_type>(op.opcode)),
+                                        u8".\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            g.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
+        }
+
+        inline void finalize_wasm1_globals_after_linking() noexcept
+        {
+            // First: attach owner pointers for on-demand evaluation across modules.
+            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            {
+                for(auto& g: curr_rt.local_defined_global_vec_storage) { g.owner_module_rt_ptr = ::std::addressof(curr_rt); }
+            }
+
+            // Second: evaluate all wasm1 global initializers (including those that use `global.get`).
+            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            {
+                for(auto& g: curr_rt.local_defined_global_vec_storage) { ensure_wasm1_local_defined_global_initialized(g); }
             }
         }
 
@@ -616,14 +1022,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const imported_count{exported_rt->imported_function_vec_storage.size()};
                     if(exported_idx < imported_count)
                     {
-                        imp.storage.imported_ptr = ::std::addressof(exported_rt->imported_function_vec_storage.index_unchecked(exported_idx));
+                        imp.imported_ptr = ::std::addressof(exported_rt->imported_function_vec_storage.index_unchecked(exported_idx));
+                        imp.defined_ptr = nullptr;
                         imp.is_opposite_side_imported = true;
                     }
                     else
                     {
                         auto const local_idx{exported_idx - imported_count};
                         if(local_idx >= exported_rt->local_defined_function_vec_storage.size()) [[unlikely]] { continue; }
-                        imp.storage.defined_ptr = ::std::addressof(exported_rt->local_defined_function_vec_storage.index_unchecked(local_idx));
+                        imp.imported_ptr = nullptr;
+                        imp.defined_ptr = ::std::addressof(exported_rt->local_defined_function_vec_storage.index_unchecked(local_idx));
                         imp.is_opposite_side_imported = false;
                     }
                 }
@@ -646,14 +1054,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const imported_count{exported_rt->imported_table_vec_storage.size()};
                     if(exported_idx < imported_count)
                     {
-                        imp.storage.imported_ptr = ::std::addressof(exported_rt->imported_table_vec_storage.index_unchecked(exported_idx));
+                        imp.imported_ptr = ::std::addressof(exported_rt->imported_table_vec_storage.index_unchecked(exported_idx));
+                        imp.defined_ptr = nullptr;
                         imp.is_opposite_side_imported = true;
                     }
                     else
                     {
                         auto const local_idx{exported_idx - imported_count};
                         if(local_idx >= exported_rt->local_defined_table_vec_storage.size()) [[unlikely]] { continue; }
-                        imp.storage.defined_ptr = ::std::addressof(exported_rt->local_defined_table_vec_storage.index_unchecked(local_idx));
+                        imp.imported_ptr = nullptr;
+                        imp.defined_ptr = ::std::addressof(exported_rt->local_defined_table_vec_storage.index_unchecked(local_idx));
                         imp.is_opposite_side_imported = false;
                     }
                 }
@@ -676,14 +1086,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const imported_count{exported_rt->imported_memory_vec_storage.size()};
                     if(exported_idx < imported_count)
                     {
-                        imp.storage.imported_ptr = ::std::addressof(exported_rt->imported_memory_vec_storage.index_unchecked(exported_idx));
+                        imp.imported_ptr = ::std::addressof(exported_rt->imported_memory_vec_storage.index_unchecked(exported_idx));
+                        imp.defined_ptr = nullptr;
                         imp.is_opposite_side_imported = true;
                     }
                     else
                     {
                         auto const local_idx{exported_idx - imported_count};
                         if(local_idx >= exported_rt->local_defined_memory_vec_storage.size()) [[unlikely]] { continue; }
-                        imp.storage.defined_ptr = ::std::addressof(exported_rt->local_defined_memory_vec_storage.index_unchecked(local_idx));
+                        imp.imported_ptr = nullptr;
+                        imp.defined_ptr = ::std::addressof(exported_rt->local_defined_memory_vec_storage.index_unchecked(local_idx));
                         imp.is_opposite_side_imported = false;
                     }
                 }
@@ -706,14 +1118,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const imported_count{exported_rt->imported_global_vec_storage.size()};
                     if(exported_idx < imported_count)
                     {
-                        imp.storage.imported_ptr = ::std::addressof(exported_rt->imported_global_vec_storage.index_unchecked(exported_idx));
+                        imp.imported_ptr = ::std::addressof(exported_rt->imported_global_vec_storage.index_unchecked(exported_idx));
+                        imp.defined_ptr = nullptr;
                         imp.is_opposite_side_imported = true;
                     }
                     else
                     {
                         auto const local_idx{exported_idx - imported_count};
                         if(local_idx >= exported_rt->local_defined_global_vec_storage.size()) [[unlikely]] { continue; }
-                        imp.storage.defined_ptr = ::std::addressof(exported_rt->local_defined_global_vec_storage.index_unchecked(local_idx));
+                        imp.imported_ptr = nullptr;
+                        imp.defined_ptr = ::std::addressof(exported_rt->local_defined_global_vec_storage.index_unchecked(local_idx));
                         imp.is_opposite_side_imported = false;
                     }
                 }
@@ -759,6 +1173,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         // Best-effort linking between wasm file modules.
         details::resolve_imports_for_wasm_file_modules();
+        details::finalize_wasm1_globals_after_linking();
         details::finalize_wasm1_offsets_after_linking();
     }
 }

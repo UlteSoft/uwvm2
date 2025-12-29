@@ -83,6 +83,15 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    struct wasm_module_storage_t;
+
+    enum class wasm_global_init_state : unsigned
+    {
+        uninitialized,
+        initializing,
+        initialized
+    };
+
     using local_defined_function_vec_storage_t = ::uwvm2::utils::container::vector<local_defined_function_storage_t>;
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -93,15 +102,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_function_storage_t
     {
-        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
-        union imported_function_storage_u
-        {
-            // For other uses of WASM, the prerequisite is that WASM must be initialized.
-            imported_function_storage_t const* imported_ptr;
-            local_defined_function_storage_t const* defined_ptr;
-        };
-
-        imported_function_storage_u storage{};
+        // If unresolved, both pointers are null.
+        // If resolved, exactly one of the pointers is non-null.
+        imported_function_storage_t const* imported_ptr{};
+        local_defined_function_storage_t const* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported function also imported or custom?
@@ -179,15 +183,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_table_storage_t
     {
-        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
-        union imported_table_storage_u
-        {
-            // For other uses of WASM, the prerequisite is that WASM must be initialized.
-            imported_table_storage_t const* imported_ptr;
-            local_defined_table_storage_t const* defined_ptr;
-        };
-
-        imported_table_storage_u storage{};
+        // If unresolved, both pointers are null.
+        // If resolved, exactly one of the pointers is non-null.
+        imported_table_storage_t const* imported_ptr{};
+        local_defined_table_storage_t const* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported table also imported or custom?
@@ -247,15 +246,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_memory_storage_t
     {
-        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
-        union imported_memory_storage_u
-        {
-            // For other uses of WASM, the prerequisite is that WASM must be initialized.
-            imported_memory_storage_t const* imported_ptr;
-            local_defined_memory_storage_t const* defined_ptr;
-        };
-
-        imported_memory_storage_u storage{};
+        // If unresolved, both pointers are null.
+        // If resolved, exactly one of the pointers is non-null.
+        imported_memory_storage_t const* imported_ptr{};
+        local_defined_memory_storage_t const* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported memory also imported or custom?
@@ -270,8 +264,7 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     {
         // `native_memory_t` has a non-trivial default constructor (it may allocate).
         // We only declare trivial relocatability when the selected backend is explicitly marked relocatable.
-        inline static constexpr bool value =
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::object::memory::linear::native_memory_t>;
+        inline static constexpr bool value = ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::object::memory::linear::native_memory_t>;
     };
 
     template <>
@@ -293,24 +286,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_global_type_t = decltype(get_final_global_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    inline consteval auto get_final_local_global_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
+    { return ::uwvm2::parser::wasm::standard::wasm1::features::final_local_global_type<Fs...>{}; }
+
+    using wasm_binfmt1_final_local_global_type_t = decltype(get_final_local_global_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
     struct local_defined_global_storage_t
     {
         ::uwvm2::object::global::wasm_global_storage_t global{};
 
         wasm_binfmt1_final_global_type_t const* global_type_ptr{};
+        wasm_binfmt1_final_local_global_type_t const* local_global_type_ptr{};
+
+        // These two fields are only meaningful during/after instantiation initialization.
+        // They enable correct evaluation of wasm1 global initializers that use `global.get`.
+        wasm_module_storage_t* owner_module_rt_ptr{};
+        wasm_global_init_state init_state{wasm_global_init_state::uninitialized};
     };
 
     struct imported_global_storage_t
     {
-        // The imported function may have been imported from another module by the other party, or it may have been defined by the other party.
-        union imported_global_storage_u
-        {
-            // For other uses of WASM, the prerequisite is that WASM must be initialized.
-            imported_global_storage_t const* imported_ptr;
-            local_defined_global_storage_t const* defined_ptr;
-        };
-
-        imported_global_storage_u storage{};
+        // If unresolved, both pointers are null.
+        // If resolved, exactly one of the pointers is non-null.
+        imported_global_storage_t const* imported_ptr{};
+        local_defined_global_storage_t const* defined_ptr{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
 
         // Is the opposite side of this imported global also imported or custom?
@@ -537,35 +537,55 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
     template <>
     struct is_zero_default_constructible<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
     {
-        inline static constexpr bool value =
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
+        inline static constexpr bool value = ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
     };
 
     template <>
     struct is_trivially_copyable_or_relocatable<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t>
     {
-        inline static constexpr bool value =
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
+        inline static constexpr bool value = ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_global_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_element_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>;
     };
 }
 
