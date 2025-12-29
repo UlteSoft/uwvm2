@@ -57,6 +57,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::global
 #endif
     };
 
+    inline constexpr ::uwvm2::utils::container::u8string_view get_global_type_name(global_type type) noexcept
+    {
+        switch(type)
+        {
+            case global_type::wasm_i32:
+            {
+                return u8"i32";
+            }
+            case global_type::wasm_i64:
+            {
+                return u8"i64";
+            }
+            case global_type::wasm_f32:
+            {
+                return u8"f32";
+            }
+            case global_type::wasm_f64:
+            {
+                return u8"f64";
+            }
+            case global_type::wasm_v128:
+            {
+                return u8"v128";
+            }
+            /// @todo wasm3.0
+            [[unlikely]] default:
+            {
+                return u8"unknown";
+            }
+        }
+    }
+
     union wasm_global_storage_u
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;

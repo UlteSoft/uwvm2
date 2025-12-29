@@ -26,8 +26,10 @@ module;
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
 export module uwvm2.uwvm.runtime.storage:storage;
 
@@ -37,6 +39,8 @@ import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.parser.wasm.standard.wasm3.type;
 import uwvm2.object;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.wasm;
 import uwvm2.uwvm.runtime.storage;
 
