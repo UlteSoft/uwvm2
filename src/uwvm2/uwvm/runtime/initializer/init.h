@@ -2236,6 +2236,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
     {
         details::verbose_info(u8"Initialize the runtime environment for the WASM module. ");
 
+        ::fast_io::unix_timestamp start_time{};
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+#ifdef UWVM_CPP_EXCEPTIONS
+            try
+#endif
+            {
+                start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+#ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+#endif
+        }
+
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
         constexpr auto module_type_to_string{[](module_type_t t) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
                                              {
@@ -2372,7 +2389,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         details::finalize_wasm1_offsets_after_linking();
         details::verbose_info(u8"initializer: Apply wasm1 active elem/data segments. ");
         details::apply_wasm1_active_element_and_data_segments_after_linking();
-        details::verbose_info(u8"initializer: Runtime initialization done. ");
+
+        // finalize time
+        ::fast_io::unix_timestamp end_time{};
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+#ifdef UWVM_CPP_EXCEPTIONS
+            try
+#endif
+            {
+                end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+#ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+#endif
+        }
+
+        details::verbose_info(u8"initializer: Runtime initialization done. (time=",
+                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                              end_time - start_time,
+                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                              u8"). ");
     }
 }
 

@@ -33,6 +33,7 @@
 # include <tuple>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -1428,17 +1429,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::section_detail
     {
         ::fast_io::basic_obuf<::fast_io::u8native_io_observer> u8out_obuf{::fast_io::u8out()};
 
-#ifdef UWVM_TIMER
-        ::uwvm2::utils::debug::timer parsing_timer{u8"print section details"};
+        ::fast_io::unix_timestamp start_time{};
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+#ifdef UWVM_CPP_EXCEPTIONS
+            try
 #endif
+            {
+                start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+#ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+#endif
+        }
 
         ::fast_io::io::print(u8out_obuf, u8"All Module Section Details:\n\n");
 
         for(auto const& curr_module: ::uwvm2::uwvm::wasm::storage::all_module) { ::fast_io::io::print(u8out_obuf, section_details(curr_module.second)); }
+
+        // finished
+        ::fast_io::unix_timestamp end_time{};
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+#ifdef UWVM_CPP_EXCEPTIONS
+            try
+#endif
+            {
+                end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+#ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+#endif
+
+            // verbose
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Print section details done. (time=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                end_time - start_time,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"s). ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
     }
 
 }  // namespace uwvm2::uwvm::wasm::section_detail
 
 #ifndef UWVM_MODULE
+# include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
