@@ -100,13 +100,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_import_type_t = decltype(get_final_import_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
+    enum class imported_function_link_kind : unsigned
+    {
+        unresolved,
+        imported,
+        defined,
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+        dl,
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+        weak_symbol,
+#endif
+        local_imported
+    };
+
     struct imported_function_storage_t
     {
-        // If unresolved, both pointers are null.
-        // If resolved, exactly one of the pointers is non-null.
-        imported_function_storage_t const* imported_ptr{};
-        local_defined_function_storage_t const* defined_ptr{};
+        struct local_imported_target_t
+        {
+            ::uwvm2::uwvm::wasm::type::local_imported_t* module_ptr{};
+            ::std::size_t index{};
+        };
+
+        union imported_function_target_u
+        {
+            // If unresolved, this holds a null pointer.
+            imported_function_storage_t const* imported_ptr;
+            local_defined_function_storage_t const* defined_ptr;
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+            ::uwvm2::uwvm::wasm::type::capi_function_t const* dl_ptr;
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+            ::uwvm2::uwvm::wasm::type::capi_function_t const* weak_symbol_ptr;
+#endif
+            local_imported_target_t local_imported;
+        };
+
+        // If unresolved, `link_kind == unresolved` and `target.imported_ptr == nullptr`.
+        // If resolved, the active `target` member is specified by `link_kind`.
+        imported_function_target_u target{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+        imported_function_link_kind link_kind{imported_function_link_kind::unresolved};
 
         // Is the opposite side of this imported function also imported or custom?
         bool is_opposite_side_imported{};
@@ -183,11 +217,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_table_storage_t
     {
-        // If unresolved, both pointers are null.
-        // If resolved, exactly one of the pointers is non-null.
-        imported_table_storage_t const* imported_ptr{};
-        local_defined_table_storage_t* defined_ptr{};
+        enum class imported_table_link_kind : unsigned
+        {
+            unresolved = 0u,
+            imported,
+            defined
+        };
+
+        union imported_table_target_u
+        {
+            imported_table_storage_t const* imported_ptr;
+            local_defined_table_storage_t* defined_ptr;
+        };
+
+        // If unresolved, `link_kind == unresolved` and `target.imported_ptr == nullptr`.
+        // If resolved, the active `target` member is specified by `link_kind`.
+        imported_table_target_u target{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+        imported_table_link_kind link_kind{imported_table_link_kind::unresolved};
 
         // Is the opposite side of this imported table also imported or custom?
         bool is_opposite_side_imported{};
@@ -246,11 +293,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_memory_storage_t
     {
-        // If unresolved, both pointers are null.
-        // If resolved, exactly one of the pointers is non-null.
-        imported_memory_storage_t const* imported_ptr{};
-        local_defined_memory_storage_t* defined_ptr{};
+        enum class imported_memory_link_kind : unsigned
+        {
+            unresolved = 0u,
+            imported,
+            defined,
+            local_imported
+        };
+
+        struct local_imported_target_t
+        {
+            ::uwvm2::uwvm::wasm::type::local_imported_t* module_ptr{};
+            ::std::size_t index{};
+        };
+
+        union imported_memory_target_u
+        {
+            imported_memory_storage_t const* imported_ptr;
+            local_defined_memory_storage_t* defined_ptr;
+            local_imported_target_t local_imported;
+        };
+
+        // If unresolved, `link_kind == unresolved` and `target.imported_ptr == nullptr`.
+        // If resolved, the active `target` member is specified by `link_kind`.
+        imported_memory_target_u target{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+        imported_memory_link_kind link_kind{imported_memory_link_kind::unresolved};
 
         // Is the opposite side of this imported memory also imported or custom?
         bool is_opposite_side_imported{};
@@ -307,11 +375,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     struct imported_global_storage_t
     {
-        // If unresolved, both pointers are null.
-        // If resolved, exactly one of the pointers is non-null.
-        imported_global_storage_t const* imported_ptr{};
-        local_defined_global_storage_t* defined_ptr{};
+        enum class imported_global_link_kind : unsigned
+        {
+            unresolved = 0u,
+            imported,
+            defined,
+            local_imported
+        };
+
+        struct local_imported_target_t
+        {
+            ::uwvm2::uwvm::wasm::type::local_imported_t* module_ptr{};
+            ::std::size_t index{};
+        };
+
+        union imported_global_target_u
+        {
+            imported_global_storage_t const* imported_ptr;
+            local_defined_global_storage_t* defined_ptr;
+            local_imported_target_t local_imported;
+        };
+
+        // If unresolved, `link_kind == unresolved` and `target.imported_ptr == nullptr`.
+        // If resolved, the active `target` member is specified by `link_kind`.
+        imported_global_target_u target{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+        imported_global_link_kind link_kind{imported_global_link_kind::unresolved};
 
         // Is the opposite side of this imported global also imported or custom?
         bool is_opposite_side_imported{};
