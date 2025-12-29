@@ -52,6 +52,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 {
     namespace details
     {
+        template <typename... Args>
+        inline constexpr void verbose_info(Args&&... args) noexcept
+        {
+            if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                ::std::forward<Args>(args)...,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                u8"[",
+                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                u8"] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8"(verbose)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        }
+
+        inline ::uwvm2::utils::container::u8string_view current_initializing_module_name{};
+
+        template <typename... Args>
+        inline constexpr void verbose_module_info(Args&&... args) noexcept
+        {
+            if(current_initializing_module_name.empty())
+            {
+                verbose_info(::std::forward<Args>(args)...);
+                return;
+            }
+
+            verbose_info(u8"initializer: Module \"",
+                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                         current_initializing_module_name,
+                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                         u8"\": ",
+                         ::std::forward<Args>(args)...);
+        }
+
         inline constexpr ::std::size_t importdesc_func_index{0uz};
         inline constexpr ::std::size_t importdesc_table_index{1uz};
         inline constexpr ::std::size_t importdesc_memory_index{2uz};
@@ -560,6 +600,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                verbose_info(u8"initializer: Validate import types for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\". ");
+
+                ::std::size_t func_checked{};
+                ::std::size_t table_checked{};
+                ::std::size_t table_skipped_unresolved{};
+                ::std::size_t memory_checked{};
+                ::std::size_t memory_skipped_unresolved{};
+                ::std::size_t global_checked{};
+
                 // func imports
                 for(auto const& imp: curr_rt.imported_function_vec_storage)
                 {
@@ -573,6 +626,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+                    ++func_checked;
 
                     if(import_ptr->imports.type != external_types::func) [[unlikely]]
                     {
@@ -670,7 +724,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t* resolved_table{};
-                    if(!maybe_resolve_wasm1_imported_table_defined(::std::addressof(imp), resolved_table)) { continue; }
+                    if(!maybe_resolve_wasm1_imported_table_defined(::std::addressof(imp), resolved_table))
+                    {
+                        ++table_skipped_unresolved;
+                        continue;
+                    }
+                    ++table_checked;
 
                     if(resolved_table == nullptr || resolved_table->table_type_ptr == nullptr) [[unlikely]]
                     {
@@ -735,7 +794,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t* resolved_memory{};
-                    if(!maybe_resolve_wasm1_imported_memory_defined(::std::addressof(imp), resolved_memory)) { continue; }
+                    if(!maybe_resolve_wasm1_imported_memory_defined(::std::addressof(imp), resolved_memory))
+                    {
+                        ++memory_skipped_unresolved;
+                        continue;
+                    }
+                    ++memory_checked;
 
                     if(resolved_memory == nullptr || resolved_memory->memory_type_ptr == nullptr) [[unlikely]]
                     {
@@ -790,6 +854,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     if(imp.imported_ptr == nullptr && imp.defined_ptr == nullptr) { continue; }
+                    ++global_checked;
 
                     if(import_ptr->imports.type != external_types::global) [[unlikely]]
                     {
@@ -864,6 +929,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
                 }
+
+                verbose_info(u8"initializer: Import type validation summary for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\": checked(f/t/m/g)=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             func_checked,
+                             u8"/",
+                             table_checked,
+                             u8"/",
+                             memory_checked,
+                             u8"/",
+                             global_checked,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8", unresolved_skipped(t/m)=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             table_skipped_unresolved,
+                             u8"/",
+                             memory_skipped_unresolved,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8". ");
             }
         }
 
@@ -963,6 +1050,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<code_section_storage_t>(module_storage.sections)};
             auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_section_storage_t>(module_storage.sections)};
 
+            verbose_module_info(u8"Init: imported descriptors. ");
             // imported
             {
                 auto const& imported_funcs{importsec.importdesc.index_unchecked(importdesc_func_index)};
@@ -1005,6 +1093,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: local functions and code. ");
             // local defined function + code
             {
                 auto const defined_func_count{funcsec.funcs.size()};
@@ -1042,6 +1131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: local tables. ");
             // local defined table
             {
                 out.local_defined_table_vec_storage.reserve(tablesec.tables.size());
@@ -1054,6 +1144,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: local memories. ");
             // local defined memory
             {
                 out.local_defined_memory_vec_storage.reserve(memorysec.memories.size());
@@ -1066,6 +1157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: local globals. ");
             // local defined global
             {
                 out.local_defined_global_vec_storage.reserve(globalsec.local_globals.size());
@@ -1146,6 +1238,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: element segments. ");
             // element (wasm1: active segments)
             {
                 out.local_defined_element_vec_storage.reserve(elemsec.elems.size());
@@ -1172,6 +1265,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+            verbose_module_info(u8"Init: data segments. ");
             // data (wasm1: active segments)
             {
                 out.local_defined_data_vec_storage.reserve(datasec.datas.size());
@@ -1434,7 +1528,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             // Second: evaluate all wasm1 global initializers (including those that use `global.get`).
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                verbose_info(u8"initializer: Finalize globals for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\". ");
+                ::std::size_t globals_total{curr_rt.local_defined_global_vec_storage.size()};
+                ::std::size_t globals_need_eval{};
+                for(auto const& g: curr_rt.local_defined_global_vec_storage)
+                {
+                    if(g.init_state != ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized) { ++globals_need_eval; }
+                }
                 for(auto& g: curr_rt.local_defined_global_vec_storage) { ensure_wasm1_local_defined_global_initialized(g); }
+                verbose_info(u8"initializer: Finalize globals summary for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\": total=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             globals_total,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8", evaluated=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             globals_need_eval,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8". ");
             }
         }
 
@@ -1442,6 +1560,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         {
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                verbose_info(u8"initializer: Finalize offsets for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\". ");
 
                 for(auto& elem: curr_rt.local_defined_element_vec_storage)
                 {
@@ -1456,6 +1579,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const& expr{data.data_type_ptr->storage.memory_idx.expr};
                     try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, data.data.offset);
                 }
+
+                verbose_info(u8"initializer: Finalize offsets summary for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\": segments(elem/data)=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_rt.local_defined_element_vec_storage.size(),
+                             u8"/",
+                             curr_rt.local_defined_data_vec_storage.size(),
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8". ");
             }
         }
 
@@ -1502,11 +1637,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                verbose_info(u8"initializer: Apply active elem/data segments for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\". ");
+
+                ::std::size_t elem_active_applied{};
+                ::std::size_t data_active_applied{};
+
                 // element (wasm1: active segments)
                 for(auto const& elem_seg: curr_rt.local_defined_element_vec_storage)
                 {
                     auto const& elem{elem_seg.element};
                     if(elem.kind != ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active || elem.dropped) { continue; }
+                    ++elem_active_applied;
 
                     auto const table_idx{safe_u32_to_size_t(elem.table_idx)};
                     auto const imported_table_count{curr_rt.imported_table_vec_storage.size()};
@@ -1648,6 +1793,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     auto const& data{data_seg.data};
                     if(data.kind != ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::active || data.dropped) { continue; }
+                    ++data_active_applied;
 
                     auto const mem_idx{safe_u32_to_size_t(data.memory_idx)};
                     auto const imported_mem_count{curr_rt.imported_memory_vec_storage.size()};
@@ -1767,6 +1913,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::freestanding::my_memcpy(target_memory->memory.memory_begin + offset, byte_begin, byte_count);
                     }
                 }
+
+                verbose_info(u8"initializer: Apply segments summary for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\": applied(elem/data)=",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             elem_active_applied,
+                             u8"/",
+                             data_active_applied,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8". ");
             }
         }
 
@@ -1801,6 +1959,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                verbose_info(u8"initializer: Resolve imports for module \"",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             curr_module_name,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                             u8"\". ");
+
                 auto const resolve_exported_module_runtime{
                     [](auto const& import_ptr) constexpr noexcept -> ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t*
                     {
@@ -1853,6 +2017,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                 }
 
+                {
+                    auto const total{curr_rt.imported_function_vec_storage.size()};
+                    ::std::size_t linked_imported{};
+                    ::std::size_t linked_defined{};
+                    for(auto const& imp: curr_rt.imported_function_vec_storage)
+                    {
+                        linked_imported += static_cast<::std::size_t>(imp.imported_ptr != nullptr);
+                        linked_defined += static_cast<::std::size_t>(imp.defined_ptr != nullptr);
+                    }
+                    auto const unresolved{total - linked_imported - linked_defined};
+                    verbose_info(u8"initializer: Resolve imports summary (func) for module \"",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 curr_module_name,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8"\": total=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 total,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8", linked(imported/defined/unresolved)=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 linked_imported,
+                                 u8"/",
+                                 linked_defined,
+                                 u8"/",
+                                 unresolved,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8". ");
+                }
+
                 for(auto& imp: curr_rt.imported_table_vec_storage)
                 {
                     auto const import_ptr{imp.import_type_ptr};
@@ -1883,6 +2076,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         imp.defined_ptr = ::std::addressof(exported_rt->local_defined_table_vec_storage.index_unchecked(local_idx));
                         imp.is_opposite_side_imported = false;
                     }
+                }
+
+                {
+                    auto const total{curr_rt.imported_table_vec_storage.size()};
+                    ::std::size_t linked_imported{};
+                    ::std::size_t linked_defined{};
+                    for(auto const& imp: curr_rt.imported_table_vec_storage)
+                    {
+                        linked_imported += static_cast<::std::size_t>(imp.imported_ptr != nullptr);
+                        linked_defined += static_cast<::std::size_t>(imp.defined_ptr != nullptr);
+                    }
+                    auto const unresolved{total - linked_imported - linked_defined};
+                    verbose_info(u8"initializer: Resolve imports summary (table) for module \"",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 curr_module_name,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8"\": total=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 total,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8", linked(imported/defined/unresolved)=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 linked_imported,
+                                 u8"/",
+                                 linked_defined,
+                                 u8"/",
+                                 unresolved,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8". ");
                 }
 
                 for(auto& imp: curr_rt.imported_memory_vec_storage)
@@ -1917,6 +2139,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                 }
 
+                {
+                    auto const total{curr_rt.imported_memory_vec_storage.size()};
+                    ::std::size_t linked_imported{};
+                    ::std::size_t linked_defined{};
+                    for(auto const& imp: curr_rt.imported_memory_vec_storage)
+                    {
+                        linked_imported += static_cast<::std::size_t>(imp.imported_ptr != nullptr);
+                        linked_defined += static_cast<::std::size_t>(imp.defined_ptr != nullptr);
+                    }
+                    auto const unresolved{total - linked_imported - linked_defined};
+                    verbose_info(u8"initializer: Resolve imports summary (memory) for module \"",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 curr_module_name,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8"\": total=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 total,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8", linked(imported/defined/unresolved)=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 linked_imported,
+                                 u8"/",
+                                 linked_defined,
+                                 u8"/",
+                                 unresolved,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8". ");
+                }
+
                 for(auto& imp: curr_rt.imported_global_vec_storage)
                 {
                     auto const import_ptr{imp.import_type_ptr};
@@ -1948,36 +2199,101 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         imp.is_opposite_side_imported = false;
                     }
                 }
+
+                {
+                    auto const total{curr_rt.imported_global_vec_storage.size()};
+                    ::std::size_t linked_imported{};
+                    ::std::size_t linked_defined{};
+                    for(auto const& imp: curr_rt.imported_global_vec_storage)
+                    {
+                        linked_imported += static_cast<::std::size_t>(imp.imported_ptr != nullptr);
+                        linked_defined += static_cast<::std::size_t>(imp.defined_ptr != nullptr);
+                    }
+                    auto const unresolved{total - linked_imported - linked_defined};
+                    verbose_info(u8"initializer: Resolve imports summary (global) for module \"",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 curr_module_name,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8"\": total=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 total,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8", linked(imported/defined/unresolved)=",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                 linked_imported,
+                                 u8"/",
+                                 linked_defined,
+                                 u8"/",
+                                 unresolved,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8". ");
+                }
             }
         }
     }  // namespace details
 
     inline void initialize_runtime() noexcept
     {
-        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-        {
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                u8"[info]  ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Initialize the runtime environment for the WASM module. ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                                u8"[",
-                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
-                                u8"] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                u8"(verbose)\n",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-        }
+        details::verbose_info(u8"Initialize the runtime environment for the WASM module. ");
 
+        using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+        constexpr auto module_type_to_string{[](module_type_t t) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
+                                             {
+                                                 switch(t)
+                                                 {
+                                                     case module_type_t::exec_wasm:
+                                                     {
+                                                         return u8"exec_wasm";
+                                                     }
+                                                     case module_type_t::preloaded_wasm:
+                                                     {
+                                                         return u8"preloaded_wasm";
+                                                     }
+                                                     case module_type_t::local_import:
+                                                     {
+                                                         return u8"local_import";
+                                                     }
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                                                     case module_type_t::preloaded_dl:
+                                                     {
+                                                         return u8"preloaded_dl";
+                                                     }
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                                                     case module_type_t::weak_symbol:
+                                                     {
+                                                         return u8"weak_symbol";
+                                                     }
+#endif
+                                                     [[unlikely]] default:
+                                                     {
+                                                         return u8"unknown";
+                                                     }
+                                                 }
+                                             }};
+
+        details::verbose_info(u8"initializer: Clear runtime storage. ");
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
-        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(::uwvm2::uwvm::wasm::storage::all_module.size());
+        auto const all_module_size{::uwvm2::uwvm::wasm::storage::all_module.size()};
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(all_module_size);
+        details::verbose_info(u8"initializer: Reserve runtime storage (modules=",
+                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                              all_module_size,
+                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                              u8"). ");
 
         for(auto const& [module_name, mod]: ::uwvm2::uwvm::wasm::storage::all_module)
         {
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t rt{};
+            details::verbose_info(u8"initializer: Build runtime record for module \"",
+                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                  module_name,
+                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                  u8"\" (type=",
+                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                  module_type_to_string(mod.type),
+                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                  u8"). ");
 
             switch(mod.type)
             {
@@ -1992,12 +2308,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
 
+                    details::current_initializing_module_name = module_name;
                     details::initialize_from_wasm_file(*mod.module_storage_ptr.wf, rt);
+                    details::current_initializing_module_name = {};
+                    details::verbose_info(u8"initializer: Module \"",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                          module_name,
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                          u8"\" initialized: imported(f/t/m/g)=",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                          rt.imported_function_vec_storage.size(),
+                                          u8"/",
+                                          rt.imported_table_vec_storage.size(),
+                                          u8"/",
+                                          rt.imported_memory_vec_storage.size(),
+                                          u8"/",
+                                          rt.imported_global_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                          u8", local(f/t/m/g)=",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                          rt.local_defined_function_vec_storage.size(),
+                                          u8"/",
+                                          rt.local_defined_table_vec_storage.size(),
+                                          u8"/",
+                                          rt.local_defined_memory_vec_storage.size(),
+                                          u8"/",
+                                          rt.local_defined_global_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                          u8", segments(elem/data)=",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                          rt.local_defined_element_vec_storage.size(),
+                                          u8"/",
+                                          rt.local_defined_data_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                          u8". ");
                     break;
                 }
                 default:
                 {
                     // Other module types are not yet representable by `wasm_module_storage_t`.
+                    details::verbose_info(u8"initializer: Skip module \"",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                          module_name,
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                          u8"\" (type not supported by runtime storage yet). ");
                     break;
                 }
             }
@@ -2007,11 +2361,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         // Best-effort linking between wasm file modules.
+        details::verbose_info(u8"initializer: Resolve imports (best-effort). ");
         details::resolve_imports_for_wasm_file_modules();
+        details::verbose_info(u8"initializer: Validate linked import types. ");
         details::validate_wasm_file_module_import_types_after_linking();
+        details::verbose_info(u8"initializer: Finalize wasm1 globals. ");
         details::finalize_wasm1_globals_after_linking();
+        details::verbose_info(u8"initializer: Finalize wasm1 offsets. ");
         details::finalize_wasm1_offsets_after_linking();
+        details::verbose_info(u8"initializer: Apply wasm1 active elem/data segments. ");
         details::apply_wasm1_active_element_and_data_segments_after_linking();
+        details::verbose_info(u8"initializer: Runtime initialization done. ");
     }
 }
 
