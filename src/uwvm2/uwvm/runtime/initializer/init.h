@@ -1481,17 +1481,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                              u8"\": checked(f/t/m/g)=",
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              func_checked,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              table_checked,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              memory_checked,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              global_checked,
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8", unresolved_skipped(t/m)=",
-                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                              table_skipped_unresolved,
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                              memory_skipped_unresolved,
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8". ");
@@ -2168,7 +2176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                              u8"\": segments(elem/data)=",
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              curr_rt.local_defined_element_vec_storage.size(),
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8"/",
+                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                              curr_rt.local_defined_data_vec_storage.size(),
                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                              u8". ");
@@ -2776,19 +2786,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                  u8"/local_imported/unresolved)=",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_defined,
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_dl,
 #endif
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_weak_symbol,
 #endif
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_local_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                  unresolved,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8". ");
@@ -2829,15 +2849,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                 {
                     auto const total{curr_rt.imported_table_vec_storage.size()};
+
                     ::std::size_t linked_imported{};
                     ::std::size_t linked_defined{};
-                    ::std::size_t linked_local_imported{};
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                    ::std::size_t linked_dl{};
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                    ::std::size_t linked_weak_symbol{};
-#endif
+
                     for(auto const& imp: curr_rt.imported_table_vec_storage)
                     {
                         using table_link_kind = ::uwvm2::uwvm::runtime::storage::imported_table_storage_t::imported_table_link_kind;
@@ -2853,29 +2868,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  total,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                 u8", linked(imported/defined"
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                                 u8"/dl"
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/weak_symbol"
-#endif
-                                 u8"/local_imported/unresolved)=",
+                                 u8", linked(imported/defined/unresolved)=",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_defined,
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
-                                 linked_dl,
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/",
-                                 linked_weak_symbol,
-#endif
-                                 u8"/",
-                                 linked_local_imported,
-                                 u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                  unresolved,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8". ");
@@ -2942,12 +2944,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::std::size_t linked_imported{};
                     ::std::size_t linked_defined{};
                     ::std::size_t linked_local_imported{};
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                    ::std::size_t linked_dl{};
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                    ::std::size_t linked_weak_symbol{};
-#endif
+
                     for(auto const& imp: curr_rt.imported_memory_vec_storage)
                     {
                         using memory_link_kind = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t::imported_memory_link_kind;
@@ -2964,29 +2961,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  total,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                 u8", linked(imported/defined"
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                                 u8"/dl"
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/weak_symbol"
-#endif
-                                 u8"/local_imported/unresolved)=",
+                                 u8", linked(imported/defined/local_imported/unresolved)=",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_defined,
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
-                                 linked_dl,
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/",
-                                 linked_weak_symbol,
-#endif
-                                 u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_local_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                  unresolved,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8". ");
@@ -3052,12 +3040,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::std::size_t linked_imported{};
                     ::std::size_t linked_defined{};
                     ::std::size_t linked_local_imported{};
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                    ::std::size_t linked_dl{};
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                    ::std::size_t linked_weak_symbol{};
-#endif
+
                     for(auto const& imp: curr_rt.imported_global_vec_storage)
                     {
                         using global_link_kind = ::uwvm2::uwvm::runtime::storage::imported_global_storage_t::imported_global_link_kind;
@@ -3065,14 +3048,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         linked_defined += static_cast<::std::size_t>(imp.link_kind == global_link_kind::defined);
                         linked_local_imported += static_cast<::std::size_t>(imp.link_kind == global_link_kind::local_imported);
                     }
-                    auto const unresolved{total - linked_imported - linked_defined - linked_local_imported
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                                          - linked_dl
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                          - linked_weak_symbol
-#endif
-                    };
+
+                    auto const unresolved{total - linked_imported - linked_defined - linked_local_imported};
+
                     verbose_info(u8"initializer: Resolve imports summary (global) for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  curr_module_name,
@@ -3081,29 +3059,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  total,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                 u8", linked(imported/defined"
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                                 u8"/dl"
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/weak_symbol"
-#endif
-                                 u8"/local_imported/unresolved)=",
+                                 u8", linked(imported/defined/local_imported/unresolved)=",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_defined,
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
-                                 linked_dl,
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                 u8"/",
-                                 linked_weak_symbol,
-#endif
-                                 u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  linked_local_imported,
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8"/",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
                                  unresolved,
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                  u8". ");
@@ -3355,27 +3324,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                           u8"\": Init: imported(f/t/m/g)=",
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.imported_function_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.imported_table_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.imported_memory_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.imported_global_vec_storage.size(),
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8", local(f/t/m/g)=",
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_function_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_table_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_memory_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_global_vec_storage.size(),
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8", segments(elem/data)=",
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_element_vec_storage.size(),
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8"/",
+                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.local_defined_data_vec_storage.size(),
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                           u8". ");
