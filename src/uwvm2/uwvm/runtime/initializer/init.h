@@ -2332,7 +2332,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           module_name,
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                          u8"\" initialized: imported(f/t/m/g)=",
+                                          u8"\": Init: imported(f/t/m/g)=",
                                           ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                           rt.imported_function_vec_storage.size(),
                                           u8"/",
