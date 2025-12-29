@@ -528,9 +528,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         inline void finalize_wasm1_offsets_after_linking() noexcept
         {
-            for(auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+            for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
-                (void)curr_module_name;
 
                 for(auto& elem: curr_rt.local_defined_element_vec_storage)
                 {
@@ -722,7 +721,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
     }  // namespace details
 
-    inline void initialize() noexcept
+    inline void initialize_runtime() noexcept
     {
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(::uwvm2::uwvm::wasm::storage::all_module.size());

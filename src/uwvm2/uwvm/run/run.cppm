@@ -46,6 +46,7 @@ import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.utils.memory;
 import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm;
+import uwvm2.uwvm.runtime;
 import :retval;
 import :loader;
 

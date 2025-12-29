@@ -24,4 +24,5 @@
 
 #ifndef UWVM_MODULE
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/uwvm/runtime/initializer/impl.h>
 #endif

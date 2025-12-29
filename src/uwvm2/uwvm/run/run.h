@@ -45,6 +45,7 @@
 # include <uwvm2/uwvm/utils/memory/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
+# include <uwvm2/uwvm/runtime/impl.h>
 # include "retval.h"
 # include "loader.h"
 #endif
@@ -117,7 +118,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
         }
 
-        /// @todo initialization
+        
+        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
 
         // run vm
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
