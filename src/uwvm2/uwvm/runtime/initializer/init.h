@@ -722,6 +722,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         template <typename ValueType>
         inline constexpr ::std::size_t safe_ptr_range_size(ValueType const* begin, ValueType const* end) noexcept
         {
+            // For many external dl/weak_symbols, provide checks.
+
             if(begin == end) { return 0uz; }
             if(begin == nullptr || end == nullptr) [[unlikely]]
             {
