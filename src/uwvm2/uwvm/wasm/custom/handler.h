@@ -98,7 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::custom
                                         u8"). ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                         u8"[",
-                                        local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                        ::uwvm2::uwvm::io::get_local_realtime(),
                                         u8"] ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                         u8"(verbose)\n",

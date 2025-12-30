@@ -27,4 +27,5 @@
 # include "output.h"
 # include "warn_control.h"
 # include "verbose_control.h"
+# include "time.h"
 #endif

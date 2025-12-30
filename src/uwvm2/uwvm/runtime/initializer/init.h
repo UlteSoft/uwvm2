@@ -66,7 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 ::std::forward<Args>(args)...,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
                                 u8"[",
-                                local(::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::realtime)),
+                                ::uwvm2::uwvm::io::get_local_realtime(),
                                 u8"] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(verbose)\n",
@@ -91,6 +91,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                          u8"\": ",
                          ::std::forward<Args>(args)...);
+        }
+
+        inline constexpr ::uwvm2::utils::container::u8string_view module_type_to_string(::uwvm2::uwvm::wasm::type::module_type_t t) noexcept
+        {
+            switch(t)
+            {
+                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
+                {
+                    return u8"exec_wasm";
+                }
+                case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
+                {
+                    return u8"preloaded_wasm";
+                }
+                case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
+                {
+                    return u8"local_import";
+                }
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_dl:
+                {
+                    return u8"preloaded_dl";
+                }
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                case ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol:
+                {
+                    return u8"weak_symbol";
+                }
+#endif
+                [[unlikely]] default:
+                {
+                    return u8"unknown";
+                }
+            }
         }
 
         inline constexpr ::std::size_t importdesc_func_index{0uz};
@@ -3503,42 +3538,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
         }
 
-        using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
-        constexpr auto module_type_to_string{[](module_type_t t) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
-                                             {
-                                                 switch(t)
-                                                 {
-                                                     case module_type_t::exec_wasm:
-                                                     {
-                                                         return u8"exec_wasm";
-                                                     }
-                                                     case module_type_t::preloaded_wasm:
-                                                     {
-                                                         return u8"preloaded_wasm";
-                                                     }
-                                                     case module_type_t::local_import:
-                                                     {
-                                                         return u8"local_import";
-                                                     }
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-                                                     case module_type_t::preloaded_dl:
-                                                     {
-                                                         return u8"preloaded_dl";
-                                                     }
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-                                                     case module_type_t::weak_symbol:
-                                                     {
-                                                         return u8"weak_symbol";
-                                                     }
-#endif
-                                                     [[unlikely]] default:
-                                                     {
-                                                         return u8"unknown";
-                                                     }
-                                                 }
-                                             }};
-
         details::verbose_info(u8"initializer: Clear runtime storage. ");
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
         auto const all_module_size{::uwvm2::uwvm::wasm::storage::all_module.size()};
@@ -3558,7 +3557,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   u8"\" (type=",
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                  module_type_to_string(mod.type),
+                                  details::module_type_to_string(mod.type),
                                   ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                   u8"). ");
 
