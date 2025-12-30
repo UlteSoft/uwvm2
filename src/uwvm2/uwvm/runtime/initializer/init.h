@@ -969,7 +969,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
-                if(::uwvm2::uwvm::io::show_verbose)
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     verbose_info(u8"initializer: Validate import types for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
@@ -2647,6 +2647,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     auto const& expr{data.data_type_ptr->storage.memory_idx.expr};
                     try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, data.data.offset);
                 }
+
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     verbose_info(u8"initializer: Finalize offsets summary for module \"",
@@ -2680,6 +2681,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
             }
+
             return static_cast<::std::size_t>(v);
         }
 
@@ -2693,6 +2695,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
                 ::fast_io::fast_terminate();
             }
+
             return static_cast<::std::size_t>(v);
         }
 
@@ -2820,6 +2823,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                             ::fast_io::fast_terminate();
                         }
+
                         target_table = ::std::addressof(curr_rt.local_defined_table_vec_storage.index_unchecked(local_idx));
                     }
 
@@ -2843,6 +2847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
                         ::fast_io::fast_terminate();
                     }
+
                     auto const func_count{safe_ptr_range_size(funcidx_begin, funcidx_end)};
 
                     auto const table_size{target_table->elems.size()};
@@ -3011,6 +3016,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                             ::fast_io::fast_terminate();
                         }
+
                         target_memory = ::std::addressof(curr_rt.local_defined_memory_vec_storage.index_unchecked(local_idx));
                     }
 
@@ -3101,10 +3107,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
                             ::fast_io::fast_terminate();
                         }
+
                         auto const mem_length_u64{page_count_u64 * static_cast<::std::uint_least64_t>(page_size_bytes)};
                         mem_length = safe_u64_to_size_t(mem_length_u64);
                         memory_begin = li->memory_begin_from_index(target_local_imported_index);
                     }
+
                     if(offset > mem_length || byte_count > (mem_length - offset)) [[unlikely]]
                     {
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -3147,6 +3155,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::freestanding::my_memcpy(memory_begin + offset, byte_begin, byte_count);
                     }
                 }
+
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
                     verbose_info(u8"initializer: Apply segments summary for module \"",
@@ -3264,6 +3273,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 imp.link_kind = func_link_kind::defined;
                                 imp.is_opposite_side_imported = false;
                             }
+
                             break;
                         }
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
@@ -3275,6 +3285,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             imp.target.dl_ptr = dl_ptr;
                             imp.link_kind = func_link_kind::dl;
                             imp.is_opposite_side_imported = false;
+
                             break;
                         }
 #endif
@@ -3287,6 +3298,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             imp.target.weak_symbol_ptr = weak_ptr;
                             imp.link_kind = func_link_kind::weak_symbol;
                             imp.is_opposite_side_imported = false;
+
                             break;
                         }
 #endif
@@ -3299,6 +3311,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             imp.target.local_imported.index = li_exp.index;
                             imp.link_kind = func_link_kind::local_imported;
                             imp.is_opposite_side_imported = false;
+
                             break;
                         }
                         [[unlikely]] default:
@@ -3333,6 +3346,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #endif
                         linked_local_imported += static_cast<::std::size_t>(imp.link_kind == func_link_kind::local_imported);
                     }
+
                     auto const unresolved{total - linked_imported - linked_defined
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                                           - linked_dl
@@ -3341,6 +3355,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                           - linked_weak_symbol
 #endif
                                           - linked_local_imported};
+
                     verbose_info(u8"initializer: Resolve imports summary (func) for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  curr_module_name,
@@ -3434,6 +3449,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         linked_defined += static_cast<::std::size_t>(imp.link_kind == table_link_kind::defined);
                     }
                     auto const unresolved{total - linked_imported - linked_defined};
+
                     verbose_info(u8"initializer: Resolve imports summary (table) for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  curr_module_name,
@@ -3493,6 +3509,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 imp.link_kind = memory_link_kind::defined;
                                 imp.is_opposite_side_imported = false;
                             }
+
                             break;
                         }
                         case module_type_t::local_import:
@@ -3528,6 +3545,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         linked_local_imported += static_cast<::std::size_t>(imp.link_kind == memory_link_kind::local_imported);
                     }
                     auto const unresolved{total - linked_imported - linked_defined - linked_local_imported};
+                    
                     verbose_info(u8"initializer: Resolve imports summary (memory) for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  curr_module_name,
