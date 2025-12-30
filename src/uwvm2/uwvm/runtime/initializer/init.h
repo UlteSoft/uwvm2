@@ -196,10 +196,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::fast_io::fast_terminate();
         }
 
-        inline void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept;
+        inline constexpr void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept;
 
-        inline void try_resolve_wasm1_imported_global_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
-                                                            ::uwvm2::object::global::wasm_global_storage_t const*& out) noexcept
+        inline constexpr void try_resolve_wasm1_imported_global_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
+                                                                      ::uwvm2::object::global::wasm_global_storage_t const*& out,
+                                                                      ::uwvm2::object::global::wasm_global_storage_t& local_imported_scratch) noexcept
         {
             using imported_global_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_global_storage_t const*;
 
@@ -300,12 +301,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
 
-                    thread_local ::uwvm2::object::global::wasm_global_storage_t local_imported_global{};
-                    local_imported_global.kind = to_object_global_type(li->global_value_type_from_index(idx));
-                    local_imported_global.is_mutable = li->global_is_mutable_from_index(idx);
-                    li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_global.storage)));
+                    // Fill into caller-provided scratch (no per-thread storage) and keep union access well-defined.
+                    local_imported_scratch.kind = to_object_global_type(li->global_value_type_from_index(idx));
+                    local_imported_scratch.is_mutable = li->global_is_mutable_from_index(idx);
 
-                    out = ::std::addressof(local_imported_global);
+                    switch(local_imported_scratch.kind)
+                    {
+                        case ::uwvm2::object::global::global_type::wasm_i32:
+                        {
+                            local_imported_scratch.storage.i32 = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.i32)));
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_i64:
+                        {
+                            local_imported_scratch.storage.i64 = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.i64)));
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_f32:
+                        {
+                            local_imported_scratch.storage.f32 = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.f32)));
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_f64:
+                        {
+                            local_imported_scratch.storage.f64 = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.f64)));
+                            break;
+                        }
+                        case ::uwvm2::object::global::global_type::wasm_v128:
+                        {
+                            local_imported_scratch.storage.v128 = {};
+                            li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.v128)));
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+
+                    out = ::std::addressof(local_imported_scratch);
                     return;
                 }
 
@@ -358,8 +399,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::std::unreachable();
         }
 
-        inline void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
-                                                                ::std::uint_least64_t& out) noexcept
+        inline constexpr void try_resolve_wasm1_imported_global_i32_value(::uwvm2::uwvm::runtime::storage::imported_global_storage_t const* imported_global_ptr,
+                                                                          ::std::uint_least64_t& out) noexcept
         {
             using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
 
@@ -411,7 +452,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             ::uwvm2::object::global::wasm_global_storage_t const* resolved_global{};
-            try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global);
+            ::uwvm2::object::global::wasm_global_storage_t local_imported_scratch{};
+            try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global, local_imported_scratch);
 
             if(resolved_global == nullptr) [[unlikely]]
             {
@@ -443,8 +485,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return;
         }
 
-        inline bool maybe_resolve_wasm1_imported_table_defined(::uwvm2::uwvm::runtime::storage::imported_table_storage_t const* imported_table_ptr,
-                                                               ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*& out) noexcept
+        inline constexpr bool maybe_resolve_wasm1_imported_table_defined(::uwvm2::uwvm::runtime::storage::imported_table_storage_t const* imported_table_ptr,
+                                                                         ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t*& out) noexcept
         {
             using imported_table_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_table_storage_t const*;
 
@@ -512,8 +554,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline bool maybe_resolve_wasm1_imported_memory_defined(::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const* imported_memory_ptr,
-                                                                ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t*& out) noexcept
+        inline constexpr bool maybe_resolve_wasm1_imported_memory_defined(::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const* imported_memory_ptr,
+                                                                          ::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t*& out) noexcept
         {
             using imported_memory_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const*;
 
@@ -588,8 +630,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             ::std::size_t local_imported_index{};
         };
 
-        inline bool maybe_resolve_wasm1_imported_memory(::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const* imported_memory_ptr,
-                                                        wasm1_resolved_imported_memory_t& out) noexcept
+        inline constexpr bool maybe_resolve_wasm1_imported_memory(::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const* imported_memory_ptr,
+                                                                  wasm1_resolved_imported_memory_t& out) noexcept
         {
             using imported_memory_ptr_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t const*;
 
@@ -689,8 +731,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 ::fast_io::fast_terminate();
             }
 
-            auto const diff{end - begin};
-            if(diff < 0) [[unlikely]]
+            // NOTE: `end - begin` is UB unless both pointers refer into the same array object.
+            // The runtime may run with a partially-degraded parser; fail-safe instead of triggering UB.
+            auto const begin_u{reinterpret_cast<::std::uintptr_t>(begin)};
+            auto const end_u{reinterpret_cast<::std::uintptr_t>(end)};
+
+            if(end_u < begin_u) [[unlikely]]
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -698,7 +744,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 ::fast_io::fast_terminate();
             }
 
-            return static_cast<::std::size_t>(diff);
+            auto const diff_bytes{end_u - begin_u};
+            if((diff_bytes % sizeof(ValueType)) != 0uz) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            return static_cast<::std::size_t>(diff_bytes / sizeof(ValueType));
         }
 
         inline constexpr bool wasm1_function_type_equal(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* expected,
@@ -754,7 +809,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return true;
         }
 
-        inline void validate_wasm_file_module_import_types_after_linking() noexcept
+        inline constexpr void validate_wasm_file_module_import_types_after_linking() noexcept
         {
             using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
 
@@ -1578,7 +1633,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
 
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-        inline void initialize_from_binfmt_ver1_module_storage(
+        inline constexpr void initialize_from_binfmt_ver1_module_storage(
             ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
             ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept
         {
@@ -1911,7 +1966,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept
+        inline constexpr void ensure_wasm1_local_defined_global_initialized(::uwvm2::uwvm::runtime::storage::local_defined_global_storage_t& g) noexcept
         {
             using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
 
@@ -2061,7 +2116,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
 
                     ::uwvm2::object::global::wasm_global_storage_t const* resolved_global{};
-                    try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global);
+                    ::uwvm2::object::global::wasm_global_storage_t local_imported_scratch{};
+                    try_resolve_wasm1_imported_global_value(imported_global_ptr, resolved_global, local_imported_scratch);
 
                     if(resolved_global == nullptr) [[unlikely]]
                     {
@@ -2144,7 +2200,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             g.init_state = ::uwvm2::uwvm::runtime::storage::wasm_global_init_state::initialized;
         }
 
-        inline void finalize_wasm1_globals_after_linking() noexcept
+        inline constexpr void finalize_wasm1_globals_after_linking() noexcept
         {
             // First: attach owner pointers for on-demand evaluation across modules.
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
@@ -2183,7 +2239,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void finalize_wasm1_offsets_after_linking() noexcept
+        inline constexpr void finalize_wasm1_offsets_after_linking() noexcept
         {
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
@@ -2260,7 +2316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return memory.get_page_size() << memory.custom_page_size_log2;
         }
 
-        inline void apply_wasm1_active_element_and_data_segments_after_linking() noexcept
+        inline constexpr void apply_wasm1_active_element_and_data_segments_after_linking() noexcept
         {
             using table_elem_type = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t;
 
@@ -2697,8 +2753,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void initialize_from_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf,
-                                              ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept
+        inline constexpr void initialize_from_wasm_file(::uwvm2::uwvm::wasm::type::wasm_file_t const& wf,
+                                                        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t& out) noexcept
         {
             switch(wf.binfmt_ver)
             {
@@ -2721,7 +2777,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void resolve_imports_for_wasm_file_modules() noexcept
+        inline constexpr void resolve_imports_for_wasm_file_modules() noexcept
         {
             using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
             using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
@@ -3180,7 +3236,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        inline void error_on_unresolved_imports_after_linking() noexcept
+        inline constexpr void error_on_unresolved_imports_after_linking() noexcept
         {
             bool any_unresolved{};
 
@@ -3424,7 +3480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         }
     }  // namespace details
 
-    inline void initialize_runtime() noexcept
+    inline constexpr void initialize_runtime() noexcept
     {
         details::verbose_info(u8"Initialize the runtime environment for the WASM module. ");
 
