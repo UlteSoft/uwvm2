@@ -371,6 +371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         inline constexpr char8_t name_sock_shutdown[] = u8"sock_shutdown";
         using sock_shutdown = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_shutdown), name_sock_shutdown>;
 #  endif
+
         // wasi uextension: memory64. Non-standard extension, but imported by default for security reasons.
 
         inline constexpr char8_t name_args_get_wasm64[] = u8"args_get_wasm64";
