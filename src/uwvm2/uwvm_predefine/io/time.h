@@ -36,6 +36,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 {
+    // For verbose logging while preventing exceptions from being thrown.
     inline constexpr ::fast_io::iso8601_timestamp get_local_realtime() noexcept
     {
         ::fast_io::iso8601_timestamp local_realtime{};
