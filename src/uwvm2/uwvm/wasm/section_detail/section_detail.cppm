@@ -47,6 +47,9 @@ import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm_predefine.io;
+import uwvm2.uwvm_predefine.utils.ansies;
+
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
