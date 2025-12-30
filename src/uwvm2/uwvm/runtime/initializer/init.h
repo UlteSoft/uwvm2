@@ -2774,6 +2774,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                             auto const exported_rt{resolve_exported_module_runtime(import_ptr)};
                             if(exported_rt == nullptr) [[unlikely]] { continue; }
 
+                            // This conversion is reasonable, as no index exceeding size_t will occur during the parsing phase.
                             auto const exported_idx{static_cast<::std::size_t>(export_ptr->storage.func_idx)};
                             auto const imported_count{exported_rt->imported_function_vec_storage.size()};
                             using func_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
