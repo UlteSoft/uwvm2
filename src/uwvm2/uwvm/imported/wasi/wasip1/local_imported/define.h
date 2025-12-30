@@ -560,56 +560,108 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view module_name{u8"wasi_snapshot_preview1"};
 
-        using local_function_tuple = ::uwvm2::utils::container::tuple<details::args_get,
-                                                                      details::args_sizes_get,
-                                                                      details::clock_res_get,
-                                                                      details::clock_time_get,
-                                                                      details::environ_get,
-                                                                      details::environ_sizes_get,
-                                                                      details::fd_advise,
-                                                                      details::fd_allocate,
-                                                                      details::fd_close,
-                                                                      details::fd_datasync,
-                                                                      details::fd_fdstat_get,
-                                                                      details::fd_fdstat_set_flags,
-                                                                      details::fd_fdstat_set_rights,
-                                                                      details::fd_filestat_get,
-                                                                      details::fd_filestat_set_size,
-                                                                      details::fd_filestat_set_times,
-                                                                      details::fd_pread,
-                                                                      details::fd_prestat_dir_name,
-                                                                      details::fd_prestat_get,
-                                                                      details::fd_pwrite,
-                                                                      details::fd_read,
-                                                                      details::fd_readdir,
-                                                                      details::fd_renumber,
-                                                                      details::fd_seek,
-                                                                      details::fd_sync,
-                                                                      details::fd_tell,
-                                                                      details::fd_write,
-                                                                      details::path_create_directory,
-                                                                      details::path_filestat_get,
-                                                                      details::path_filestat_set_times,
-                                                                      details::path_link,
-                                                                      details::path_open,
-                                                                      details::path_readlink,
-                                                                      details::path_remove_directory,
-                                                                      details::path_rename,
-                                                                      details::path_symlink,
-                                                                      details::path_unlink_file,
-                                                                      details::poll_oneoff,
-                                                                      details::proc_exit,
-                                                                      details::proc_raise,
-                                                                      details::random_get,
-                                                                      details::sched_yield
+        using local_function_tuple = ::uwvm2::utils::container::tuple<
+            // wasi
+            details::args_get,
+            details::args_sizes_get,
+            details::clock_res_get,
+            details::clock_time_get,
+            details::environ_get,
+            details::environ_sizes_get,
+            details::fd_advise,
+            details::fd_allocate,
+            details::fd_close,
+            details::fd_datasync,
+            details::fd_fdstat_get,
+            details::fd_fdstat_set_flags,
+            details::fd_fdstat_set_rights,
+            details::fd_filestat_get,
+            details::fd_filestat_set_size,
+            details::fd_filestat_set_times,
+            details::fd_pread,
+            details::fd_prestat_dir_name,
+            details::fd_prestat_get,
+            details::fd_pwrite,
+            details::fd_read,
+            details::fd_readdir,
+            details::fd_renumber,
+            details::fd_seek,
+            details::fd_sync,
+            details::fd_tell,
+            details::fd_write,
+            details::path_create_directory,
+            details::path_filestat_get,
+            details::path_filestat_set_times,
+            details::path_link,
+            details::path_open,
+            details::path_readlink,
+            details::path_remove_directory,
+            details::path_rename,
+            details::path_symlink,
+            details::path_unlink_file,
+            details::poll_oneoff,
+            details::proc_exit,
+            details::proc_raise,
+            details::random_get,
+            details::sched_yield,
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-                                                                      ,
-                                                                      details::sock_accept,
-                                                                      details::sock_recv,
-                                                                      details::sock_send,
-                                                                      details::sock_shutdown
+            details::sock_accept,
+            details::sock_recv,
+            details::sock_send,
+            details::sock_shutdown,
 #  endif
-                                                                      >;
+
+            // wasm64
+            details::args_get_wasm64,
+            details::args_sizes_get_wasm64,
+            details::clock_res_get_wasm64,
+            details::clock_time_get_wasm64,
+            details::environ_get_wasm64,
+            details::environ_sizes_get_wasm64,
+            details::fd_advise_wasm64,
+            details::fd_allocate_wasm64,
+            details::fd_close_wasm64,
+            details::fd_datasync_wasm64,
+            details::fd_fdstat_get_wasm64,
+            details::fd_fdstat_set_flags_wasm64,
+            details::fd_fdstat_set_rights_wasm64,
+            details::fd_filestat_get_wasm64,
+            details::fd_filestat_set_size_wasm64,
+            details::fd_filestat_set_times_wasm64,
+            details::fd_pread_wasm64,
+            details::fd_prestat_dir_name_wasm64,
+            details::fd_prestat_get_wasm64,
+            details::fd_pwrite_wasm64,
+            details::fd_read_wasm64,
+            details::fd_readdir_wasm64,
+            details::fd_renumber_wasm64,
+            details::fd_seek_wasm64,
+            details::fd_sync_wasm64,
+            details::fd_tell_wasm64,
+            details::fd_write_wasm64,
+            details::path_create_directory_wasm64,
+            details::path_filestat_get_wasm64,
+            details::path_filestat_set_times_wasm64,
+            details::path_link_wasm64,
+            details::path_open_wasm64,
+            details::path_readlink_wasm64,
+            details::path_remove_directory_wasm64,
+            details::path_rename_wasm64,
+            details::path_symlink_wasm64,
+            details::path_unlink_file_wasm64,
+            details::poll_oneoff_wasm64,
+            details::proc_exit_wasm64,
+            details::proc_raise_wasm64,
+            details::random_get_wasm64,
+            details::sched_yield_wasm64
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+            ,
+            details::sock_accept_wasm64,
+            details::sock_recv_wasm64,
+            details::sock_send_wasm64,
+            details::sock_shutdown_wasm64
+#  endif
+            >;
     };
 
     static_assert(::uwvm2::uwvm::wasm::type::is_local_imported_module<wasip1_local_imported_module_t>);
@@ -620,73 +672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
     ///       (`init_wasip1_environment` inside `load_local_modules`) before any WASI function is invoked, so it is intentionally not modeled
     ///       as a "local_imported function"/concept requirement here.
 
-    struct wasip1_wasm64_local_imported_module_t
-    {
-        // wasi uextension: memory64
-        // Since wasmp1 itself does not support memory64, the memory64 API is provided here.
-        inline static constexpr ::uwvm2::utils::container::u8string_view module_name{u8"wasiu_wasi_snapshot_preview1_wasm64"};
-
-        using local_function_tuple = ::uwvm2::utils::container::tuple<details::args_get_wasm64,
-                                                                      details::args_sizes_get_wasm64,
-                                                                      details::clock_res_get_wasm64,
-                                                                      details::clock_time_get_wasm64,
-                                                                      details::environ_get_wasm64,
-                                                                      details::environ_sizes_get_wasm64,
-                                                                      details::fd_advise_wasm64,
-                                                                      details::fd_allocate_wasm64,
-                                                                      details::fd_close_wasm64,
-                                                                      details::fd_datasync_wasm64,
-                                                                      details::fd_fdstat_get_wasm64,
-                                                                      details::fd_fdstat_set_flags_wasm64,
-                                                                      details::fd_fdstat_set_rights_wasm64,
-                                                                      details::fd_filestat_get_wasm64,
-                                                                      details::fd_filestat_set_size_wasm64,
-                                                                      details::fd_filestat_set_times_wasm64,
-                                                                      details::fd_pread_wasm64,
-                                                                      details::fd_prestat_dir_name_wasm64,
-                                                                      details::fd_prestat_get_wasm64,
-                                                                      details::fd_pwrite_wasm64,
-                                                                      details::fd_read_wasm64,
-                                                                      details::fd_readdir_wasm64,
-                                                                      details::fd_renumber_wasm64,
-                                                                      details::fd_seek_wasm64,
-                                                                      details::fd_sync_wasm64,
-                                                                      details::fd_tell_wasm64,
-                                                                      details::fd_write_wasm64,
-                                                                      details::path_create_directory_wasm64,
-                                                                      details::path_filestat_get_wasm64,
-                                                                      details::path_filestat_set_times_wasm64,
-                                                                      details::path_link_wasm64,
-                                                                      details::path_open_wasm64,
-                                                                      details::path_readlink_wasm64,
-                                                                      details::path_remove_directory_wasm64,
-                                                                      details::path_rename_wasm64,
-                                                                      details::path_symlink_wasm64,
-                                                                      details::path_unlink_file_wasm64,
-                                                                      details::poll_oneoff_wasm64,
-                                                                      details::proc_exit_wasm64,
-                                                                      details::proc_raise_wasm64,
-                                                                      details::random_get_wasm64,
-                                                                      details::sched_yield_wasm64
-#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
-                                                                      ,
-                                                                      details::sock_accept_wasm64,
-                                                                      details::sock_recv_wasm64,
-                                                                      details::sock_send_wasm64,
-                                                                      details::sock_shutdown_wasm64
-#  endif
-                                                                      >;
-    };
-
-    static_assert(::uwvm2::uwvm::wasm::type::is_local_imported_module<wasip1_wasm64_local_imported_module_t>);
-    static_assert(::uwvm2::uwvm::wasm::type::has_local_function_tuple<wasip1_wasm64_local_imported_module_t>);
-    /// @note This local_imported module only provides the WASI Preview1 importable function list.
-    ///       The runtime environment (`default_wasip1_env`, memory binding, argv/envp, fd table, etc.) is initialized by the loader
-    ///       (`init_wasip1_environment` inside `load_local_modules`) before any WASI function is invoked, so it is intentionally not modeled
-    ///       as a "local_imported function"/concept requirement here.
-
     inline constexpr wasip1_local_imported_module_t wasip1_local_imported_module{};
-    inline constexpr wasip1_wasm64_local_imported_module_t wasip1_wasm64_local_imported_module{};
 
 # endif
 #endif

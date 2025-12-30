@@ -48,7 +48,6 @@
 # include "wasip1_socket_tcp_connect.h"
 # include "wasip1_socket_udp_bind.h"
 # include "wasip1_socket_udp_connect.h"
-# include "wasiu_wasip1_wasm64_disable.h"
 
 // log
 # include "log_output.h"

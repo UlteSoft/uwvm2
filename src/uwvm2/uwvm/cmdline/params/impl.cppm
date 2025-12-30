@@ -50,7 +50,6 @@ export import :wasip1_socket_tcp_listen;
 export import :wasip1_socket_tcp_connect;
 export import :wasip1_socket_udp_bind;
 export import :wasip1_socket_udp_connect;
-export import :wasiu_wasip1_wasm64_disable;
 
 // log
 export import :log_output;
