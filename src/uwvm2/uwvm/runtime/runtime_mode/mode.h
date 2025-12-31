@@ -55,9 +55,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     enum class runtime_compiler_t : unsigned
     {
-        uwvm_interpreter,
+        uwvm_interpreter_only,
         uwvm_interpreter_llvm_jit_tiered,
-        llvm_jit
+        llvm_jit_only
     };
 }
 
