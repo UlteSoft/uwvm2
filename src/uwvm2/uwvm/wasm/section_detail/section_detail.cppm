@@ -37,6 +37,8 @@ module;
 export module uwvm2.uwvm.wasm.section_detail:section_detail;
 
 import fast_io;
+import uwvm2.uwvm_predefine.io;
+import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
 import uwvm2.parser.wasm.concepts;
