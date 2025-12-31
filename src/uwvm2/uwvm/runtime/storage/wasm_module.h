@@ -31,10 +31,12 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/features/impl.h>
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 #endif
