@@ -45,7 +45,6 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
-
     enum class runtime_mode_t : unsigned
     {
         lazy_compile,
@@ -59,6 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         uwvm_interpreter_llvm_jit_tiered,
         llvm_jit_only
     };
+
 }
 
 #ifndef UWVM_MODULE

@@ -25,6 +25,7 @@ module;
 export module uwvm2.uwvm.runtime;
 export import uwvm2.uwvm.runtime.storage;
 export import uwvm2.uwvm.runtime.initializer;
+export import uwvm2.uwvm.runtime.runtime_mode;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
