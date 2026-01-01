@@ -440,7 +440,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         }
                         case ::uwvm2::object::global::global_type::wasm_v128:
                         {
-                            local_imported_scratch.storage.v128 = {};
+                            local_imported_scratch.storage.v128 = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128{};
                             li->global_get_from_index(idx, reinterpret_cast<::std::byte*>(::std::addressof(local_imported_scratch.storage.v128)));
                             break;
                         }
@@ -3551,7 +3551,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         linked_local_imported += static_cast<::std::size_t>(imp.link_kind == memory_link_kind::local_imported);
                     }
                     auto const unresolved{total - linked_imported - linked_defined - linked_local_imported};
-                    
+
                     verbose_info(u8"initializer: Resolve imports summary (memory) for module \"",
                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                  curr_module_name,
