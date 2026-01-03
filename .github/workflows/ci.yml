@@ -285,13 +285,12 @@ jobs:
   # ---------------------------------------------------------------------------
   x86_64-freebsd:
     name: FreeBSD (x86_64) ${{ matrix.compiler }}
-    if: ${{ !always() }}
     runs-on: ubuntu-latest
     env:
       version: "14.3"
     strategy:
       matrix:
-        compiler: ["CLANG", "GCC"]
+        compiler: ["CLANG"]
         mode: ["debug"]
         policies: ["build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined"]
     steps:
@@ -320,8 +319,8 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo pkg install -y llvm-devel-lite xmake-io
-            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config-devel --prefix)"
+            sudo pkg install -y llvm21 xmake-io
+            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
