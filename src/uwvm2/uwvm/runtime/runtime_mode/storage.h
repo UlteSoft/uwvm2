@@ -65,8 +65,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details full_compile + llvm_jit_only
     inline bool is_runtime_mode_code_aot_existed{};  // [global]
 
-    inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{};          // [global]
-    inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{};  // [global]
+    /// @brief   The global runtime mode.
+    /// @details default = runtime-tiered
+    inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
+    inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};  // [global]
 }
 
 #ifndef UWVM_MODULE
