@@ -51,19 +51,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief   Whether the runtime mode is code interpreted.
     /// @details lazy_compile + uwvm_interpreter_only
-    inline bool is_runtime_mode_code_int{};  // [global]
+    inline bool is_runtime_mode_code_int_existed{};  // [global]
 
     /// @brief   Whether the runtime mode is code jit.
     /// @details lazy_compile + llvm_jit_only
-    inline bool is_runtime_mode_code_jit{};  // [global]
+    inline bool is_runtime_mode_code_jit_existed{};  // [global]
 
     /// @brief   Whether the runtime mode is code jit.
     /// @details lazy_compile + uwvm_interpreter_llvm_jit_tiered
-    inline bool is_runtime_mode_code_tiered{};  // [global]
+    inline bool is_runtime_mode_code_tiered_existed{};  // [global]
 
     /// @brief   Whether the runtime mode is code aot.
     /// @details full_compile + llvm_jit_only
-    inline bool is_runtime_mode_code_aot{};  // [global]
+    inline bool is_runtime_mode_code_aot_existed{};  // [global]
 
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{};          // [global]
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{};  // [global]
