@@ -23,6 +23,6 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "wasm_module.h" 
+# include "mode.h" 
 # include "storage.h"
 #endif

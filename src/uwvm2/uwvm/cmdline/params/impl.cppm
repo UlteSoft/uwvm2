@@ -41,6 +41,14 @@ export import :wasm_set_parser_limit;
 export import :wasm_list_weak_symbol_module;
 export import :wasm_memory_grow_strict;
 
+// runtime
+export import :runtime_custom_mode;
+export import :runtime_custom_compiler;
+export import :runtime_int;
+export import :runtime_jit;
+export import :runtime_tiered;
+export import :runtime_aot;
+
 // wasi
 export import :wasi_disable_utf8_check;
 export import :wasip1_set_fd_limit;

@@ -31,6 +31,7 @@
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <uwvm2/utils/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
@@ -68,6 +69,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
+
+            // runtime
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_jit),
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered),
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
+#endif
 
         // wasi
 #if defined(UWVM_IMPORT_WASI)
@@ -118,6 +135,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif

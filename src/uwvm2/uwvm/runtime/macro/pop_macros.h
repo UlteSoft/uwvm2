@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
+ * @date        2025-03-23
  * @copyright   APL-2.0 License
  */
 
@@ -20,18 +20,12 @@
  *                                      *
  ****************************************/
 
-module;
+/// @brief      The following are the macros used by uwvm.
+/// @details    Use `push_macro` to avoid side effects on existing macros. Please use `pop_macro` in conjunction.
 
-export module uwvm2.uwvm.runtime;
-export import uwvm2.uwvm.runtime.storage;
-export import uwvm2.uwvm.runtime.initializer;
-export import uwvm2.uwvm.runtime.runtime_mode;
+// #pragma once
 
-#ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
-#endif
+#pragma pop_macro("UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED")
+#pragma pop_macro("UWVM_RUNTIME_LLVM_JIT")
+#pragma pop_macro("UWVM_RUNTIME_UWVM_INTERPRETER")
 
-#include "impl.h"

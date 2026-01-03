@@ -23,7 +23,7 @@
 module;
 
 export module uwvm2.uwvm.runtime.storage;
-export import :wasm_module;
+export import :mode;
 export import :storage;
 
 #ifndef UWVM_MODULE
