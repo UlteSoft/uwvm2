@@ -29,6 +29,7 @@
 # include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -43,6 +44,10 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if !defined(UWVM_RUNTIME_UWVM_INTERPRETER) && !defined(UWVM_RUNTIME_LLVM_JIT)
+# error "No runtime backend selected. Include <uwvm2/uwvm/runtime/macro/push_macros.h> before this header (or enable interpreter/JIT in build flags)."
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
     enum class runtime_mode_t : unsigned
@@ -54,14 +59,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     enum class runtime_compiler_t : unsigned
     {
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         uwvm_interpreter_only,
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         uwvm_interpreter_llvm_jit_tiered,
-        llvm_jit_only
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+        llvm_jit_only,
+#endif
     };
-
 }
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

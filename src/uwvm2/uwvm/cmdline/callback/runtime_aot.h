@@ -28,6 +28,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -46,11 +47,13 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-#if defined(UWVM_MODULE)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+
+# if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
-#else
+# else
     UWVM_GNU_COLD inline constexpr
-#endif
+# endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_aot_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
                                                                             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
                                                                             [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
@@ -86,8 +89,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        if(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed || ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
-           ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed) [[unlikely]]
+        if(
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
+#endif
+            false) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -96,7 +108,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Conflicting runtime parameters: only one shortcut runtime mode parameter is allowed "
-                                u8"(--runtime-int/--runtime-jit/--runtime-tiered/--runtime-aot).\n"
+                                u8"("
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                                u8"--runtime-int"
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                                ,
+                                u8"|"
+# endif
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                                u8"--runtime-jit"
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                                ,
+                                u8"|",
+                                u8"--runtime-tiered"
+# endif
+                                ,
+                                u8"|",
+                                u8"--runtime-aot"
+#endif
+                                u8").\n"
                                 u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 u8"[info]  ",
@@ -114,10 +145,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only;
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
+
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

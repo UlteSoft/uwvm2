@@ -28,6 +28,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -61,7 +62,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_compiler{
         .name{u8"--runtime-custom-compiler"},
         .describe{u8"Custom selection of runtime compiler."},
-        .usage{u8"[int|tiered|jit]"},
+        .usage{u8"["
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+               u8"int"
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+               u8"|"
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+               u8"tiered"
+#endif
+#if (defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED) && defined(UWVM_RUNTIME_LLVM_JIT)) ||                                                              \
+    (defined(UWVM_RUNTIME_UWVM_INTERPRETER) && defined(UWVM_RUNTIME_LLVM_JIT))
+               u8"|"
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+               u8"jit"
+#endif
+               u8"]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_custom_compiler_alias), 1uz}},
         .handle{::std::addressof(details::runtime_custom_compiler_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_compiler_existed)},
@@ -73,6 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

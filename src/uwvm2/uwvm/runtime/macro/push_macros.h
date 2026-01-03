@@ -25,10 +25,12 @@
 
 // #pragma once
 
+// macro checkers
 #if defined(UWVM_DISABLE_INT) && defined(UWVM_DISABLE_JIT)
 # error "Both interpreter and JIT are disabled. Please enable at least one of them."
 #endif
 
+// macro definitions
 #pragma push_macro("UWVM_RUNTIME_UWVM_INTERPRETER")
 #undef UWVM_RUNTIME_UWVM_INTERPRETER
 #ifndef UWVM_DISABLE_INT

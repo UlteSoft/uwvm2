@@ -28,6 +28,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -60,31 +61,61 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // [  safe  ] unsafe (could be the module_end)
         //      ^^ para_curr
 
-        if(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed || ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
-           ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed || ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_aot_existed)
-            [[unlikely]]
+        if(
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_aot_existed ||
+#endif
+            false) [[unlikely]]
         {
-            ::fast_io::io::perr(
-                ::uwvm2::uwvm::io::u8log_output,
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                u8"uwvm: ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                u8"[error] ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"Conflicting runtime parameters: \"",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                u8"--runtime-custom-compiler",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"\" conflicts with shortcut runtime mode parameters (--runtime-int/--runtime-jit/--runtime-tiered/--runtime-aot).\n" u8"uwvm: ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                u8"[info]  ",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"Use \"",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                u8"--help runtime",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"\" for details.\n\n",
-                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Conflicting runtime parameters: \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                u8"--runtime-custom-compiler",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\" conflicts with shortcut runtime mode parameters "
+                                u8"("
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                                u8"--runtime-int"
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                                ,
+                                u8"|"
+# endif
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                                u8"--runtime-jit"
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                                ,
+                                u8"|",
+                                u8"--runtime-tiered"
+# endif
+                                ,
+                                u8"|",
+                                u8"--runtime-aot"
+#endif
+                                u8").\n" u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Use \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"--help runtime",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\" for details.\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
@@ -117,20 +148,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        if(auto const currp1_str{currp1->str}; currp1_str == u8"int")
+        auto const currp1_str{currp1->str};
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        if(currp1_str == u8"int")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only;
         }
-        else if(auto const currp1_str{currp1->str}; currp1_str == u8"tiered" || currp1_str == u8"teried")
+        else
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            if(currp1_str == u8"tiered")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler =
                 ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
         }
-        else if(auto const currp1_str{currp1->str}; currp1_str == u8"jit")
+        else
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(currp1_str == u8"jit")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only;
         }
-        else [[unlikely]]
+        else
+#endif
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -155,7 +196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-
