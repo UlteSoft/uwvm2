@@ -98,6 +98,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::cmdline
         debug,
         wasm,
         log,
+        runtime,
 #if defined(UWVM_IMPORT_WASI)
         wasi,
 #endif

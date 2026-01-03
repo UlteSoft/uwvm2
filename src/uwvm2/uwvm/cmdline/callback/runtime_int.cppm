@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
+ * @date        2026-01-03
  * @copyright   APL-2.0 License
  */
 
@@ -22,9 +22,23 @@
 
 module;
 
-export module uwvm2.uwvm.runtime.storage;
-export import :mode;
-export import :storage;
+// std
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.callback:runtime_int;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.ansies;
+import uwvm2.utils.cmdline;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.runtime.runtime_mode;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -33,4 +47,5 @@ export import :storage;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "runtime_int.h"
+

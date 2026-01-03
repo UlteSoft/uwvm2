@@ -41,6 +41,14 @@
 # include "wasm_list_weak_symbol_module.h"
 # include "wasm_memory_grow_strict.h"
 
+// runtime
+# include "runtime_custom_mode.h"
+# include "runtime_custom_compiler.h"
+# include "runtime_int.h"
+# include "runtime_jit.h"
+# include "runtime_tiered.h"
+# include "runtime_aot.h"
+
 // wasi
 # include "wasi_disable_utf8_check.h"
 # include "wasip1_set_fd_limit.h"

@@ -69,6 +69,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
 
+            // runtime
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_jit),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
+
         // wasi
 #if defined(UWVM_IMPORT_WASI)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasi_disable_utf8_check),
