@@ -2088,8 +2088,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     ///////////////////////////
     /// @brief Code Version ///
     ///////////////////////////
-    
-    struct wasm1_code_version;
+
+    struct wasm1_code_version{};
 }
 
 UWVM_MODULE_EXPORT namespace std
