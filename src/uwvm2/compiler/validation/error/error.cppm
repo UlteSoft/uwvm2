@@ -5,10 +5,11 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Standard
+ * @brief       WebAssembly Release 1.0 (2019-07-20)
+ * @details     antecedent dependency: null
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-02
+ * @date        2025-05-07
  * @copyright   APL-2.0 License
  */
 
@@ -23,10 +24,29 @@
 
 module;
 
-export module uwvm2.compiler.validation;
-export import uwvm2.compiler.validation.error;
-export import uwvm2.compiler.validation.concepts;
-export import uwvm2.compiler.validation.standard;
+// std
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <concepts>
+#include <type_traits>
+#include <utility>
+#include <memory>
+#include <limits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#endif
+
+export module uwvm2.compiler.validation.error:error;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.debug;
+import uwvm2.utils.intrinsics;
+import uwvm2.parser.wasm.base;
+import uwvm2.parser.wasm.utils;
+import uwvm2.parser.wasm.concepts;
+import uwvm2.parser.wasm.standard;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -35,4 +55,4 @@ export import uwvm2.compiler.validation.standard;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "error.h"
