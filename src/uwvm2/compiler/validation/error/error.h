@@ -58,15 +58,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ok = 0u,
         missing_end,
         illegal_opbase,
+        operand_stack_underflow,
     };
 
     /// @brief define IEEE 754 F32 and F64
     using error_f32 = ::uwvm2::utils::precfloat::float32_t;
     using error_f64 = ::uwvm2::utils::precfloat::float64_t;
 
+    /// @brief used for duplicate_exports_of_the_same_export_type
+    struct operand_stack_underflow_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::std::size_t stack_size_actual;
+        ::std::size_t stack_size_required;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
+        operand_stack_underflow_err_t operand_stack_underflow;
+        static_assert(::std::is_trivially_copyable_v<operand_stack_underflow_err_t> && ::std::is_trivially_destructible_v<operand_stack_underflow_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

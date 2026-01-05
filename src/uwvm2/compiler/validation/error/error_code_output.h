@@ -93,6 +93,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_illegal_opbase.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow:
+            {
+#include "error_code_outputs/eco_operand_stack_underflow.h"
+                return;
+            }
         }
     }
 }

@@ -61,6 +61,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
+    using operand_stack_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+
+    union operand_stack_storate_u
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
+    };
+
+    struct operand_stack_storage_t
+    {
+        operand_stack_storate_u value{};
+        operand_stack_value_type type{};
+    };
+
+    using operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t>;
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline void validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
                               ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
@@ -69,6 +87,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                               ::std::byte const* code_end,
                               ::uwvm2::compiler::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
+        // stack
+        operand_stack_type operand_stack{};
+        bool is_polymorphic{};
+
+        // start parse the code
         auto code_curr{code_begin};
 
         // [before_section ... ] | opbase opextent
@@ -97,69 +120,158 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
             // ^^ code_curr
 
             // switch the code
-            wasm1_code check_end;  // no initialize necessary
-            ::std::memcpy(::std::addressof(check_end), code_curr, sizeof(wasm1_code));
+            wasm1_code curr_opbase;  // no initialize necessary
+            ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
 
-            switch(check_end)
+            switch(curr_opbase)
             {
                 case wasm1_code::unreachable:
                 {
+                    // unreachable make operand_stack polymorphic
+
+                    /// @todo
                     break;
                 }
                 case wasm1_code::nop:
                 {
+                    // nop    ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    ++code_curr;
+
+                    // nop    ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
                     break;
                 }
                 case wasm1_code::block:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::loop:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::if_:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::else_:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::end:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::br:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::br_if:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::br_table:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::return_:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::call:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::call_indirect:
                 {
+                    /// @todo
                     break;
                 }
                 case wasm1_code::drop:
                 {
+                    // drop   ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    ++code_curr;
+
+                    // drop   ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.empty()) [[unlikely]]
+                        {
+                            err.err_curr = code_curr;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        operand_stack.pop_back_unchecked();
+                    }
+
                     break;
                 }
                 case wasm1_code::select:
                 {
+                    // select ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    ++code_curr;
+
+                    // select ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 3uz) [[unlikely]]
+                        {
+                            err.err_curr = code_curr;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const cond{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        auto const v2{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        auto const v1{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(cond.type != operand_stack_value_type::i32) [[unlikely]] 
+                        {
+                            err.err_curr = code_curr;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                    }
+
                     break;
                 }
                 case wasm1_code::local_get:
@@ -793,7 +905,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 [[unlikely]] default:
                 {
                     err.err_curr = code_curr;
-                    err.err_selectable.u8 = static_cast<::std::uint_least8_t>(check_end);
+                    err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
                     err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     break;
