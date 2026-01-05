@@ -53,9 +53,11 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 {
-    enum class wasm_validation_error_code : ::std::uint_least32_t
+    enum class code_validation_error_code : ::std::uint_least32_t
     {
         ok = 0u,
+        missing_end,
+        illegal_opbase,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -102,7 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
     {
         code_validation_error_selectable_t err_selectable{};
         ::std::byte const* err_curr{};
-        wasm_validation_error_code err_code{};
+        code_validation_error_code err_code{};
     };
 }
 

@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
     struct error_output_t
     {
         ::std::byte const* module_begin{};
-        ::uwvm2::parser::wasm::base::error_impl err{};
+        ::uwvm2::compiler::validation::error::code_validation_error_impl err{};
         error_output_flag_t flag{};
     };
 
@@ -76,6 +76,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
             default:
             {
 #include "error_code_outputs/eco_default.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::ok:
+            {
+#include "error_code_outputs/eco_ok.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::missing_end:
+            {
+#include "error_code_outputs/eco_missing_end.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase:
+            {
+#include "error_code_outputs/eco_illegal_opbase.h"
                 return;
             }
         }
