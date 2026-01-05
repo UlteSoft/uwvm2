@@ -58,12 +58,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::concepts
     inline consteval auto get_code_version_reserve_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
     { return ::uwvm2::parser::wasm::binfmt::ver1::final_code_version_reserve_type_t<Fs...>{}; }
 
-    template <typename CodeVersionType>
+    template <typename CodeVersionType, typename... Fs>
     concept can_validate_code = requires(CodeVersionType code_adl,
+                                         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
+                                         ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...> const& code_type,
                                          ::std::byte const* code_begin,
                                          ::std::byte const* code_end,
                                          ::uwvm2::compiler::validation::error::code_validation_error_impl& err) {
-        { validate_code(code_adl, code_begin, code_end, err) } -> ::std::same_as<void>;
+        { validate_code(code_adl, module_storage, code_type, code_begin, code_end, err) } -> ::std::same_as<void>;
     };
 }
 
