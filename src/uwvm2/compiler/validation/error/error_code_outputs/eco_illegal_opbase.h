@@ -11,10 +11,16 @@
  * @copyright   APL-2.0 License
  */
 
-// Without pragma once, this header file will be included in a specific code segment
+/****************************************
+ *  _   _ __        ____     __ __  __  *
+ * | | | |\ \      / /\ \   / /|  \/  | *
+ * | | | | \ \ /\ / /  \ \ / / | |\/| | *
+ * | |_| |  \ V  V /    \ V /  | |  | | *
+ *  \___/    \_/\_/      \_/   |_|  |_| *
+ *                                      *
+ ****************************************/
 
-auto const illegal_opbase_u8{errout.err.err_curr ? ::std::to_integer<::std::uint_least8_t>(*errout.err.err_curr)
-                                                 : static_cast<::std::uint_least8_t>(0u)};
+// Without pragma once, this header file will be included in a specific code segment
 
 if constexpr(::std::same_as<char_type, char>)
 {
@@ -36,7 +42,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              ") Illegal opcode base: \"",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                             ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "\".",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
@@ -54,7 +60,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      ") Illegal opcode base: \"",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                     ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      "\".",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
@@ -80,7 +86,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              L") Illegal opcode base: \"",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                             ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"\".",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
@@ -98,7 +104,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      L") Illegal opcode base: \"",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                     ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"\".",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
@@ -124,7 +130,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              u8") Illegal opcode base: \"",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                             ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"\".",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
@@ -142,7 +148,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      u8") Illegal opcode base: \"",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                     ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"\".",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
@@ -168,7 +174,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              u") Illegal opcode base: \"",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                             ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"\".",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
@@ -186,7 +192,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      u") Illegal opcode base: \"",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                     ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"\".",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
@@ -212,7 +218,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              U") Illegal opcode base: \"",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                             ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"\".",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
@@ -230,7 +236,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      U") Illegal opcode base: \"",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     ::fast_io::mnp::hex0x<true>(illegal_opbase_u8),
+                                                     ::fast_io::mnp::hex0x<true>(errout.err.err_selectable.u8),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"\".",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));

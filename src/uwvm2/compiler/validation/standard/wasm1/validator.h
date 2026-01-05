@@ -792,6 +792,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 [[unlikely]] default:
                 {
+                    err.err_curr = code_curr;
+                    err.err_selectable.u8 = static_cast<::std::uint_least8_t>(check_end);
+                    err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     break;
                 }
             }
