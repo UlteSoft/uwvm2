@@ -191,6 +191,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
             ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>>(module_storage.sections)};
 
         auto const& curr_func_type{typesec.types.index_unchecked(funcsec.funcs.index_unchecked(local_func_idx))};
+        auto const func_parameter_begin{curr_func_type.parameter.begin};
+        auto const func_parameter_end{curr_func_type.parameter.end};
+        auto const func_parameter_count_uz{static_cast<::std::size_t>(func_parameter_end - func_parameter_begin)};
+        auto const func_parameter_count_u32{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(func_parameter_count_uz)};
+        
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        if(func_parameter_count_u32 != func_parameter_count_uz) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
 
         auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>>(module_storage.sections)};
@@ -198,12 +206,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto const& curr_code{codesec.codes.index_unchecked(local_func_idx)};
         auto const& curr_code_locals{curr_code.locals};
 
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count{func_parameter_count_u32};
         for(auto const& local_part: curr_code_locals)
         {
             // all_local_count never overflow and never exceed the max of size_t
             all_local_count += local_part.count;
         }
+
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        if constexpr(::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max() > ::std::numeric_limits<::std::size_t>::max())
+        {
+            if(all_local_count > ::std::numeric_limits<::std::size_t>::max()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+        }
+#endif
 
         // stack
         operand_stack_type operand_stack{};
@@ -459,28 +474,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     //                       ^^ code_curr
 
                     // check the local_index is valid
-                    auto tem_local_index{local_index};
-                    ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> curr_local_type{};
-
-                    for(auto const& local_part: curr_code_locals)
-                    {
-                        if(tem_local_index < local_part.count)
-                        {
-                            curr_local_type = local_part.type;
-                            tem_local_index = 0uz;
-                            break;
-                        }
-
-                        tem_local_index -= local_part.count;
-                    }
-
-                    if(tem_local_index != 0uz) [[unlikely]]
+                    if(local_index >= all_local_count) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_local_index.local_index = local_index;
                         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
                         err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack_value_type curr_local_type{};
+
+                    if(local_index < func_parameter_count_u32)
+                    {
+                        // function parameter
+                        curr_local_type = static_cast<operand_stack_value_type>(func_parameter_begin[static_cast<::std::size_t>(local_index)]);
+                    }
+                    else
+                    {
+                        // function defined local variable
+                        auto tem_local_index{local_index - func_parameter_count_u32};
+
+                        bool found_local{};
+                        for(auto const& local_part: curr_code_locals)
+                        {
+                            if(tem_local_index < local_part.count)
+                            {
+                                curr_local_type = static_cast<operand_stack_value_type>(local_part.type);
+                                found_local = true;
+                                break;
+                            }
+
+                            tem_local_index -= local_part.count;
+                        }
+
+                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                     }
 
                     if(!is_polymorphic) { operand_stack.push_back({curr_local_type}); }
