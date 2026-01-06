@@ -106,6 +106,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         auto const& funcsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<function_section_storage_t>(module_storage.sections)};
         auto const defined_func_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(funcsec.funcs.size())};
 
+        // get typesec
+        auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<type_section_storage_t<Fs...>>(module_storage.sections)};
+
         // check duplicate
         if(codesec.sec_span.sec_begin) [[unlikely]]
         {
@@ -335,6 +338,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // The final list of local variables obtained by concatenating all groups must not exceed u32max.
             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_clocal_counter{};
 
+            auto const curr_code_match_type_index{code_counter - 1u};
+            auto const& curr_code_match_type{typesec.types.index_unchecked(funcsec.funcs.index_unchecked(curr_code_match_type_index))};
+            auto const curr_code_parameter_size{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(
+                static_cast<::std::size_t>(curr_code_match_type.parameter.end - curr_code_match_type.parameter.begin))};
+            // The WASM specification requires that locally defined `local+parameter` values must not exceed `u32max`.
+            auto const max_local_defined_count{wasm_u32_max - curr_code_parameter_size};
+
             // Undeterministic boundaries need to use quantity loops (No local_end)
             for(::std::size_t local_counter{}; local_counter != local_count; ++local_counter)
             {
@@ -375,9 +385,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 }
 
                 // The final list of local variables obtained by concatenating all groups must not exceed u32max.
-                if(clocal_n > wasm_u32_max - all_clocal_counter) [[unlikely]]
+                if(clocal_n > max_local_defined_count - all_clocal_counter) [[unlikely]]
                 {
                     err.err_curr = section_curr;
+                    err.err_selectable.u32 = max_local_defined_count;
                     err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::final_list_of_locals_exceeds_the_maximum_value_of_u32max;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }

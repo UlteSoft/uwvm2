@@ -61,22 +61,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
-    using operand_stack_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    using operand_stack_value_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...>;
 
-    union operand_stack_storate_u
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
-    };
-
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct operand_stack_storage_t
     {
-        operand_stack_value_type type{};
+        operand_stack_value_type<Fs...> type{};
     };
 
-    using operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t>;
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    using operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t<Fs...>>;
 
     template <typename T>
     struct fast_io_native_typed_global_allocator_guard
@@ -195,7 +190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto const func_parameter_end{curr_func_type.parameter.end};
         auto const func_parameter_count_uz{static_cast<::std::size_t>(func_parameter_end - func_parameter_begin)};
         auto const func_parameter_count_u32{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(func_parameter_count_uz)};
-        
+
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(func_parameter_count_u32 != func_parameter_count_uz) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
@@ -206,6 +201,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto const& curr_code{codesec.codes.index_unchecked(local_func_idx)};
         auto const& curr_code_locals{curr_code.locals};
 
+        // all local count = parameter + local defined local count
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count{func_parameter_count_u32};
         for(auto const& local_part: curr_code_locals)
         {
@@ -221,7 +217,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 #endif
 
         // stack
-        operand_stack_type operand_stack{};
+        using curr_operand_stack_type = operand_stack_type<Fs...>;
+        curr_operand_stack_type operand_stack{};
         bool is_polymorphic{};
 
         // start parse the code
@@ -408,7 +405,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         auto const v1{operand_stack.back_unchecked()};
                         // select need same type for v1 and v2, no necessary to pop and push back
 
-                        if(cond.type != operand_stack_value_type::i32) [[unlikely]]
+                        if(cond.type != curr_operand_stack_type::i32) [[unlikely]]
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.select_cond_type_not_i32.cond_type = cond.type;
@@ -483,12 +480,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    operand_stack_value_type curr_local_type{};
+                    curr_operand_stack_type curr_local_type{};
 
                     if(local_index < func_parameter_count_u32)
                     {
                         // function parameter
-                        curr_local_type = static_cast<operand_stack_value_type>(func_parameter_begin[static_cast<::std::size_t>(local_index)]);
+                        curr_local_type = func_parameter_begin[local_index];
                     }
                     else
                     {
@@ -500,7 +497,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         {
                             if(tem_local_index < local_part.count)
                             {
-                                curr_local_type = static_cast<operand_stack_value_type>(local_part.type);
+                                curr_local_type = local_part.type;
                                 found_local = true;
                                 break;
                             }
