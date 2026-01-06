@@ -52,7 +52,7 @@ int main()
     ::uwvm2::compiler::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
-    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index)};
+    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -93,6 +93,16 @@ int main()
             {
                 errout.err.err_selectable.invalid_function_index.function_index = 10uz;
                 errout.err.err_selectable.invalid_function_index.all_function_size = 5uz;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index:
+            {
+                errout.err.err_selectable.illegal_local_index.local_index = 10u;
+                errout.err.err_selectable.illegal_local_index.all_local_count = 5u;
                 break;
             }
             default: break;

@@ -63,6 +63,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         select_cond_type_not_i32,
         not_local_function,
         invalid_function_index,
+        invalid_local_index,
+        illegal_local_index,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -99,6 +101,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::std::size_t all_function_size;
     };
 
+    struct illegal_local_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 local_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -116,6 +124,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         invalid_function_index_err_t invalid_function_index;
         static_assert(::std::is_trivially_copyable_v<invalid_function_index_err_t> && ::std::is_trivially_destructible_v<invalid_function_index_err_t>);
+
+        illegal_local_index_err_t illegal_local_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_local_index_err_t> && ::std::is_trivially_destructible_v<illegal_local_index_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

@@ -198,6 +198,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto const& curr_code{codesec.codes.index_unchecked(local_func_idx)};
         auto const& curr_code_locals{curr_code.locals};
 
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count{};
+        for(auto const& local_part: curr_code_locals)
+        {
+            // all_local_count never overflow and never exceed the max of size_t
+            all_local_count += local_part.count;
+        }
+
         // stack
         operand_stack_type operand_stack{};
         bool is_polymorphic{};
@@ -409,6 +416,74 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::local_get:
                 {
+                    // local.get ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // local.get ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // local.get local_index ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 local_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+                    auto const [local_index_next, local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                            ::fast_io::mnp::leb128_get(local_index))};
+
+                    if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
+                    }
+
+                    // local.get local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(local_index_next);
+
+                    // local.get local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //                       ^^ code_curr
+
+                    // check the local_index is valid
+                    auto tem_local_index{local_index};
+                    ::uwvm2::parser::wasm::standard::wasm1::features::final_value_type_t<Fs...> curr_local_type{};
+
+                    for(auto const& local_part: curr_code_locals)
+                    {
+                        if(tem_local_index < local_part.count)
+                        {
+                            curr_local_type = local_part.type;
+                            tem_local_index = 0uz;
+                            break;
+                        }
+
+                        tem_local_index -= local_part.count;
+                    }
+
+                    if(tem_local_index != 0uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_local_index.local_index = local_index;
+                        err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    if(!is_polymorphic) { operand_stack.push_back({curr_local_type}); }
 
                     break;
                 }
