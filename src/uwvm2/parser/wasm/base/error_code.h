@@ -139,7 +139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         illegal_code_body_size,
         code_missing_local_type,
         invalid_clocal_n,
-        final_list_of_locals_exceeds_the_maximum_value_of_u32max,
+        final_list_of_locals_exceeds_the_maximum_value_of_u32max_minus_parameter_size,
         code_section_resolved_not_match_the_actual_number,
         invalid_local_count,
         func_ref_by_start_has_illegal_sign,

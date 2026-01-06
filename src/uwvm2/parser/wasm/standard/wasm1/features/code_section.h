@@ -388,8 +388,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                 if(clocal_n > max_local_defined_count - all_clocal_counter) [[unlikely]]
                 {
                     err.err_curr = section_curr;
-                    err.err_selectable.u32 = max_local_defined_count;
-                    err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::final_list_of_locals_exceeds_the_maximum_value_of_u32max;
+                    err.err_selectable.u32 = curr_code_parameter_size;
+                    err.err_code =
+                        ::uwvm2::parser::wasm::base::wasm_parse_error_code::final_list_of_locals_exceeds_the_maximum_value_of_u32max_minus_parameter_size;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                 }
 
