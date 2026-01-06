@@ -206,6 +206,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [safe] unsafe (could be the section_end)
                     // ^^ code_curr
 
+                    auto const op_begin{code_curr};
+
+                    // drop   ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ op_begin
+
                     ++code_curr;
 
                     // drop   ...
@@ -216,7 +222,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         if(operand_stack.empty()) [[unlikely]]
                         {
-                            err.err_curr = code_curr;
+                            err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
@@ -235,6 +241,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [safe] unsafe (could be the section_end)
                     // ^^ code_curr
 
+                    auto const op_begin{code_curr};
+
+                    // select ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
                     ++code_curr;
 
                     // select ...
@@ -245,7 +257,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         if(operand_stack.size() < 3uz) [[unlikely]]
                         {
-                            err.err_curr = code_curr;
+                            err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
@@ -264,22 +276,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
                         if(cond.type != operand_stack_value_type::i32) [[unlikely]]
                         {
-                            err.err_curr = code_curr;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_curr = op_begin;
+                            err.err_selectable.select_cond_type_not_i32.cond_type = cond.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
                         // select need same type for v1 and v2
                         if(v1.type != v2.type) [[unlikely]]
                         {
-                            err.err_curr = code_curr;
+                            err.err_curr = op_begin;
                             err.err_selectable.select_type_mismatch.type_v1 = v1.type;
                             err.err_selectable.select_type_mismatch.type_v2 = v2.type;
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
-
-
                     }
 
                     break;

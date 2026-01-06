@@ -52,7 +52,7 @@ int main()
     ::uwvm2::compiler::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
-    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch)};
+    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -79,6 +79,11 @@ int main()
                 errout.err.err_selectable.select_type_mismatch.type_v2 = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32:
+            {
+                errout.err.err_selectable.select_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
             default: break;
         }
 
@@ -103,4 +108,3 @@ int main()
 
 // macro
 #include <uwvm2/utils/macro/pop_macros.h>
-

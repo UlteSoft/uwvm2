@@ -60,6 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         illegal_opbase,
         operand_stack_underflow,
         select_type_mismatch,
+        select_cond_type_not_i32,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -80,6 +81,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type type_v2;
     };
 
+    struct select_cond_type_not_i32_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -88,6 +94,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         select_type_mismatch_err_t select_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<select_type_mismatch_err_t> && ::std::is_trivially_destructible_v<select_type_mismatch_err_t>);
+
+        select_cond_type_not_i32_err_t select_cond_type_not_i32;
+        static_assert(::std::is_trivially_copyable_v<select_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<select_cond_type_not_i32_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;
