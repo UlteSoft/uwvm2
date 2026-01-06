@@ -176,6 +176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             }
         }
 
+        // There is no need to check code_count > sz max here, as it automatically satisfies the condition since it matches the function size.
         codesec.codes.reserve(static_cast<::std::size_t>(code_count));
 
         section_curr = reinterpret_cast<::std::byte const*>(code_count_next);  // never out of bounds
