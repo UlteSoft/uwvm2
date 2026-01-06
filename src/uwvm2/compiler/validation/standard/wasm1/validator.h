@@ -73,7 +73,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
     struct operand_stack_storage_t
     {
-        operand_stack_storate_u value{};
         operand_stack_value_type type{};
     };
 
@@ -261,14 +260,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         operand_stack.pop_back_unchecked();
 
                         auto const v1{operand_stack.back_unchecked()};
-                        operand_stack.pop_back_unchecked();
+                        // select need same type for v1 and v2, no necessary to pop and push back
 
-                        if(cond.type != operand_stack_value_type::i32) [[unlikely]] 
+                        if(cond.type != operand_stack_value_type::i32) [[unlikely]]
                         {
                             err.err_curr = code_curr;
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
+
+                        // select need same type for v1 and v2
+                        if(v1.type != v2.type) [[unlikely]]
+                        {
+                            err.err_curr = code_curr;
+                            err.err_selectable.select_type_mismatch.type_v1 = v1.type;
+                            err.err_selectable.select_type_mismatch.type_v2 = v2.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
 
                     }
 

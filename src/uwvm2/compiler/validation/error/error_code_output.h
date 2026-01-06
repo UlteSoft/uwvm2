@@ -98,6 +98,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_operand_stack_underflow.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch:
+            {
+#include "error_code_outputs/eco_select_type_mismatch.h"
+                return;
+            }
         }
     }
 }
