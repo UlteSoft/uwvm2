@@ -11,6 +11,7 @@
 
 #ifndef UWVM_MODULE
 # include <uwvm2/uwvm/runtime/initializer/init.h>
+# include <uwvm2/uwvm/cmdline/callback/impl.h>
 #else
 # error "Module testing is not currently supported"
 #endif
