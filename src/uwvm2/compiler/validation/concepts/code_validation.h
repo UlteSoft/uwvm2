@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::concepts
     template <typename CodeVersionType, typename... Fs>
     concept can_validate_code = requires(CodeVersionType code_adl,
                                          ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-                                         ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...> const& code_type,
+                                         ::std::size_t const function_index,
                                          ::std::byte const* code_begin,
                                          ::std::byte const* code_end,
                                          ::uwvm2::compiler::validation::error::code_validation_error_impl& err) {

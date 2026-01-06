@@ -81,11 +81,51 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline void validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
                               ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-                              ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...> const& code_type,
+                              ::std::size_t const function_index,
                               ::std::byte const* code_begin,
                               ::std::byte const* code_end,
                               ::uwvm2::compiler::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
+        // check
+        auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(module_storage.sections)};
+        static_assert(importsec.importdesc_count > 0uz);
+        auto const import_func_count{importsec.importdesc.index_unchecked(0u).size()};
+        if(function_index < import_func_count) [[unlikely]]
+        {
+            err.err_curr = code_begin;
+            err.err_selectable.not_local_function.function_index = function_index;
+            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
+        auto const local_func_idx{function_index - import_func_count};
+
+        auto const& funcsec{
+            ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::function_section_storage_t>(
+                module_storage.sections)};
+        auto const local_func_count{funcsec.funcs.size()};
+        if(local_func_idx >= local_func_count) [[unlikely]]
+        {
+            err.err_curr = code_begin;
+            err.err_selectable.invalid_function_index.function_index = function_index;
+            // this add will never overflow, because it has been validated in parsing.
+            err.err_selectable.invalid_function_index.all_function_size = import_func_count + local_func_count;
+            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
+        auto const& typesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::type_section_storage_t<Fs...>>(module_storage.sections)};
+
+        auto const& curr_func_type{typesec.types.index_unchecked(funcsec.funcs.index_unchecked(local_func_idx))};
+
+        auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>>(module_storage.sections)};
+
+        auto const& curr_code{codesec.codes.index_unchecked(local_func_idx)};
+        
+
         // stack
         operand_stack_type operand_stack{};
         bool is_polymorphic{};
@@ -297,6 +337,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::local_get:
                 {
+
                     break;
                 }
                 case wasm1_code::local_set:

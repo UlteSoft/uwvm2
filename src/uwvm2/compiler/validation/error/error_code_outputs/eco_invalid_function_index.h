@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-01-05
+ * @date        2026-01-06
  * @copyright   APL-2.0 License
  */
 
@@ -22,7 +22,7 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
-auto const& osuf{errout.err.err_selectable.operand_stack_underflow};
+auto const& ifi{errout.err.err_selectable.invalid_function_index};
 
 if constexpr(::std::same_as<char_type, char>)
 {
@@ -42,19 +42,15 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             ") Operand stack underflow: \"",
+                                                             ") Invalid function index: ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                             ifi.function_index,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             "\" requires ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.stack_size_required,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             " operand(s), but stack has ",
+                                                             " (all function count=",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             osuf.stack_size_actual,
+                                                             ifi.all_function_size,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ".",
+                                                             ").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -68,19 +64,15 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      "(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     ") Operand stack underflow: \"",
+                                                     ") Invalid function index: ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                     ifi.function_index,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     "\" requires ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     osuf.stack_size_required,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     " operand(s), but stack has ",
+                                                     " (all function count=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
-                                                     osuf.stack_size_actual,
+                                                     ifi.all_function_size,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ".",
+                                                     ").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -102,19 +94,15 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             L") Operand stack underflow: \"",
+                                                             L") Invalid function index: ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                             ifi.function_index,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L"\" requires ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.stack_size_required,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L" operand(s), but stack has ",
+                                                             L" (all function count=",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             osuf.stack_size_actual,
+                                                             ifi.all_function_size,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L".",
+                                                             L").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -128,19 +116,15 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     L") Operand stack underflow: \"",
+                                                     L") Invalid function index: ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                     ifi.function_index,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L"\" requires ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     osuf.stack_size_required,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L" operand(s), but stack has ",
+                                                     L" (all function count=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
-                                                     osuf.stack_size_actual,
+                                                     ifi.all_function_size,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L".",
+                                                     L").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -162,19 +146,15 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u8") Operand stack underflow: \"",
+                                                             u8") Invalid function index: ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.op_code_name,
+                                                             ifi.function_index,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8"\" requires ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.stack_size_required,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8" operand(s), but stack has ",
+                                                             u8" (all function count=",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             osuf.stack_size_actual,
+                                                             ifi.all_function_size,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8".",
+                                                             u8").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -188,19 +168,15 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u8") Operand stack underflow: \"",
+                                                     u8") Invalid function index: ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     osuf.op_code_name,
+                                                     ifi.function_index,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8"\" requires ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     osuf.stack_size_required,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8" operand(s), but stack has ",
+                                                     u8" (all function count=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_YELLOW),
-                                                     osuf.stack_size_actual,
+                                                     ifi.all_function_size,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8".",
+                                                     u8").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -222,19 +198,15 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u") Operand stack underflow: \"",
+                                                             u") Invalid function index: ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                             ifi.function_index,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u"\" requires ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.stack_size_required,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u" operand(s), but stack has ",
+                                                             u" (all function count=",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             osuf.stack_size_actual,
+                                                             ifi.all_function_size,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u".",
+                                                             u").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -248,19 +220,15 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u") Operand stack underflow: \"",
+                                                     u") Invalid function index: ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                     ifi.function_index,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u"\" requires ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     osuf.stack_size_required,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u" operand(s), but stack has ",
+                                                     u" (all function count=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
-                                                     osuf.stack_size_actual,
+                                                     ifi.all_function_size,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u".",
+                                                     u").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -282,19 +250,15 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             U") Operand stack underflow: \"",
+                                                             U") Invalid function index: ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                             ifi.function_index,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U"\" requires ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             osuf.stack_size_required,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U" operand(s), but stack has ",
+                                                             U" (all function count=",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             osuf.stack_size_actual,
+                                                             ifi.all_function_size,
                                                              UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U".",
+                                                             U").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -308,19 +272,15 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     U") Operand stack underflow: \"",
+                                                     U") Invalid function index: ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     ::fast_io::mnp::code_cvt(osuf.op_code_name),
+                                                     ifi.function_index,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U"\" requires ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     osuf.stack_size_required,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U" operand(s), but stack has ",
+                                                     U" (all function count=",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
-                                                     osuf.stack_size_actual,
+                                                     ifi.all_function_size,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U".",
+                                                     U").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }

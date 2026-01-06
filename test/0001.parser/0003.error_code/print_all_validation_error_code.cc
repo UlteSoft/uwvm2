@@ -52,7 +52,7 @@ int main()
     ::uwvm2::compiler::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
-    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32)};
+    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -82,6 +82,17 @@ int main()
             case ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32:
             {
                 errout.err.err_selectable.select_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
+            {
+                errout.err.err_selectable.not_local_function.function_index = 0uz;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index:
+            {
+                errout.err.err_selectable.invalid_function_index.function_index = 10uz;
+                errout.err.err_selectable.invalid_function_index.all_function_size = 5uz;
                 break;
             }
             default: break;

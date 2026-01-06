@@ -61,6 +61,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         operand_stack_underflow,
         select_type_mismatch,
         select_cond_type_not_i32,
+        not_local_function,
+        invalid_function_index,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -86,6 +88,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
     };
 
+    struct not_local_function_err_t
+    {
+        ::std::size_t function_index;
+    };
+
+    struct invalid_function_index_err_t
+    {
+        ::std::size_t function_index;
+        ::std::size_t all_function_size;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -97,6 +110,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         select_cond_type_not_i32_err_t select_cond_type_not_i32;
         static_assert(::std::is_trivially_copyable_v<select_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<select_cond_type_not_i32_err_t>);
+
+        not_local_function_err_t not_local_function;
+        static_assert(::std::is_trivially_copyable_v<not_local_function_err_t> && ::std::is_trivially_destructible_v<not_local_function_err_t>);
+
+        invalid_function_index_err_t invalid_function_index;
+        static_assert(::std::is_trivially_copyable_v<invalid_function_index_err_t> && ::std::is_trivially_destructible_v<invalid_function_index_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;
