@@ -78,6 +78,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
     using operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t>;
 
+    template <typename T>
+    struct fast_io_native_typed_global_allocator_guard
+    {
+        using allocator = ::fast_io::native_typed_global_allocator<T>;
+        T* ptr{};
+
+        inline constexpr fast_io_native_typed_global_allocator_guard() noexcept = default;
+
+        inline constexpr fast_io_native_typed_global_allocator_guard(T* o_ptr) noexcept : ptr{o_ptr} {}
+
+        inline constexpr fast_io_native_typed_global_allocator_guard(fast_io_native_typed_global_allocator_guard const&) = delete;
+        inline constexpr fast_io_native_typed_global_allocator_guard& operator= (fast_io_native_typed_global_allocator_guard const&) = delete;
+
+        inline constexpr fast_io_native_typed_global_allocator_guard(fast_io_native_typed_global_allocator_guard&& other) noexcept :
+            ptr{::std::exchange(other.ptr, nullptr)}
+        {
+        }
+
+        inline constexpr fast_io_native_typed_global_allocator_guard& operator= (fast_io_native_typed_global_allocator_guard&& other) noexcept
+        {
+            if(::std::addressof(other) == this) [[unlikely]] { return *this; }
+
+            // The deallocator performs internal null pointer checks.
+            allocator::deallocate(this->ptr);
+            this->ptr = ::std::exchange(other.ptr, nullptr);
+
+            return *this;
+        }
+
+        inline constexpr ~fast_io_native_typed_global_allocator_guard()
+        {
+            // The deallocator performs internal null pointer checks.
+            allocator::deallocate(this->ptr);
+        }
+    };
+
+    template <typename T>
+    struct fast_io_native_typed_thread_local_allocator_guard
+    {
+        using allocator = ::fast_io::native_typed_thread_local_allocator<T>;
+        T* ptr{};
+
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard() noexcept = default;
+
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard(T* o_ptr) noexcept : ptr{o_ptr} {}
+
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard(fast_io_native_typed_thread_local_allocator_guard const&) = delete;
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard& operator= (fast_io_native_typed_thread_local_allocator_guard const&) = delete;
+
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard(fast_io_native_typed_thread_local_allocator_guard&& other) noexcept :
+            ptr{::std::exchange(other.ptr, nullptr)}
+        {
+        }
+
+        inline constexpr fast_io_native_typed_thread_local_allocator_guard& operator= (fast_io_native_typed_thread_local_allocator_guard&& other) noexcept
+        {
+            if(::std::addressof(other) == this) [[unlikely]] { return *this; }
+
+            // The deallocator performs internal null pointer checks.
+            allocator::deallocate(this->ptr);
+            this->ptr = ::std::exchange(other.ptr, nullptr);
+
+            return *this;
+        }
+
+        inline constexpr ~fast_io_native_typed_thread_local_allocator_guard()
+        {
+            // The deallocator performs internal null pointer checks.
+            allocator::deallocate(this->ptr);
+        }
+    };
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline void validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
                               ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
@@ -124,7 +196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
             ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Fs...>>(module_storage.sections)};
 
         auto const& curr_code{codesec.codes.index_unchecked(local_func_idx)};
-        
+        auto const& curr_code_locals{curr_code.locals};
 
         // stack
         operand_stack_type operand_stack{};
