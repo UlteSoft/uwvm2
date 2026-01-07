@@ -146,6 +146,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    using block_result_type = ::uwvm2::parser::wasm::standard::wasm1::features::final_result_type<Fs...>;
+
+    enum class block_type : unsigned
+    {
+        function,
+        block,
+        loop,
+        if_,
+        else_
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    struct block_t
+    {
+        block_result_type<Fs...> result{};
+        block_type type{};
+    };
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline void validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version,
                               ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
                               ::std::size_t const function_index,
@@ -235,11 +254,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         // all_memory_count never overflow and never exceed the max of u32 (validated by parser limits)
         auto const all_memory_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_memory_count + local_memory_count)};
 
-        // stack
+        // control-flow stack
+        using curr_block_type = block_t<Fs...>;
+        ::uwvm2::utils::container::vector<curr_block_type> control_flow_stack{};
+
+        // operand stack
         using curr_operand_stack_value_type = operand_stack_value_type<Fs...>;
         using curr_operand_stack_type = operand_stack_type<Fs...>;
         curr_operand_stack_type operand_stack{};
         bool is_polymorphic{};
+
+        // function block
+        control_flow_stack.push_back({.result = curr_func_type.parameter, .type = block_type::function});
 
         // start parse the code
         auto code_curr{code_begin};
