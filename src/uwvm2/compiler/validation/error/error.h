@@ -58,6 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ok = 0u,
         missing_end,
         missing_block_type,
+        illegal_block_type,
         illegal_opbase,
         operand_stack_underflow,
         select_type_mismatch,

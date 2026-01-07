@@ -70,6 +70,11 @@ int main()
             {
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type:
+            {
+                errout.err.err_selectable.u8 = 0x7Fu;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow:
             {
                 errout.err.err_selectable.operand_stack_underflow.op_code_name = u8"select";

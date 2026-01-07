@@ -425,7 +425,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                 // Unknown blocktype encoding; treat as invalid code.
                                 err.err_curr = op_begin;
                                 err.err_selectable.u8 = blocktype_byte;
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
@@ -514,7 +514,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             {
                                 err.err_curr = op_begin;
                                 err.err_selectable.u8 = blocktype_byte;
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
