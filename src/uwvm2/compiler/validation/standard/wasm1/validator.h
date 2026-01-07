@@ -257,9 +257,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
             {
                 case wasm1_code::unreachable:
                 {
-                    // unreachable make operand_stack polymorphic
+                    // `unreachable` makes the operand stack "polymorphic" (per Wasm validation rules):
+                    // after an unreachable point, the following instructions are type-checked under the
+                    // assumption that any required operands can be popped (and any results pushed),
+                    // because this code path will not execute at runtime; this suppresses false
+                    // operand-stack underflow/type errors until the control-flow merges/ends.
 
-                    /// @todo
+                    // unreachable ...
+                    // [   safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    ++code_curr;
+
+                    // unreachable ...
+                    // [   safe  ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    is_polymorphic = true;
+
                     break;
                 }
                 case wasm1_code::nop:
