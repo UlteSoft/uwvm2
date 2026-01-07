@@ -65,6 +65,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         local_tee_type_mismatch,
         invalid_global_index,
         illegal_global_index,
+        immutable_global_set,
+        global_set_type_mismatch,
         not_local_function,
         invalid_function_index,
         invalid_local_index,
@@ -97,6 +99,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
     struct local_variable_type_mismatch_err_t
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 local_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct immutable_global_set_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;
+    };
+
+    struct global_variable_type_mismatch_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
     };
@@ -137,7 +151,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         static_assert(::std::is_trivially_copyable_v<select_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<select_cond_type_not_i32_err_t>);
 
         local_variable_type_mismatch_err_t local_variable_type_mismatch;
-        static_assert(::std::is_trivially_copyable_v<local_variable_type_mismatch_err_t> && ::std::is_trivially_destructible_v<local_variable_type_mismatch_err_t>);
+        static_assert(::std::is_trivially_copyable_v<local_variable_type_mismatch_err_t> &&
+                      ::std::is_trivially_destructible_v<local_variable_type_mismatch_err_t>);
 
         not_local_function_err_t not_local_function;
         static_assert(::std::is_trivially_copyable_v<not_local_function_err_t> && ::std::is_trivially_destructible_v<not_local_function_err_t>);
@@ -150,6 +165,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         illegal_global_index_err_t illegal_global_index;
         static_assert(::std::is_trivially_copyable_v<illegal_global_index_err_t> && ::std::is_trivially_destructible_v<illegal_global_index_err_t>);
+
+        immutable_global_set_err_t immutable_global_set;
+        static_assert(::std::is_trivially_copyable_v<immutable_global_set_err_t> && ::std::is_trivially_destructible_v<immutable_global_set_err_t>);
+
+        global_variable_type_mismatch_err_t global_variable_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<global_variable_type_mismatch_err_t> &&
+                      ::std::is_trivially_destructible_v<global_variable_type_mismatch_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

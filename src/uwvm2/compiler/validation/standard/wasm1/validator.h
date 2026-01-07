@@ -226,6 +226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto const all_global_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_global_count + local_global_count)};
 
         // stack
+        using curr_operand_stack_value_type = operand_stack_value_type<Fs...>;
         using curr_operand_stack_type = operand_stack_type<Fs...>;
         curr_operand_stack_type operand_stack{};
         bool is_polymorphic{};
@@ -808,7 +809,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    operand_stack_value_type curr_global_type{};
+                    curr_operand_stack_value_type curr_global_type{};
                     if(global_index < imported_global_count)
                     {
                         auto const imported_global_ptr{imported_globals.index_unchecked(global_index)};
@@ -819,8 +820,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     }
                     else
                     {
-                        auto const local_global_index{
-                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(global_index - imported_global_count)};
+                        auto const local_global_index{global_index - imported_global_count};
                         curr_global_type = globalsec.local_globals.index_unchecked(local_global_index).global.type;
                     }
 
@@ -830,6 +830,116 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::global_set:
                 {
+                    // global.set ...
+                    // [  safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // global.set ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // global.set global_index ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+                    auto const [global_index_next, global_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                              ::fast_io::mnp::leb128_get(global_index))};
+
+                    if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
+                    }
+
+                    // global.set global_index ...
+                    // [     safe            ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(global_index_next);
+
+                    // global.set global_index ...
+                    // [      safe           ] unsafe (could be the section_end)
+                    //                         ^^ code_curr
+
+                    // Validate global_index range (imports + local globals)
+                    if(global_index >= all_global_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_global_index.global_index = global_index;
+                        err.err_selectable.illegal_global_index.all_global_count = all_global_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Resolve the global's value type and mutability for global.set
+                    curr_operand_stack_value_type curr_global_type{};
+
+                    bool curr_global_mutable{};
+                    if(global_index < imported_global_count)
+                    {
+                        auto const imported_global_ptr{imported_globals.index_unchecked(global_index)};
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        if(imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+                        auto const& imported_global{imported_global_ptr->imports.storage.global};
+                        curr_global_type = imported_global.type;
+                        curr_global_mutable = imported_global.is_mutable;
+                    }
+                    else
+                    {
+                        auto const local_global_index{global_index - imported_global_count};
+                        auto const& local_global{globalsec.local_globals.index_unchecked(local_global_index).global};
+                        curr_global_type = local_global.type;
+                        curr_global_mutable = local_global.is_mutable;
+                    }
+
+                    // global.set requires the target global to be mutable (immutable globals cannot be written)
+                    if(!curr_global_mutable) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.immutable_global_set.global_index = global_index;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::immutable_global_set;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (value) -> () where value must match global's value type
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.empty()) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"global.set";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(value.type != curr_global_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.global_variable_type_mismatch.global_index = global_index;
+                            err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
+                            err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::global_set_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
                     break;
                 }
                 case wasm1_code::i32_load:

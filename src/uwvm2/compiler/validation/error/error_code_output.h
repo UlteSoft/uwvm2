@@ -128,6 +128,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_illegal_global_index.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::immutable_global_set:
+            {
+#include "error_code_outputs/eco_immutable_global_set.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::global_set_type_mismatch:
+            {
+#include "error_code_outputs/eco_global_set_type_mismatch.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

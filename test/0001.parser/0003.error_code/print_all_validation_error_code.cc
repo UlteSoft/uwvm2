@@ -108,6 +108,18 @@ int main()
                 errout.err.err_selectable.illegal_global_index.all_global_count = 5u;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::immutable_global_set:
+            {
+                errout.err.err_selectable.immutable_global_set.global_index = 2u;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::global_set_type_mismatch:
+            {
+                errout.err.err_selectable.global_variable_type_mismatch.global_index = 9u;
+                errout.err.err_selectable.global_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                errout.err.err_selectable.global_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
                 errout.err.err_selectable.not_local_function.function_index = 0uz;
