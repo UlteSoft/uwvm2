@@ -568,7 +568,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             tem_local_index -= local_part.count;
                         }
 
-                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                        if(!found_local) [[unlikely]]
+                        {
+                            // Inconsistency between `all_local_count` and the locals vector; treat as invalid code.
+                            err.err_curr = op_begin;
+                            err.err_selectable.illegal_local_index.local_index = local_index;
+                            err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                     }
 
                     // local.get always pushes one value of the local's type (even in polymorphic mode)
@@ -655,7 +663,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             tem_local_index -= local_part.count;
                         }
 
-                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                        if(!found_local) [[unlikely]]
+                        {
+                            // Inconsistency between `all_local_count` and the locals vector; treat as invalid code.
+                            err.err_curr = op_begin;
+                            err.err_selectable.illegal_local_index.local_index = local_index;
+                            err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                     }
 
                     if(operand_stack.empty()) [[unlikely]]
@@ -768,7 +784,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             tem_local_index -= local_part.count;
                         }
 
-                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                        if(!found_local) [[unlikely]]
+                        {
+                            // Inconsistency between `all_local_count` and the locals vector; treat as invalid code.
+                            err.err_curr = op_begin;
+                            err.err_selectable.illegal_local_index.local_index = local_index;
+                            err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                     }
 
                     if(operand_stack.empty()) [[unlikely]]
@@ -782,6 +806,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                        else
+                        {
+                            // In polymorphic mode, `local.tee` still produces a value of the local's type.
+                            // pop t (dismiss), push t (here)
+                            operand_stack.push_back({curr_local_type});
                         }
                     }
                     else
@@ -1104,7 +1134,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
                     }
 
-                    operand_stack.push_back_unchecked({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
+                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
                     break;
                 }
                 case wasm1_code::i64_load:
@@ -1218,7 +1248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
                     }
 
-                    operand_stack.push_back_unchecked({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64});
+                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64});
                     break;
                 }
                 case wasm1_code::f32_load:
@@ -1332,7 +1362,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
                     }
 
-                    operand_stack.push_back_unchecked({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32});
+                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32});
                     break;
                 }
                 case wasm1_code::f64_load:
@@ -1446,7 +1476,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
                     }
 
-                    operand_stack.push_back_unchecked({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64});
+                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64});
                     break;
                 }
                 case wasm1_code::i32_load8_s:
