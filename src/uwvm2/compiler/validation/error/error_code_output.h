@@ -118,6 +118,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_local_tee_type_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index:
+            {
+#include "error_code_outputs/eco_invalid_global_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index:
+            {
+#include "error_code_outputs/eco_illegal_global_index.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

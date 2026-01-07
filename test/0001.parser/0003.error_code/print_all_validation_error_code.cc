@@ -98,6 +98,16 @@ int main()
                 errout.err.err_selectable.local_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index:
+            {
+                errout.err.err_selectable.illegal_global_index.global_index = 10u;
+                errout.err.err_selectable.illegal_global_index.all_global_count = 5u;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
                 errout.err.err_selectable.not_local_function.function_index = 0uz;

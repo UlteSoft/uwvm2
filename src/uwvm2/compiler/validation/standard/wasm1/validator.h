@@ -216,6 +216,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         }
 #endif
 
+        auto const& globalsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+            ::uwvm2::parser::wasm::standard::wasm1::features::global_section_storage_t<Fs...>>(module_storage.sections)};
+        static_assert(importsec.importdesc_count > 3uz);
+        auto const& imported_globals{importsec.importdesc.index_unchecked(3u)};
+        auto const imported_global_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_globals.size())};
+        auto const local_global_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(globalsec.local_globals.size())};
+        // all_global_count never overflow and never exceed the max of u32 (validated by parser limits)
+        auto const all_global_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(imported_global_count + local_global_count)};
+
         // stack
         using curr_operand_stack_type = operand_stack_type<Fs...>;
         curr_operand_stack_type operand_stack{};
@@ -747,6 +756,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::global_get:
                 {
+                    // global.get ...
+                    // [  safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // global.get ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // global.get global_index ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+                    auto const [global_index_next, global_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                              ::fast_io::mnp::leb128_get(global_index))};
+
+                    if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
+                    }
+
+                    // global.get global_index ...
+                    // [     safe            ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(global_index_next);
+
+                    // global.get global_index ...
+                    // [      safe           ] unsafe (could be the section_end)
+                    //                         ^^ code_curr
+
+                    // check the global_index is valid
+                    if(global_index >= all_global_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_global_index.global_index = global_index;
+                        err.err_selectable.illegal_global_index.all_global_count = all_global_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack_value_type curr_global_type{};
+                    if(global_index < imported_global_count)
+                    {
+                        auto const imported_global_ptr{imported_globals.index_unchecked(global_index)};
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        if(imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+                        curr_global_type = imported_global_ptr->imports.storage.global.type;
+                    }
+                    else
+                    {
+                        auto const local_global_index{
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(global_index - imported_global_count)};
+                        curr_global_type = globalsec.local_globals.index_unchecked(local_global_index).global.type;
+                    }
+
+                    if(!is_polymorphic) { operand_stack.push_back({curr_global_type}); }
+
                     break;
                 }
                 case wasm1_code::global_set:

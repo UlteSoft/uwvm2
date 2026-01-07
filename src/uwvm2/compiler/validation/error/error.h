@@ -63,6 +63,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         select_cond_type_not_i32,
         local_set_type_mismatch,
         local_tee_type_mismatch,
+        invalid_global_index,
+        illegal_global_index,
         not_local_function,
         invalid_function_index,
         invalid_local_index,
@@ -116,6 +118,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_local_count;
     };
 
+    struct illegal_global_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_global_count;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -139,6 +147,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         illegal_local_index_err_t illegal_local_index;
         static_assert(::std::is_trivially_copyable_v<illegal_local_index_err_t> && ::std::is_trivially_destructible_v<illegal_local_index_err_t>);
+
+        illegal_global_index_err_t illegal_global_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_global_index_err_t> && ::std::is_trivially_destructible_v<illegal_global_index_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;
