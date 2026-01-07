@@ -265,7 +265,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
 
-            // opbase [opextent|code] ...
+            // opbase ...
             // [safe] unsafe (could be the section_end)
             // ^^ code_curr
 
@@ -384,9 +384,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [safe] unsafe (could be the section_end)
                     //        ^^ code_curr
 
-                    if(!is_polymorphic)
+                    if(operand_stack.empty()) [[unlikely]]
                     {
-                        if(operand_stack.empty()) [[unlikely]]
+                        // Polymorphic stack: underflow is allowed, so drop becomes a no-op on the concrete stack.
+                        if(!is_polymorphic)
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
@@ -395,7 +396,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
-
+                    }
+                    else
+                    {
                         operand_stack.pop_back_unchecked();
                     }
 
@@ -419,45 +422,70 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [safe] unsafe (could be the section_end)
                     //        ^^ code_curr
 
-                    if(!is_polymorphic)
-                    {
-                        if(operand_stack.size() < 3uz) [[unlikely]]
-                        {
-                            err.err_curr = op_begin;
-                            err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
-                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-                            err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
+                    // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
+                    // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
 
+                    if(!is_polymorphic && operand_stack.size() < 3uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // cond (must be i32 if it exists on the concrete stack)
+                    bool cond_from_stack{};
+                    curr_operand_stack_value_type cond_type{};
+                    if(!operand_stack.empty())
+                    {
                         auto const cond{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
+                        cond_from_stack = true;
+                        cond_type = cond.type;
+                    }
 
+                    if(cond_from_stack && cond_type != curr_operand_stack_type::i32) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // v2
+                    bool v2_from_stack{};
+                    curr_operand_stack_value_type v2_type{};
+                    if(!operand_stack.empty())
+                    {
                         auto const v2{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
-
-                        auto const v1{operand_stack.back_unchecked()};
-                        // select need same type for v1 and v2, no necessary to pop and push back
-
-                        if(cond.type != curr_operand_stack_type::i32) [[unlikely]]
-                        {
-                            err.err_curr = op_begin;
-                            err.err_selectable.select_cond_type_not_i32.cond_type = cond.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
-
-                        // select need same type for v1 and v2
-                        if(v1.type != v2.type) [[unlikely]]
-                        {
-                            err.err_curr = op_begin;
-                            err.err_selectable.select_type_mismatch.type_v1 = v1.type;
-                            err.err_selectable.select_type_mismatch.type_v2 = v2.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
+                        v2_from_stack = true;
+                        v2_type = v2.type;
                     }
+
+                    // v1 (kept as result when present, matching existing implementation)
+                    bool v1_from_stack{};
+                    curr_operand_stack_value_type v1_type{};
+                    if(!operand_stack.empty())
+                    {
+                        auto const v1{operand_stack.back_unchecked()};
+                        v1_from_stack = true;
+                        v1_type = v1.type;
+                    }
+
+                    if(v1_from_stack && v2_from_stack && v1_type != v2_type) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.select_type_mismatch.type_v1 = v1_type;
+                        err.err_selectable.select_type_mismatch.type_v2 = v2_type;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // If v1 is not present on the concrete stack but v2 is, we must still produce one result of v2's type.
+                    if(!v1_from_stack && v2_from_stack) { operand_stack.push_back({v2_type}); }
 
                     break;
                 }
@@ -543,7 +571,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                     }
 
-                    if(!is_polymorphic) { operand_stack.push_back({curr_local_type}); }
+                    // local.get always pushes one value of the local's type (even in polymorphic mode)
+                    operand_stack.push_back({curr_local_type});
 
                     break;
                 }
@@ -629,9 +658,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                     }
 
-                    if(!is_polymorphic)
+                    if(operand_stack.empty()) [[unlikely]]
                     {
-                        if(operand_stack.empty()) [[unlikely]]
+                        // Polymorphic stack: underflow is allowed, so local.set becomes a no-op on the concrete stack.
+                        if(!is_polymorphic)
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"local.set";
@@ -640,7 +670,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
-
+                    }
+                    else
+                    {
                         auto const value{operand_stack.back_unchecked()};
                         if(value.type != curr_local_type) [[unlikely]]
                         {
@@ -739,9 +771,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
                     }
 
-                    if(!is_polymorphic)
+                    if(operand_stack.empty()) [[unlikely]]
                     {
-                        if(operand_stack.empty()) [[unlikely]]
+                        // Polymorphic stack: underflow is allowed.
+                        if(!is_polymorphic)
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"local.tee";
@@ -750,7 +783,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
-
+                    }
+                    else
+                    {
                         auto const value{operand_stack.back_unchecked()};
                         if(value.type != curr_local_type) [[unlikely]]
                         {
@@ -834,7 +869,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         curr_global_type = globalsec.local_globals.index_unchecked(local_global_index).global.type;
                     }
 
-                    if(!is_polymorphic) { operand_stack.push_back({curr_global_type}); }
+                    // global.get always pushes one value of the global's type (even in polymorphic mode)
+                    operand_stack.push_back({curr_global_type});
 
                     break;
                 }
@@ -924,9 +960,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     }
 
                     // Stack effect: (value) -> () where value must match global's value type
-                    if(!is_polymorphic)
+                    if(operand_stack.empty()) [[unlikely]]
                     {
-                        if(operand_stack.empty()) [[unlikely]]
+                        // Polymorphic stack: underflow is allowed, so global.set becomes a no-op on the concrete stack.
+                        if(!is_polymorphic)
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"global.set";
@@ -935,7 +972,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
-
+                    }
+                    else
+                    {
                         auto const value{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
 
