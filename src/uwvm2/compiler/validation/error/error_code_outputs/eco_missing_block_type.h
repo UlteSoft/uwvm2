@@ -22,11 +22,6 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
-auto const& manti{errout.err.err_selectable.memarg_address_type_not_i32};
-
-auto const actual_type_name{
-    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(manti.addr_type))};
-
 if constexpr(::std::same_as<char_type, char>)
 {
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -45,19 +40,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             ") Memory address type mismatch for ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ": expected ",
-                                                             UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             "i32",
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ", actual ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             actual_type_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             ".",
+                                                             ") Missing block type for block/loop/if instruction.",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -71,19 +54,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      "(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     ") Memory address type mismatch for ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ": expected ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
-                                                     "i32",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ", actual ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     actual_type_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     ".",
+                                                     ") Missing block type for block/loop/if instruction.",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
     return;
 }
@@ -105,19 +76,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             L") Memory address type mismatch for ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L": expected ",
-                                                             UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             L"i32",
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L", actual ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             actual_type_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             L".",
+                                                             L") Missing block type for block/loop/if instruction.",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -131,19 +90,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     L") Memory address type mismatch for ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L": expected ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
-                                                     L"i32",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L", actual ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     actual_type_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                     L".",
+                                                     L") Missing block type for block/loop/if instruction.",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -165,19 +112,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u8") Memory address type mismatch for ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             manti.op_code_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8": expected ",
-                                                             UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             u8"i32",
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8", actual ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             actual_type_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u8".",
+                                                             u8") Missing block type for block/loop/if instruction.",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -191,19 +126,7 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u8") Memory address type mismatch for ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     manti.op_code_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8": expected ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_YELLOW),
-                                                     u8"i32",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8", actual ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     actual_type_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                     u8".",
+                                                     u8") Missing block type for block/loop/if instruction.",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -225,19 +148,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u") Memory address type mismatch for ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u": expected ",
-                                                             UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             u"i32",
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u", actual ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             actual_type_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             u".",
+                                                             u") Missing block type for block/loop/if instruction.",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -251,19 +162,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u") Memory address type mismatch for ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u": expected ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
-                                                     u"i32",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u", actual ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     actual_type_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                     u".",
+                                                     u") Missing block type for block/loop/if instruction.",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -285,19 +184,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             U") Memory address type mismatch for ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U": expected ",
-                                                             UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             U"i32",
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U", actual ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             actual_type_name,
-                                                             UWVM_WIN32_TEXTATTR_WHITE,
-                                                             U".",
+                                                             U") Missing block type for block/loop/if instruction.",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -311,19 +198,8 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     U") Memory address type mismatch for ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     ::fast_io::mnp::code_cvt(manti.op_code_name),
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U": expected ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
-                                                     U"i32",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U", actual ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     actual_type_name,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                     U".",
+                                                     U") Missing block type for block/loop/if instruction.",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }
+

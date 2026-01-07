@@ -66,6 +66,10 @@ int main()
                 errout.err.err_selectable.u8 = 0xFFu;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type:
+            {
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow:
             {
                 errout.err.err_selectable.operand_stack_underflow.op_code_name = u8"select";

@@ -88,6 +88,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_missing_end.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type:
+            {
+#include "error_code_outputs/eco_missing_block_type.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase:
             {
 #include "error_code_outputs/eco_illegal_opbase.h"

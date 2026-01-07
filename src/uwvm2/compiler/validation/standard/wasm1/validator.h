@@ -161,7 +161,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
     struct block_t
     {
         block_result_type<Fs...> result{};
+        ::std::size_t operand_stack_base{};
         block_type type{};
+        bool polymorphic_base{};
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -264,8 +266,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         curr_operand_stack_type operand_stack{};
         bool is_polymorphic{};
 
-        // function block
-        control_flow_stack.push_back({.result = curr_func_type.parameter, .type = block_type::function});
+        // function block (label/result type is the function result)
+        control_flow_stack.push_back({.result = curr_func_type.result, .type = block_type::function, .operand_stack_base = 0uz, .polymorphic_base = false});
 
         // start parse the code
         auto code_curr{code_begin};
@@ -339,7 +341,102 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::block:
                 {
-                    /// @todo
+                    // block  blocktype ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // block  blocktype ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // block  blocktype ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ op_begin
+
+                    if(code_curr == code_end) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
+                    }
+
+                    // block blocktype ...
+                    // [     safe    ] unsafe (could be the section_end)
+                    //       ^^ op_begin
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte blocktype_byte;  // No initialization necessary
+                    ::std::memcpy(::std::addressof(blocktype_byte), code_curr, sizeof(blocktype_byte));
+
+                    ++code_curr;
+
+                    // block blocktype ...
+                    // [     safe    ] unsafe (could be the section_end)
+                    //                 ^^ op_begin
+
+                    // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
+                    block_result_type<Fs...> block_result{};
+
+                    using value_type_enum = curr_operand_stack_value_type;
+                    static constexpr value_type_enum i32_result_arr[1u]{
+                        static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)};
+                    static constexpr value_type_enum i64_result_arr[1u]{
+                        static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64)};
+                    static constexpr value_type_enum f32_result_arr[1u]{
+                        static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32)};
+                    static constexpr value_type_enum f64_result_arr[1u]{
+                        static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
+
+                    if(blocktype_byte == 0x40u)
+                    {
+                        // empty result
+                        block_result = {};
+                    }
+                    else
+                    {
+                        switch(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(blocktype_byte))
+                        {
+                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32:
+                            {
+                                block_result.begin = i32_result_arr;
+                                block_result.end = i32_result_arr + 1u;
+                                break;
+                            }
+                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64:
+                            {
+                                block_result.begin = i64_result_arr;
+                                block_result.end = i64_result_arr + 1u;
+                                break;
+                            }
+                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32:
+                            {
+                                block_result.begin = f32_result_arr;
+                                block_result.end = f32_result_arr + 1u;
+                                break;
+                            }
+                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64:
+                            {
+                                block_result.begin = f64_result_arr;
+                                block_result.end = f64_result_arr + 1u;
+                                break;
+                            }
+                            default:
+                            {
+                                // Unknown blocktype encoding; treat as invalid code.
+                                err.err_curr = op_begin;
+                                err.err_selectable.u8 = blocktype_byte;
+                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            }
+                        }
+                    }
+
+                    control_flow_stack.push_back(
+                        {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::block, .polymorphic_base = is_polymorphic});
+
                     break;
                 }
                 case wasm1_code::loop:
