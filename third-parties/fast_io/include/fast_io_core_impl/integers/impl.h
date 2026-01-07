@@ -626,6 +626,32 @@ inline constexpr auto funcvw(scalar_type *t) noexcept
 }
 
 template <bool uppercase = false, typename scalar_type>
+	requires(::std::is_member_object_pointer_v<scalar_type>)
+inline constexpr auto fieldptrvw(scalar_type t) noexcept
+{
+	if constexpr (sizeof(t) == sizeof(::fast_io::manipulators::member_function_pointer_holder_t))
+	{
+		return ::fast_io::details::scalar_flags_int_cache<
+			::fast_io::details::base_mani_flags_cache<16, uppercase, true, true, false>>(
+			::std::bit_cast<::fast_io::manipulators::member_function_pointer_holder_t>(t));
+	}
+	else
+	{
+		using equivalentsizetype = ::std::conditional_t<
+			sizeof(scalar_type) == sizeof(::std::size_t), ::std::size_t,
+			::std::conditional_t<sizeof(scalar_type) == sizeof(::std::uint_least64_t),
+								 ::std::uint_least64_t,
+								 ::std::conditional_t<sizeof(scalar_type) == sizeof(::std::uint_least32_t),
+													  ::std::uint_least32_t,
+													  ::std::conditional_t<sizeof(scalar_type) == sizeof(::std::uint_least16_t),
+																		   ::std::uint_least16_t,
+																		   ::std::uint_least8_t>>>>;
+		return ::fast_io::details::scalar_flags_int_cache<
+			::fast_io::details::base_mani_flags_cache<16, uppercase, true, true, false>>(::std::bit_cast<equivalentsizetype>(t));
+	}
+}
+
+template <bool uppercase = false, typename scalar_type>
 	requires(::std::is_member_function_pointer_v<scalar_type> && (sizeof(scalar_type) % sizeof(::std::size_t) == 0))
 inline constexpr auto methodvw(scalar_type t) noexcept
 {

@@ -270,7 +270,7 @@ inline
 #endif
 void yield() noexcept
 {
-	__wasi_sched_yield();
+	(void)__wasi_sched_yield();
 }
 
 } // namespace this_thread
