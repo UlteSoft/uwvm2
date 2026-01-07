@@ -108,6 +108,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_select_cond_type_not_i32.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
+            {
+#include "error_code_outputs/eco_local_set_type_mismatch.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_tee_type_mismatch:
+            {
+#include "error_code_outputs/eco_local_tee_type_mismatch.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

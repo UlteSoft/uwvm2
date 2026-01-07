@@ -514,10 +514,220 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::local_set:
                 {
+                    // local.set ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // local.set ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // local.set local_index ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 local_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+                    auto const [local_index_next, local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                            ::fast_io::mnp::leb128_get(local_index))};
+
+                    if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
+                    }
+
+                    // local.set local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(local_index_next);
+
+                    // local.set local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //                       ^^ code_curr
+
+                    // check the local_index is valid
+                    if(local_index >= all_local_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_local_index.local_index = local_index;
+                        err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_type curr_local_type{};
+
+                    if(local_index < func_parameter_count_u32)
+                    {
+                        // function parameter
+                        curr_local_type = func_parameter_begin[local_index];
+                    }
+                    else
+                    {
+                        // function defined local variable
+                        auto tem_local_index{local_index - func_parameter_count_u32};
+
+                        bool found_local{};
+                        for(auto const& local_part: curr_code_locals)
+                        {
+                            if(tem_local_index < local_part.count)
+                            {
+                                curr_local_type = local_part.type;
+                                found_local = true;
+                                break;
+                            }
+
+                            tem_local_index -= local_part.count;
+                        }
+
+                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    }
+
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.empty()) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.set";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        if(value.type != curr_local_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.local_variable_type_mismatch.local_index = local_index;
+                            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
+                            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        operand_stack.pop_back_unchecked();
+                    }
+
                     break;
                 }
                 case wasm1_code::local_tee:
                 {
+                    // local.tee ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // local.tee ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // local.tee local_index ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 local_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    // No explicit checking required because ::fast_io::parse_by_scan self-checking (::fast_io::parse_code::end_of_file)
+                    auto const [local_index_next, local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                            ::fast_io::mnp::leb128_get(local_index))};
+
+                    if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
+                    }
+
+                    // local.tee local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(local_index_next);
+
+                    // local.tee local_index ...
+                    // [     safe          ] unsafe (could be the section_end)
+                    //                       ^^ code_curr
+
+                    // check the local_index is valid
+                    if(local_index >= all_local_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_local_index.local_index = local_index;
+                        err.err_selectable.illegal_local_index.all_local_count = all_local_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_type curr_local_type{};
+
+                    if(local_index < func_parameter_count_u32)
+                    {
+                        // function parameter
+                        curr_local_type = func_parameter_begin[local_index];
+                    }
+                    else
+                    {
+                        // function defined local variable
+                        auto tem_local_index{local_index - func_parameter_count_u32};
+
+                        bool found_local{};
+                        for(auto const& local_part: curr_code_locals)
+                        {
+                            if(tem_local_index < local_part.count)
+                            {
+                                curr_local_type = local_part.type;
+                                found_local = true;
+                                break;
+                            }
+
+                            tem_local_index -= local_part.count;
+                        }
+
+                        if(!found_local) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    }
+
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.empty()) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.tee";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        if(value.type != curr_local_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.local_variable_type_mismatch.local_index = local_index;
+                            err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
+                            err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::local_tee_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
                     break;
                 }
                 case wasm1_code::global_get:

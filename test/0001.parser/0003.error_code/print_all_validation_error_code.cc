@@ -84,6 +84,20 @@ int main()
                 errout.err.err_selectable.select_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
+            {
+                errout.err.err_selectable.local_variable_type_mismatch.local_index = 3u;
+                errout.err.err_selectable.local_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                errout.err.err_selectable.local_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_tee_type_mismatch:
+            {
+                errout.err.err_selectable.local_variable_type_mismatch.local_index = 7u;
+                errout.err.err_selectable.local_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
+                errout.err.err_selectable.local_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
                 errout.err.err_selectable.not_local_function.function_index = 0uz;
