@@ -137,6 +137,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         capi_function_vec_t capi_function_vec{};
     };
 
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+    // the wasm_dl_t only supported on the platform which make the UWVM_SUPPORT_PRELOAD_DL macro defined
     struct wasm_dl_t
     {
         // wasm file name
@@ -150,6 +152,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         // wasm_parameter_t
         ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
     };
+#endif
 }  // namespace uwvm2::uwvm::wasm::storage
 
 #ifndef UWVM_MODULE
