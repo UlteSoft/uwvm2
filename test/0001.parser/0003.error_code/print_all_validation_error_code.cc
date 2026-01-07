@@ -122,6 +122,9 @@ int main()
             }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory:
             {
+                errout.err.err_selectable.no_memory.op_code_name = u8"i32.load8_s";
+                errout.err.err_selectable.no_memory.align = 0u;
+                errout.err.err_selectable.no_memory.offset = 123u;
                 break;
             }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align:

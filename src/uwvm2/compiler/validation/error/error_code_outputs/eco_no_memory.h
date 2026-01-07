@@ -22,6 +22,8 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
+auto const& nm{errout.err.err_selectable.no_memory};
+
 if constexpr(::std::same_as<char_type, char>)
 {
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
@@ -40,22 +42,24 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             ") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                             ") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                             nm.align,
+                                                             ", memoffset=",
+                                                             nm.offset,
+                                                             ").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
     }
 #endif
     ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL UWVM_AES_WHITE),
-                                                     "uwvm: ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RED),
-                                                     "[error] ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                     "(offset=",
+                                                     "uwvm: [error] (offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     ") Memory instruction requires at least one memory, but the module defines/imports none.",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_RST_ALL));
+                                                     ") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                     nm.align,
+                                                     ", memoffset=",
+                                                     nm.offset,
+                                                     ").");
     return;
 }
 else if constexpr(::std::same_as<char_type, wchar_t>)
@@ -76,7 +80,11 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             L") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                             L") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                             nm.align,
+                                                             L", memoffset=",
+                                                             nm.offset,
+                                                             L").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -90,7 +98,11 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     L") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                     L") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                     nm.align,
+                                                     L", memoffset=",
+                                                     nm.offset,
+                                                     L").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_RST_ALL));
     return;
 }
@@ -112,7 +124,11 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u8") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                             u8") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                             nm.align,
+                                                             u8", memoffset=",
+                                                             nm.offset,
+                                                             u8").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -126,7 +142,11 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u8") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                     u8") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                     nm.align,
+                                                     u8", memoffset=",
+                                                     nm.offset,
+                                                     u8").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_RST_ALL));
     return;
 }
@@ -148,7 +168,11 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                             u") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                             nm.align,
+                                                             u", memoffset=",
+                                                             nm.offset,
+                                                             u").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -162,7 +186,11 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                     u") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                     nm.align,
+                                                     u", memoffset=",
+                                                     nm.offset,
+                                                     u").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_RST_ALL));
     return;
 }
@@ -184,7 +212,11 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             U") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                             U") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                             nm.align,
+                                                             U", memoffset=",
+                                                             nm.offset,
+                                                             U").",
                                                              UWVM_WIN32_TEXTATTR_RST_ALL);
             return;
         }
@@ -198,8 +230,11 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     U") Memory instruction requires at least one memory, but the module defines/imports none.",
+                                                     U") Memory instruction requires at least one memory, but the module defines/imports none (align=",
+                                                     nm.align,
+                                                     U", memoffset=",
+                                                     nm.offset,
+                                                     U").",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_RST_ALL));
     return;
 }
-

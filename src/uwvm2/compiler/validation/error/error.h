@@ -127,6 +127,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 max_align;
     };
 
+    struct no_memory_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;
+    };
+
     struct memarg_address_type_not_i32_err_t
     {
         ::uwvm2::utils::container::u8string_view op_code_name;
@@ -193,6 +200,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         illegal_memarg_alignment_err_t illegal_memarg_alignment;
         static_assert(::std::is_trivially_copyable_v<illegal_memarg_alignment_err_t> && ::std::is_trivially_destructible_v<illegal_memarg_alignment_err_t>);
+
+        no_memory_err_t no_memory;
+        static_assert(::std::is_trivially_copyable_v<no_memory_err_t> && ::std::is_trivially_destructible_v<no_memory_err_t>);
 
         memarg_address_type_not_i32_err_t memarg_address_type_not_i32;
         static_assert(::std::is_trivially_copyable_v<memarg_address_type_not_i32_err_t> && ::std::is_trivially_destructible_v<memarg_address_type_not_i32_err_t>);
