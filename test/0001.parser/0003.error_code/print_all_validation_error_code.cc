@@ -120,6 +120,31 @@ int main()
                 errout.err.err_selectable.global_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment:
+            {
+                errout.err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load";
+                errout.err.err_selectable.illegal_memarg_alignment.align = 6u;
+                errout.err.err_selectable.illegal_memarg_alignment.max_align = 2u;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32:
+            {
+                errout.err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f64.load";
+                errout.err.err_selectable.memarg_address_type_not_i32.addr_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
                 errout.err.err_selectable.not_local_function.function_index = 0uz;

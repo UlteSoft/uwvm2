@@ -67,6 +67,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         illegal_global_index,
         immutable_global_set,
         global_set_type_mismatch,
+        no_memory,
+        invalid_memarg_align,
+        invalid_memarg_offset,
+        illegal_memarg_alignment,
+        memarg_address_type_not_i32,
         not_local_function,
         invalid_function_index,
         invalid_local_index,
@@ -113,6 +118,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 global_index;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct illegal_memarg_alignment_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 max_align;
+    };
+
+    struct memarg_address_type_not_i32_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type addr_type;
     };
 
     struct not_local_function_err_t
@@ -172,6 +190,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         global_variable_type_mismatch_err_t global_variable_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<global_variable_type_mismatch_err_t> &&
                       ::std::is_trivially_destructible_v<global_variable_type_mismatch_err_t>);
+
+        illegal_memarg_alignment_err_t illegal_memarg_alignment;
+        static_assert(::std::is_trivially_copyable_v<illegal_memarg_alignment_err_t> && ::std::is_trivially_destructible_v<illegal_memarg_alignment_err_t>);
+
+        memarg_address_type_not_i32_err_t memarg_address_type_not_i32;
+        static_assert(::std::is_trivially_copyable_v<memarg_address_type_not_i32_err_t> && ::std::is_trivially_destructible_v<memarg_address_type_not_i32_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

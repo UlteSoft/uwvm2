@@ -138,6 +138,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_global_set_type_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory:
+            {
+#include "error_code_outputs/eco_no_memory.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align:
+            {
+#include "error_code_outputs/eco_invalid_memarg_align.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset:
+            {
+#include "error_code_outputs/eco_invalid_memarg_offset.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment:
+            {
+#include "error_code_outputs/eco_illegal_memarg_alignment.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32:
+            {
+#include "error_code_outputs/eco_memarg_address_type_not_i32.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"
