@@ -757,24 +757,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [     safe       ] unsafe (could be the section_end)
                     //                    ^^ code_curr
 
-                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
-                    if(label_index >= all_label_count) [[unlikely]]
+                    auto const all_label_count_uz{control_flow_stack.size()};
+                    auto const label_index_uz{static_cast<::std::size_t>(label_index)};
+                    if(label_index_uz >= all_label_count_uz) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_label_index.label_index = label_index;
-                        err.err_selectable.illegal_label_index.all_label_count = all_label_count;
+                        err.err_selectable.illegal_label_index.all_label_count =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
                         err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    auto const& target_frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - label_index))};
+                    auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
 
-                    auto const target_arity = [&target_frame]() noexcept -> ::std::size_t
-                    {
-                        if(target_frame.type == block_type::loop) { return 0uz; }
-                        if(target_frame.result.begin == nullptr) { return 0uz; }
-                        return static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin);
-                    }();
+                    // Label arity = label_types count. In MVP, we only support empty or single-value blocktypes.
+                    // For loops, label_types are the loop's blocktype (same as `result` here).
+                    auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
                     if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
                     {
@@ -789,8 +788,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // type-check the branch arguments if present
                     if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
                     {
-                        auto const expected_type{target_frame.result.begin[0]};
-                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        auto const expected_type{*target_frame.result.begin};
+                        auto const actual_type{operand_stack.back_unchecked().type};
                         if(actual_type != expected_type) [[unlikely]]
                         {
                             err.err_curr = op_begin;
@@ -859,24 +858,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [      safe      ] unsafe (could be the section_end)
                     //                    ^^ code_curr
 
-                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
-                    if(label_index >= all_label_count) [[unlikely]]
+                    auto const all_label_count_uz{control_flow_stack.size()};
+                    auto const label_index_uz{static_cast<::std::size_t>(label_index)};
+                    if(label_index_uz >= all_label_count_uz) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_label_index.label_index = label_index;
-                        err.err_selectable.illegal_label_index.all_label_count = all_label_count;
+                        err.err_selectable.illegal_label_index.all_label_count =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
                         err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    auto const& target_frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - label_index))};
+                    auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
 
-                    auto const target_arity{[&target_frame]() constexpr noexcept -> ::std::size_t
-                                            {
-                                                if(target_frame.type == block_type::loop) { return 0uz; }
-                                                if(target_frame.result.begin == nullptr) { return 0uz; }
-                                                return static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin);
-                                            }()};
+                    // Label arity = label_types count (MVP: 0 or 1). For loops, label_types are the loop's blocktype.
+                    auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
                     // Need (labelargs..., i32 cond)
                     if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
@@ -908,8 +905,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // type-check label arguments if present (they remain on stack for the fallthrough path)
                     if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
                     {
-                        auto const expected_type{target_frame.result.begin[0]};
-                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        auto const expected_type{*target_frame.result.begin};
+                        auto const actual_type{operand_stack.back_unchecked().type};
                         if(actual_type != expected_type) [[unlikely]]
                         {
                             err.err_curr = op_begin;
@@ -966,8 +963,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [       safe         ] unsafe (could be the section_end)
                     //                       ^^ code_curr
 
-                    ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> targets{};
-                    targets.reserve(static_cast<::std::size_t>(target_count));
+                    auto const all_label_count_uz{control_flow_stack.size()};
+                    auto const validate_label{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr UWVM_THROWS
+                                              {
+                                                  if(static_cast<::std::size_t>(li) >= all_label_count_uz) [[unlikely]]
+                                                  {
+                                                      err.err_curr = op_begin;
+                                                      err.err_selectable.illegal_label_index.label_index = li;
+                                                      err.err_selectable.illegal_label_index.all_label_count =
+                                                          static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
+                                                      err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                                  }
+                                              }};
+
+                    struct get_sig_result_t
+                    {
+                        ::std::size_t arity{};
+                        curr_operand_stack_value_type type{};
+                    };
+
+                    auto const get_sig{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr noexcept
+                                       {
+                                           auto const& frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - static_cast<::std::size_t>(li))};
+                                           ::std::size_t arity{};
+                                           curr_operand_stack_value_type type{};
+                                           if(frame.result.begin == nullptr) { arity = 0uz; }
+                                           else
+                                           {
+                                               arity = static_cast<::std::size_t>(frame.result.end - frame.result.begin);
+                                               if(arity != 0uz) { type = frame.result.begin[0]; }
+                                           }
+                                           return get_sig_result_t{arity, type};
+                                       }};
+
+                    bool have_expected_sig{};
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 expected_label{};
+                    ::std::size_t expected_arity{};
+                    curr_operand_stack_value_type expected_type{};
 
                     for(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 i{}; i != target_count; ++i)
                     {
@@ -996,7 +1029,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         // [safe | safe      ] unsafe (could be the section_end)
                         //                     ^^ code_curr
 
-                        targets.push_back_unchecked(li);
+                        validate_label(li);
+
+                        auto const [arity, type]{get_sig(li)};
+                        if(!have_expected_sig)
+                        {
+                            have_expected_sig = true;
+                            expected_label = li;
+                            expected_arity = arity;
+                            expected_type = type;
+                        }
+                        else if(arity != expected_arity || (expected_arity != 0uz && type != expected_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
+                            err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
+                            err.err_selectable.br_table_target_type_mismatch.expected_arity =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
+                            err.err_selectable.br_table_target_type_mismatch.actual_arity =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(arity);
+                            err.err_selectable.br_table_target_type_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                            err.err_selectable.br_table_target_type_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
                     }
 
                     // ... last_target | default_label ...
@@ -1024,57 +1082,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // [         safe  |      safe   ] unsafe (could be the section_end)
                     //                                 ^^ code_curr
 
-                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
-                    auto const validate_label{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr UWVM_THROWS
-                                              {
-                                                  if(li >= all_label_count) [[unlikely]]
-                                                  {
-                                                      err.err_curr = op_begin;
-                                                      err.err_selectable.illegal_label_index.label_index = li;
-                                                      err.err_selectable.illegal_label_index.all_label_count = all_label_count;
-                                                      err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
-                                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                                                  }
-                                              }};
-
-                    for(auto const li: targets) { validate_label(li); }
                     validate_label(default_label);
 
-                    auto const get_sig = [&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li)
+                    auto const [default_arity, default_type]{get_sig(default_label)};
+                    if(!have_expected_sig)
                     {
-                        auto const& frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - li))};
-                        ::std::size_t arity{};
-                        curr_operand_stack_value_type type{};
-                        if(frame.type == block_type::loop || frame.result.begin == nullptr) { arity = 0uz; }
-                        else
-                        {
-                            arity = static_cast<::std::size_t>(frame.result.end - frame.result.begin);
-                            if(arity != 0uz) { type = frame.result.begin[0]; }
-                        }
-                        return ::uwvm2::utils::container::tuple{arity, type};
-                    };
-
-                    auto const [expected_arity, expected_type]{get_sig(default_label)};
-
-                    for(auto const li: targets)
+                        have_expected_sig = true;
+                        expected_label = default_label;
+                        expected_arity = default_arity;
+                        expected_type = default_type;
+                    }
+                    else if(default_arity != expected_arity || (expected_arity != 0uz && default_type != expected_type)) [[unlikely]]
                     {
-                        auto const [arity, type]{get_sig(li)};
-                        if(arity != expected_arity || (arity != 0uz && type != expected_type)) [[unlikely]]
-                        {
-                            err.err_curr = op_begin;
-                            err.err_selectable.br_table_target_type_mismatch.expected_label_index = default_label;
-                            err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
-                            err.err_selectable.br_table_target_type_mismatch.expected_arity =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
-                            err.err_selectable.br_table_target_type_mismatch.actual_arity =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(arity);
-                            err.err_selectable.br_table_target_type_mismatch.expected_type =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                            err.err_selectable.br_table_target_type_mismatch.actual_type =
-                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                        }
+                        err.err_curr = op_begin;
+                        err.err_selectable.br_table_target_type_mismatch.expected_label_index = expected_label;
+                        err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = default_label;
+                        err.err_selectable.br_table_target_type_mismatch.expected_arity =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
+                        err.err_selectable.br_table_target_type_mismatch.actual_arity =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(default_arity);
+                        err.err_selectable.br_table_target_type_mismatch.expected_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                        err.err_selectable.br_table_target_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(default_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
                     // Stack effect: (labelargs..., i32 index) -> unreachable
@@ -1104,7 +1136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
                     if(!is_polymorphic && expected_arity != 0uz && operand_stack.size() >= expected_arity)
                     {
-                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        auto const actual_type{operand_stack.back_unchecked().type};
                         if(actual_type != expected_type) [[unlikely]]
                         {
                             err.err_curr = op_begin;
