@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // [   safe        ] unsafe (could be the section_end)
         //                   ^^ section_curr
 
-        // In MVP, the memory page count (min and optional max) cannot exceed 65,536.
+        // In MVP, the memory page count (min and optional max) cannot exceed 65,536 (u32max / default_page_size).
         // In the future custom_page_size proposal, it will directly replace the entire adl of uwvm2::parser::wasm::standard::wasm1::type::memory_type, so
         // it is logically impossible to hit.
 
