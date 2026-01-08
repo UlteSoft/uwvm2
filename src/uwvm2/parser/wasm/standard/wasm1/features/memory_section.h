@@ -101,14 +101,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         // [   safe        ] unsafe (could be the section_end)
         //                   ^^ section_curr
 
+        // In MVP, the memory page count (min and optional max) cannot exceed 65,536.
+        // In the future custom_page_size proposal, it will directly replace the entire adl of uwvm2::parser::wasm::standard::wasm1::type::memory_type, so
+        // it is logically impossible to hit.
+
+        constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 wasm1_max_pages{
+            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(65536u)};
+
+        if(memory_r.limits.min > wasm1_max_pages) [[unlikely]]
+        {
+            err.err_curr = check_max_page_ptr;
+            err.err_selectable.u32 = memory_r.limits.min;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::memory_section_resolved_exceeded_the_maximum_value;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
         if(memory_r.limits.present_max)
         {
-            // In MVP, the maximum memory page size (when a maximum value is specified) cannot exceed 65,536.
-            // In the future custom_page_size proposal, it will directly replace the entire adl of uwvm2::parser::wasm::standard::wasm1::type::memory_type, so
-            // it is logically impossible to hit.
-
-            constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 wasm1_max_pages{
-                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(65536u)};
             if(memory_r.limits.max > wasm1_max_pages) [[unlikely]]
             {
                 err.err_curr = check_max_page_ptr;
