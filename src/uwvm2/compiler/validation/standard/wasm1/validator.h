@@ -387,47 +387,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
                     block_result_type<Fs...> block_result{};
 
-                    if(blocktype_byte == 0x40u)
+                    switch(blocktype_byte)
                     {
-                        // empty result
-                        block_result = {};
-                    }
-                    else
-                    {
-                        switch(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(blocktype_byte))
+                        case 0x40u:
                         {
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32:
-                            {
-                                block_result.begin = i32_result_arr;
-                                block_result.end = i32_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64:
-                            {
-                                block_result.begin = i64_result_arr;
-                                block_result.end = i64_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32:
-                            {
-                                block_result.begin = f32_result_arr;
-                                block_result.end = f32_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64:
-                            {
-                                block_result.begin = f64_result_arr;
-                                block_result.end = f64_result_arr + 1u;
-                                break;
-                            }
-                            [[unlikely]] default:
-                            {
-                                // Unknown blocktype encoding; treat as invalid code.
-                                err.err_curr = op_begin;
-                                err.err_selectable.u8 = blocktype_byte;
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                            // empty result
+                            block_result = {};
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32):
+                        {
+                            block_result.begin = i32_result_arr;
+                            block_result.end = i32_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64):
+                        {
+                            block_result.begin = i64_result_arr;
+                            block_result.end = i64_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32):
+                        {
+                            block_result.begin = f32_result_arr;
+                            block_result.end = f32_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64):
+                        {
+                            block_result.begin = f64_result_arr;
+                            block_result.end = f64_result_arr + 1u;
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            // Unknown blocktype encoding; treat as invalid code.
+                            err.err_curr = op_begin;
+                            err.err_selectable.u8 = blocktype_byte;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
 
@@ -477,46 +479,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     // MVP blocktype: 0x40 (empty) or a single value type (i32/i64/f32/f64)
                     block_result_type<Fs...> block_result{};
 
-                    if(blocktype_byte == 0x40u)
+                    switch(blocktype_byte)
                     {
-                        // empty result
-                        block_result = {};
-                    }
-                    else
-                    {
-                        switch(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(blocktype_byte))
+                        case 0x40u:
                         {
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32:
-                            {
-                                block_result.begin = i32_result_arr;
-                                block_result.end = i32_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64:
-                            {
-                                block_result.begin = i64_result_arr;
-                                block_result.end = i64_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32:
-                            {
-                                block_result.begin = f32_result_arr;
-                                block_result.end = f32_result_arr + 1u;
-                                break;
-                            }
-                            case ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64:
-                            {
-                                block_result.begin = f64_result_arr;
-                                block_result.end = f64_result_arr + 1u;
-                                break;
-                            }
-                            [[unlikely]] default:
-                            {
-                                err.err_curr = op_begin;
-                                err.err_selectable.u8 = blocktype_byte;
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
-                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                            }
+                            // empty result
+                            block_result = {};
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32):
+                        {
+                            block_result.begin = i32_result_arr;
+                            block_result.end = i32_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64):
+                        {
+                            block_result.begin = i64_result_arr;
+                            block_result.end = i64_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32):
+                        {
+                            block_result.begin = f32_result_arr;
+                            block_result.end = f32_result_arr + 1u;
+                            break;
+                        }
+                        case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
+                            ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64):
+                        {
+                            block_result.begin = f64_result_arr;
+                            block_result.end = f64_result_arr + 1u;
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.u8 = blocktype_byte;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
 
