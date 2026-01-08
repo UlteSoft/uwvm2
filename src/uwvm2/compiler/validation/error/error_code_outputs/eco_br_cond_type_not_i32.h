@@ -47,7 +47,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              ") ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             bctni32.op_code_name,
+                                                             ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              " condition/index type must be ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
@@ -73,7 +73,7 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      ") ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     bctni32.op_code_name,
+                                                     ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      " condition/index type must be ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
@@ -89,7 +89,6 @@ if constexpr(::std::same_as<char_type, char>)
 }
 else if constexpr(::std::same_as<char_type, wchar_t>)
 {
-    auto const op_name{::fast_io::mnp::code_cvt(bctni32.op_code_name)};
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     if constexpr(::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::wide_nt, char_type>> ||
                  ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::ansi_9x, char_type>> ||
@@ -108,7 +107,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              L") ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             op_name,
+                                                             ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L" condition/index type must be ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
@@ -134,7 +133,7 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      L") ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     op_name,
+                                                     ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L" condition/index type must be ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
@@ -210,7 +209,6 @@ else if constexpr(::std::same_as<char_type, char8_t>)
 }
 else if constexpr(::std::same_as<char_type, char16_t>)
 {
-    auto const op_name{::fast_io::mnp::code_cvt(bctni32.op_code_name)};
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     if constexpr(::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::wide_nt, char_type>> ||
                  ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::ansi_9x, char_type>> ||
@@ -229,7 +227,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              u") ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             op_name,
+                                                             ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u" condition/index type must be ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
@@ -255,7 +253,7 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      u") ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     op_name,
+                                                     ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u" condition/index type must be ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
@@ -271,7 +269,6 @@ else if constexpr(::std::same_as<char_type, char16_t>)
 }
 else if constexpr(::std::same_as<char_type, char32_t>)
 {
-    auto const op_name{::fast_io::mnp::code_cvt(bctni32.op_code_name)};
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
     if constexpr(::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::wide_nt, char_type>> ||
                  ::std::same_as<::std::remove_cvref_t<Stm>, ::fast_io::basic_win32_family_io_observer<::fast_io::win32_family::ansi_9x, char_type>> ||
@@ -290,7 +287,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                              U") ",
                                                              UWVM_WIN32_TEXTATTR_CYAN,
-                                                             op_name,
+                                                             ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U" condition/index type must be ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
@@ -316,7 +313,7 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
                                                      U") ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     op_name,
+                                                     ::fast_io::mnp::code_cvt(bctni32.op_code_name),
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U" condition/index type must be ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
