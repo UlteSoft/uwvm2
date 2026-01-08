@@ -125,6 +125,11 @@ int main()
                     errout.err.err_selectable.exceed_the_max_parser_limit.maxval = 0u;
                     break;
                 }
+                case ::uwvm2::parser::wasm::base::wasm_parse_error_code::memory_section_resolved_exceeded_the_maximum_value:
+                {
+                    errout.err.err_selectable.u32 = 70000u;
+                    break;
+                }
                 default:
                 {
                     errout.err.err_selectable.u64 = 0xcdcdcdcdcdcdcdcd;

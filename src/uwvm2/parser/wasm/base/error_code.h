@@ -105,6 +105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
         wasm1_not_allow_multi_memory,
         memory_section_resolved_exceeded_the_actual_number,
         memory_section_resolved_not_match_the_actual_number,
+        memory_section_resolved_exceeded_the_maximum_value,
         imp_def_num_exceed_u32max,
         invalid_global_count,
         global_section_resolved_exceeded_the_actual_number,
