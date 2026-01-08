@@ -63,6 +63,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         operand_stack_underflow,
         select_type_mismatch,
         select_cond_type_not_i32,
+        if_cond_type_not_i32,
+        illegal_else,
+        if_then_result_mismatch,
         local_set_type_mismatch,
         local_tee_type_mismatch,
         invalid_global_index,
@@ -101,6 +104,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
     struct select_cond_type_not_i32_err_t
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
+    };
+
+    struct if_cond_type_not_i32_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
+    };
+
+    struct if_then_result_mismatch_err_t
+    {
+        ::std::size_t expected_count;
+        ::std::size_t actual_count;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
     };
 
     struct local_variable_type_mismatch_err_t
@@ -176,6 +192,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         select_cond_type_not_i32_err_t select_cond_type_not_i32;
         static_assert(::std::is_trivially_copyable_v<select_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<select_cond_type_not_i32_err_t>);
+
+        if_cond_type_not_i32_err_t if_cond_type_not_i32;
+        static_assert(::std::is_trivially_copyable_v<if_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<if_cond_type_not_i32_err_t>);
+
+        if_then_result_mismatch_err_t if_then_result_mismatch;
+        static_assert(::std::is_trivially_copyable_v<if_then_result_mismatch_err_t> && ::std::is_trivially_destructible_v<if_then_result_mismatch_err_t>);
 
         local_variable_type_mismatch_err_t local_variable_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<local_variable_type_mismatch_err_t> &&
