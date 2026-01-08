@@ -71,6 +71,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         br_value_type_mismatch,
         br_cond_type_not_i32,
         br_table_target_type_mismatch,
+        invalid_function_index_encoding,
+        invalid_type_index,
+        illegal_type_index,
+        invalid_table_index,
+        illegal_table_index,
         local_set_type_mismatch,
         local_tee_type_mismatch,
         invalid_global_index,
@@ -151,6 +156,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 actual_arity;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct illegal_type_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 type_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_type_count;
+    };
+
+    struct illegal_table_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_table_count;
     };
 
     struct local_variable_type_mismatch_err_t
@@ -245,6 +262,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         br_table_target_type_mismatch_err_t br_table_target_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<br_table_target_type_mismatch_err_t> &&
                       ::std::is_trivially_destructible_v<br_table_target_type_mismatch_err_t>);
+
+        illegal_type_index_err_t illegal_type_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_type_index_err_t> && ::std::is_trivially_destructible_v<illegal_type_index_err_t>);
+
+        illegal_table_index_err_t illegal_table_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_table_index_err_t> && ::std::is_trivially_destructible_v<illegal_table_index_err_t>);
 
         local_variable_type_mismatch_err_t local_variable_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<local_variable_type_mismatch_err_t> &&

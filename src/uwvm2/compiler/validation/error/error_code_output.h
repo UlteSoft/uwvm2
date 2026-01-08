@@ -158,6 +158,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_br_table_target_type_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index_encoding:
+            {
+#include "error_code_outputs/eco_invalid_function_index_encoding.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_type_index:
+            {
+#include "error_code_outputs/eco_invalid_type_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_type_index:
+            {
+#include "error_code_outputs/eco_illegal_type_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_table_index:
+            {
+#include "error_code_outputs/eco_invalid_table_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_table_index:
+            {
+#include "error_code_outputs/eco_illegal_table_index.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
 #include "error_code_outputs/eco_local_set_type_mismatch.h"

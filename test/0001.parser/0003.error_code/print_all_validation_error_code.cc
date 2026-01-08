@@ -143,6 +143,30 @@ int main()
                 errout.err.err_selectable.br_table_target_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index_encoding:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_type_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_type_index:
+            {
+                errout.err.err_selectable.illegal_type_index.type_index = 3u;
+                errout.err.err_selectable.illegal_type_index.all_type_count = 2u;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_table_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_table_index:
+            {
+                errout.err.err_selectable.illegal_table_index.table_index = 1u;
+                errout.err.err_selectable.illegal_table_index.all_table_count = 1u;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
                 errout.err.err_selectable.local_variable_type_mismatch.local_index = 3u;
