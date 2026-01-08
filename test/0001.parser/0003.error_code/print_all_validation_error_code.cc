@@ -110,6 +110,39 @@ int main()
                 errout.err.err_selectable.if_then_result_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index:
+            {
+                errout.err.err_selectable.illegal_label_index.label_index = 7u;
+                errout.err.err_selectable.illegal_label_index.all_label_count = 3u;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch:
+            {
+                errout.err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
+                errout.err.err_selectable.br_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                errout.err.err_selectable.br_value_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32:
+            {
+                errout.err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
+                errout.err.err_selectable.br_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch:
+            {
+                errout.err.err_selectable.br_table_target_type_mismatch.expected_label_index = 0u;
+                errout.err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = 2u;
+                errout.err.err_selectable.br_table_target_type_mismatch.expected_arity = 1u;
+                errout.err.err_selectable.br_table_target_type_mismatch.actual_arity = 1u;
+                errout.err.err_selectable.br_table_target_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                errout.err.err_selectable.br_table_target_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
                 errout.err.err_selectable.local_variable_type_mismatch.local_index = 3u;

@@ -66,6 +66,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         if_cond_type_not_i32,
         illegal_else,
         if_then_result_mismatch,
+        invalid_label_index,
+        illegal_label_index,
+        br_value_type_mismatch,
+        br_cond_type_not_i32,
+        br_table_target_type_mismatch,
         local_set_type_mismatch,
         local_tee_type_mismatch,
         invalid_global_index,
@@ -115,6 +120,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
     {
         ::std::size_t expected_count;
         ::std::size_t actual_count;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct illegal_label_index_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 label_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_label_count;
+    };
+
+    struct br_value_type_mismatch_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct br_cond_type_not_i32_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
+    };
+
+    struct br_table_target_type_mismatch_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 expected_label_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 mismatched_label_index;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 expected_arity;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 actual_arity;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
     };
@@ -198,6 +232,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         if_then_result_mismatch_err_t if_then_result_mismatch;
         static_assert(::std::is_trivially_copyable_v<if_then_result_mismatch_err_t> && ::std::is_trivially_destructible_v<if_then_result_mismatch_err_t>);
+
+        illegal_label_index_err_t illegal_label_index;
+        static_assert(::std::is_trivially_copyable_v<illegal_label_index_err_t> && ::std::is_trivially_destructible_v<illegal_label_index_err_t>);
+
+        br_value_type_mismatch_err_t br_value_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<br_value_type_mismatch_err_t> && ::std::is_trivially_destructible_v<br_value_type_mismatch_err_t>);
+
+        br_cond_type_not_i32_err_t br_cond_type_not_i32;
+        static_assert(::std::is_trivially_copyable_v<br_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<br_cond_type_not_i32_err_t>);
+
+        br_table_target_type_mismatch_err_t br_table_target_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<br_table_target_type_mismatch_err_t> &&
+                      ::std::is_trivially_destructible_v<br_table_target_type_mismatch_err_t>);
 
         local_variable_type_mismatch_err_t local_variable_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<local_variable_type_mismatch_err_t> &&

@@ -717,17 +717,418 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::br:
                 {
-                    /// @todo
+                    // br     label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // br     label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // br     label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 label_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [label_next, label_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(label_index))};
+                    if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
+                    }
+
+                    // br     label_index ...
+                    // [     safe       ] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(label_next);
+
+                    // br     label_index ...
+                    // [     safe       ] unsafe (could be the section_end)
+                    //                    ^^ code_curr
+
+                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
+                    if(label_index >= all_label_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_label_index.label_index = label_index;
+                        err.err_selectable.illegal_label_index.all_label_count = all_label_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    auto const& target_frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - label_index))};
+
+                    auto const target_arity = [&target_frame]() noexcept -> ::std::size_t
+                    {
+                        if(target_frame.type == block_type::loop) { return 0uz; }
+                        if(target_frame.result.begin == nullptr) { return 0uz; }
+                        return static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin);
+                    }();
+
+                    if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"br";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // type-check the branch arguments if present
+                    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+                    {
+                        auto const expected_type{target_frame.result.begin[0]};
+                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        if(actual_type != expected_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
+                            err.err_selectable.br_value_type_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                            err.err_selectable.br_value_type_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
+                    // Consume branch arguments (if present) and make stack polymorphic (unreachable).
+                    if(target_arity != 0uz)
+                    {
+                        auto n{target_arity};
+                        while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
+                    }
+                    // Avoid leaking concrete stack values into the polymorphic region (prevents false type errors after an unconditional branch).
+                    auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
+                    while(operand_stack.size() > curr_frame_base) { operand_stack.pop_back_unchecked(); }
+                    is_polymorphic = true;
+
                     break;
                 }
                 case wasm1_code::br_if:
                 {
-                    /// @todo
+                    // br_if  label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // br_if  label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // br_if  label_index ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 label_index;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [label_next, label_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(label_index))};
+                    if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
+                    }
+
+                    // br_if  label_index ...
+                    // [      safe      ] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(label_next);
+
+                    // br_if  label_index ...
+                    // [      safe      ] unsafe (could be the section_end)
+                    //                    ^^ code_curr
+
+                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
+                    if(label_index >= all_label_count) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_label_index.label_index = label_index;
+                        err.err_selectable.illegal_label_index.all_label_count = all_label_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    auto const& target_frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - label_index))};
+
+                    auto const target_arity{[&target_frame]() constexpr noexcept -> ::std::size_t
+                                            {
+                                                if(target_frame.type == block_type::loop) { return 0uz; }
+                                                if(target_frame.result.begin == nullptr) { return 0uz; }
+                                                return static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin);
+                                            }()};
+
+                    // Need (labelargs..., i32 cond)
+                    if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity + 1uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // cond (must be i32 if present)
+                    if(!operand_stack.empty())
+                    {
+                        auto const cond{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        if(!is_polymorphic && cond.type != curr_operand_stack_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
+                            err.err_selectable.br_cond_type_not_i32.cond_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(cond.type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
+                    // type-check label arguments if present (they remain on stack for the fallthrough path)
+                    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+                    {
+                        auto const expected_type{target_frame.result.begin[0]};
+                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        if(actual_type != expected_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
+                            err.err_selectable.br_value_type_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                            err.err_selectable.br_value_type_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
                     break;
                 }
                 case wasm1_code::br_table:
                 {
-                    /// @todo
+                    // br_table  target_count ...
+                    // [ safe ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // br_table  target_count ...
+                    // [ safe ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // br_table  target_count ...
+                    // [ safe ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 target_count;  // No initialization necessary
+                    auto const [cnt_next, cnt_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                            ::fast_io::mnp::leb128_get(target_count))};
+                    if(cnt_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(cnt_err);
+                    }
+
+                    // br_table  target_count ...
+                    // [       safe         ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(cnt_next);
+
+                    // br_table  target_count ...
+                    // [       safe         ] unsafe (could be the section_end)
+                    //                       ^^ code_curr
+
+                    ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32> targets{};
+                    targets.reserve(static_cast<::std::size_t>(target_count));
+
+                    for(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 i{}; i != target_count; ++i)
+                    {
+                        // ...    | curr_target ...
+                        // [safe] | unsafe (could be the section_end)
+                        //          ^^ code_curr
+
+                        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li;  // No initialization necessary
+                        auto const [li_next, li_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                              ::fast_io::mnp::leb128_get(li))};
+                        if(li_err != ::fast_io::parse_code::ok) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(li_err);
+                        }
+
+                        // ...   | curr_target ...
+                        // [safe | safe      ] unsafe (could be the section_end)
+                        //         ^^ code_curr
+
+                        code_curr = reinterpret_cast<::std::byte const*>(li_next);
+
+                        // ...   | curr_target ...
+                        // [safe | safe      ] unsafe (could be the section_end)
+                        //                     ^^ code_curr
+
+                        targets.push_back_unchecked(li);
+                    }
+
+                    // ... last_target | default_label ...
+                    // [   safe      ]   unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 default_label;  // No initialization necessary
+                    auto const [def_next, def_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                            ::fast_io::mnp::leb128_get(default_label))};
+                    if(def_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(def_err);
+                    }
+
+                    // ... last_target | default_label ...
+                    // [         safe  |      safe   ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(def_next);
+
+                    // ... last_target | default_label ...
+                    // [         safe  |      safe   ] unsafe (could be the section_end)
+                    //                                 ^^ code_curr
+
+                    auto const all_label_count{static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(control_flow_stack.size())};
+                    auto const validate_label{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr UWVM_THROWS
+                                              {
+                                                  if(li >= all_label_count) [[unlikely]]
+                                                  {
+                                                      err.err_curr = op_begin;
+                                                      err.err_selectable.illegal_label_index.label_index = li;
+                                                      err.err_selectable.illegal_label_index.all_label_count = all_label_count;
+                                                      err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                                  }
+                                              }};
+
+                    for(auto const li: targets) { validate_label(li); }
+                    validate_label(default_label);
+
+                    auto const get_sig = [&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li)
+                    {
+                        auto const& frame{control_flow_stack.index_unchecked(static_cast<::std::size_t>(all_label_count - 1u - li))};
+                        ::std::size_t arity{};
+                        curr_operand_stack_value_type type{};
+                        if(frame.type == block_type::loop || frame.result.begin == nullptr) { arity = 0uz; }
+                        else
+                        {
+                            arity = static_cast<::std::size_t>(frame.result.end - frame.result.begin);
+                            if(arity != 0uz) { type = frame.result.begin[0]; }
+                        }
+                        return ::uwvm2::utils::container::tuple{arity, type};
+                    };
+
+                    auto const [expected_arity, expected_type]{get_sig(default_label)};
+
+                    for(auto const li: targets)
+                    {
+                        auto const [arity, type]{get_sig(li)};
+                        if(arity != expected_arity || (arity != 0uz && type != expected_type)) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_table_target_type_mismatch.expected_label_index = default_label;
+                            err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = li;
+                            err.err_selectable.br_table_target_type_mismatch.expected_arity =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(expected_arity);
+                            err.err_selectable.br_table_target_type_mismatch.actual_arity =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(arity);
+                            err.err_selectable.br_table_target_type_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                            err.err_selectable.br_table_target_type_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
+                    // Stack effect: (labelargs..., i32 index) -> unreachable
+                    if(!is_polymorphic && operand_stack.size() < expected_arity + 1uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = expected_arity + 1uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    if(!operand_stack.empty())
+                    {
+                        auto const idx{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        if(!is_polymorphic && idx.type != curr_operand_stack_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
+                            err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(idx.type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
+                    if(!is_polymorphic && expected_arity != 0uz && operand_stack.size() >= expected_arity)
+                    {
+                        auto const actual_type{operand_stack[operand_stack.size() - 1u].type};
+                        if(actual_type != expected_type) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
+                            err.err_selectable.br_value_type_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                            err.err_selectable.br_value_type_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+
+                    // Consume label args if present and make stack polymorphic.
+                    if(expected_arity != 0uz)
+                    {
+                        auto n{expected_arity};
+                        while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
+                    }
+                    // Avoid leaking concrete stack values into the polymorphic region (prevents false type errors after br_table).
+                    auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
+                    while(operand_stack.size() > curr_frame_base) { operand_stack.pop_back_unchecked(); }
+                    is_polymorphic = true;
+
                     break;
                 }
                 case wasm1_code::return_:

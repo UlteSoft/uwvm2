@@ -133,6 +133,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_if_then_result_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index:
+            {
+#include "error_code_outputs/eco_invalid_label_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index:
+            {
+#include "error_code_outputs/eco_illegal_label_index.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch:
+            {
+#include "error_code_outputs/eco_br_value_type_mismatch.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32:
+            {
+#include "error_code_outputs/eco_br_cond_type_not_i32.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch:
+            {
+#include "error_code_outputs/eco_br_table_target_type_mismatch.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
 #include "error_code_outputs/eco_local_set_type_mismatch.h"
