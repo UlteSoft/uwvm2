@@ -285,7 +285,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         static constexpr value_type_enum f64_result_arr[1u]{static_cast<value_type_enum>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64)};
 
         // function block (label/result type is the function result)
-        control_flow_stack.push_back({.result = curr_func_type.result, .type = block_type::function, .operand_stack_base = 0uz, .polymorphic_base = false});
+        control_flow_stack.push_back({.result = curr_func_type.result,
+                                      .operand_stack_base = 0uz,
+                                      .type = block_type::function,
+                                      .polymorphic_base = false,
+                                      .then_polymorphic_end = false});
 
         // start parse the code
         auto code_curr{code_begin};
@@ -535,8 +539,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         }
                     }
 
-                    control_flow_stack.push_back(
-                        {.result = block_result, .type = block_type::loop, .operand_stack_base = operand_stack.size(), .polymorphic_base = is_polymorphic});
+                    control_flow_stack.push_back({.result = block_result,
+                                                  .operand_stack_base = operand_stack.size(),
+                                                  .type = block_type::loop,
+                                                  .polymorphic_base = is_polymorphic,
+                                                  .then_polymorphic_end = false});
 
                     break;
                 }
@@ -641,7 +648,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         auto const cond{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
 
-                        if(cond.type != curr_operand_stack_type::i32) [[unlikely]]
+                        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
@@ -1076,7 +1083,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         auto const cond{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
-                        if(!is_polymorphic && cond.type != curr_operand_stack_type::i32) [[unlikely]]
+                        if(!is_polymorphic && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
@@ -1306,7 +1313,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         auto const idx{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
-                        if(!is_polymorphic && idx.type != curr_operand_stack_type::i32) [[unlikely]]
+                        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
@@ -1648,7 +1655,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         auto const idx{operand_stack.back_unchecked()};
                         operand_stack.pop_back_unchecked();
 
-                        if(!is_polymorphic && idx.type != curr_operand_stack_type::i32) [[unlikely]]
+                        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
@@ -1772,7 +1779,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         cond_type = cond.type;
                     }
 
-                    if(cond_from_stack && cond_type != curr_operand_stack_type::i32) [[unlikely]]
+                    if(cond_from_stack && cond_type != curr_operand_stack_value_type::i32) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
@@ -1869,7 +1876,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    curr_operand_stack_type curr_local_type{};
+                    curr_operand_stack_value_type curr_local_type{};
 
                     if(local_index < func_parameter_count_u32)
                     {
@@ -1964,7 +1971,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    curr_operand_stack_type curr_local_type{};
+                    curr_operand_stack_value_type curr_local_type{};
 
                     if(local_index < func_parameter_count_u32)
                     {
@@ -2085,7 +2092,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    curr_operand_stack_type curr_local_type{};
+                    curr_operand_stack_value_type curr_local_type{};
 
                     if(local_index < func_parameter_count_u32)
                     {

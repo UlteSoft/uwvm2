@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::concepts
                                          ::std::byte const* code_begin,
                                          ::std::byte const* code_end,
                                          ::uwvm2::compiler::validation::error::code_validation_error_impl& err) {
-        { validate_code(code_adl, module_storage, code_type, code_begin, code_end, err) } -> ::std::same_as<void>;
+        { validate_code(code_adl, module_storage, function_index, code_begin, code_end, err) } -> ::std::same_as<void>;
     };
 }
 
