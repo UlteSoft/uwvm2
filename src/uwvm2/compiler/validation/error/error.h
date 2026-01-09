@@ -94,6 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         invalid_function_index,
         invalid_local_index,
         illegal_local_index,
+        store_value_type_mismatch,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -250,6 +251,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 all_global_count;
     };
 
+    struct store_value_type_mismatch_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -324,6 +332,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         memarg_address_type_not_i32_err_t memarg_address_type_not_i32;
         static_assert(::std::is_trivially_copyable_v<memarg_address_type_not_i32_err_t> && ::std::is_trivially_destructible_v<memarg_address_type_not_i32_err_t>);
+
+        store_value_type_mismatch_err_t store_value_type_mismatch;
+        static_assert(::std::is_trivially_copyable_v<store_value_type_mismatch_err_t> && ::std::is_trivially_destructible_v<store_value_type_mismatch_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;

@@ -3980,38 +3980,1164 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::i32_store:
                 {
+                    // i32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i32.store align offset ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i32.store align offset ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i32.store align offset ...
+                    // [      safe          ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i32.store align offset ...
+                    // [      safe          ] unsafe (could be the section_end)
+                    //                        ^^ code_curr
+
+                    // MVP memory instructions implicitly target memory 0. If the module has no imported/defined memory, any load/store is invalid.
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i32.store";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i32.store natural alignment is 4 bytes => alignment exponent must be <= 2
+                    if(align > 2u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 2u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i32 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i64_store:
                 {
+                    // i64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i64.store align offset ...
+                    // [     safe    ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i64.store align offset ...
+                    // [     safe    ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i64.store align offset ...
+                    // [        safe        ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i64.store align offset ...
+                    // [        safe        ] unsafe (could be the section_end)
+                    //                        ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i64.store";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i64.store natural alignment is 8 bytes => alignment exponent must be <= 3
+                    if(align > 3u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 3u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i64 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::f32_store:
                 {
+                    // f32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // f32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // f32.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // f32.store align offset ...
+                    // [       safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // f32.store align offset ...
+                    // [       safe  ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // f32.store align offset ...
+                    // [       safe         ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // f32.store align offset ...
+                    // [       safe         ] unsafe (could be the section_end)
+                    //                        ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"f32.store";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // f32.store natural alignment is 4 bytes => alignment exponent must be <= 2
+                    if(align > 2u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f32.store";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 2u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, f32 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"f32.store";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f32.store";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"f32.store";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::f64_store:
                 {
+                    // f64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // f64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // f64.store align offset ...
+                    // [ safe  ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // f64.store align offset ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //           ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // f64.store align offset ...
+                    // [      safe   ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // f64.store align offset ...
+                    // [      safe          ] unsafe (could be the section_end)
+                    //                 ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // f64.store align offset ...
+                    // [      safe          ] unsafe (could be the section_end)
+                    //                        ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"f64.store";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // f64.store natural alignment is 8 bytes => alignment exponent must be <= 3
+                    if(align > 3u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f64.store";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 3u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, f64 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"f64.store";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f64.store";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"f64.store";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i32_store8:
                 {
+                    // i32.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i32.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i32.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i32.store8 align offset ...
+                    // [       safe   ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i32.store8 align offset ...
+                    // [       safe   ] unsafe (could be the section_end)
+                    //                  ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i32.store8 align offset ...
+                    // [       safe          ] unsafe (could be the section_end)
+                    //                  ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i32.store8 align offset ...
+                    // [       safe          ] unsafe (could be the section_end)
+                    //                         ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i32.store8";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i32.store8 natural alignment is 1 byte => alignment exponent must be <= 0
+                    if(align > 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store8";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 0u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i32 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store8";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store8";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store8";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i32_store16:
                 {
+                    // i32.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i32.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i32.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i32.store16 align offset ...
+                    // [      safe     ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i32.store16 align offset ...
+                    // [      safe     ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i32.store16 align offset ...
+                    // [      safe            ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i32.store16 align offset ...
+                    // [      safe            ] unsafe (could be the section_end)
+                    //                          ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i32.store16";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i32.store16 natural alignment is 2 bytes => alignment exponent must be <= 1
+                    if(align > 1u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store16";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 1u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i32 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store16";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store16";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store16";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i64_store8:
                 {
+                    // i64.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.store8 align offset ...
+                    // [ safe   ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i64.store8 align offset ...
+                    // [   safe       ] unsafe (could be the section_end)
+                    //            ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i64.store8 align offset ...
+                    // [   safe       ] unsafe (could be the section_end)
+                    //                  ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i64.store8 align offset ...
+                    // [          safe       ] unsafe (could be the section_end)
+                    //                  ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i64.store8 align offset ...
+                    // [          safe       ] unsafe (could be the section_end)
+                    //                         ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i64.store8";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i64.store8 natural alignment is 1 byte => alignment exponent must be <= 0
+                    if(align > 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store8";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 0u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i64 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store8";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store8";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store8";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i64_store16:
                 {
+                    // i64.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.store16 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i64.store16 align offset ...
+                    // [       safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i64.store16 align offset ...
+                    // [       safe    ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i64.store16 align offset ...
+                    // [       safe           ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i64.store16 align offset ...
+                    // [       safe           ] unsafe (could be the section_end)
+                    //                          ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i64.store16";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i64.store16 natural alignment is 2 bytes => alignment exponent must be <= 1
+                    if(align > 1u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store16";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 1u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i64 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store16";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store16";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store16";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::i64_store32:
                 {
+                    // i64.store32 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.store32 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.store32 align offset ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                ::fast_io::mnp::leb128_get(align))};
+                    if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                    }
+
+                    // i64.store32 align offset ...
+                    // [       safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(align_next);
+
+                    // i64.store32 align offset ...
+                    // [       safe    ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                  reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                  ::fast_io::mnp::leb128_get(offset))};
+                    if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                    }
+
+                    // i64.store32 align offset ...
+                    // [       safe           ] unsafe (could be the section_end)
+                    //                   ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+
+                    // i64.store32 align offset ...
+                    // [       safe           ] unsafe (could be the section_end)
+                    //                          ^^ code_curr
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"i64.store32";
+                        err.err_selectable.no_memory.align = align;
+                        err.err_selectable.no_memory.offset = offset;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // i64.store32 natural alignment is 4 bytes => alignment exponent must be <= 2
+                    if(align > 2u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store32";
+                        err.err_selectable.illegal_memarg_alignment.align = align;
+                        err.err_selectable.illegal_memarg_alignment.max_align = 2u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: (i32 addr, i64 value) -> ()
+                    if(!is_polymorphic)
+                    {
+                        if(operand_stack.size() < 2uz) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store32";
+                            err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                            err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        auto const value{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+                        auto const addr{operand_stack.back_unchecked()};
+                        operand_stack.pop_back_unchecked();
+
+                        if(addr.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store32";
+                            err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(value.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store32";
+                            err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                            err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                    }
+                    else
+                    {
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     break;
                 }
                 case wasm1_code::memory_size:
