@@ -5204,6 +5204,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
                     // Stack effect: () -> (i32)
                     operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
+
                     break;
                 }
                 case wasm1_code::memory_grow:
