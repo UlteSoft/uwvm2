@@ -66,6 +66,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         if_cond_type_not_i32,
         illegal_else,
         if_then_result_mismatch,
+        if_missing_else,
+        end_result_mismatch,
+        trailing_code_after_end,
         invalid_label_index,
         illegal_label_index,
         br_value_type_mismatch,
@@ -123,6 +126,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
     struct if_then_result_mismatch_err_t
     {
+        ::std::size_t expected_count;
+        ::std::size_t actual_count;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
+    };
+
+    struct if_missing_else_err_t
+    {
+        ::std::size_t expected_count;
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
+    };
+
+    struct end_result_mismatch_err_t
+    {
+        ::uwvm2::utils::container::u8string_view block_kind;
         ::std::size_t expected_count;
         ::std::size_t actual_count;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type;
@@ -249,6 +267,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         if_then_result_mismatch_err_t if_then_result_mismatch;
         static_assert(::std::is_trivially_copyable_v<if_then_result_mismatch_err_t> && ::std::is_trivially_destructible_v<if_then_result_mismatch_err_t>);
+
+        if_missing_else_err_t if_missing_else;
+        static_assert(::std::is_trivially_copyable_v<if_missing_else_err_t> && ::std::is_trivially_destructible_v<if_missing_else_err_t>);
+
+        end_result_mismatch_err_t end_result_mismatch;
+        static_assert(::std::is_trivially_copyable_v<end_result_mismatch_err_t> && ::std::is_trivially_destructible_v<end_result_mismatch_err_t>);
 
         illegal_label_index_err_t illegal_label_index;
         static_assert(::std::is_trivially_copyable_v<illegal_label_index_err_t> && ::std::is_trivially_destructible_v<illegal_label_index_err_t>);

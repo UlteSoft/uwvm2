@@ -110,6 +110,25 @@ int main()
                 errout.err.err_selectable.if_then_result_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::if_missing_else:
+            {
+                errout.err.err_selectable.if_missing_else.expected_count = 1uz;
+                errout.err.err_selectable.if_missing_else.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch:
+            {
+                errout.err.err_selectable.end_result_mismatch.block_kind = u8"block";
+                errout.err.err_selectable.end_result_mismatch.expected_count = 1uz;
+                errout.err.err_selectable.end_result_mismatch.actual_count = 1uz;
+                errout.err.err_selectable.end_result_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                errout.err.err_selectable.end_result_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::trailing_code_after_end:
+            {
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index:
             {
                 break;

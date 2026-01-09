@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-01-07
+ * @date        2026-01-09
  * @copyright   APL-2.0 License
  */
 
@@ -22,15 +22,12 @@
 
 // Without pragma once, this header file will be included in a specific code segment
 
-auto const& itr{errout.err.err_selectable.if_then_result_mismatch};
+auto const& ime{errout.err.err_selectable.if_missing_else};
 
-auto const expected_is_single{itr.expected_count == 1uz};
-auto const actual_is_single{itr.actual_count == 1uz};
+auto const expected_is_single{ime.expected_count == 1uz};
 
 auto const expected_type_name{
-    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(itr.expected_type))};
-auto const actual_type_name{
-    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(itr.actual_type))};
+    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(ime.expected_type))};
 
 if constexpr(::std::same_as<char_type, char>)
 {
@@ -50,9 +47,9 @@ if constexpr(::std::same_as<char_type, char>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              "(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             ") If-then branch result mismatch: expected ",
+                                                             ") `if` with non-empty result requires an `else` branch: expected ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             itr.expected_count,
+                                                             ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
             if(expected_is_single)
             {
@@ -60,20 +57,6 @@ if constexpr(::std::same_as<char_type, char>)
                                                                  " (",
                                                                  UWVM_WIN32_TEXTATTR_YELLOW,
                                                                  expected_type_name,
-                                                                 UWVM_WIN32_TEXTATTR_WHITE,
-                                                                 ")");
-            }
-            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                             ", got ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             itr.actual_count,
-                                                             UWVM_WIN32_TEXTATTR_WHITE);
-            if(actual_is_single)
-            {
-                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                                 " (",
-                                                                 UWVM_WIN32_TEXTATTR_CYAN,
-                                                                 actual_type_name,
                                                                  UWVM_WIN32_TEXTATTR_WHITE,
                                                                  ")");
             }
@@ -90,9 +73,9 @@ if constexpr(::std::same_as<char_type, char>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                      "(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     ") If-then branch result mismatch: expected ",
+                                                     ") `if` with non-empty result requires an `else` branch: expected ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
-                                                     itr.expected_count,
+                                                     ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE));
     if(expected_is_single)
     {
@@ -100,20 +83,6 @@ if constexpr(::std::same_as<char_type, char>)
                                                          " (",
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_YELLOW),
                                                          expected_type_name,
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
-                                                         ")");
-    }
-    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     ", got ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                     itr.actual_count,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE));
-    if(actual_is_single)
-    {
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                         " (",
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_CYAN),
-                                                         actual_type_name,
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_WHITE),
                                                          ")");
     }
@@ -138,9 +107,9 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              L"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             L") If-then branch result mismatch: expected ",
+                                                             L") `if` with non-empty result requires an `else` branch: expected ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             itr.expected_count,
+                                                             ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
             if(expected_is_single)
             {
@@ -148,20 +117,6 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                                  L" (",
                                                                  UWVM_WIN32_TEXTATTR_YELLOW,
                                                                  expected_type_name,
-                                                                 UWVM_WIN32_TEXTATTR_WHITE,
-                                                                 L")");
-            }
-            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                             L", got ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             itr.actual_count,
-                                                             UWVM_WIN32_TEXTATTR_WHITE);
-            if(actual_is_single)
-            {
-                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                                 L" (",
-                                                                 UWVM_WIN32_TEXTATTR_CYAN,
-                                                                 actual_type_name,
                                                                  UWVM_WIN32_TEXTATTR_WHITE,
                                                                  L")");
             }
@@ -178,9 +133,9 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                      L"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     L") If-then branch result mismatch: expected ",
+                                                     L") `if` with non-empty result requires an `else` branch: expected ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
-                                                     itr.expected_count,
+                                                     ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
     if(expected_is_single)
     {
@@ -188,20 +143,6 @@ else if constexpr(::std::same_as<char_type, wchar_t>)
                                                          L" (",
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_YELLOW),
                                                          expected_type_name,
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
-                                                         L")");
-    }
-    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     L", got ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                     itr.actual_count,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE));
-    if(actual_is_single)
-    {
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                         L" (",
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_CYAN),
-                                                         actual_type_name,
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_W_WHITE),
                                                          L")");
     }
@@ -226,9 +167,9 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u8"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u8") If-then branch result mismatch: expected ",
+                                                             u8") `if` with non-empty result requires an `else` branch: expected ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             itr.expected_count,
+                                                             ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
             if(expected_is_single)
             {
@@ -236,20 +177,6 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                                  u8" (",
                                                                  UWVM_WIN32_TEXTATTR_YELLOW,
                                                                  expected_type_name,
-                                                                 UWVM_WIN32_TEXTATTR_WHITE,
-                                                                 u8")");
-            }
-            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                             u8", got ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             itr.actual_count,
-                                                             UWVM_WIN32_TEXTATTR_WHITE);
-            if(actual_is_single)
-            {
-                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                                 u8" (",
-                                                                 UWVM_WIN32_TEXTATTR_CYAN,
-                                                                 actual_type_name,
                                                                  UWVM_WIN32_TEXTATTR_WHITE,
                                                                  u8")");
             }
@@ -266,9 +193,9 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                      u8"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u8") If-then branch result mismatch: expected ",
+                                                     u8") `if` with non-empty result requires an `else` branch: expected ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_YELLOW),
-                                                     itr.expected_count,
+                                                     ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE));
     if(expected_is_single)
     {
@@ -276,20 +203,6 @@ else if constexpr(::std::same_as<char_type, char8_t>)
                                                          u8" (",
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_YELLOW),
                                                          expected_type_name,
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
-                                                         u8")");
-    }
-    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     u8", got ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                     itr.actual_count,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE));
-    if(actual_is_single)
-    {
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                         u8" (",
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_CYAN),
-                                                         actual_type_name,
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U8_WHITE),
                                                          u8")");
     }
@@ -314,9 +227,9 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              u"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             u") If-then branch result mismatch: expected ",
+                                                             u") `if` with non-empty result requires an `else` branch: expected ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             itr.expected_count,
+                                                             ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
             if(expected_is_single)
             {
@@ -324,20 +237,6 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                                  u" (",
                                                                  UWVM_WIN32_TEXTATTR_YELLOW,
                                                                  expected_type_name,
-                                                                 UWVM_WIN32_TEXTATTR_WHITE,
-                                                                 u")");
-            }
-            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                             u", got ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             itr.actual_count,
-                                                             UWVM_WIN32_TEXTATTR_WHITE);
-            if(actual_is_single)
-            {
-                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                                 u" (",
-                                                                 UWVM_WIN32_TEXTATTR_CYAN,
-                                                                 actual_type_name,
                                                                  UWVM_WIN32_TEXTATTR_WHITE,
                                                                  u")");
             }
@@ -354,9 +253,9 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                      u"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     u") If-then branch result mismatch: expected ",
+                                                     u") `if` with non-empty result requires an `else` branch: expected ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
-                                                     itr.expected_count,
+                                                     ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
     if(expected_is_single)
     {
@@ -364,20 +263,6 @@ else if constexpr(::std::same_as<char_type, char16_t>)
                                                          u" (",
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_YELLOW),
                                                          expected_type_name,
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
-                                                         u")");
-    }
-    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     u", got ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                     itr.actual_count,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE));
-    if(actual_is_single)
-    {
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                         u" (",
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_CYAN),
-                                                         actual_type_name,
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U16_WHITE),
                                                          u")");
     }
@@ -402,9 +287,9 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                              UWVM_WIN32_TEXTATTR_WHITE,
                                                              U"(offset=",
                                                              ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                             U") If-then branch result mismatch: expected ",
+                                                             U") `if` with non-empty result requires an `else` branch: expected ",
                                                              UWVM_WIN32_TEXTATTR_YELLOW,
-                                                             itr.expected_count,
+                                                             ime.expected_count,
                                                              UWVM_WIN32_TEXTATTR_WHITE);
             if(expected_is_single)
             {
@@ -412,20 +297,6 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                                  U" (",
                                                                  UWVM_WIN32_TEXTATTR_YELLOW,
                                                                  expected_type_name,
-                                                                 UWVM_WIN32_TEXTATTR_WHITE,
-                                                                 U")");
-            }
-            ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                             U", got ",
-                                                             UWVM_WIN32_TEXTATTR_CYAN,
-                                                             itr.actual_count,
-                                                             UWVM_WIN32_TEXTATTR_WHITE);
-            if(actual_is_single)
-            {
-                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                                 U" (",
-                                                                 UWVM_WIN32_TEXTATTR_CYAN,
-                                                                 actual_type_name,
                                                                  UWVM_WIN32_TEXTATTR_WHITE,
                                                                  U")");
             }
@@ -442,9 +313,9 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                      U"(offset=",
                                                      ::fast_io::mnp::addrvw(errout.err.err_curr - errout.module_begin),
-                                                     U") If-then branch result mismatch: expected ",
+                                                     U") `if` with non-empty result requires an `else` branch: expected ",
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
-                                                     itr.expected_count,
+                                                     ime.expected_count,
                                                      ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));
     if(expected_is_single)
     {
@@ -452,20 +323,6 @@ else if constexpr(::std::same_as<char_type, char32_t>)
                                                          U" (",
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_YELLOW),
                                                          expected_type_name,
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
-                                                         U")");
-    }
-    ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                     U", got ",
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                     itr.actual_count,
-                                                     ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE));
-    if(actual_is_single)
-    {
-        ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
-                                                         U" (",
-                                                         ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_CYAN),
-                                                         actual_type_name,
                                                          ::fast_io::mnp::cond(enable_ansi, UWVM_AES_U32_WHITE),
                                                          U")");
     }

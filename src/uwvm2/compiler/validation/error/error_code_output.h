@@ -133,6 +133,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_if_then_result_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::if_missing_else:
+            {
+#include "error_code_outputs/eco_if_missing_else.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch:
+            {
+#include "error_code_outputs/eco_end_result_mismatch.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::trailing_code_after_end:
+            {
+#include "error_code_outputs/eco_trailing_code_after_end.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index:
             {
 #include "error_code_outputs/eco_invalid_label_index.h"

@@ -164,6 +164,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         ::std::size_t operand_stack_base{};
         block_type type{};
         bool polymorphic_base{};
+        bool then_polymorphic_end{};  // only meaningful for if/else frames
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -585,6 +586,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         case 0x40u:
                         {
                             block_result = {};
+                            break;
                         }
                         case static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(
                             ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32):
@@ -715,6 +717,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         }
                     }
 
+                    // Record then-branch reachability to merge with else at `end`.
+                    if_frame.then_polymorphic_end = is_polymorphic;
+
                     // Start else branch with the operand stack at if-entry height.
                     while(operand_stack.size() > if_frame.operand_stack_base) { operand_stack.pop_back_unchecked(); }
                     is_polymorphic = if_frame.polymorphic_base;
@@ -726,7 +731,173 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::end:
                 {
-                    /// @todo
+                    // end    ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // end    ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // end    ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // `end` closes the innermost control frame (block/loop/if/function) and checks that the current
+                    // operand stack matches the declared block result type.
+
+                    if(control_flow_stack.empty()) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    auto const frame{control_flow_stack.back_unchecked()};
+                    bool const is_function_frame{frame.type == block_type::function};
+
+                    ::uwvm2::utils::container::u8string_view block_kind;  // no initialization necessary
+                    switch(frame.type)
+                    {
+                        case block_type::function:
+                        {
+                            block_kind = u8"function";
+                            break;
+                        }
+                        case block_type::block:
+                        {
+                            block_kind = u8"block";
+                            break;
+                        }
+                        case block_type::loop:
+                        {
+                            block_kind = u8"loop";
+                            break;
+                        }
+                        case block_type::if_:
+                        {
+                            block_kind = u8"if";
+                            break;
+                        }
+                        case block_type::else_:
+                        {
+                            block_kind = u8"if-else";
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            block_kind = u8"block";
+                            break;
+                        }
+                    }
+
+                    auto const expected_count{static_cast<::std::size_t>(frame.result.end - frame.result.begin)};
+
+                    // Special rule: an `if` with a non-empty result type must have an `else` branch, otherwise the
+                    // false branch would not produce the required values.
+                    if(frame.type == block_type::if_ && expected_count != 0uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.if_missing_else.expected_count = expected_count;
+                        err.err_selectable.if_missing_else.expected_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::if_missing_else;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    auto const base{frame.operand_stack_base};
+                    auto const stack_size{operand_stack.size()};
+                    auto const actual_count{stack_size >= base ? stack_size - base : 0uz};
+
+                    if(!is_polymorphic)
+                    {
+                        if(actual_count != expected_count) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_selectable.end_result_mismatch.block_kind = block_kind;
+                            err.err_selectable.end_result_mismatch.expected_count = expected_count;
+                            err.err_selectable.end_result_mismatch.actual_count = actual_count;
+                            if(expected_count == 1uz)
+                            {
+                                err.err_selectable.end_result_mismatch.expected_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
+                            }
+                            else
+                            {
+                                err.err_selectable.end_result_mismatch.expected_type = {};
+                            }
+                            if(actual_count == 1uz && stack_size != 0uz)
+                            {
+                                err.err_selectable.end_result_mismatch.actual_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_stack.back_unchecked().type);
+                            }
+                            else
+                            {
+                                err.err_selectable.end_result_mismatch.actual_type = {};
+                            }
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+
+                        if(expected_count != 0uz)
+                        {
+                            for(::std::size_t i{}; i != expected_count; ++i)
+                            {
+                                auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
+                                auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
+                                if(actual_type != expected_type) [[unlikely]]
+                                {
+                                    err.err_curr = op_begin;
+                                    err.err_selectable.end_result_mismatch.block_kind = block_kind;
+                                    err.err_selectable.end_result_mismatch.expected_count = expected_count;
+                                    err.err_selectable.end_result_mismatch.actual_count = actual_count;
+                                    err.err_selectable.end_result_mismatch.expected_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                                    err.err_selectable.end_result_mismatch.actual_type =
+                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                    err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch;
+                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                }
+                            }
+                        }
+                    }
+
+                    // Leave the frame: discard any intermediate values and push the declared results for outer typing.
+                    while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
+                    for(::std::size_t i{}; i != expected_count; ++i) { operand_stack.push_back({frame.result.begin[i]}); }
+
+                    // Restore / merge the polymorphic state.
+                    if(frame.type == block_type::else_)
+                    {
+                        // For if-else, continuation is unreachable only when both branches are unreachable.
+                        is_polymorphic = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic);
+                    }
+                    else
+                    {
+                        is_polymorphic = frame.polymorphic_base;
+                    }
+
+                    // Pop the control frame.
+                    control_flow_stack.pop_back_unchecked();
+
+                    // The function body is a single expression terminated by `end`. When the function frame is closed,
+                    // validation of this function is complete and `end` must be the last opcode in the body.
+                    if(is_function_frame)
+                    {
+                        if(code_curr != code_end) [[unlikely]]
+                        {
+                            err.err_curr = op_begin;
+                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::trailing_code_after_end;
+                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                        }
+                        return;
+                    }
+
                     break;
                 }
                 case wasm1_code::br:
