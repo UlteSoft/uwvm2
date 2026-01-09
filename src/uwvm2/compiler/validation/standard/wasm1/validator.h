@@ -5142,6 +5142,68 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::memory_size:
                 {
+                    // memory.size memidx ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // memory.size memidx ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // memory.size memidx ...
+                    // [ safe    ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
+
+                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                    auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                            ::fast_io::mnp::leb128_get(memidx))};
+                    if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memory_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
+                    }
+
+                    // memory.size memidx ...
+                    // [ safe           ] unsafe (could be the section_end)
+                    //             ^^ code_curr
+
+                    code_curr = reinterpret_cast<::std::byte const*>(mem_next);
+
+                    // memory.size memidx ...
+                    // [ safe           ] unsafe (could be the section_end)
+                    //                    ^^ code_curr
+
+                    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+                    if(memidx != 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.illegal_memory_index.memory_index = memidx;
+                        err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memory_index;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    if(all_memory_count == 0u) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.no_memory.op_code_name = u8"memory.size";
+                        err.err_selectable.no_memory.align = 0u;
+                        err.err_selectable.no_memory.offset = 0u;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // Stack effect: () -> (i32)
+                    operand_stack.push_back({::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32});
                     break;
                 }
                 case wasm1_code::memory_grow:

@@ -186,6 +186,16 @@ int main()
                 errout.err.err_selectable.illegal_table_index.all_table_count = 1u;
                 break;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memory_index:
+            {
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memory_index:
+            {
+                errout.err.err_selectable.illegal_memory_index.memory_index = 1u;
+                errout.err.err_selectable.illegal_memory_index.all_memory_count = 1u;
+                break;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
                 errout.err.err_selectable.local_variable_type_mismatch.local_index = 3u;
