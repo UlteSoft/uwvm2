@@ -52,7 +52,7 @@ int main()
     ::uwvm2::compiler::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
-    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch)};
+    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -286,6 +286,16 @@ int main()
                 errout.err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store32";
                 errout.err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 errout.err.err_selectable.store_value_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32:
+            {
+                errout.err.err_selectable.memory_grow_delta_type_not_i32.delta_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate:
+            {
+                errout.err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
                 break;
             }
             default: break;

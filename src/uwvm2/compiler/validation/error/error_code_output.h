@@ -268,6 +268,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_store_value_type_mismatch.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32:
+            {
+#include "error_code_outputs/eco_memory_grow_delta_type_not_i32.h"
+                return;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate:
+            {
+#include "error_code_outputs/eco_invalid_const_immediate.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

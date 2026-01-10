@@ -97,6 +97,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         invalid_local_index,
         illegal_local_index,
         store_value_type_mismatch,
+        memory_grow_delta_type_not_i32,
+        invalid_const_immediate,
     };
 
     /// @brief define IEEE 754 F32 and F64
@@ -266,6 +268,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type;
     };
 
+    struct memory_grow_delta_type_not_i32_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::value_type delta_type;
+    };
+
+    struct invalid_const_immediate_err_t
+    {
+        ::uwvm2::utils::container::u8string_view op_code_name;
+    };
+
     /// @brief Additional information provided by wasm error
     union code_validation_error_selectable_t
     {
@@ -346,6 +358,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 
         store_value_type_mismatch_err_t store_value_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<store_value_type_mismatch_err_t> && ::std::is_trivially_destructible_v<store_value_type_mismatch_err_t>);
+
+        memory_grow_delta_type_not_i32_err_t memory_grow_delta_type_not_i32;
+        static_assert(::std::is_trivially_copyable_v<memory_grow_delta_type_not_i32_err_t> &&
+                      ::std::is_trivially_destructible_v<memory_grow_delta_type_not_i32_err_t>);
+
+        invalid_const_immediate_err_t invalid_const_immediate;
+        static_assert(::std::is_trivially_copyable_v<invalid_const_immediate_err_t> && ::std::is_trivially_destructible_v<invalid_const_immediate_err_t>);
 
         ::std::byte const* err_end;
         ::std::size_t err_uz;
