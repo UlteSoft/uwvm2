@@ -776,6 +776,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         define_imported_and_defined_exceeding_checker(sec_adl, final_extern_type_adl, module_storage, importsec_importdesc_begin, section_curr, err, fs_para);
 #endif
+
+        constexpr bool allow_multi_memory{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_memory<Fs...>()};
+        if constexpr(!allow_multi_memory)
+        {
+            // When multiple memory allocations are not permitted, ensure no more than one is checked.
+
+            constexpr auto mem_pos{
+                static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::memory)};
+
+            if(importsec_importdesc_begin[mem_pos].size() > 1uz) [[unlikely]]
+            {
+                // Point to the 2nd imported memory's name for a more useful offset.
+                err.err_curr = reinterpret_cast<::std::byte const*>(importsec_importdesc_begin[mem_pos].index_unchecked(1uz)->module_name.data());
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_memory;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+
+        constexpr bool allow_multi_table{::uwvm2::parser::wasm::standard::wasm1::features::allow_multi_table<Fs...>()};
+        if constexpr(!allow_multi_table)
+        {
+            // When multiple table allocations are not permitted, ensure no more than one is checked.
+            constexpr auto table_pos{
+                static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::table)};
+
+            if(importsec_importdesc_begin[table_pos].size() > 1uz) [[unlikely]]
+            {
+                // Point to the 2nd imported table's name for a more useful offset.
+                err.err_curr = reinterpret_cast<::std::byte const*>(importsec_importdesc_begin[table_pos].index_unchecked(1uz)->module_name.data());
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
     }
 
     /// @brief Wrapper for the import section storage structure
