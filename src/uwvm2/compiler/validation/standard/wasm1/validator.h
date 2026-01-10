@@ -6276,46 +6276,796 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 }
                 case wasm1_code::i64_eqz:
                 {
+                    // i64.eqz ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.eqz ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.eqz ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.empty()) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.eqz";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    bool operand_from_stack{};
+                    curr_operand_stack_value_type operand_type{};
+                    if(!operand_stack.empty())
+                    {
+                        operand_from_stack = true;
+                        operand_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && operand_from_stack && operand_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.eqz";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_eq:
                 {
+                    // i64.eq  ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.eq  ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.eq  ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.eq";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.eq";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.eq";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_ne:
                 {
+                    // i64.ne  ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.ne  ...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.ne  ...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.ne";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ne";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ne";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_lt_s:
                 {
+                    // i64.lt_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.lt_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.lt_s...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.lt_s";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.lt_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.lt_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_lt_u:
                 {
+                    // i64.lt_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.lt_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.lt_u...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.lt_u";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.lt_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.lt_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_gt_s:
                 {
+                    // i64.gt_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.gt_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.gt_s...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.gt_s";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.gt_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.gt_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_gt_u:
                 {
+                    // i64.gt_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.gt_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.gt_u...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.gt_u";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.gt_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.gt_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_le_s:
                 {
+                    // i64.le_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.le_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.le_s...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.le_s";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.le_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.le_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_le_u:
                 {
+                    // i64.le_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.le_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.le_u...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.le_u";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.le_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.le_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_ge_s:
                 {
+                    // i64.ge_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.ge_s...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.ge_s...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.ge_s";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ge_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ge_s";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::i64_ge_u:
                 {
+                    // i64.ge_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ code_curr
+
+                    auto const op_begin{code_curr};
+
+                    // i64.ge_u...
+                    // [safe] unsafe (could be the section_end)
+                    // ^^ op_begin
+
+                    ++code_curr;
+
+                    // i64.ge_u...
+                    // [safe] unsafe (could be the section_end)
+                    //        ^^ code_curr
+
+                    // Stack effect: (i64 i64) -> (i32)
+
+                    if(!is_polymorphic && operand_stack.size() < 2uz) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.ge_u";
+                        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
+                        err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type rhs_type{};
+                    bool rhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        rhs_from_stack = true;
+                        rhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && rhs_from_stack && rhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ge_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(rhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    curr_operand_stack_value_type lhs_type{};
+                    bool lhs_from_stack{};
+                    if(!operand_stack.empty())
+                    {
+                        lhs_from_stack = true;
+                        lhs_type = operand_stack.back_unchecked().type;
+                        operand_stack.pop_back_unchecked();
+                    }
+
+                    if(!is_polymorphic && lhs_from_stack && lhs_type != curr_operand_stack_value_type::i64) [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i64.ge_u";
+                        err.err_selectable.numeric_operand_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
+                        err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(lhs_type);
+                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    operand_stack.push_back({curr_operand_stack_value_type::i32});
+
                     break;
                 }
                 case wasm1_code::f32_eq:
