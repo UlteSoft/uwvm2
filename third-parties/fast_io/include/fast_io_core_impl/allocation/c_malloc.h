@@ -5,6 +5,7 @@
 #elif __has_include(<malloc_np.h>)
 #include <malloc_np.h>
 #endif
+#include <cstdlib>
 
 namespace fast_io
 {
@@ -197,6 +198,30 @@ public:
 			::fast_io::noexcept_call(_aligned_free, p);
 		}
 	}
+#elif !defined(__MSDOS__) && 0
+	static inline void *allocate_aligned(::std::size_t alignment, ::std::size_t n) noexcept
+	{
+		if (n == 0)
+		{
+			n = 1;
+		}
+		void *p =
+#if FAST_IO_HAS_BUILTIN(__builtin_aligned_alloc)
+			__builtin_aligned_alloc(alignment, n)
+#else
+			::std::aligned_alloc(alignment, n)
+#endif
+			;
+		if (p == nullptr)
+		{
+			::fast_io::fast_terminate();
+		}
+		return p;
+	}
+	static inline void deallocate_aligned(void *p, ::std::size_t) noexcept
+	{
+		deallocate(p);
+	}
 #endif
 	static inline void deallocate(void *p) noexcept
 	{
@@ -204,9 +229,9 @@ public:
 		{
 			return;
 		}
-		
+
 #if FAST_IO_HAS_BUILTIN(__builtin_free)
-        __builtin_free
+		__builtin_free
 #else
 		::std::free
 #endif

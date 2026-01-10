@@ -1611,9 +1611,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                         switch(vt_u8)
                         {
-                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32):
-                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64):
-                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32):
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32): [[fallthrough]];
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64): [[fallthrough]];
+                            case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32): [[fallthrough]];
                             case static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64):
                             {
                                 actual_global_local_imported.type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(vt_u8);
@@ -2119,6 +2119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local functions and code. "); }
+
             // local defined function + code
             {
                 auto const defined_func_count{funcsec.funcs.size()};
@@ -2195,6 +2196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local tables. "); }
+
             // local defined table
             {
                 out.local_defined_table_vec_storage.reserve(tablesec.tables.size());
@@ -2208,6 +2210,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local memories. "); }
+
             // local defined memory
             {
                 out.local_defined_memory_vec_storage.reserve(memorysec.memories.size());
@@ -2221,6 +2224,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local globals. "); }
+            
             // local defined global
             {
                 out.local_defined_global_vec_storage.reserve(globalsec.local_globals.size());

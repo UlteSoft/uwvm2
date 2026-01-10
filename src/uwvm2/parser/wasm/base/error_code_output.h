@@ -378,6 +378,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 #include "error_code_outputs/eco_memory_section_resolved_not_match_the_actual_number.h"
                 return;
             }
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::memory_section_resolved_exceeded_the_maximum_value:
+            {
+#include "error_code_outputs/eco_memory_section_resolved_exceeded_the_maximum_value.h"
+                return;
+            }
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::imp_def_num_exceed_u32max:
             {
 #include "error_code_outputs/eco_imp_def_num_exceed_u32max.h"
@@ -548,9 +553,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::base
 #include "error_code_outputs/eco_invalid_clocal_n.h"
                 return;
             }
-            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::final_list_of_locals_exceeds_the_maximum_value_of_u32max:
+            case ::uwvm2::parser::wasm::base::wasm_parse_error_code::final_list_of_locals_exceeds_the_maximum_value_of_u32max_minus_parameter_size:
             {
-#include "error_code_outputs/eco_final_list_of_locals_exceeds_the_maximum_value_of_u32max.h"
+#include "error_code_outputs/eco_final_list_of_locals_exceeds_the_maximum_value_of_u32max_minus_parameter_size.h"
                 return;
             }
             case ::uwvm2::parser::wasm::base::wasm_parse_error_code::code_section_resolved_not_match_the_actual_number:

@@ -90,6 +90,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::uwvm2::parser::wasm::concepts::operation::root_of_replacement,
             ::uwvm2::parser::wasm::concepts::text_format_wapper<::uwvm2::parser::wasm::text_format::text_format::utf8_rfc3629>>;
 
+        /// @brief Default code validation dispatch feature (can be replaced by other features)
+        using code_version = ::uwvm2::parser::wasm::concepts::operation::type_replacer<::uwvm2::parser::wasm::concepts::operation::root_of_replacement,
+                                                                                       ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version>;
+
         // type section
         template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         using type_type =
@@ -189,6 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     // binfmt ver1
     static_assert(::uwvm2::parser::wasm::binfmt::ver1::has_final_check<wasm1>);
     static_assert(::uwvm2::parser::wasm::binfmt::ver1::has_binfmt_ver1_extensible_section_define<wasm1>);
+    static_assert(::uwvm2::parser::wasm::binfmt::ver1::has_code_version_reserve_type<wasm1>);
 
     // order
     static_assert(::uwvm2::parser::wasm::binfmt::ver1::has_section_sequential_packer<wasm1>);

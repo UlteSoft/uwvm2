@@ -391,7 +391,7 @@ public:
 		this->construct_vector_common_impl(::std::ranges::begin(rg), ::std::ranges::end(rg));
 	}
 
-	inline explicit constexpr vector(::std::initializer_list<value_type> ilist) noexcept(::std::is_nothrow_move_constructible_v<value_type>)
+	inline explicit constexpr vector(::std::initializer_list<value_type> ilist) noexcept(::std::is_nothrow_copy_constructible_v<value_type>)
 	{
 		this->construct_vector_common_impl(ilist.begin(), ilist.end());
 	}

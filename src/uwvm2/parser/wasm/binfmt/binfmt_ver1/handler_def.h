@@ -522,6 +522,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     concept has_custom_section_sequential_mapping_table_define = requires {
         details::find_from_custom_section_sequential_mapping_table(final_section_sequential_packer_t<Fs...>::custom_section_sequential_mapping_table, {});
     };
+
+    /// @brief Prevent inheritance effects when adl matching
+    template <typename FeatureType>
+    struct code_version_reserve_type_t
+    {
+        using feature_type = FeatureType;
+
+        static_assert(::std::is_same_v<::std::remove_cvref_t<FeatureType>, FeatureType>,
+                      "code_version_reserve_type_t: typename 'FeatureType' cannot have refer and const attributes");
+        explicit constexpr code_version_reserve_type_t() noexcept = default;
+    };
+
+    template <typename FeatureType>
+    inline constexpr code_version_reserve_type_t<FeatureType> code_version_reserve_type{};
+
+    /// @brief      has final_check type
+    /// @details
+    ///             ```cpp
+    ///
+    ///             struct basic_final_check
+    ///             {
+    ///             };
+    ///
+    ///             struct F
+    ///             {
+    ///                 template <typename ... Fs>
+    ///                 using final_check = type_replacer<root_of_replacement, basic_final_check>;
+    ///             };
+    ///             ```
+    template <typename FeatureType>
+    concept has_code_version_reserve_type = requires {
+        typename FeatureType::code_version;
+        requires ::uwvm2::parser::wasm::concepts::operation::details::check_is_type_replacer<::uwvm2::parser::wasm::concepts::operation::type_replacer,
+                                                                                             typename FeatureType::code_version>;
+    };
+
+    template <typename FeatureType>
+    inline consteval auto get_code_version_reserve_type() noexcept
+    {
+        if constexpr(has_code_version_reserve_type<FeatureType>) { return typename FeatureType::code_version{}; }
+        else
+        {
+            return ::uwvm2::parser::wasm::concepts::operation::irreplaceable_t{};
+        }
+    }
+
+    template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
+    using final_code_version_reserve_type_t =
+        ::uwvm2::parser::wasm::concepts::operation::replacement_structure_t<decltype(get_code_version_reserve_type<Fs>())...>;
 }
 
 #ifndef UWVM_MODULE
