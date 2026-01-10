@@ -781,14 +781,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         if constexpr(!allow_multi_memory)
         {
             // When multiple memory allocations are not permitted, ensure no more than one is checked.
-
             constexpr auto mem_pos{
                 static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::memory)};
+            static_assert(mem_pos < importdesc_count);
 
             if(importsec_importdesc_begin[mem_pos].size() > 1uz) [[unlikely]]
             {
                 // Point to the 2nd imported memory's name for a more useful offset.
-                err.err_curr = reinterpret_cast<::std::byte const*>(importsec_importdesc_begin[mem_pos].index_unchecked(1uz)->module_name.data());
+                err.err_curr = section_curr;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_memory;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -800,11 +800,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             // When multiple table allocations are not permitted, ensure no more than one is checked.
             constexpr auto table_pos{
                 static_cast<::std::size_t>(decltype(::uwvm2::parser::wasm::standard::wasm1::features::final_extern_type_t<Fs...>{}.type)::table)};
+            static_assert(table_pos < importdesc_count);
 
             if(importsec_importdesc_begin[table_pos].size() > 1uz) [[unlikely]]
             {
                 // Point to the 2nd imported table's name for a more useful offset.
-                err.err_curr = reinterpret_cast<::std::byte const*>(importsec_importdesc_begin[table_pos].index_unchecked(1uz)->module_name.data());
+                err.err_curr = section_curr;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
