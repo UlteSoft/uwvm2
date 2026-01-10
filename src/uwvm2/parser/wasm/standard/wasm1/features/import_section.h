@@ -787,7 +787,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             if(importsec_importdesc_begin[mem_pos].size() > 1uz) [[unlikely]]
             {
-                // Point to the 2nd imported memory's name for a more useful offset.
                 err.err_curr = section_curr;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_memory;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
@@ -804,7 +803,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
             if(importsec_importdesc_begin[table_pos].size() > 1uz) [[unlikely]]
             {
-                // Point to the 2nd imported table's name for a more useful offset.
                 err.err_curr = section_curr;
                 err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::wasm1_not_allow_multi_table;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
