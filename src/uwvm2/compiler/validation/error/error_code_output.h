@@ -278,6 +278,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
 #include "error_code_outputs/eco_invalid_const_immediate.h"
                 return;
             }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch:
+            {
+#include "error_code_outputs/eco_numeric_operand_type_mismatch.h"
+                return;
+            }
             case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
             {
 #include "error_code_outputs/eco_not_local_function.h"

@@ -52,7 +52,8 @@ int main()
     ::uwvm2::compiler::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
-    auto const last_ec{static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate)};
+    auto const last_ec{
+        static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
@@ -296,6 +297,15 @@ int main()
             case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate:
             {
                 errout.err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
+                break;
+            }
+            case ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch:
+            {
+                errout.err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i32.eq";
+                errout.err.err_selectable.numeric_operand_type_mismatch.expected_type =
+                    ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
+                errout.err.err_selectable.numeric_operand_type_mismatch.actual_type =
+                    ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
             default: break;
