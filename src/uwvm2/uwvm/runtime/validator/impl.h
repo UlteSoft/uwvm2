@@ -5,11 +5,9 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Release 1.0 (2019-07-20)
- * @details     antecedent dependency: null
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-02
+ * @date        2025-04-05
  * @copyright   APL-2.0 License
  */
 
@@ -25,7 +23,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "error.h"
-# include "error_code_output.h"
+# include "validate.h"
 #endif
-
