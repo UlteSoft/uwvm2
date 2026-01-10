@@ -308,7 +308,6 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", {public = is_debug_mode})
 			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", {public = is_debug_mode})
 		end
-				
 		-- third-parties/bizwen
 		add_includedirs("third-parties/bizwen/include")
 
@@ -350,6 +349,38 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
 		if is_libfuzzer then
 			if get_config("use-llvm") and test_libfuzzer then
+				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
+				if need_wabt then
+					local function try_add_wabt(wabt_root)
+						local wabt_include = path.join(wabt_root, "include")
+						local wabt_build = path.join(wabt_root, "build")
+						local wabt_config = path.join(wabt_build, "include/wabt/config.h")
+						local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
+							os.isfile(path.join(wabt_build, "libwabt.so")) or
+							os.isfile(path.join(wabt_build, "libwabt.dylib")) or
+							os.isfile(path.join(wabt_build, "wabt.lib"))
+
+						if os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib then
+							add_includedirs(wabt_include, path.join(wabt_build, "include"))
+							add_linkdirs(wabt_build)
+							add_links("wabt")
+							-- libwabt may depend on OpenSSL's libcrypto (e.g. SHA256)
+							if not is_plat("windows") then
+								add_syslinks("crypto")
+							end
+							return true
+						end
+
+						return false
+					end
+
+						if not (try_add_wabt("third-parties/wabt") or try_add_wabt("wabt")) then
+							os.raise("wabt is required for " .. name .. " but no built artifacts were found. " ..
+								"Build it first (example): cmake -S third-parties/wabt -B third-parties/wabt/build " ..
+								"-DBUILD_TESTS=OFF -DBUILD_TOOLS=OFF -DBUILD_LIBWASM=OFF && cmake --build third-parties/wabt/build --target wabt")
+						end
+					end
+
 				add_cxflags("-fsanitize=fuzzer", {force = true})
 				add_ldflags("-fsanitize=fuzzer", {force = true})
 				-- change the env variables in ci to change the default values
@@ -358,9 +389,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				local maxlen   = os.getenv("FUZZ_MAX_LEN") or "1024"
 				add_tests("fuzz", {group = "libfuzzer",runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen }}) -- xmake test -g libfuzzer
 				add_files(file)
-			elseif not get_config("use-llvm") and test_libfuzzer then
-			    error("Libfuzzer is not supported on this platform, please use llvm toolchain.")
-			end
+				elseif not get_config("use-llvm") and test_libfuzzer then
+			    os.raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
+				end
 		else
 			add_tests("unit", {group = "default"}) -- xmake test -g default
 			add_files(file)
