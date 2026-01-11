@@ -93,6 +93,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
         ::uwvm2::utils::debug::timer parsing_timer{u8"parse custom section: name"};
 #endif
 
+        // assume end >= begin
+
         // The name section should appear only once in a module, and only after the data section.
         // Here, check that only one remains.
         // After the data section is checked by the parser.
@@ -1060,9 +1062,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 #endif
                 [[unlikely]] default:
                 {
+#if 0
+                    // unknown subsection IDs are supposed to be ignored/skipped for forward compatibility
                     err.emplace_back(section_id_ptr,
                                      ::uwvm2::parser::wasm_custom::customs::name_err_type_t::illegal_section_id,
                                      ::uwvm2::parser::wasm_custom::customs::name_err_storage_t{.u8 = section_id});
+#endif
 
                     // Jump directly to the next loop
                     curr = map_end;

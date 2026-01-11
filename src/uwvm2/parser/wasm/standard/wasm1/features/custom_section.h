@@ -38,6 +38,7 @@
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/utf/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
@@ -145,6 +146,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         //                                    ^^ section_curr
 
         cs.custom_name = ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr), name_len};
+
+        // wasm custom section name is encoded as UTF-8 (Name); validate it.
+        {
+            auto const [utf8pos,
+                        utf8err]{::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(cs.custom_name.cbegin(),
+                                                                                                                                        cs.custom_name.cend())};
+
+            if(utf8err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+            {
+                err.err_curr = reinterpret_cast<::std::byte const*>(utf8pos);
+                err.err_selectable.u32 = static_cast<::std::uint_least32_t>(utf8err);
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::invalid_char_sequence;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
 
         // check custom order
         if constexpr(::uwvm2::parser::wasm::binfmt::ver1::has_custom_section_sequential_mapping_table_define<Fs...>)
