@@ -149,11 +149,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         // wasm custom section name is encoded as UTF-8 (Name); validate it.
         {
-            auto const* const name_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr)};
-            auto const* const name_end{name_begin + name_len};
+            auto const name_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(section_curr)};
+            auto const name_end{name_begin + name_len};
 
-            auto const [utf8pos, utf8err]{::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(name_begin,
-                                                                                                                                            name_end)};
+            auto const [utf8pos,
+                        utf8err]{::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(name_begin, name_end)};
 
             if(utf8err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
             {
