@@ -282,14 +282,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
             // [         safe          ] unsafe (could be the module_end)
             //                           ^^ module_curr
 
-            // Note that module_curr may be equal to module_end
-            // Check here to see if there is a one-byte section_id
-            // same as static_cast<::std::size_t>(module_end - module_curr) < 1uz
+            // Note that module_curr may be equal to module_end: the wasm module may be empty (no sections),
+            // which is valid per spec. In this case, skip the section loop and run final checks.
             if(module_curr == module_end) [[unlikely]]
             {
-                err.err_curr = module_curr;
-                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::no_wasm_section_found;
-                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                if constexpr(has_final_check_handler<Fs...>)
+                {
+                    constexpr ::uwvm2::parser::wasm::concepts::feature_reserve_type_t<::uwvm2::parser::wasm::binfmt::ver1::final_final_check_t<Fs...>>
+                        final_adl{};
+                    define_final_check(final_adl, ret, module_end, err, fs_para);
+                }
+
+                return ret;
             }
 
             // [00 61 73 6D 01 00 00 00 sec_id] sec_len ...
