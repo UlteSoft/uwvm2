@@ -222,38 +222,44 @@ namespace
 
         Errors errors;
         Module module;
-        Features features;
+        Features validate_features;
 
         // Restrict to a Wasm1 MVP-like feature set (match UWVM wasm1 implementation as closely as possible).
-        features.disable_exceptions();
-        features.disable_sat_float_to_int();
-        features.disable_sign_extension();
-        features.disable_simd();
-        features.disable_threads();
-        features.disable_function_references();
-        features.disable_multi_value();
-        features.disable_tail_call();
-        features.disable_bulk_memory();
-        features.disable_reference_types();
-        features.disable_code_metadata();
-        features.disable_annotations();
-        features.disable_gc();
-        features.disable_memory64();
-        features.disable_multi_memory();
-        features.disable_extended_const();
-        features.disable_relaxed_simd();
-        features.disable_custom_page_sizes();
+        validate_features.disable_exceptions();
+        validate_features.disable_sat_float_to_int();
+        validate_features.disable_sign_extension();
+        validate_features.disable_simd();
+        validate_features.disable_threads();
+        validate_features.disable_function_references();
+        validate_features.disable_multi_value();
+        validate_features.disable_tail_call();
+        validate_features.disable_bulk_memory();
+        validate_features.disable_reference_types();
+        validate_features.disable_code_metadata();
+        validate_features.disable_annotations();
+        validate_features.disable_gc();
+        validate_features.disable_memory64();
+        validate_features.disable_multi_memory();
+        validate_features.disable_extended_const();
+        validate_features.disable_relaxed_simd();
+        validate_features.disable_custom_page_sizes();
 
         const bool kStopOnFirstError = true;
         const bool kReadDebugNames = wabt_strict_mode();
         const bool kFailOnCustomSectionError = wabt_strict_mode();
 
-        ReadBinaryOptions read_options(features, nullptr, kReadDebugNames, kStopOnFirstError, kFailOnCustomSectionError);
+        // WABT's binary reader can hit debug assertions when `reference_types` is disabled and a typed-ref marker
+        // (e.g. `ref.null`) appears. Parse with `reference_types` enabled to avoid aborting, but validate with the
+        // strict feature set above so these inputs still fail validation as expected.
+        Features read_features{validate_features};
+        read_features.enable_reference_types();
+
+        ReadBinaryOptions read_options(read_features, nullptr, kReadDebugNames, kStopOnFirstError, kFailOnCustomSectionError);
 
         Result result = ReadBinaryIr("<buffer>", data, size, read_options, &errors, &module);
         if(Failed(result)) { return false; }
 
-        ValidateOptions validate_options(features);
+        ValidateOptions validate_options(validate_features);
         result = ValidateModule(&module, &errors, validate_options);
         return Succeeded(result);
     }
