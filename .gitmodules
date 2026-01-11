@@ -1,3 +1,0 @@
-[submodule "test/third-parties/wabt"]
-	path = test/third-parties/wabt
-	url = git@github.com:WebAssembly/wabt.git
