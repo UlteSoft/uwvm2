@@ -143,7 +143,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
 
     inline constexpr bool validate_all_wasm_code() noexcept
     {
-
         // validate all wasm code (full verification before execution)
         for(auto const& [module_name, mod]: ::uwvm2::uwvm::wasm::storage::all_module)
         {
