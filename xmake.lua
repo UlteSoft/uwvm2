@@ -397,8 +397,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						if os.isdir(wabt_root) then
 							print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
 							local build_dir = path.join(wabt_root, "build")
-							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
-							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt"})
+							-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
+							-- when fed malformed inputs (important for fuzzing/differential validation).
+							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
+							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 						else
 							raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
 						end

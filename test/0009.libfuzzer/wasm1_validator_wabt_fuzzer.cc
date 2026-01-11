@@ -249,10 +249,12 @@ namespace
         const bool kFailOnCustomSectionError = wabt_strict_mode();
 
         // WABT's binary reader can hit debug assertions when `reference_types` is disabled and a typed-ref marker
-        // (e.g. `ref.null`) appears. Parse with `reference_types` enabled to avoid aborting, but validate with the
+        // (e.g. `ref.null`) appears. Parse with `reference_types` (and related typed ref support) enabled to avoid
+        // aborting, but validate with the
         // strict feature set above so these inputs still fail validation as expected.
         Features read_features{validate_features};
         read_features.enable_reference_types();
+        read_features.enable_function_references();
 
         ReadBinaryOptions read_options(read_features, nullptr, kReadDebugNames, kStopOnFirstError, kFailOnCustomSectionError);
 
