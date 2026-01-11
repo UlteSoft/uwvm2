@@ -9,7 +9,10 @@ add_defines("UWVM_VERSION_Y=0")
 add_defines("UWVM_VERSION_Z=0")
 add_defines("UWVM_VERSION_S=0")
 
-set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd", "openbsd", "macosx", "iphoneos", "watchos", "wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3", "wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads", "wasm-emscripten", "serenity", "sun", "cross", "none")
+set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd",
+	"openbsd", "macosx", "iphoneos", "watchos", "wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3",
+	"wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads", "wasm-emscripten",
+	"serenity", "sun", "cross", "none")
 
 includes("xmake/impl.lua")
 includes("xmake/platform/impl.lua")
@@ -21,7 +24,6 @@ set_defaultmode("releasedbg")
 set_allowedmodes(support_rules_table)
 
 function def_build()
-
 	if is_mode("debug") then
 		add_rules("debug")
 	elseif is_mode("release") then
@@ -32,7 +34,7 @@ function def_build()
 		add_rules("releasedbg")
 	end
 
-    set_languages("c23", "cxx26")
+	set_languages("c23", "cxx26")
 
 	set_encodings("utf-8")
 	set_warnings("all", "extra", "pedantic", "error")
@@ -42,36 +44,36 @@ function def_build()
 		add_defines("UWVM_MODULE")
 		set_policy("build.c++.modules", true)
 		-- set_policy("build.c++.modules.std", true)
-	end 
+	end
 
 	local use_stdlib = get_config("stdlib")
 	if use_stdlib ~= "default" and use_stdlib then
 		local flags = "-stdlib=" .. use_stdlib
 		add_cxflags(flags)
 		add_ldflags(flags)
-	end 
+	end
 
 	local disable_cpp_exceptions = get_config("fno-exceptions")
 	if disable_cpp_exceptions then
 		set_exceptions("no-cxx")
 	end
 
-    local enable_debug_timer = get_config("debug-timer")
+	local enable_debug_timer = get_config("debug-timer")
 	if enable_debug_timer then
 		add_defines("UWVM_TIMER")
 	end
 
-    local enable_multithread_allocator_mem = get_config("use-multithread-allocator-memory")
+	local enable_multithread_allocator_mem = get_config("use-multithread-allocator-memory")
 	if enable_multithread_allocator_mem then
 		add_defines("UWVM_USE_MULTITHREAD_ALLOCATOR")
 	end
 
-    local disable_local_imported_wasip1 = get_config("disable-local-imported-wasip1")
+	local disable_local_imported_wasip1 = get_config("disable-local-imported-wasip1")
 	if disable_local_imported_wasip1 then
 		add_defines("UWVM_DISABLE_LOCAL_IMPORTED_WASIP1")
 	end
 
-    local enable_int = get_config("enable-int")
+	local enable_int = get_config("enable-int")
 	if not enable_int or enable_int == "none" then
 		add_defines("UWVM_DISABLE_INT")
 	elseif enable_int == "default" then
@@ -80,7 +82,7 @@ function def_build()
 		add_defines("UWVM_USE_UWVM_INT")
 	end
 
-    local enable_jit = get_config("enable-jit")
+	local enable_jit = get_config("enable-jit")
 	if not enable_jit or enable_jit == "none" then
 		add_defines("UWVM_DISABLE_JIT")
 	elseif enable_jit == "default" then
@@ -89,49 +91,49 @@ function def_build()
 		add_defines("UWVM_USE_LLVM_JIT")
 	end
 
-    local detailed_debug_check = get_config("detailed-debug-check")
+	local detailed_debug_check = get_config("detailed-debug-check")
 	if is_mode("debug") and detailed_debug_check then
 		add_defines("UWVM_ENABLE_DETAILED_DEBUG_CHECK")
 	end
 
-    if is_plat("windows") then
-        windows_target()
-    elseif is_plat("mingw") then
-        mingw_target()
+	if is_plat("windows") then
+		windows_target()
+	elseif is_plat("mingw") then
+		mingw_target()
 	elseif is_plat("linux") then
-        linux_target()
+		linux_target()
 	elseif is_plat("macosx", "iphoneos", "watchos") then
-        darwin_target()
+		darwin_target()
 	elseif is_plat("djgpp") then
-        djgpp_target()
+		djgpp_target()
 	elseif is_plat("unix", "bsd", "freebsd", "dragonflybsd", "netbsd", "openbsd") then
-        bsd_target()
-	elseif is_plat("wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3", "wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads") then 
+		bsd_target()
+	elseif is_plat("wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3", "wasm-wasi-threads", "wasm-wasip1-threads", "wasm-wasip2-threads", "wasm-wasip3-threads") then
 		wasm_wasi_target()
-	elseif is_plat("wasm-emscripten") then 
+	elseif is_plat("wasm-emscripten") then
 		wasm_emscripten_target()
 	elseif is_plat("cygwin") then
 		cygwin_target()
 	elseif is_plat("none") then
 		none_target()
-    end
+	end
 
 	local use_llvm_toolchain = get_config("use-llvm")
-    if use_llvm_toolchain then	
-        local llvm_target = get_config("llvm-target")
+	if use_llvm_toolchain then
+		local llvm_target = get_config("llvm-target")
 		if llvm_target ~= "detect" and llvm_target then
 			local llvm_target_cvt = "--target=" .. llvm_target
-			add_cxflags(llvm_target_cvt, {force = true})
-			add_ldflags(llvm_target_cvt, {force = true})
+			add_cxflags(llvm_target_cvt, { force = true })
+			add_ldflags(llvm_target_cvt, { force = true })
 		end
 
 		-- Since neither LLVM nor Wextra supports this parameter by default, this addition prevents compilation.
-		add_cxflags("-Wimplicit-fallthrough", {force = true})
-    end
+		add_cxflags("-Wimplicit-fallthrough", { force = true })
+	end
 
 	before_build(
-		function (target)
-			try 
+		function(target)
+			try
 			{
 				function()
 					local function git_available()
@@ -144,11 +146,11 @@ function def_build()
 						local result = os.iorun("git rev-parse --is-inside-work-tree")
 						return result and result:trim() == "true"
 					end
-					
+
 					if not git_available() or not is_git_repo() then
 						return
 					end
-					
+
 					-- General Git commands execute functions and return results or nil
 					local function git_command(cmd)
 						local result = os.iorun(cmd)
@@ -195,7 +197,7 @@ function def_build()
 							end
 						end
 					end
-					
+
 					-- Get submission timestamp (UTC)
 					local timestamp_str = git_command("git log -1 --format=%ct HEAD")
 					local timestamp = tonumber(timestamp_str) or 0
@@ -216,142 +218,143 @@ function def_build()
 					target:add("defines", "UWVM_GIT_REMOTE_URL=u8\"" .. remote_url .. "\"")
 					target:add("defines", "UWVM_GIT_COMMIT_DATA=u8\"" .. commit_date .. "\"")
 					target:add("defines", "UWVM_GIT_UPSTREAM_BRANCH=u8\"" .. upstream_branch .. "\"")
-					if is_dirty then 
+					if is_dirty then
 						target:add("defines", "UWVM_GIT_HAS_UNCOMMITTED_MODIFICATIONS")
 					end
- 				end,
-				catch  
+				end,
+				catch
 				{
-            	    function() 
-						return nil 
+					function()
+						return nil
 					end
-            	}
-        	}
+				}
+			}
 		end
 	)
-
 end
 
 target("uwvm")
-	set_kind("binary")
-	def_build()
+set_kind("binary")
+def_build()
 
-	local is_debug_mode = is_mode("debug") -- public all modules in debug mode
-	local enable_cxx_module = get_config("use-cxx-module")
+local is_debug_mode = is_mode("debug")  -- public all modules in debug mode
+local enable_cxx_module = get_config("use-cxx-module")
 
-	-- third-parties/fast_io
-	add_includedirs("third-parties/fast_io/include")
-	
-	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", {public = is_debug_mode})
-		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", {public = is_debug_mode})
-	end 
-		
-	-- third-parties/bizwen
-	add_includedirs("third-parties/bizwen/include")
-	
-	-- third-parties/boost
-	add_includedirs("third-parties/boost_unordered/include")
+-- third-parties/fast_io
+add_includedirs("third-parties/fast_io/include")
+
+if enable_cxx_module then
+	add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+	add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+end
+
+-- third-parties/bizwen
+add_includedirs("third-parties/bizwen/include")
+
+-- third-parties/boost
+add_includedirs("third-parties/boost_unordered/include")
+
+-- uwvm
+add_defines("UWVM=2")
+
+-- src
+add_includedirs("src/")
+
+add_headerfiles("src/**.h")
+
+if enable_cxx_module then
+	-- uwvm predefine
+	add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+	-- utils
+	add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+	-- object
+	add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+	-- imported
+	add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+	-- wasm parser
+	add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
 
 	-- uwvm
-	add_defines("UWVM=2")
+	add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+end
 
-	-- src
-	add_includedirs("src/")
-
-	add_headerfiles("src/**.h")
-
-	if enable_cxx_module then
-		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", {public = is_debug_mode})
-
-		-- utils
-		add_files("src/uwvm2/utils/**.cppm", {public = is_debug_mode})
-
-		-- object
-		add_files("src/uwvm2/object/**.cppm", {public = is_debug_mode})
-
-		-- imported
-		add_files("src/uwvm2/imported/**.cppm", {public = is_debug_mode})
-		
-        -- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", {public = is_debug_mode})
-
-		-- uwvm
-		add_files("src/uwvm2/uwvm/**.cppm", {public = is_debug_mode})
-	end 
-
-	if enable_cxx_module then
-		-- uwvm main
-		add_files("src/uwvm2/uwvm/main.module.cpp")
-	else
-		-- uwvm main
-		add_files("src/uwvm2/uwvm/main.default.cpp")
-	end
+if enable_cxx_module then
+	-- uwvm main
+	add_files("src/uwvm2/uwvm/main.module.cpp")
+else
+	-- uwvm main
+	add_files("src/uwvm2/uwvm/main.default.cpp")
+end
 
 target_end()
 
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
-    local name = path.basename(file)
-    target(name)
-        set_kind("binary")
-		def_build()
-        set_default(false)
-			
-		local enable_cxx_module = get_config("use-cxx-module")
+	local name = path.basename(file)
+	target(name)
+	set_kind("binary")
+	def_build()
+	set_default(false)
 
-		-- third-parties/fast_io
-		add_includedirs("third-parties/fast_io/include")
+	local enable_cxx_module = get_config("use-cxx-module")
 
-		if enable_cxx_module then
-			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", {public = is_debug_mode})
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", {public = is_debug_mode})
-		end
-		-- third-parties/bizwen
-		add_includedirs("third-parties/bizwen/include")
+	-- third-parties/fast_io
+	add_includedirs("third-parties/fast_io/include")
 
-		-- third-parties/boost
-		add_includedirs("third-parties/boost_unordered/include")
+	if enable_cxx_module then
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+	end
+	-- third-parties/bizwen
+	add_includedirs("third-parties/bizwen/include")
+
+	-- third-parties/boost
+	add_includedirs("third-parties/boost_unordered/include")
+
+	-- uwvm
+	add_defines("UWVM=2")
+	-- uwvm test
+	add_defines("UWVM_TEST=2")
+
+	-- src
+	add_includedirs("src/")
+
+	if enable_cxx_module then
+		-- uwvm predefine
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+		-- utils
+		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+		-- object
+		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+		-- imported
+		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+		-- wasm parser
+		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
 
 		-- uwvm
-		add_defines("UWVM=2")
-		-- uwvm test
-		add_defines("UWVM_TEST=2")
+		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+	end
 
-		-- src
-		add_includedirs("src/")
+	set_warnings("all", "extra", "error")
 
-		if enable_cxx_module then
-			-- uwvm predefine
-			add_files("src/uwvm2/uwvm_predefine/**.cppm", {public = is_debug_mode})
-			
-			-- utils
-			add_files("src/uwvm2/utils/**.cppm", {public = is_debug_mode})
+	local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
+	(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
+	local test_libfuzzer = get_config("test-libfuzzer")
 
-			-- object
-			add_files("src/uwvm2/object/**.cppm", {public = is_debug_mode})
-            
-            -- imported
-		    add_files("src/uwvm2/imported/**.cppm", {public = is_debug_mode})
-	
-			-- wasm parser
-			add_files("src/uwvm2/parser/**.cppm", {public = is_debug_mode})
-
-			-- uwvm
-			add_files("src/uwvm2/uwvm/**.cppm", {public = is_debug_mode})
-		end 
-
-		set_warnings("all", "extra", "error")
-
-		local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or (string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
-		local test_libfuzzer = get_config("test-libfuzzer")
-
-		if is_libfuzzer then
-			if get_config("use-llvm") and test_libfuzzer then
-				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
-				if need_wabt then
-					local function try_add_wabt(wabt_root)
+	if is_libfuzzer then
+		if get_config("use-llvm") and test_libfuzzer then
+			local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
+			if need_wabt then
+				before_build(function(target)
+					local function has_wabt(wabt_root)
 						local wabt_include = path.join(wabt_root, "include")
 						local wabt_build = path.join(wabt_root, "build")
 						local wabt_config = path.join(wabt_build, "include/wabt/config.h")
@@ -360,13 +363,65 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							os.isfile(path.join(wabt_build, "libwabt.dylib")) or
 							os.isfile(path.join(wabt_build, "wabt.lib"))
 
-						if os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib then
-							add_includedirs(wabt_include, path.join(wabt_build, "include"))
-							add_linkdirs(wabt_build)
-							add_links("wabt")
+						return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib
+					end
+
+					if not (has_wabt("third-parties/wabt") or has_wabt("wabt")) then
+						local wabt_root = "third-parties/wabt"
+						-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
+						if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
+							print("wabt source not found or incomplete. Attempting to initialize submodule...")
+							-- Try submodule update first, fallback to clone
+							try
+							{
+								function()
+									-- Add force to fix cases where directory is empty but git thinks it's checked out
+									os.vrunv("git", {"submodule", "update", "--force", "--init", "--recursive", "third-parties/wabt"})
+								end,
+								catch
+								{
+									function()
+										print("Submodule update failed. Cloning directly...")
+										-- Remove potentially empty/corrupt directory before cloning
+										os.rm(wabt_root)
+										os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", "third-parties/wabt", "--recursive"})
+									end
+								}
+							}
+						end
+
+						if not os.isdir(wabt_root) then
+							wabt_root = "wabt"
+						end
+
+						if os.isdir(wabt_root) then
+							print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
+							local build_dir = path.join(wabt_root, "build")
+							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
+							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt"})
+						else
+							raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
+						end
+					end
+				end)
+
+				on_load(function(target)
+					local function try_add_wabt(wabt_root, force)
+						local wabt_include = path.join(wabt_root, "include")
+						local wabt_build = path.join(wabt_root, "build")
+						local wabt_config = path.join(wabt_build, "include/wabt/config.h")
+						local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
+							os.isfile(path.join(wabt_build, "libwabt.so")) or
+							os.isfile(path.join(wabt_build, "libwabt.dylib")) or
+							os.isfile(path.join(wabt_build, "wabt.lib"))
+
+						if force or (os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib) then
+							target:add("includedirs", wabt_include, path.join(wabt_build, "include"))
+							target:add("linkdirs", wabt_build)
+							target:add("links", "wabt")
 							-- libwabt may depend on OpenSSL's libcrypto (e.g. SHA256)
 							if not is_plat("windows") then
-								add_syslinks("crypto")
+								target:add("syslinks", "crypto")
 							end
 							return true
 						end
@@ -374,28 +429,30 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						return false
 					end
 
-						if not (try_add_wabt("third-parties/wabt") or try_add_wabt("wabt")) then
-							os.raise("wabt is required for " .. name .. " but no built artifacts were found. " ..
-								"Build it first (example): cmake -S third-parties/wabt -B third-parties/wabt/build " ..
-								"-DBUILD_TESTS=OFF -DBUILD_TOOLS=OFF -DBUILD_LIBWASM=OFF && cmake --build third-parties/wabt/build --target wabt")
-						end
+					-- Try to find existing wabt, if not found, force configure third-parties/wabt
+					-- assuming before_build will handle the build.
+					if not try_add_wabt("third-parties/wabt", false) and not try_add_wabt("wabt", false) then
+						try_add_wabt("third-parties/wabt", true)
 					end
+				end)
+			end
 
-				add_cxflags("-fsanitize=fuzzer", {force = true})
-				add_ldflags("-fsanitize=fuzzer", {force = true})
-				-- change the env variables in ci to change the default values
-				local rss      = os.getenv("FUZZ_RSS") or "512"
-				local maxtime  = os.getenv("FUZZ_MAX_TIME") or "10"
-				local maxlen   = os.getenv("FUZZ_MAX_LEN") or "1024"
-				add_tests("fuzz", {group = "libfuzzer",runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen }}) -- xmake test -g libfuzzer
-				add_files(file)
-				elseif not get_config("use-llvm") and test_libfuzzer then
-			    os.raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
-				end
-		else
-			add_tests("unit", {group = "default"}) -- xmake test -g default
+			add_cxflags("-fsanitize=fuzzer", { force = true })
+			add_ldflags("-fsanitize=fuzzer", { force = true })
+			-- change the env variables in ci to change the default values
+			local rss     = os.getenv("FUZZ_RSS") or "512"
+			local maxtime = os.getenv("FUZZ_MAX_TIME") or "10"
+			local maxlen  = os.getenv("FUZZ_MAX_LEN") or "1024"
+			add_tests("fuzz",
+				{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
 			add_files(file)
+		elseif not get_config("use-llvm") and test_libfuzzer then
+			raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
 		end
+	else
+		add_tests("unit", { group = "default" }) -- xmake test -g default
+		add_files(file)
+	end
 
 	target_end()
 end

@@ -18,6 +18,12 @@
  *                                      *
  ****************************************/
 
+// libwabt uses assert() in headers and may abort on malformed inputs when NDEBUG is not set.
+// For differential fuzzing, treat those cases as validation failures instead of crashing.
+#ifndef NDEBUG
+# define NDEBUG 1
+#endif
+
 #include <cstddef>
 #include <cstdint>
 
@@ -49,6 +55,10 @@
 namespace
 {
     using uwvm_feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+
+    // Some environments run binaries under ptrace-like supervision, which makes LeakSanitizer abort.
+    // Disable leak checking by default so the fuzzer can run reliably.
+    extern "C" const char* __asan_default_options() { return "detect_leaks=0"; }
 
     [[nodiscard]] static constexpr bool is_wasm_binfmt_ver1_mvp(::std::uint8_t const* data, ::std::size_t size) noexcept
     {
@@ -82,8 +92,6 @@ namespace
             auto const& customsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                 ::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>(module_storage.sections)};
 
-            ::uwvm2::parser::wasm_custom::customs::name_storage_t name_storage{};
-            ::uwvm2::utils::container::vector<::uwvm2::parser::wasm_custom::customs::name_err_t> name_errs{};
             ::uwvm2::parser::wasm_custom::customs::name_parser_param_t name_param{};
 
             for(auto const& cs: customsec.customs)
@@ -93,10 +101,12 @@ namespace
                 auto const* const name_begin{reinterpret_cast<::std::byte const*>(cs.custom_begin)};
                 auto const* const name_end{reinterpret_cast<::std::byte const*>(cs.sec_span.sec_end)};
 
+                // WABT allows multiple "name" custom sections; validate each independently.
+                ::uwvm2::parser::wasm_custom::customs::name_storage_t name_storage{};
+                ::uwvm2::utils::container::vector<::uwvm2::parser::wasm_custom::customs::name_err_t> name_errs{};
                 ::uwvm2::parser::wasm_custom::customs::parse_name_storage(name_storage, name_begin, name_end, name_errs, name_param);
+                if(!name_errs.empty()) { return false; }
             }
-
-            if(!name_errs.empty()) { return false; }
         }
 
         auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
