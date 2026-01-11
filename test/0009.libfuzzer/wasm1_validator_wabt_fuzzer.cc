@@ -26,6 +26,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <vector>
 
 #ifndef UWVM_MODULE
 # include <fast_io.h>
@@ -60,6 +62,71 @@ namespace
     // Disable leak checking by default so the fuzzer can run reliably.
     extern "C" const char* __asan_default_options() { return "detect_leaks=0"; }
 
+    [[nodiscard]] static bool wabt_strict_mode() noexcept
+    {
+        auto const* v = ::std::getenv("UWVM_WABT_STRICT");
+        return v != nullptr && *v != '\0' && !(v[0] == '0' && v[1] == '\0');
+    }
+
+    [[nodiscard]] static constexpr bool is_wasm_binfmt_ver1_mvp(::std::uint8_t const* data, ::std::size_t size) noexcept;
+
+    [[nodiscard]] static bool read_leb_u32(::std::uint8_t const*& p, ::std::uint8_t const* end, ::std::uint32_t& out) noexcept
+    {
+        ::std::uint32_t result{};
+        unsigned shift{};
+        for(unsigned i{}; i != 5u; ++i)
+        {
+            if(p == end) { return false; }
+            auto const byte{*p++};
+            result |= static_cast<::std::uint32_t>(byte & 0x7fu) << shift;
+            if((byte & 0x80u) == 0u)
+            {
+                out = result;
+                return true;
+            }
+            shift += 7u;
+        }
+        return false;
+    }
+
+    [[nodiscard]] static bool strip_custom_sections(::std::uint8_t const* data, ::std::size_t size, ::std::vector<::std::uint8_t>& out) noexcept
+    {
+        if(!is_wasm_binfmt_ver1_mvp(data, size)) { return false; }
+
+        out.clear();
+        out.reserve(size);
+        out.insert(out.end(), data, data + 8u);
+
+        auto const* p{data + 8u};
+        auto const* const end{data + size};
+
+        while(p != end)
+        {
+            auto const section_id{*p++};
+
+            auto const* const size_begin{p};
+            ::std::uint32_t section_size_u32{};
+            if(!read_leb_u32(p, end, section_size_u32)) { return false; }
+
+            auto const section_size{static_cast<::std::size_t>(section_size_u32)};
+            if(static_cast<::std::size_t>(end - p) < section_size) { return false; }
+
+            auto const* const payload_begin{p};
+            auto const* const payload_end{p + section_size};
+
+            if(section_id != 0u)
+            {
+                out.push_back(section_id);
+                out.insert(out.end(), size_begin, p);
+                out.insert(out.end(), payload_begin, payload_end);
+            }
+
+            p = payload_end;
+        }
+
+        return true;
+    }
+
     [[nodiscard]] static constexpr bool is_wasm_binfmt_ver1_mvp(::std::uint8_t const* data, ::std::size_t size) noexcept
     {
         // WABT requires a valid magic + version(1). UWVM's parser checks magic but does not reject unknown versions by default.
@@ -86,8 +153,10 @@ namespace
         {
             return false;
         }
+        if(parse_err.err_code != ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok) { return false; }
 
         // Phase 1.5: parse and validate "name" custom section (debug names), to match WABT's default behaviour.
+        if(wabt_strict_mode())
         {
             auto const& customsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                 ::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>(module_storage.sections)};
@@ -139,6 +208,7 @@ namespace
             {
                 return false;
             }
+            if(v_err.err_code != ::uwvm2::compiler::validation::error::code_validation_error_code::ok) { return false; }
         }
 
         return true;
@@ -175,8 +245,8 @@ namespace
         features.disable_custom_page_sizes();
 
         const bool kStopOnFirstError = true;
-        const bool kReadDebugNames = true;
-        const bool kFailOnCustomSectionError = true;
+        const bool kReadDebugNames = wabt_strict_mode();
+        const bool kFailOnCustomSectionError = wabt_strict_mode();
 
         ReadBinaryOptions read_options(features, nullptr, kReadDebugNames, kStopOnFirstError, kFailOnCustomSectionError);
 
@@ -195,8 +265,23 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
     if(!is_wasm_binfmt_ver1_mvp(data, size)) { return 0; }
 
-    auto const uwvm_ok{validate_with_uwvm(data, size)};
-    auto const wabt_ok{validate_with_wabt(data, size)};
+    bool const strict{wabt_strict_mode()};
+
+    ::std::uint8_t const* test_data{data};
+    ::std::size_t test_size{size};
+
+    // Default to stripping custom sections to avoid noise from toolchain-specific custom sections
+    // (e.g. reloc/linking/name), and to focus on core Wasm validity.
+    static thread_local ::std::vector<::std::uint8_t> stripped{};
+    if(!strict)
+    {
+        if(!strip_custom_sections(data, size, stripped)) { return 0; }
+        test_data = stripped.data();
+        test_size = stripped.size();
+    }
+
+    auto const uwvm_ok{validate_with_uwvm(test_data, test_size)};
+    auto const wabt_ok{validate_with_wabt(test_data, test_size)};
 
     if(uwvm_ok != wabt_ok) { __builtin_trap(); }
 
