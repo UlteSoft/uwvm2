@@ -127,8 +127,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 
         while(curr != end)
         {
-            // [...  section_id] name_map_length ...
-            // [     safe      ] unsafe (could be the end)
+            // [...  section_id]  name_map_length ...
+            // [     safe  ] ...  unsafe (could be the end)
             //       ^^ curr
 
             using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -148,7 +148,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                 return;
             }
 
+            // [...  section_id] name_map_length ...
+            // [     safe      ] unsafe (could be the end)
+            //       ^^ curr
+
             curr = reinterpret_cast<::std::byte const*>(section_id_next);
+
+            // [...  section_id] name_map_length ...
+            // [     safe      ] unsafe (could be the end)
+            //                   ^^ curr
 
             // Each subsection may occur at most once, and in order of increasing id.
             if(has_prev_section_id && section_id <= max_section_id) [[unlikely]]
@@ -1046,16 +1054,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 
                     break;
                 }
-                case 4u:
-                case 5u:
-                case 6u:
-                case 7u:
-                case 8u:
-                case 9u:
+                case 4u: [[fallthrough]];
+                case 5u: [[fallthrough]];
+                case 6u: [[fallthrough]];
+                case 7u: [[fallthrough]];
+                case 8u: [[fallthrough]];
+                case 9u: [[fallthrough]];
                 case 11u:
                 {
                     // type/table/memory/global/elem/data/tag name map:
                     // name_count { index, name }*
+
+                    // [... ] name_count ... ... (map_end)
+                    // [safe] unsafe (could be the map_end)
+                    //        ^^ curr
 
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 name_count;  // number of naming in names
                     auto const [name_count_next, name_count_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(curr),
@@ -1068,6 +1080,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                         curr = map_end;
                         continue;
                     }
+
+                    // [... ] name_count ... ... (map_end)
+                    // [safe               ] unsafe (could be the map_end)
+                    //        ^^ curr
 
                     if constexpr(size_t_max < wasm_u32_max)
                     {
@@ -1083,6 +1099,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 
                     curr = reinterpret_cast<::std::byte const*>(name_count_next);
 
+                    // [... ] name_count ... ... (map_end)
+                    // [safe               ] unsafe (could be the map_end)
+                    //                       ^^ curr
+
                     // WABT's ReadCount early-outs when an erroneous large count is used (assumes each item takes at least 1 byte).
                     if(static_cast<::std::size_t>(map_end - curr) < static_cast<::std::size_t>(name_count)) [[unlikely]]
                     {
@@ -1093,10 +1113,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                         continue;
                     }
 
+                    // [... ] name_count ... ...  ... (map_end)
+                    // [safe               ] ...] ... unsafe (could be the map_end)
+                    //                       ^^ curr
+
                     bool ct_1{};
 
                     for(::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 name_counter{}; name_counter != name_count; ++name_counter)
                     {
+                        // [... ] index ...
+                        // [safe] ... unsafe (could be the map_end)
+                        //        ^^ curr
+
                         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 index;
                         auto const [index_next, index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(curr),
                                                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(map_end),
@@ -1110,7 +1138,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                             break;
                         }
 
+                        // [... ] index ...]
+                        // [safe           ] ... unsafe (could be the map_end)
+                        //        ^^ curr
+
                         curr = reinterpret_cast<::std::byte const*>(index_next);
+
+                        // [... ] index ...] name_length ...
+                        // [safe           ] ... unsafe (could be the map_end)
+                        //                   ^^ curr
 
                         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 name_length;
                         auto const [name_length_next, name_length_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(curr),
@@ -1124,6 +1160,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                             ct_1 = true;
                             break;
                         }
+
+                        // [... ] index ... name_length ...] ...
+                        // [safe                           ] ... unsafe (could be the map_end)
+                        //                  ^^ curr
 
                         if constexpr(size_t_max < wasm_u32_max)
                         {
@@ -1141,6 +1181,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 
                         curr = reinterpret_cast<::std::byte const*>(name_length_next);
 
+                        // [... ] index ... name_length ...] ...
+                        // [safe                           ] ... unsafe (could be the map_end)
+                        //                                   ^^ curr
+
                         if(static_cast<::std::size_t>(map_end - curr) < static_cast<::std::size_t>(name_length)) [[unlikely]]
                         {
                             err.emplace_back(curr,
@@ -1151,16 +1195,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
                             break;
                         }
 
+                        // [... ] index ... name_length ... name ...] ...
+                        // [safe                                    ] ... unsafe (could be the map_end)
+                        //                                  ^^ curr
+
                         auto const name_begin_tmp{reinterpret_cast<char8_t_const_may_alias_ptr>(curr)};
+
+                        // [... ] index ... name_length ... name ...] ...
+                        // [safe                                    ] ... unsafe (could be the map_end)
+                        //                                  ^^ name_begin_tmp
+
                         curr += name_length;
+
+                        // [... ] index ... name_length ... name ...] ...
+                        // [safe                                    ] ... unsafe (could be the map_end)
+                        //                                            ^^ curr
+
                         auto const name_end_tmp{reinterpret_cast<char8_t_const_may_alias_ptr>(curr)};
 
-                        ::uwvm2::utils::container::u8string_view const name_tmp{
-                            name_begin_tmp, static_cast<::std::size_t>(name_end_tmp - name_begin_tmp)};
+                        // [... ] index ... name_length ... name ...] ...
+                        // [safe                                    ] ... unsafe (could be the map_end)
+                        //                                            ^^ name_end_tmp
 
                         auto const [utf8pos, utf8err]{
-                            ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(name_tmp.cbegin(),
-                                                                                                                                   name_tmp.cend())};
+                            ::uwvm2::utils::utf::check_legal_utf8_unchecked<::uwvm2::utils::utf::utf8_specification::utf8_rfc3629>(name_begin_tmp,
+                                                                                                                                   name_end_tmp)};
 
                         if(utf8err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
                         {
@@ -1182,6 +1241,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
 
                     // WABT skips any remaining bytes in these subsections.
                     curr = map_end;
+
+                    // [... ]  ...] (end)
+                    // [safe      ] unsafe (could be the map_end)
+                    //              ^^ name_end_tmp
+
                     break;
                 }
                 [[unlikely]] default:
