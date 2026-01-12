@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-# fix https://github.com/llvm/llvm-project/issues/170970?utm_source=chatgpt.com
+# fix https://github.com/llvm/llvm-project/issues/170970
 
 SUFFIX = Path("include/c++/v1/__functional/hash.h")
 ALT_SUFFIX = Path("usr/include/c++/v1/__functional/hash.h")

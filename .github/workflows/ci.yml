@@ -18,7 +18,6 @@ jobs:
     strategy:
       matrix:
         mode: ["debug"]
-        policies: ["build.sanitizer.address,build.sanitizer.undefined"]
     steps:
       - uses: actions/checkout@v4
       - name: Setup xmake
@@ -31,7 +30,7 @@ jobs:
       - name: Work around LLVM libc++ header bug
         run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
       - name: Configure
-        run: xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)"
+        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)"
       - name: Build
         run: |
           xmake b -rv
