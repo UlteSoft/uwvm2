@@ -52,7 +52,7 @@ $ uwvm --help
 ```bash
 $ uwvm <param0> <param1> ... --run <wasm> <argv1> <argv2> ...
 ```
-* WASI mount dir (wasip1 only)
+* WASI mount dir (wasip1)
 ```bash
 $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 ```
