@@ -52,9 +52,9 @@ $ uwvm --help
 ```bash
 $ uwvm <param0> <param1> ... --run <wasm> <argv1> <argv2> ...
 ```
-* WASI mount dir
+* WASI mount dir (wasip1)
 ```bash
-$ uwvm --wasi-mount-dir <wasi dir> <system dir> ... --run ...
+$ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 ```
 
 ## How to build

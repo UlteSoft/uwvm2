@@ -12,6 +12,35 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
+  aarch64-apple-darwin:
+    name: macOS (aarch64)
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        mode: ["debug"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+      - name: Setup LLVM (Homebrew)
+        run: |
+          brew install llvm
+          brew install lld
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+      - name: Work around LLVM libc++ header bug
+        run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
+      - name: Configure
+        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)"
+      - name: Build
+        run: |
+          xmake b -rv
+          export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+      - name: Check UWVM version
+        run: xmake run uwvm --version
+      - name: Unit tests
+        run: xmake test -v
+
+  # ---------------------------------------------------------------------------
   x86_64-linux-gnu:
     name: Linux (x86_64)
     runs-on: ubuntu-latest
