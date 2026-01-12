@@ -2224,7 +2224,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
 
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local globals. "); }
-            
+
             // local defined global
             {
                 out.local_defined_global_vec_storage.reserve(globalsec.local_globals.size());

@@ -90,15 +90,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         if(
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
-#endif
+# endif
             false) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -109,24 +109,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Conflicting runtime parameters: only one shortcut runtime mode parameter is allowed "
                                 u8"("
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                                 u8"--runtime-int"
-# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  if defined(UWVM_RUNTIME_LLVM_JIT)
                                 ,
                                 u8"|"
+#  endif
 # endif
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
                                 u8"--runtime-jit"
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                                 ,
                                 u8"|",
                                 u8"--runtime-tiered"
-# endif
+#  endif
                                 ,
                                 u8"|",
                                 u8"--runtime-aot"
-#endif
+# endif
                                 u8").\n"
                                 u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),

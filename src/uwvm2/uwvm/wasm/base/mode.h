@@ -31,7 +31,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::base
     enum class mode : unsigned
     {
         section_details,
-        run // non-img
+        run  // non-img
     };
 
 }  // namespace uwvm2::parser::wasm::base
