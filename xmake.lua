@@ -370,24 +370,17 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						local wabt_root = "test/third-parties/wabt"
 						-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
 						if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
-							print("wabt source not found or incomplete. Attempting to initialize submodule...")
-							-- Try submodule update first, fallback to clone
-							try
-							{
-								function()
-									-- Add force to fix cases where directory is empty but git thinks it's checked out
-									os.vrunv("git", {"submodule", "update", "--force", "--init", "--recursive", "test/third-parties/wabt"})
-								end,
-								catch
-								{
-									function()
-										print("Submodule update failed. Cloning directly...")
-										-- Remove potentially empty/corrupt directory before cloning
-										os.rm(wabt_root)
-										os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", "test/third-parties/wabt", "--recursive"})
-									end
-								}
-							}
+							print("wabt source not found or incomplete. Attempting to pull...")
+							if not os.isdir(wabt_root) then
+								os.mkdir(wabt_root)
+							end
+							-- Use git clone/pull instead of submodule
+							if not os.isdir(path.join(wabt_root, ".git")) then
+								os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", wabt_root, "--recursive"})
+							else
+								os.vrunv("git", {"-C", wabt_root, "pull"})
+								os.vrunv("git", {"-C", wabt_root, "submodule", "update", "--init", "--recursive"})
+							end
 						end
 
 						if not os.isdir(wabt_root) then
@@ -402,7 +395,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
 							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 						else
-							raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
+							error("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
 						end
 					end
 				end)
@@ -449,7 +442,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
 			add_files(file)
 		elseif not get_config("use-llvm") and test_libfuzzer then
-			raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
+			error("Libfuzzer is not supported on this platform, please use llvm toolchain.")
 		end
 	else
 		add_tests("unit", { group = "default" }) -- xmake test -g default
