@@ -26,9 +26,10 @@ jobs:
       - name: Setup LLVM (Homebrew)
         run: |
           brew install llvm
+          brew install lld
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
       - name: Configure
-        run: xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --use-llvm=n --sdk="$(brew --prefix llvm)"
+        run: xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)"
       - name: Build
         run: |
           xmake b -rv
