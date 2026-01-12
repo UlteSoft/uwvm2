@@ -366,8 +366,8 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib
 					end
 
-					if not (has_wabt("test/third-parties/wabt") or has_wabt("wabt")) then
-						local wabt_root = "test/third-parties/wabt"
+					if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
+						local wabt_root = "build/test/third-parties/wabt"
 						-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
 						if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
 							print("wabt source not found or incomplete. Attempting to pull...")
@@ -424,10 +424,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						return false
 					end
 
-					-- Try to find existing wabt, if not found, force configure test/third-parties/wabt
+					-- Try to find existing wabt, if not found, force configure build/third-parties/wabt
 					-- assuming before_build will handle the build.
-					if not try_add_wabt("test/third-parties/wabt", false) and not try_add_wabt("wabt", false) then
-						try_add_wabt("test/third-parties/wabt", true)
+					if not try_add_wabt("build/test/third-parties/wabt", false) and not try_add_wabt("wabt", false) then
+						try_add_wabt("build/test/third-parties/wabt", true)
 					end
 				end)
 			end
