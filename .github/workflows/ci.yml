@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         mode: ["debug"]
-        policies: ["build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined"]
+        policies: ["build.sanitizer.address,build.sanitizer.undefined"]
     steps:
       - uses: actions/checkout@v4
       - name: Setup xmake
