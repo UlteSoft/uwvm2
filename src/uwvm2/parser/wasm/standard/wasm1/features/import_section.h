@@ -169,7 +169,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         [[maybe_unused]] ::uwvm2::parser::wasm::concepts::feature_parameter_t<Fs...> const& fs_para) UWVM_THROWS
     {
         // Note that section_curr may be equal to section_end, which needs to be checked
-        return ::uwvm2::parser::wasm::standard::wasm1::features::scan_memory_type(memory_r, section_curr, section_end, err);
+
+        // Keep a stable pointer to report page-limit violations at the beginning of the limits encoding.
+        auto const check_max_page_ptr{section_curr};
+
+        // [ ... ] | memory ...
+        // [ safe] | unsafe (could be the section_end)
+        //           ^^ section_curr
+        //           ^^ check_max_page_ptr
+
+        section_curr = ::uwvm2::parser::wasm::standard::wasm1::features::scan_memory_type(memory_r, section_curr, section_end, err);
+
+        // [ ...  | memory] ...
+        // [safe  |       ] unsafe (could be the section_end)
+        //                  ^^ section_curr
+
+        // In MVP, the memory page count (min and optional max) cannot exceed 65,536 (u32max / default_page_size).
+        constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 wasm1_max_pages{
+            static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(65536u)};
+
+        if(memory_r.limits.min > wasm1_max_pages) [[unlikely]]
+        {
+            err.err_curr = check_max_page_ptr;
+            err.err_selectable.u32 = memory_r.limits.min;
+            err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::memory_section_resolved_exceeded_the_maximum_value;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+
+        if(memory_r.limits.present_max)
+        {
+            if(memory_r.limits.max > wasm1_max_pages) [[unlikely]]
+            {
+                err.err_curr = check_max_page_ptr;
+                err.err_selectable.u32 = memory_r.limits.max;
+                err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::memory_section_resolved_exceeded_the_maximum_value;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+
+        return section_curr;
     }
 
     /// @brief define handler for ::uwvm2::parser::wasm::standard::wasm1::type::table_type
