@@ -78,12 +78,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
         if(defined_code_count != defined_func_count) [[unlikely]]
         {
-            // Use a stable in-module pointer for error reporting (avoid null when the code section is missing).
-            ::std::byte const* err_pos{module_end};
-            if(codesec.sec_span.sec_begin != nullptr) { err_pos = reinterpret_cast<::std::byte const*>(codesec.sec_span.sec_begin); }
-            else if(funcsec.sec_span.sec_begin != nullptr) { err_pos = reinterpret_cast<::std::byte const*>(funcsec.sec_span.sec_begin); }
-
-            err.err_curr = err_pos;
+            err.err_curr = module_end;
             err.err_selectable.u32arr[0] = defined_code_count;
             err.err_selectable.u32arr[1] = defined_func_count;
             err.err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::code_ne_defined_func;
