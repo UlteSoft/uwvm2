@@ -28,6 +28,8 @@ jobs:
           brew install llvm
           brew install lld
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+      - name: Work around LLVM libc++ header bug
+        run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
       - name: Configure
         run: xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)"
       - name: Build
