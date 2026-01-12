@@ -362,7 +362,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
         static_assert(::std::is_trivially_copyable_v<no_memory_err_t> && ::std::is_trivially_destructible_v<no_memory_err_t>);
 
         memarg_address_type_not_i32_err_t memarg_address_type_not_i32;
-        static_assert(::std::is_trivially_copyable_v<memarg_address_type_not_i32_err_t> && ::std::is_trivially_destructible_v<memarg_address_type_not_i32_err_t>);
+        static_assert(::std::is_trivially_copyable_v<memarg_address_type_not_i32_err_t> &&
+                      ::std::is_trivially_destructible_v<memarg_address_type_not_i32_err_t>);
 
         store_value_type_mismatch_err_t store_value_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<store_value_type_mismatch_err_t> && ::std::is_trivially_destructible_v<store_value_type_mismatch_err_t>);

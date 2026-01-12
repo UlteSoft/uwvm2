@@ -24,10 +24,10 @@
 
 auto const& notm{errout.err.err_selectable.numeric_operand_type_mismatch};
 
-auto const expected_type_name{::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(
-    ::uwvm2::parser::wasm::standard::wasm1::type::section_details(notm.expected_type))};
-auto const actual_type_name{::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(
-    ::uwvm2::parser::wasm::standard::wasm1::type::section_details(notm.actual_type))};
+auto const expected_type_name{
+    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(notm.expected_type))};
+auto const actual_type_name{
+    ::uwvm2::parser::wasm::standard::wasm1::type::get_value_name<char_type>(::uwvm2::parser::wasm::standard::wasm1::type::section_details(notm.actual_type))};
 
 if constexpr(::std::same_as<char_type, char>)
 {

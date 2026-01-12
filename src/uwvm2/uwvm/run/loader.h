@@ -140,7 +140,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 return static_cast<int>(::uwvm2::uwvm::run::retval::load_local_modules_error);
             }
 
-
             // verbose
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
