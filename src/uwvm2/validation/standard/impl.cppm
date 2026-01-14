@@ -5,8 +5,7 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Release 1.0 (2019-07-20)
- * @details     antecedent dependency: null
+ * @brief       WebAssembly Standard
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-02
@@ -24,9 +23,8 @@
 
 module;
 
-export module uwvm2.compiler.validation.error;
-export import :error;
-export import :error_code_output;
+export module uwvm2.validation.standard;
+export import uwvm2.validation.standard.wasm1;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

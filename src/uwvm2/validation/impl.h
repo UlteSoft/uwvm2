@@ -24,5 +24,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include <uwvm2/compiler/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/error/impl.h>
+# include <uwvm2/validation/concepts/impl.h>
+# include <uwvm2/validation/standard/impl.h>
 #endif

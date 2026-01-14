@@ -107,6 +107,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 // Return directly
                 return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
             }
+            case ::uwvm2::uwvm::wasm::base::mode::validation:
+            {
+                // Validate all wasm code
+
+                // Runtime initialization is not performed; only validity checks are conducted using the parser's built-in validation, not the runtime
+                // validation with compilation and partitioning capabilities.
+
+                // validate_all_wasm_code has verbose message, no necessary to print again.
+                if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
+                {
+                    return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
+                }
+
+                // Return directly
+                return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
+            }
             default:
             {
                 break;
@@ -128,10 +144,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // run vm
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
-            case ::uwvm2::uwvm::wasm::base::mode::section_details:
+            case ::uwvm2::uwvm::wasm::base::mode::section_details: [[fallthrough]];
+            case ::uwvm2::uwvm::wasm::base::mode::validation:
             {
-                // section details Occurs before dependency checks
-                break;
+                /// this is an vm bug
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::std::unreachable();
             }
             case ::uwvm2::uwvm::wasm::base::mode::run:
             {
@@ -140,16 +160,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
                         /// @todo run interpreter
+
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
-                        // valid all wasm code
-
-                        if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
-                        {
-                            return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
-                        }
+                        /// @todo valid all wasm code (not wasm validation, Compiler validator - simultaneously generating ECU)
 
                         /// @todo run interpreter
 

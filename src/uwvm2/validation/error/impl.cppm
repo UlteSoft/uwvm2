@@ -24,8 +24,9 @@
 
 module;
 
-export module uwvm2.compiler.validation.standard.wasm1;
-import :validator;
+export module uwvm2.validation.error;
+export import :error;
+export import :error_code_output;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

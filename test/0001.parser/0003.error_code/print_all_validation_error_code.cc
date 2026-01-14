@@ -31,7 +31,7 @@
 #ifndef UWVM_MODULE
 # include <fast_io.h>
 # include <fast_io_dsal/string_view.h>
-# include <uwvm2/compiler/validation/error/error_code_output.h>
+# include <uwvm2/validation/error/error_code_output.h>
 # include <uwvm2/uwvm/io/impl.h>
 #else
 # error "Module testing is not currently supported"
@@ -49,61 +49,61 @@ int main()
 
     ::std::byte module_bytes[64]{};
 
-    ::uwvm2::compiler::validation::error::error_output_t errout{};
+    ::uwvm2::validation::error::error_output_t errout{};
     errout.module_begin = module_bytes;
 
     auto const last_ec{
-        static_cast<::std::uint_least32_t>(::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch)};
+        static_cast<::std::uint_least32_t>(::uwvm2::validation::error::code_validation_error_code::numeric_operand_type_mismatch)};
 
     for(::std::uint_least32_t i{}; i != last_ec + 1u; ++i)
     {
         errout.err.err_curr = module_bytes + (i % (sizeof(module_bytes) / sizeof(module_bytes[0])));
         errout.err.err_selectable.u64 = 0xcdcdcdcdcdcdcdcdULL;
 
-        switch(static_cast<::uwvm2::compiler::validation::error::code_validation_error_code>(i))
+        switch(static_cast<::uwvm2::validation::error::code_validation_error_code>(i))
         {
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_opbase:
             {
                 errout.err.err_selectable.u8 = 0xFFu;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type:
+            case ::uwvm2::validation::error::code_validation_error_code::missing_block_type:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_block_type:
             {
                 errout.err.err_selectable.u8 = 0x7Fu;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow:
+            case ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow:
             {
                 errout.err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
                 errout.err.err_selectable.operand_stack_underflow.stack_size_actual = 2uz;
                 errout.err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch:
             {
                 errout.err.err_selectable.select_type_mismatch.type_v1 = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                 errout.err.err_selectable.select_type_mismatch.type_v2 = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32:
+            case ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32:
             {
                 errout.err.err_selectable.select_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::if_cond_type_not_i32:
+            case ::uwvm2::validation::error::code_validation_error_code::if_cond_type_not_i32:
             {
                 errout.err.err_selectable.if_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_else:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_else:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::if_then_result_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch:
             {
                 errout.err.err_selectable.if_then_result_mismatch.expected_count = 1uz;
                 errout.err.err_selectable.if_then_result_mismatch.actual_count = 1uz;
@@ -111,13 +111,13 @@ int main()
                 errout.err.err_selectable.if_then_result_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::if_missing_else:
+            case ::uwvm2::validation::error::code_validation_error_code::if_missing_else:
             {
                 errout.err.err_selectable.if_missing_else.expected_count = 1uz;
                 errout.err.err_selectable.if_missing_else.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch:
             {
                 errout.err.err_selectable.end_result_mismatch.block_kind = u8"block";
                 errout.err.err_selectable.end_result_mismatch.expected_count = 1uz;
@@ -126,34 +126,34 @@ int main()
                 errout.err.err_selectable.end_result_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::trailing_code_after_end:
+            case ::uwvm2::validation::error::code_validation_error_code::trailing_code_after_end:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_label_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_label_index:
             {
                 errout.err.err_selectable.illegal_label_index.label_index = 7u;
                 errout.err.err_selectable.illegal_label_index.all_label_count = 3u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch:
             {
                 errout.err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
                 errout.err.err_selectable.br_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                 errout.err.err_selectable.br_value_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32:
+            case ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32:
             {
                 errout.err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
                 errout.err.err_selectable.br_cond_type_not_i32.cond_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch:
             {
                 errout.err.err_selectable.br_table_target_type_mismatch.expected_label_index = 0u;
                 errout.err.err_selectable.br_table_target_type_mismatch.mismatched_label_index = 2u;
@@ -163,143 +163,143 @@ int main()
                 errout.err.err_selectable.br_table_target_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index_encoding:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_function_index_encoding:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_type_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_type_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_type_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_type_index:
             {
                 errout.err.err_selectable.illegal_type_index.type_index = 3u;
                 errout.err.err_selectable.illegal_type_index.all_type_count = 2u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_table_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_table_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_table_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_table_index:
             {
                 errout.err.err_selectable.illegal_table_index.table_index = 1u;
                 errout.err.err_selectable.illegal_table_index.all_table_count = 1u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memory_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memory_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_memory_index:
             {
                 errout.err.err_selectable.illegal_memory_index.memory_index = 1u;
                 errout.err.err_selectable.illegal_memory_index.all_memory_count = 1u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch:
             {
                 errout.err.err_selectable.local_variable_type_mismatch.local_index = 3u;
                 errout.err.err_selectable.local_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                 errout.err.err_selectable.local_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::local_tee_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::local_tee_type_mismatch:
             {
                 errout.err.err_selectable.local_variable_type_mismatch.local_index = 7u;
                 errout.err.err_selectable.local_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
                 errout.err.err_selectable.local_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_global_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_global_index:
             {
                 errout.err.err_selectable.illegal_global_index.global_index = 10u;
                 errout.err.err_selectable.illegal_global_index.all_global_count = 5u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::immutable_global_set:
+            case ::uwvm2::validation::error::code_validation_error_code::immutable_global_set:
             {
                 errout.err.err_selectable.immutable_global_set.global_index = 2u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::global_set_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch:
             {
                 errout.err.err_selectable.global_variable_type_mismatch.global_index = 9u;
                 errout.err.err_selectable.global_variable_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 errout.err.err_selectable.global_variable_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory:
+            case ::uwvm2::validation::error::code_validation_error_code::no_memory:
             {
                 errout.err.err_selectable.no_memory.op_code_name = u8"i32.load8_s";
                 errout.err.err_selectable.no_memory.align = 0u;
                 errout.err.err_selectable.no_memory.offset = 123u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment:
             {
                 errout.err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load";
                 errout.err.err_selectable.illegal_memarg_alignment.align = 6u;
                 errout.err.err_selectable.illegal_memarg_alignment.max_align = 2u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32:
+            case ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32:
             {
                 errout.err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f64.load";
                 errout.err.err_selectable.memarg_address_type_not_i32.addr_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function:
+            case ::uwvm2::validation::error::code_validation_error_code::not_local_function:
             {
                 errout.err.err_selectable.not_local_function.function_index = 0uz;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_function_index:
             {
                 errout.err.err_selectable.invalid_function_index.function_index = 10uz;
                 errout.err.err_selectable.invalid_function_index.all_function_size = 5uz;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_local_index:
             {
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index:
+            case ::uwvm2::validation::error::code_validation_error_code::illegal_local_index:
             {
                 errout.err.err_selectable.illegal_local_index.local_index = 10u;
                 errout.err.err_selectable.illegal_local_index.all_local_count = 5u;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch:
             {
                 errout.err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store32";
                 errout.err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                 errout.err.err_selectable.store_value_type_mismatch.actual_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32:
+            case ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32:
             {
                 errout.err.err_selectable.memory_grow_delta_type_not_i32.delta_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate:
+            case ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate:
             {
                 errout.err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
                 break;
             }
-            case ::uwvm2::compiler::validation::error::code_validation_error_code::numeric_operand_type_mismatch:
+            case ::uwvm2::validation::error::code_validation_error_code::numeric_operand_type_mismatch:
             {
                 errout.err.err_selectable.numeric_operand_type_mismatch.op_code_name = u8"i32.eq";
                 errout.err.err_selectable.numeric_operand_type_mismatch.expected_type =
@@ -311,10 +311,10 @@ int main()
             default: break;
         }
 
-        errout.err.err_code = static_cast<::uwvm2::compiler::validation::error::code_validation_error_code>(i);
+        errout.err.err_code = static_cast<::uwvm2::validation::error::code_validation_error_code>(i);
 
         {
-            ::uwvm2::compiler::validation::error::error_output_t obuf_u8err_errout{errout};
+            ::uwvm2::validation::error::error_output_t obuf_u8err_errout{errout};
             obuf_u8err_errout.flag.enable_ansi = static_cast<::std::uint_least8_t>(::uwvm2::uwvm::utils::ansies::put_color);
 #if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
             obuf_u8err_errout.flag.win32_use_text_attr = static_cast<::std::uint_least8_t>(!::uwvm2::uwvm::utils::ansies::log_win32_use_ansi_b);

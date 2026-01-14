@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "uwvm2/compiler/validation/error/error.h"
+#include "uwvm2/validation/error/error.h"
 #include "uwvm2/parser/wasm/standard/wasm1/opcode/mvp.h"
 #ifndef UWVM_MODULE
 // std
@@ -47,15 +47,15 @@
 # include <uwvm2/parser/wasm/utils/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/impl.h>
-# include <uwvm2/compiler/validation/error/impl.h>
-# include <uwvm2/compiler/validation/concepts/impl.h>
+# include <uwvm2/validation/error/impl.h>
+# include <uwvm2/validation/concepts/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
+UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
 {
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
 
@@ -173,7 +173,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                               ::std::size_t const function_index,
                               ::std::byte const* code_begin,
                               ::std::byte const* code_end,
-                              ::uwvm2::compiler::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                              ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         // check
         auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
@@ -184,7 +184,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         {
             err.err_curr = code_begin;
             err.err_selectable.not_local_function.function_index = function_index;
-            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::not_local_function;
+            err.err_code = ::uwvm2::validation::error::code_validation_error_code::not_local_function;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
@@ -200,7 +200,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
             err.err_selectable.invalid_function_index.function_index = function_index;
             // this add will never overflow, because it has been validated in parsing.
             err.err_selectable.invalid_function_index.all_function_size = import_func_count + local_func_count;
-            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index;
+            err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_function_index;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
@@ -295,7 +295,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
         auto code_curr{code_begin};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
-        using code_validation_error_code = ::uwvm2::compiler::validation::error::code_validation_error_code;
+        using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
 
         auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view op_name,
                                               curr_operand_stack_value_type expected_operand_type,
@@ -441,7 +441,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
 
                 // Validation completes when the end is reached, so this condition can never be met. If it were met, it would indicate a missing end.
                 err.err_curr = code_curr;
-                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::missing_end;
+                err.err_code = ::uwvm2::validation::error::code_validation_error_code::missing_end;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
 
@@ -512,7 +512,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::missing_block_type;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
@@ -573,7 +573,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             // Unknown blocktype encoding; treat as invalid code.
                             err.err_curr = op_begin;
                             err.err_selectable.u8 = blocktype_byte;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_block_type;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -604,7 +604,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::missing_block_type;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
@@ -664,7 +664,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.u8 = blocktype_byte;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_block_type;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -698,7 +698,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(code_curr == code_end) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::missing_block_type;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::missing_block_type;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
@@ -757,7 +757,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.u8 = blocktype_byte;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_block_type;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_block_type;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -769,7 +769,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"if";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                         err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -782,7 +782,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::if_cond_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_cond_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -813,7 +813,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(control_flow_stack.empty() || control_flow_stack.back_unchecked().type != block_type::if_) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_else;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_else;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -849,7 +849,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
                             err.err_selectable.if_then_result_mismatch.expected_type = expected_type;
                             err.err_selectable.if_then_result_mismatch.actual_type = actual_type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::if_then_result_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -891,7 +891,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_opbase;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -943,7 +943,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.if_missing_else.expected_count = expected_count;
                         err.err_selectable.if_missing_else.expected_type =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::if_missing_else;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_missing_else;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -977,7 +977,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             {
                                 err.err_selectable.end_result_mismatch.actual_type = {};
                             }
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -997,7 +997,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                         static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                                     err.err_selectable.end_result_mismatch.actual_type =
                                         static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                    err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::end_result_mismatch;
+                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
                                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                 }
                             }
@@ -1029,7 +1029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(code_curr != code_end) [[unlikely]]
                         {
                             err.err_curr = op_begin;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::trailing_code_after_end;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::trailing_code_after_end;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                         return;
@@ -1065,7 +1065,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
                     }
 
@@ -1087,7 +1087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_label_index.label_index = label_index;
                         err.err_selectable.illegal_label_index.all_label_count =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1103,7 +1103,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"br";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = target_arity;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1120,7 +1120,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                             err.err_selectable.br_value_type_mismatch.actual_type =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1166,7 +1166,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(label_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(label_err);
                     }
 
@@ -1188,7 +1188,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_label_index.label_index = label_index;
                         err.err_selectable.illegal_label_index.all_label_count =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1204,7 +1204,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = target_arity + 1uz;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1219,7 +1219,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
                             err.err_selectable.br_cond_type_not_i32.cond_type =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(cond.type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1237,7 +1237,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                             err.err_selectable.br_value_type_mismatch.actual_type =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1271,7 +1271,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(cnt_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(cnt_err);
                     }
 
@@ -1294,7 +1294,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                                       err.err_selectable.illegal_label_index.label_index = li;
                                                       err.err_selectable.illegal_label_index.all_label_count =
                                                           static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_label_count_uz);
-                                                      err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_label_index;
+                                                      err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_label_index;
                                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                                   }
                                               }};
@@ -1334,7 +1334,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         if(li_err != ::fast_io::parse_code::ok) [[unlikely]]
                         {
                             err.err_curr = op_begin;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_label_index;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(li_err);
                         }
 
@@ -1371,7 +1371,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                             err.err_selectable.br_table_target_type_mismatch.actual_type =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1387,7 +1387,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(def_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_label_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_label_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(def_err);
                     }
 
@@ -1424,7 +1424,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                         err.err_selectable.br_table_target_type_mismatch.actual_type =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(default_type);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_table_target_type_mismatch;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1435,7 +1435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = expected_arity + 1uz;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1448,7 +1448,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
                             err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(idx.type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1464,7 +1464,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                             err.err_selectable.br_value_type_mismatch.actual_type =
                                 static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1512,7 +1512,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"return";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = return_arity;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1533,7 +1533,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                                 err.err_selectable.br_value_type_mismatch.actual_type =
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
@@ -1581,7 +1581,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(func_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index_encoding;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_function_index_encoding;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(func_err);
                     }
 
@@ -1602,7 +1602,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.invalid_function_index.function_index = static_cast<::std::size_t>(func_index);
                         err.err_selectable.invalid_function_index.all_function_size = all_function_size;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_function_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_function_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1639,7 +1639,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"call";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = param_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1660,7 +1660,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                                 err.err_selectable.br_value_type_mismatch.actual_type =
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
@@ -1708,7 +1708,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(type_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_type_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_type_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(type_err);
                     }
 
@@ -1729,7 +1729,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_type_index.type_index = type_index;
                         err.err_selectable.illegal_type_index.all_type_count =
                             static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>(all_type_count_uz);
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_type_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_type_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1740,7 +1740,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(table_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_table_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_table_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(table_err);
                     }
 
@@ -1759,7 +1759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_table_index.table_index = table_index;
                         err.err_selectable.illegal_table_index.all_table_count = all_table_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_table_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_table_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1775,7 +1775,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"call_indirect";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = param_count + 1uz;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1790,7 +1790,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
                             err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(idx.type);
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_cond_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_cond_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1810,7 +1810,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
                                 err.err_selectable.br_value_type_mismatch.actual_type =
                                     static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::br_value_type_mismatch;
+                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
@@ -1856,7 +1856,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -1894,7 +1894,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                         err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1913,7 +1913,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.select_cond_type_not_i32.cond_type = cond_type;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_cond_type_not_i32;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_cond_type_not_i32;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1943,7 +1943,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.select_type_mismatch.type_v1 = v1_type;
                         err.err_selectable.select_type_mismatch.type_v2 = v2_type;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::select_type_mismatch;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::select_type_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -1982,7 +1982,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
                     }
 
@@ -2002,7 +2002,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_local_index.local_index = local_index;
                         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2037,7 +2037,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.illegal_local_index.local_index = local_index;
                             err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2077,7 +2077,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
                     }
 
@@ -2097,7 +2097,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_local_index.local_index = local_index;
                         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2132,7 +2132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.illegal_local_index.local_index = local_index;
                             err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2146,7 +2146,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"local.set";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2159,7 +2159,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
                             err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
                             err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::local_set_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -2198,7 +2198,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(local_index_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(local_index_err);
                     }
 
@@ -2218,7 +2218,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_local_index.local_index = local_index;
                         err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2253,7 +2253,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.illegal_local_index.local_index = local_index;
                             err.err_selectable.illegal_local_index.all_local_count = all_local_count;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_local_index;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_local_index;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2267,7 +2267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"local.tee";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                         else
@@ -2286,7 +2286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
                             err.err_selectable.local_variable_type_mismatch.expected_type = curr_local_type;
                             err.err_selectable.local_variable_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::local_tee_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_tee_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2323,7 +2323,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_global_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
                     }
 
@@ -2343,7 +2343,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_global_index.global_index = global_index;
                         err.err_selectable.illegal_global_index.all_global_count = all_global_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_global_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2397,7 +2397,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(global_index_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_global_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_global_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(global_index_err);
                     }
 
@@ -2417,7 +2417,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_global_index.global_index = global_index;
                         err.err_selectable.illegal_global_index.all_global_count = all_global_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_global_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_global_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2448,7 +2448,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.immutable_global_set.global_index = global_index;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::immutable_global_set;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::immutable_global_set;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2462,7 +2462,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"global.set";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2477,7 +2477,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.global_variable_type_mismatch.global_index = global_index;
                             err.err_selectable.global_variable_type_mismatch.expected_type = curr_global_type;
                             err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::global_set_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2513,7 +2513,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -2533,7 +2533,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -2554,7 +2554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.load";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2565,7 +2565,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2578,7 +2578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.load";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -2590,7 +2590,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.load";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2632,7 +2632,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -2652,7 +2652,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -2672,7 +2672,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2683,7 +2683,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 3u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2696,7 +2696,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -2708,7 +2708,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2749,7 +2749,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -2769,7 +2769,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -2789,7 +2789,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"f32.load";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2800,7 +2800,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f32.load";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2813,7 +2813,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"f32.load";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -2825,7 +2825,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f32.load";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2866,7 +2866,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -2886,7 +2886,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -2906,7 +2906,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"f64.load";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2917,7 +2917,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f64.load";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 3u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -2930,7 +2930,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"f64.load";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -2942,7 +2942,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f64.load";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -2983,7 +2983,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3003,7 +3003,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3023,7 +3023,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.load8_s";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3034,7 +3034,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load8_s";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3047,7 +3047,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.load8_s";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3059,7 +3059,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.load8_s";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3100,7 +3100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3120,7 +3120,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3140,7 +3140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.load8_u";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3151,7 +3151,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load8_u";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3164,7 +3164,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.load8_u";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3176,7 +3176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.load8_u";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3217,7 +3217,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3237,7 +3237,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3257,7 +3257,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.load16_s";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3268,7 +3268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load16_s";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3281,7 +3281,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.load16_s";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3293,7 +3293,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.load16_s";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3334,7 +3334,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3354,7 +3354,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3374,7 +3374,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.load16_u";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3385,7 +3385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.load16_u";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3398,7 +3398,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.load16_u";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3410,7 +3410,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.load16_u";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3451,7 +3451,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3463,7 +3463,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3475,7 +3475,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load8_s";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3486,7 +3486,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load8_s";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3499,7 +3499,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load8_s";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3511,7 +3511,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load8_s";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3552,7 +3552,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3572,7 +3572,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3592,7 +3592,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load8_u";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3603,7 +3603,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load8_u";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3616,7 +3616,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load8_u";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3628,7 +3628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load8_u";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3669,7 +3669,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3689,7 +3689,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3709,7 +3709,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load16_s";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3720,7 +3720,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load16_s";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3733,7 +3733,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load16_s";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3745,7 +3745,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load16_s";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3786,7 +3786,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3806,7 +3806,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3826,7 +3826,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load16_u";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3837,7 +3837,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load16_u";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3850,7 +3850,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load16_u";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3862,7 +3862,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load16_u";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -3903,7 +3903,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -3923,7 +3923,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -3943,7 +3943,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load32_s";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3954,7 +3954,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load32_s";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -3967,7 +3967,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load32_s";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -3979,7 +3979,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load32_s";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4020,7 +4020,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4040,7 +4040,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4060,7 +4060,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.load32_u";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4071,7 +4071,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.load32_u";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4084,7 +4084,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.load32_u";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4096,7 +4096,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.load32_u";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4137,7 +4137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4157,7 +4157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4178,7 +4178,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.store";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4189,7 +4189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4202,7 +4202,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4216,7 +4216,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4226,7 +4226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4267,7 +4267,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4287,7 +4287,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4307,7 +4307,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.store";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4318,7 +4318,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 3u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4331,7 +4331,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4345,7 +4345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4355,7 +4355,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4396,7 +4396,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4416,7 +4416,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4436,7 +4436,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"f32.store";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4447,7 +4447,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f32.store";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4460,7 +4460,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"f32.store";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4474,7 +4474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f32.store";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4484,7 +4484,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"f32.store";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f32;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4525,7 +4525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4545,7 +4545,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4565,7 +4565,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"f64.store";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4576,7 +4576,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"f64.store";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 3u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4589,7 +4589,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"f64.store";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4603,7 +4603,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"f64.store";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4613,7 +4613,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"f64.store";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::f64;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4654,7 +4654,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4674,7 +4674,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4694,7 +4694,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.store8";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4705,7 +4705,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store8";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4718,7 +4718,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store8";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4732,7 +4732,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store8";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4742,7 +4742,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store8";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4783,7 +4783,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4803,7 +4803,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4823,7 +4823,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i32.store16";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4834,7 +4834,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i32.store16";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4847,7 +4847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i32.store16";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4861,7 +4861,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i32.store16";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4871,7 +4871,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i32.store16";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -4912,7 +4912,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -4932,7 +4932,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -4952,7 +4952,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.store8";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4963,7 +4963,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store8";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -4976,7 +4976,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store8";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -4990,7 +4990,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store8";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5000,7 +5000,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store8";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -5041,7 +5041,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -5061,7 +5061,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -5081,7 +5081,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.store16";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5092,7 +5092,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store16";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 1u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5105,7 +5105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store16";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5119,7 +5119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store16";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5129,7 +5129,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store16";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -5170,7 +5170,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_align;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_align;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
                     }
 
@@ -5190,7 +5190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memarg_offset;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memarg_offset;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
                     }
 
@@ -5210,7 +5210,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"i64.store32";
                         err.err_selectable.no_memory.align = align;
                         err.err_selectable.no_memory.offset = offset;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5221,7 +5221,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.illegal_memarg_alignment.op_code_name = u8"i64.store32";
                         err.err_selectable.illegal_memarg_alignment.align = align;
                         err.err_selectable.illegal_memarg_alignment.max_align = 2u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memarg_alignment;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memarg_alignment;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5234,7 +5234,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"i64.store32";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
                             err.err_selectable.operand_stack_underflow.stack_size_required = 2uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5248,7 +5248,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_curr = op_begin;
                             err.err_selectable.memarg_address_type_not_i32.op_code_name = u8"i64.store32";
                             err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memarg_address_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memarg_address_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5258,7 +5258,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.store_value_type_mismatch.op_code_name = u8"i64.store32";
                             err.err_selectable.store_value_type_mismatch.expected_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i64;
                             err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::store_value_type_mismatch;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::store_value_type_mismatch;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -5298,7 +5298,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memory_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
                     }
 
@@ -5318,7 +5318,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_memory_index.memory_index = memidx;
                         err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memory_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memory_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5328,7 +5328,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"memory.size";
                         err.err_selectable.no_memory.align = 0u;
                         err.err_selectable.no_memory.offset = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5365,7 +5365,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     if(mem_err != ::fast_io::parse_code::ok) [[unlikely]]
                     {
                         err.err_curr = op_begin;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_memory_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_memory_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(mem_err);
                     }
 
@@ -5385,7 +5385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_curr = op_begin;
                         err.err_selectable.illegal_memory_index.memory_index = memidx;
                         err.err_selectable.illegal_memory_index.all_memory_count = all_memory_count;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_memory_index;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_memory_index;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5395,7 +5395,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         err.err_selectable.no_memory.op_code_name = u8"memory.grow";
                         err.err_selectable.no_memory.align = 0u;
                         err.err_selectable.no_memory.offset = 0u;
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::no_memory;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::no_memory;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
@@ -5408,7 +5408,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                             err.err_selectable.operand_stack_underflow.op_code_name = u8"memory.grow";
                             err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
                             err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::operand_stack_underflow;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
@@ -5419,7 +5419,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                         {
                             err.err_curr = op_begin;
                             err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
-                            err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
+                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
                     }
@@ -5461,7 +5461,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.invalid_const_immediate.op_code_name = u8"i32.const";
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(imm_err);
                     }
 
@@ -5509,7 +5509,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.invalid_const_immediate.op_code_name = u8"i64.const";
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(imm_err);
                     }
 
@@ -5550,7 +5550,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.invalid_const_immediate.op_code_name = u8"f32.const";
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
@@ -5591,7 +5591,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.invalid_const_immediate.op_code_name = u8"f64.const";
-                        err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::invalid_const_immediate;
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::invalid_const_immediate;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
                     }
 
@@ -6229,7 +6229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::standard::wasm1
                 {
                     err.err_curr = code_curr;
                     err.err_selectable.u8 = static_cast<::std::uint_least8_t>(curr_opbase);
-                    err.err_code = ::uwvm2::compiler::validation::error::code_validation_error_code::illegal_opbase;
+                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_opbase;
                     ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     break;
                 }

@@ -45,14 +45,14 @@
 # include <uwvm2/parser/wasm/utils/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/impl.h>
-# include <uwvm2/compiler/validation/error/impl.h>
+# include <uwvm2/validation/error/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::concepts
+UWVM_MODULE_EXPORT namespace uwvm2::validation::concepts
 {
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_code_version_reserve_type_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -64,7 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::concepts
                                          ::std::size_t const function_index,
                                          ::std::byte const* code_begin,
                                          ::std::byte const* code_end,
-                                         ::uwvm2::compiler::validation::error::code_validation_error_impl& err) {
+                                         ::uwvm2::validation::error::code_validation_error_impl& err) {
         { validate_code(code_adl, module_storage, function_index, code_begin, code_end, err) } -> ::std::same_as<void>;
     };
 }
