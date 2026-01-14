@@ -32,7 +32,7 @@
 #ifndef UWVM_MODULE
 # include <fast_io.h>
 
-# include <uwvm2/compiler/validation/standard/wasm1/impl.h>
+# include <uwvm2/validation/standard/wasm1/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/features/binfmt.h>
 # include <uwvm2/parser/wasm_custom/customs/name.h>
@@ -301,11 +301,11 @@ namespace
             auto const* const code_begin_ptr{reinterpret_cast<::std::byte const*>(code.body.expr_begin)};
             auto const* const code_end_ptr{reinterpret_cast<::std::byte const*>(code.body.code_end)};
 
-            ::uwvm2::compiler::validation::error::code_validation_error_impl v_err{};
+            ::uwvm2::validation::error::code_validation_error_impl v_err{};
 
             try
             {
-                ::uwvm2::compiler::validation::standard::wasm1::validate_code<uwvm_feature>(
+                ::uwvm2::validation::standard::wasm1::validate_code<uwvm_feature>(
                     ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
                     module_storage,
                     import_func_count + local_idx,
@@ -317,7 +317,7 @@ namespace
             {
                 return false;
             }
-            if(v_err.err_code != ::uwvm2::compiler::validation::error::code_validation_error_code::ok) { return false; }
+            if(v_err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) { return false; }
         }
 
         return true;

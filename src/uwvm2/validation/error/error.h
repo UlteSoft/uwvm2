@@ -51,7 +51,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::compiler::validation::error
+UWVM_MODULE_EXPORT namespace uwvm2::validation::error
 {
     enum class code_validation_error_code : ::std::uint_least32_t
     {

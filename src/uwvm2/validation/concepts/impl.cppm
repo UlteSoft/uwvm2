@@ -24,7 +24,7 @@
 
 module;
 
-export module uwvm2.compiler.validation.concepts;
+export module uwvm2.validation.concepts;
 export import :code_validation;
 
 #ifndef UWVM_MODULE

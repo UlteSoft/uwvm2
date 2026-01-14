@@ -43,8 +43,8 @@
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
 # include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
+# include <uwvm2/validation/impl.h>
 # include <uwvm2/object/impl.h>
-# include <uwvm2/compiler/validation/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
@@ -76,12 +76,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
             auto const* const code_begin_ptr{reinterpret_cast<::std::byte const*>(code.body.expr_begin)};
             auto const* const code_end_ptr{reinterpret_cast<::std::byte const*>(code.body.code_end)};
 
-            ::uwvm2::compiler::validation::error::code_validation_error_impl v_err{};
+            ::uwvm2::validation::error::code_validation_error_impl v_err{};
 #ifdef UWVM_CPP_EXCEPTIONS
             try
 #endif
             {
-                ::uwvm2::compiler::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
+                ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
                                                                               module_storage,
                                                                               import_func_count + local_idx,
                                                                               code_begin_ptr,
@@ -95,7 +95,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                                                                                 v_err.err_curr,
                                                                                 module_storage.module_span.module_end};
 
-                ::uwvm2::compiler::validation::error::error_output_t errout{};
+                ::uwvm2::validation::error::error_output_t errout{};
                 errout.module_begin = module_storage.module_span.module_begin;
                 errout.err = v_err;
                 errout.flag.enable_ansi = static_cast<::std::uint_least8_t>(::uwvm2::uwvm::utils::ansies::put_color);

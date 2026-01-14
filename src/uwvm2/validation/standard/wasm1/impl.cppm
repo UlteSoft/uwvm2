@@ -5,7 +5,8 @@
  *************************************************************/
 
 /**
- * @brief       WebAssembly Standard
+ * @brief       WebAssembly Release 1.0 (2019-07-20)
+ * @details     antecedent dependency: null
  * @author      MacroModel
  * @version     2.0.0
  * @date        2025-04-02
@@ -21,10 +22,16 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+export module uwvm2.validation.standard.wasm1;
+import :validator;
 
 #ifndef UWVM_MODULE
-# include <uwvm2/compiler/validation/error/impl.h>
-# include <uwvm2/compiler/validation/concepts/impl.h>
-# include <uwvm2/compiler/validation/standard/impl.h>
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "impl.h"

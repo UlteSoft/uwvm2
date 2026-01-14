@@ -140,6 +140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
                         /// @todo run interpreter
+                        
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
