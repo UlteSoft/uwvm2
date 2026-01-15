@@ -100,6 +100,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_WIN32)
             // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
             ::fast_io::win32::RaiseException(static_cast<::std::uint_least32_t>(code), 0u, 0u, nullptr);
+# elif defined(__wasi__)
+            // the platform not support raise
+            ::fast_io::io::panic(::fast_io::u8err(),
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                 u8"uwvm: ",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                 u8"[fatal] ",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                 u8"proc_raise() is not supported in WASI Self-Hosting, instance terminated.\n\n",
+                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            ::std::unreachable();
 # else
             if(::uwvm2::imported::wasi::wasip1::func::posix::raise(static_cast<int>(code)) != 0) [[unlikely]]
             {
