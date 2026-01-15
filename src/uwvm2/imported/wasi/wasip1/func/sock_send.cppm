@@ -40,7 +40,9 @@ module;
 #if __has_include(<errno.h>)
 # include <errno.h>
 #endif
-#if __has_include(<sys/fcntl.h>)
+#if __has_include(<fcntl.h>)
+# include <fcntl.h>
+#elif __has_include(<sys/fcntl.h>)
 # include <sys/fcntl.h>
 #endif
 #if __has_include(<sys/socket.h>)
