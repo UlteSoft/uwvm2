@@ -451,8 +451,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 #  if defined(ESRCH)
             case ESRCH: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esrch;
 #  endif
-                // wasi no POLLERR
-#  if defined(POLLNVAL) && (!defined(EPIPE) || (defined(EPIPE) && EPIPE != POLLNVAL))
+                // wasi no POLLERR, emscripten has POLLERR
+#  if defined(POLLNVAL) && (!defined(EPIPE) || (defined(EPIPE) && EPIPE != POLLNVAL)) && (!defined(ELOOP) || (defined(ELOOP) && ELOOP != POLLNVAL))
             case POLLNVAL: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::epipe;
 #  endif
             default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
