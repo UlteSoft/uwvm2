@@ -51,12 +51,14 @@ function wasm_emscripten_target()
     --    add_syslinks("c++abi")
     --end
 
-    	if is_arch("wasm32") then
+    if is_arch("wasm32") then
         add_cxflags("--target=wasm32-unknown-emscripten", {force = true})
         add_ldflags("--target=wasm32-unknown-emscripten", {force = true})
     elseif is_arch("wasm64") then
         add_cxflags("--target=wasm64-unknown-emscripten", {force = true})
         add_ldflags("--target=wasm64-unknown-emscripten", {force = true})
     end
+
+    add_ldflags("-s STACK_SIZE=8388608", {force = true})
 
 end
