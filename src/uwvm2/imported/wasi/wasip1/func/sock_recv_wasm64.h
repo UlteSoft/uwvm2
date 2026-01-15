@@ -43,7 +43,9 @@
 # if __has_include(<errno.h>)
 #  include <errno.h>
 # endif
-# if __has_include(<sys/fcntl.h>)
+# if __has_include(<fcntl.h>)
+#  include <fcntl.h>
+# elif __has_include(<sys/fcntl.h>)
 #  include <sys/fcntl.h>
 # endif
 # if __has_include(<sys/socket.h>)
@@ -69,7 +71,19 @@
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wcpp"
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wcpp"
+# endif
 # warning "Without enabling C++ exceptions, using this WASI function may cause termination."
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic pop
+# endif
 #endif
 
 #ifndef UWVM_MODULE_EXPORT

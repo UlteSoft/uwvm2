@@ -60,8 +60,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline bool validate_all_wasm_code_for_module(
         ::uwvm2::parser::wasm::binfmt::ver1::wasm_binfmt_ver1_module_extensible_storage_t<Fs...> const& module_storage,
-        ::uwvm2::utils::container::u8cstring_view file_name,
-        ::uwvm2::utils::container::u8string_view module_name) noexcept
+        [[maybe_unused]] ::uwvm2::utils::container::u8cstring_view file_name,
+        [[maybe_unused]] ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         auto const& importsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(module_storage.sections)};
@@ -82,11 +82,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
 #endif
             {
                 ::uwvm2::validation::standard::wasm1::validate_code(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                                                                              module_storage,
-                                                                              import_func_count + local_idx,
-                                                                              code_begin_ptr,
-                                                                              code_end_ptr,
-                                                                              v_err);
+                                                                    module_storage,
+                                                                    import_func_count + local_idx,
+                                                                    code_begin_ptr,
+                                                                    code_end_ptr,
+                                                                    v_err);
             }
 #ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)

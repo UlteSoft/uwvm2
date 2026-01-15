@@ -52,7 +52,7 @@ function wasm_wasi_target()
     --    add_syslinks("c++abi")
     --end
 
-    	if is_arch("wasm32") then
+    if is_arch("wasm32") then
 		if is_plat("wasm-wasi") then
 			add_cxflags("--target=wasm32-wasi", {force = true})
 			add_ldflags("--target=wasm32-wasi", {force = true})
@@ -99,5 +99,8 @@ function wasm_wasi_target()
 			--add_defines("UWVM_ENABLE_WASI_THREADS")
 		end
 	end
+
+	-- The default WASM memory allocation is too small; here we set it to 8MB.
+	add_ldflags("-Wl,-z,stack-size=8388608", {force = true})
 
 end

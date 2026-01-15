@@ -59,7 +59,19 @@
 #endif
 
 #ifndef UWVM_CPP_EXCEPTIONS
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wcpp"
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wcpp"
+# endif
 # warning "Without enabling C++ exceptions, using this WASI function may cause termination."
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# elif defined(__GNUC__)
+#  pragma GCC diagnostic pop
+# endif
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -279,11 +291,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # else
                 auto const& curr_fd_native_file{curr_fd_native_observer};
 
+#  ifdef UWVM_CPP_EXCEPTIONS
                 try
+#  endif
                 {
                     truncate(curr_fd_native_file,
                              static_cast<::std::uintmax_t>(static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(size)>>>(size)));
                 }
+#  ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error e)
                 {
                     switch(e.code)
@@ -297,24 +312,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         case EPERM: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eperm;
                         case EISDIR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eisdir;
                         case EROFS: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::erofs;
-#  if defined(EDQUOT)
+#   if defined(EDQUOT)
                         case EDQUOT: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::edquot;
-#  endif
+#   endif
                         case EINTR: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eintr;
-#  if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
+#   if defined(EWOULDBLOCK) && (!defined(EAGAIN) || (EAGAIN != EWOULDBLOCK))
                         case EWOULDBLOCK: [[fallthrough]];
-#  endif
+#   endif
                         case EAGAIN: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eagain;
                         case ESPIPE: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::espipe;
-#  if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
+#   if defined(EOPNOTSUPP) && (!defined(ENOTSUP) || (ENOTSUP != EOPNOTSUPP))
                         case EOPNOTSUPP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
-#  if defined(ENOTSUP)
+#   endif
+#   if defined(ENOTSUP)
                         case ENOTSUP: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::enotsup;
-#  endif
+#   endif
                         default: return ::uwvm2::imported::wasi::wasip1::abi::errno_t::eio;
                     }
                 }
+#  endif
 # endif
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_t::esuccess;
