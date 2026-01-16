@@ -10,7 +10,7 @@ Upstream `fast_io` may reject reasonable changes in unexpected ways. To keep our
 
 The modifications in this vendored copy are based on (and/or include changes up to) the following upstream commit:
 
-- https://github.com/cppfastio/fast_io/commit/3c8eebcbd6cb6410835a50c33e56453f5fb9c386
+- https://github.com/cppfastio/fast_io/commit/64335ff349402016c3f10648383231a0f261b132
 
 ## License note (risk mitigation)
 
