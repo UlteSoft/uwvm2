@@ -91,6 +91,13 @@ function def_build()
 		add_defines("UWVM_USE_LLVM_JIT")
 	end
 
+	local enable_debug_int = get_config("enable-debug-int")
+	if enable_debug_int then
+		add_defines("UWVM_ENABLE_DEBUG_INT")
+	else
+		add_defines("UWVM_DISABLE_DEBUG_INT")
+	end
+
 	local detailed_debug_check = get_config("detailed-debug-check")
 	if is_mode("debug") and detailed_debug_check then
 		add_defines("UWVM_ENABLE_DETAILED_DEBUG_CHECK")

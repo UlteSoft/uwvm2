@@ -73,6 +73,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             // runtime
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_debug),
+#endif
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
 #endif

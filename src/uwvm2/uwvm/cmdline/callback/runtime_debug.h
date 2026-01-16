@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-01-03
+ * @date        2026-01-16
  * @copyright   APL-2.0 License
  */
 
@@ -47,17 +47,17 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
 
 # if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 # else
     UWVM_GNU_COLD inline constexpr
 # endif
-        ::uwvm2::utils::cmdline::parameter_return_type runtime_tiered_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
-                                                                               [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-                                                                               [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
-                                                                                   para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type runtime_debug_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+                                                                              [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                              [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
+                                                                                  para_end) noexcept
     {
         // [... curr] ...
         // [  safe  ] unsafe (could be the module_end)
@@ -74,7 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Conflicting runtime parameters: \"",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                u8"--runtime-tiered",
+                                u8"--runtime-debug",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\" conflicts with custom runtime parameters (--runtime-custom-mode/--runtime-custom-compiler).\n" u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -96,8 +96,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
 # endif
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed ||
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_aot_existed ||
@@ -130,14 +130,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"|",
                                 u8"--runtime-aot"
 # endif
-# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                                 ,
                                 u8"|"
-#  endif
+# endif
                                 ,
                                 u8"--runtime-debug"
-# endif
                                 u8").\n"
                                 u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -152,9 +150,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
-        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler =
-            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered;
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter;
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
 
@@ -167,3 +164,4 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
+

@@ -31,6 +31,7 @@
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
 # endif
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 # if defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
 #  include <linux/version.h>
@@ -42,7 +43,7 @@
 # if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
 #  include <sgidefs.h>
 # endif
-// std
+// imported
 # include <fast_io.h>
 # include <fast_io_crypto.h>
 # include <uwvm2/utils/container/impl.h>
@@ -67,6 +68,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     inline constexpr void logo_u8print_not_rst_impl(Stm && stm) noexcept
     {
         // Preventing the wasm32-wasi-uwvm stack from being too small and causing an overflow requires limiting the size of the contents of each print
+        // Platforms like GitHub CI lose color information when line breaks occur.
         ::fast_io::io::perr(::std::forward<Stm>(stm),
                             // logo
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
@@ -84,7 +86,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"__  __  ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n|",
+                            u8"|\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
                             u8" | | | | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
@@ -94,7 +98,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"|  \\/  | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n|",
+                            u8"|\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
                             u8" | | | | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
@@ -104,7 +110,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"| |\\/| | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n|",
+                            u8"|\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
                             u8" | |_| | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
@@ -114,7 +122,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"| |  | | ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n|",
+                            u8"|\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
                             u8"  \\___/ ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
@@ -124,7 +134,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"|_|  |_| ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8"|\n|                                         |\n|",
+                            u8"|\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|                                         |\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
                             u8" Ultimate ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
@@ -134,7 +148,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(70, 37, 206)),
                             u8"  Machine",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
-                            u8" |\n ----------------------------------------- \n\n");
+                            u8" |\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
+                            u8" ----------------------------------------- \n\n");
 
         // color == UWVM_COLOR_U8_RGB(72, 61, 139), not reset
     }
@@ -982,6 +998,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  endif
 # endif
 #endif
+
+        // runtime compiler
+                            u8"  * Runtime Compiler:\n"
+#ifdef UWVM_RUNTIME_UWVM_INTERPRETER
+                            u8"      - UWVM Interpreter\n"
+#endif
+#ifdef UWVM_RUNTIME_LLVM_JIT
+                            u8"      - LLVM JIT\n"
+#endif
+#ifdef UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED
+                            u8"      - UWVM Interpreter + LLVM JIT (Tiered)\n"
+#endif
+#ifdef UWVM_RUNTIME_DEBUG_INTERPRETER
+                            u8"      - Debug Interpreter\n"
+#endif
+
+        // ENDL
                             u8"\n");
 
         // Here, guard will perform destructors.
@@ -991,6 +1024,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 #  include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>  // wasip1
 # endif

@@ -44,6 +44,7 @@
 // runtime
 # include "runtime_custom_mode.h"
 # include "runtime_custom_compiler.h"
+# include "runtime_debug.h"
 # include "runtime_int.h"
 # include "runtime_jit.h"
 # include "runtime_tiered.h"

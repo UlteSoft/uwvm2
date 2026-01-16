@@ -65,6 +65,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
 #endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed ||
+#endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
 #endif
@@ -105,6 +108,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ,
                                 u8"|",
                                 u8"--runtime-aot"
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                                ,
+                                u8"|"
+# endif
+                                ,
+                                u8"--runtime-debug"
 #endif
                                 u8").\n" u8"uwvm: ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
@@ -169,6 +180,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             if(currp1_str == u8"jit")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only;
+        }
+        else
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+            if(currp1_str == u8"debug-int")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter;
         }
         else
 #endif

@@ -172,6 +172,15 @@ option("enable-jit", function()
     set_values("none", "default", "llvm")
 end)
 
+option("enable-debug-int", function()
+    set_description
+    (
+        "enable debug interpreter",
+        "default = true"
+    )
+    set_default(true)
+end)
+
 option("detailed-debug-check", function()
     set_description
     (
