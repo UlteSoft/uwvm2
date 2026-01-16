@@ -27,6 +27,10 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>  // wasip1
+#endif
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 #if defined(__linux) || defined(__linux__) || defined(__gnu_linux__)
 # include <linux/version.h>

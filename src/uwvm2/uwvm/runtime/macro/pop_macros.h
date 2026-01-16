@@ -25,6 +25,7 @@
 
 // #pragma once
 
+#pragma pop_macro("UWVM_RUNTIME_DEBUG_INTERPRETER")
 #pragma pop_macro("UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED")
 #pragma pop_macro("UWVM_RUNTIME_LLVM_JIT")
 #pragma pop_macro("UWVM_RUNTIME_UWVM_INTERPRETER")
