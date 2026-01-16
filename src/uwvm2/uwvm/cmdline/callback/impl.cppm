@@ -42,6 +42,7 @@ export import :wasm_list_weak_symbol_module;
 // runtime
 export import :runtime_custom_mode;
 export import :runtime_custom_compiler;
+export import :runtime_debug;
 export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_tiered;

@@ -45,7 +45,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if !defined(UWVM_RUNTIME_UWVM_INTERPRETER) && !defined(UWVM_RUNTIME_LLVM_JIT)
+#if !defined(UWVM_RUNTIME_UWVM_INTERPRETER) && !defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
 # error "No runtime backend selected. Include <uwvm2/uwvm/runtime/macro/push_macros.h> before this header (or enable interpreter/JIT in build flags)."
 #endif
 
@@ -58,6 +58,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @brief   Whether the runtime mode is code interpreted.
     /// @details lazy_compile + uwvm_interpreter_only
     inline bool is_runtime_mode_code_int_existed{};  // [global]
+#endif
+
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+    /// @brief   Whether the runtime mode is debug interpreter.
+    /// @details full_compile + debug_interpreter
+    inline bool is_runtime_mode_code_debug_existed{};  // [global]
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -83,6 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
 
+    // The debug interpreter is never used as a regular interpreter.
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered

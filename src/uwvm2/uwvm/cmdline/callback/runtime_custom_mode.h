@@ -65,6 +65,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
 #endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+            ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed ||
+#endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
 #endif
@@ -106,6 +109,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 ,
                 u8"|",
                 u8"--runtime-aot"
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                ,
+                u8"|"
+# endif
+                ,
+                u8"--runtime-debug"
 #endif
                 u8").\n"
                 u8"uwvm: ",

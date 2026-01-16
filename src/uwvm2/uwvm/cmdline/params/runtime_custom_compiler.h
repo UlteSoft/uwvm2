@@ -79,6 +79,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_LLVM_JIT)
                u8"jit"
 #endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+               u8"|"
+#endif
+               u8"debug-int"
+#endif
                u8"]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_custom_compiler_alias), 1uz}},
         .handle{::std::addressof(details::runtime_custom_compiler_callback)},
