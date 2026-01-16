@@ -118,6 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
             ::uwvm2::uwvm::io::toctou_warning_fatal = true;
 #endif
+            ::uwvm2::uwvm::io::runtime_warning_fatal = true;
         }
         else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::vm_warning_fatal = true; }
         else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::parser_warning_fatal = true; }
@@ -135,6 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #if defined(_WIN32) && defined(_WIN32_WINDOWS)
         else if(currp1_str == u8"toctou") { ::uwvm2::uwvm::io::toctou_warning_fatal = true; }
 #endif
+        else if(currp1_str == u8"runtime") { ::uwvm2::uwvm::io::runtime_warning_fatal = true; }
         else
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -159,4 +161,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-
