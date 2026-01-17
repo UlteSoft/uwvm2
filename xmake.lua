@@ -94,8 +94,6 @@ function def_build()
 	local enable_debug_int = get_config("enable-debug-int")
 	if enable_debug_int then
 		add_defines("UWVM_ENABLE_DEBUG_INT")
-	else
-		add_defines("UWVM_DISABLE_DEBUG_INT")
 	end
 
 	local detailed_debug_check = get_config("detailed-debug-check")

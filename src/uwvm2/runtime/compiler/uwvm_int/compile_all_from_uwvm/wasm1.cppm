@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-27
  * @copyright   APL-2.0 License
  */
 
@@ -25,31 +24,21 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
-#include <type_traits>
-#include <utility>
+#include <limits>
+#include <memory>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
-#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
-export module uwvm2.uwvm.run:run;
+export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:wasm1;
 
 import fast_io;
-import uwvm2.utils.ansies;
-import uwvm2.utils.debug;
-import uwvm2.utils.madvise;
-import uwvm2.parser.wasm.base;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard;
-import uwvm2.parser.wasm.binfmt.base;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.utils.ansies;
-import uwvm2.uwvm.utils.memory;
-import uwvm2.uwvm.cmdline;
-import uwvm2.uwvm.wasm;
-import uwvm2.uwvm.runtime;
-import :retval;
-import :loader;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.object;
+/// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
+import uwvm2.uwvm.runtime.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -58,4 +47,5 @@ import :loader;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "run.h"
+#include "wasm1.h"
+

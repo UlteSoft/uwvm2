@@ -31,6 +31,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -198,19 +199,69 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     {
                         /// @todo run interpreter
 
+                        // not supported yet
+                        ::fast_io::fast_terminate();
+
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
-                        /// @todo valid all wasm code (not wasm validation, Compiler validator - simultaneously generating ECU)
-
                         /// @todo run interpreter
+
+                        // not supported yet
+                        ::fast_io::fast_terminate();
 
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile:
                     {
-                        /// @todo run interpreter
+                        switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
+                        {
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
+                            {
+                                // not supported yet
+                                ::fast_io::fast_terminate();
+
+                                break;
+                            }
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter:
+                            {
+                                // not supported yet
+                                ::fast_io::fast_terminate();
+
+                                break;
+                            }
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
+                            {
+                                // not supported yet
+                                ::fast_io::fast_terminate();
+
+                                break;
+                            }
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                            case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
+                            {
+                                // not supported yet
+                                ::fast_io::fast_terminate();
+
+                                break;
+                            }
+#endif
+                            [[unlikely]] default:
+                            {
+/// @warning Maybe I forgot to realize it.
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                ::std::unreachable();
+                            }
+                        }
 
                         break;
                     }
@@ -241,6 +292,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

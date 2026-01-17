@@ -20,10 +20,17 @@
  *                                      *
  ****************************************/
 
-#pragma once
+/// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
+
+module;
+
+export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
 
 #ifndef UWVM_MODULE
-# include "wasm_module.h"
-# include "storage.h"
-# include "full.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "impl.h"
