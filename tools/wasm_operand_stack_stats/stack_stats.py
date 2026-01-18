@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 
@@ -313,6 +313,7 @@ class FunctionStats:
     above_threshold: int = 0
     at_or_below_threshold: int = 0
     max_stack_height: int = 0
+    stack_histogram: Dict[int, int] = field(default_factory=dict)
 
 
 def trace_operand_stack_stats(
@@ -346,6 +347,7 @@ def trace_operand_stack_stats(
             return
         func_stats.instructions_counted += 1
         func_stats.max_stack_height = max(func_stats.max_stack_height, stack_h_after)
+        func_stats.stack_histogram[stack_h_after] = func_stats.stack_histogram.get(stack_h_after, 0) + 1
         if stack_h_after > threshold:
             func_stats.above_threshold += 1
         else:
@@ -637,6 +639,8 @@ def trace_operand_stack_stats(
         total.above_threshold += stats.above_threshold
         total.at_or_below_threshold += stats.at_or_below_threshold
         total.max_stack_height = max(total.max_stack_height, stats.max_stack_height)
+        for k, v in stats.stack_histogram.items():
+            total.stack_histogram[k] = total.stack_histogram.get(k, 0) + v
 
         if per_func_out is not None:
             per_func_out[func_index] = stats
@@ -673,6 +677,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "above_threshold": total.above_threshold,
         "at_or_below_threshold": total.at_or_below_threshold,
         "max_stack_height": total.max_stack_height,
+        "stack_histogram": {str(i): total.stack_histogram.get(i, 0) for i in range(total.max_stack_height + 1)},
     }
     if per_func is not None:
         payload["per_function"] = {
@@ -681,6 +686,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "above_threshold": v.above_threshold,
                 "at_or_below_threshold": v.at_or_below_threshold,
                 "max_stack_height": v.max_stack_height,
+                "stack_histogram": {str(i): v.stack_histogram.get(i, 0) for i in range(v.max_stack_height + 1)},
             }
             for k, v in per_func.items()
         }
@@ -695,6 +701,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"> threshold: {payload['above_threshold']}")
         print(f"<= threshold: {payload['at_or_below_threshold']}")
         print(f"max_stack_height: {payload['max_stack_height']}")
+        print("stack_histogram:")
+        for i in range(total.max_stack_height + 1):
+            print(f"  {i}: {total.stack_histogram.get(i, 0)}")
         if per_func is not None:
             print(f"functions: {len(per_func)}")
 
