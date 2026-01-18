@@ -27,6 +27,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 #include <vector>
 
 #ifndef UWVM_MODULE
@@ -60,7 +61,14 @@ namespace
 
     // Some environments run binaries under ptrace-like supervision, which makes LeakSanitizer abort.
     // Disable leak checking by default so the fuzzer can run reliably.
-    extern "C" const char* __asan_default_options() { return "detect_leaks=0"; }
+    extern "C" char const* __asan_default_options() { return "detect_leaks=0"; }
+
+    struct uwvm_diag_t
+    {
+        ::uwvm2::parser::wasm::base::wasm_parse_error_code parse_err_code{};
+        ::uwvm2::validation::error::code_validation_error_code validate_err_code{};
+        ::std::size_t validate_function_index{};
+    };
 
     [[nodiscard]] static bool wabt_strict_mode() noexcept
     {
@@ -238,8 +246,7 @@ namespace
                                 ++q;  // mutability
                                 break;
                             }
-                            default:
-                                return false;
+                            default: return false;
                         }
                     }
                     break;
@@ -339,14 +346,19 @@ namespace
                     }
                     break;
                 }
-                default:
-                    break;
+                default: break;
             }
 
             p = payload_end;
         }
 
         return false;
+    }
+
+    [[nodiscard]] static bool uwvm_fuzz_debug() noexcept
+    {
+        auto const* v = ::std::getenv("UWVM_FUZZ_DEBUG");
+        return v != nullptr && *v != '\0' && !(v[0] == '0' && v[1] == '\0');
     }
 
     // WABT may accept some post-MVP encodings (e.g. element segment flags/passive segments) even when features are disabled.
@@ -481,7 +493,7 @@ namespace
                data[5] == 0x00u && data[6] == 0x00u && data[7] == 0x00u;
     }
 
-    [[nodiscard]] static bool validate_with_uwvm(::std::uint8_t const* data, ::std::size_t size)
+    [[nodiscard]] static bool validate_with_uwvm(::std::uint8_t const* data, ::std::size_t size, uwvm_diag_t* diag)
     {
         if(!is_wasm_binfmt_ver1_mvp(data, size)) { return false; }
 
@@ -498,15 +510,31 @@ namespace
         }
         catch(::fast_io::error const&)
         {
+            if(diag != nullptr)
+            {
+                diag->parse_err_code = parse_err.err_code;
+                diag->validate_err_code = {};
+                diag->validate_function_index = 0;
+            }
             return false;
         }
-        if(parse_err.err_code != ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok) { return false; }
+        if(parse_err.err_code != ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok)
+        {
+            if(diag != nullptr)
+            {
+                diag->parse_err_code = parse_err.err_code;
+                diag->validate_err_code = {};
+                diag->validate_function_index = 0;
+            }
+            return false;
+        }
 
         // Phase 1.5: parse and validate "name" custom section (debug names), to match WABT's default behaviour.
         if(wabt_strict_mode())
         {
-            auto const& customsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                ::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>(module_storage.sections)};
+            auto const& customsec{
+                ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<::uwvm2::parser::wasm::standard::wasm1::features::custom_section_storage_t>(
+                    module_storage.sections)};
 
             ::uwvm2::parser::wasm_custom::customs::name_parser_param_t name_param{};
 
@@ -521,7 +549,16 @@ namespace
                 ::uwvm2::parser::wasm_custom::customs::name_storage_t name_storage{};
                 ::uwvm2::utils::container::vector<::uwvm2::parser::wasm_custom::customs::name_err_t> name_errs{};
                 ::uwvm2::parser::wasm_custom::customs::parse_name_storage(name_storage, name_begin, name_end, name_errs, name_param);
-                if(!name_errs.empty()) { return false; }
+                if(!name_errs.empty())
+                {
+                    if(diag != nullptr)
+                    {
+                        diag->parse_err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok;
+                        diag->validate_err_code = {};
+                        diag->validate_function_index = 0;
+                    }
+                    return false;
+                }
             }
         }
 
@@ -543,31 +580,51 @@ namespace
 
             try
             {
-                ::uwvm2::validation::standard::wasm1::validate_code<uwvm_feature>(
-                    ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                    module_storage,
-                    import_func_count + local_idx,
-                    code_begin_ptr,
-                    code_end_ptr,
-                    v_err);
+                ::uwvm2::validation::standard::wasm1::validate_code<uwvm_feature>(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
+                                                                                  module_storage,
+                                                                                  import_func_count + local_idx,
+                                                                                  code_begin_ptr,
+                                                                                  code_end_ptr,
+                                                                                  v_err);
             }
             catch(::fast_io::error const&)
             {
+                if(diag != nullptr)
+                {
+                    diag->parse_err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok;
+                    diag->validate_err_code = v_err.err_code;
+                    diag->validate_function_index = import_func_count + local_idx;
+                }
                 return false;
             }
-            if(v_err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) { return false; }
+            if(v_err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok)
+            {
+                if(diag != nullptr)
+                {
+                    diag->parse_err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok;
+                    diag->validate_err_code = v_err.err_code;
+                    diag->validate_function_index = import_func_count + local_idx;
+                }
+                return false;
+            }
         }
 
+        if(diag != nullptr)
+        {
+            diag->parse_err_code = ::uwvm2::parser::wasm::base::wasm_parse_error_code::ok;
+            diag->validate_err_code = ::uwvm2::validation::error::code_validation_error_code::ok;
+            diag->validate_function_index = 0;
+        }
         return true;
     }
 
-    [[nodiscard]] static bool validate_with_wabt(::std::uint8_t const* data, ::std::size_t size)
+    [[nodiscard]] static bool validate_with_wabt(::std::uint8_t const* data, ::std::size_t size, ::wabt::Errors* out_errors)
     {
         if(!is_wasm_binfmt_ver1_mvp(data, size)) { return false; }
 
         using namespace ::wabt;
 
-        Errors errors;
+        Errors errors{};
         Module module;
         Features validate_features;
 
@@ -591,9 +648,9 @@ namespace
         validate_features.disable_relaxed_simd();
         validate_features.disable_custom_page_sizes();
 
-        const bool kStopOnFirstError = true;
-        const bool kReadDebugNames = wabt_strict_mode();
-        const bool kFailOnCustomSectionError = wabt_strict_mode();
+        bool const kStopOnFirstError = true;
+        bool const kReadDebugNames = wabt_strict_mode();
+        bool const kFailOnCustomSectionError = wabt_strict_mode();
 
         // Parse and validate with the same strict feature set as UWVM. WABT may contain debug assertions when
         // parsing malformed inputs; keep WABT built in Release (and force `NDEBUG` above) so those assertions
@@ -601,10 +658,15 @@ namespace
         ReadBinaryOptions read_options(validate_features, nullptr, kReadDebugNames, kStopOnFirstError, kFailOnCustomSectionError);
 
         Result result = ReadBinaryIr("<buffer>", data, size, read_options, &errors, &module);
-        if(Failed(result)) { return false; }
+        if(Failed(result))
+        {
+            if(out_errors != nullptr) { *out_errors = std::move(errors); }
+            return false;
+        }
 
         ValidateOptions validate_options(validate_features);
         result = ValidateModule(&module, &errors, validate_options);
+        if(out_errors != nullptr) { *out_errors = std::move(errors); }
         return Succeeded(result);
     }
 }  // namespace
@@ -633,10 +695,34 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     if(has_non_mvp_type_field_encoding(test_data, test_size)) { return 0; }
     if(has_non_mvp_element_section_encoding(test_data, test_size)) { return 0; }
 
-    auto const uwvm_ok{validate_with_uwvm(test_data, test_size)};
-    auto const wabt_ok{validate_with_wabt(test_data, test_size)};
+    auto const uwvm_ok{validate_with_uwvm(test_data, test_size, nullptr)};
+    auto const wabt_ok{validate_with_wabt(test_data, test_size, nullptr)};
 
-    if(uwvm_ok != wabt_ok) { __builtin_trap(); }
+    if(uwvm_ok != wabt_ok)
+    {
+        if(uwvm_fuzz_debug())
+        {
+            uwvm_diag_t uwvm_diag{};
+            ::wabt::Errors wabt_errors{};
+
+            (void)validate_with_uwvm(test_data, test_size, &uwvm_diag);
+            (void)validate_with_wabt(test_data, test_size, &wabt_errors);
+
+            ::std::fprintf(stderr,
+                           "uwvm_ok=%d wabt_ok=%d size=%zu uwvm_parse_err=%u uwvm_validate_err=%u uwvm_validate_func=%zu wabt_errors=%zu\\n",
+                           static_cast<int>(uwvm_ok),
+                           static_cast<int>(wabt_ok),
+                           test_size,
+                           static_cast<unsigned>(uwvm_diag.parse_err_code),
+                           static_cast<unsigned>(uwvm_diag.validate_err_code),
+                           uwvm_diag.validate_function_index,
+                           wabt_errors.size());
+            if(!wabt_errors.empty()) { ::std::fprintf(stderr, "wabt_error0: %s\\n", wabt_errors.front().message.c_str()); }
+            ::std::fflush(stderr);
+            return 0;
+        }
+        __builtin_trap();
+    }
 
     return 0;
 }
