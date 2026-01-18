@@ -1823,6 +1823,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<code_section_storage_t>(module_storage.sections)};
             auto const& datasec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<data_section_storage_t>(module_storage.sections)};
 
+            // Expose type section range for runtime/compilers (e.g. call_indirect validation).
+            if(typesec.types.empty())
+            {
+                out.type_section_storage.type_section_begin = nullptr;
+                out.type_section_storage.type_section_end = nullptr;
+            }
+            else [[likely]]
+            {
+                out.type_section_storage.type_section_begin = typesec.types.cbegin();
+                out.type_section_storage.type_section_end = typesec.types.cend();
+            }
+
             // Fail-safe validation for partially-degraded parsers:
             // - wasm1.0 MVP forbids multiple tables/memories.
             // - wasm1.0 MVP forbids multi-value results.

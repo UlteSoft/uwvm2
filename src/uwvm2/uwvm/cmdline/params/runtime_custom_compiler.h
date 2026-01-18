@@ -80,9 +80,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
                u8"jit"
 #endif
 #if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                u8"|"
-#endif
+# endif
                u8"debug-int"
 #endif
                u8"]"},

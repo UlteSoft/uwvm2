@@ -24,6 +24,7 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 // macro
@@ -33,11 +34,12 @@ export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:wasm1;
 
 import fast_io;
 import uwvm2.utils.container;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm.standard.wasm1p1.type;
-import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.parser.wasm.base;
+import uwvm2.parser.wasm.standard.wasm1;
+import uwvm2.validation.error;
 import uwvm2.object;
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
+import uwvm2.uwvm.wasm;
 import uwvm2.uwvm.runtime.storage;
 import :define;
 
@@ -49,4 +51,3 @@ import :define;
 #endif
 
 #include "wasm1.h"
-

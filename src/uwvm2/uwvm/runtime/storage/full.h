@@ -43,11 +43,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full
-{
-
-
-}
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::full {}
 
 #ifndef UWVM_MODULE
 // macro

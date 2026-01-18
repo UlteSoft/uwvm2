@@ -32,9 +32,7 @@
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
 # include <uwvm2/uwvm/runtime/storage/impl.h>

@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    /// @brief type section storage
     /// @brief Function section storage
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
@@ -54,6 +55,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
     { return ::uwvm2::parser::wasm::standard::wasm1::features::final_function_type<Fs...>{}; }
 
     using wasm_binfmt1_final_function_type_t = decltype(get_final_function_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
+
+    struct type_section_storage_t
+    {
+        wasm_binfmt1_final_function_type_t const* type_section_begin{};
+        wasm_binfmt1_final_function_type_t const* type_section_end{};
+    };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     inline consteval auto get_final_wasm_code_from_tuple(::uwvm2::utils::container::tuple<Fs...>) noexcept
@@ -597,6 +604,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
     struct wasm_module_storage_t
     {
+        // type
+        // Exposes the binfmt1 type section for compiler-side validation (e.g. call_indirect: type_index -> signature).
+        type_section_storage_t type_section_storage{};
+
         // func
         ::uwvm2::utils::container::vector<imported_function_storage_t> imported_function_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_function_storage_t> local_defined_function_vec_storage{};
