@@ -1233,6 +1233,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                             err.err_code = ::uwvm2::validation::error::code_validation_error_code::trailing_code_after_end;
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
+                        
                         return;
                     }
 

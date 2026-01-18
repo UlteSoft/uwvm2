@@ -583,8 +583,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             // a WebAssembly function with type '() -> ()' (often written as returning “nil”) can have no meaningful code, but it still must have a valid
             // instruction sequence—at minimum an end.
 
-            bool validate_function_done{};
-
             for(;;)
             {
                 if(code_curr == code_end) [[unlikely]]
@@ -1140,7 +1138,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 err.err_code = code_validation_error_code::trailing_code_after_end;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
-                            validate_function_done = true;
+
+                            return storage;
                         }
 
                         break;
@@ -3538,8 +3537,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
                 }
-
-                if(validate_function_done) { break; }
             }
         }
 
