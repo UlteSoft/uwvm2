@@ -473,6 +473,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [   safe  ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
+                    // In Wasm validation, `unreachable` resets the operand stack height to the current label's base,
+                    // and then makes the stack polymorphic for subsequent type-checking.
+                    if(!control_flow_stack.empty())
+                    {
+                        auto const base{control_flow_stack.back_unchecked().operand_stack_base};
+                        while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
+                    }
+
                     is_polymorphic = true;
 
                     break;
@@ -951,55 +959,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     auto const stack_size{operand_stack.size()};
                     auto const actual_count{stack_size >= base ? stack_size - base : 0uz};
 
-                    if(!is_polymorphic)
+                    // Stack end rule:
+                    // - In reachable code, the stack at `end` must match the block result types exactly.
+                    // - In polymorphic (unreachable) code, stack underflow is permitted, but extra values are not.
+                    if(!is_polymorphic ? (actual_count != expected_count) : (actual_count > expected_count))
                     {
-                        if(actual_count != expected_count) [[unlikely]]
+                        err.err_curr = op_begin;
+                        err.err_selectable.end_result_mismatch.block_kind = block_kind;
+                        err.err_selectable.end_result_mismatch.expected_count = expected_count;
+                        err.err_selectable.end_result_mismatch.actual_count = actual_count;
+
+                        if(expected_count == 1uz)
                         {
-                            err.err_curr = op_begin;
-                            err.err_selectable.end_result_mismatch.block_kind = block_kind;
-                            err.err_selectable.end_result_mismatch.expected_count = expected_count;
-                            err.err_selectable.end_result_mismatch.actual_count = actual_count;
-                            if(expected_count == 1uz)
-                            {
-                                err.err_selectable.end_result_mismatch.expected_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
-                            }
-                            else
-                            {
-                                err.err_selectable.end_result_mismatch.expected_type = {};
-                            }
-                            if(actual_count == 1uz && stack_size != 0uz)
-                            {
-                                err.err_selectable.end_result_mismatch.actual_type =
-                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_stack.back_unchecked().type);
-                            }
-                            else
-                            {
-                                err.err_selectable.end_result_mismatch.actual_type = {};
-                            }
-                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            err.err_selectable.end_result_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*frame.result.begin);
+                        }
+                        else
+                        {
+                            err.err_selectable.end_result_mismatch.expected_type = {};
                         }
 
-                        if(expected_count != 0uz)
+                        if(actual_count == 1uz && stack_size != 0uz)
                         {
-                            for(::std::size_t i{}; i != expected_count; ++i)
+                            err.err_selectable.end_result_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_stack.back_unchecked().type);
+                        }
+                        else
+                        {
+                            err.err_selectable.end_result_mismatch.actual_type = {};
+                        }
+                        
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    // If the stack has enough values to satisfy the expected results, check their types even in
+                    // polymorphic (unreachable) mode; only the underflow aspect is suppressed.
+                    if(expected_count != 0uz && actual_count >= expected_count)
+                    {
+                        for(::std::size_t i{}; i != expected_count; ++i)
+                        {
+                            auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
+                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
+                            if(actual_type != expected_type) [[unlikely]]
                             {
-                                auto const expected_type{frame.result.begin[expected_count - 1uz - i]};
-                                auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
-                                if(actual_type != expected_type) [[unlikely]]
-                                {
-                                    err.err_curr = op_begin;
-                                    err.err_selectable.end_result_mismatch.block_kind = block_kind;
-                                    err.err_selectable.end_result_mismatch.expected_count = expected_count;
-                                    err.err_selectable.end_result_mismatch.actual_count = actual_count;
-                                    err.err_selectable.end_result_mismatch.expected_type =
-                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                                    err.err_selectable.end_result_mismatch.actual_type =
-                                        static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-                                    err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
-                                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                                }
+                                err.err_curr = op_begin;
+                                err.err_selectable.end_result_mismatch.block_kind = block_kind;
+                                err.err_selectable.end_result_mismatch.expected_count = expected_count;
+                                err.err_selectable.end_result_mismatch.actual_count = actual_count;
+                                err.err_selectable.end_result_mismatch.expected_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                                err.err_selectable.end_result_mismatch.actual_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
+                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
                     }
