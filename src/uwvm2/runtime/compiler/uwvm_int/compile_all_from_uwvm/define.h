@@ -46,6 +46,24 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm 
 {
+    struct optable
+    {
+
+    };
+
+    struct uwvm_interpreter_full_function_symbol_t
+    {
+        ::std::size_t local_count{};
+        ::std::size_t operand_stack_max{};
+    };
+
+    // Should we merge the local stack and operand stack (with the local stack placed first)?
+    template<bool is_local_>
+    struct uwvm_interpreter_full_function_runtime_storage_t
+    {
+        ::std::size_t local_count{};
+        ::std::size_t operand_stack_max{};
+    };
 }
 
 #ifndef UWVM_MODULE

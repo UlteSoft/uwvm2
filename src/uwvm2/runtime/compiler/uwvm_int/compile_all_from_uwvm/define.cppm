@@ -19,36 +19,33 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
 
-#ifndef UWVM_MODULE
 // std
-# include <cstddef>
-# include <cstdint>
-# include <limits>
-# include <memory>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
 // macro
-# include <uwvm2/utils/macro/push_macros.h>
-// import
-# include <fast_io.h>
-# include <uwvm2/utils/container/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
-# include <uwvm2/parser/wasm/standard/wasm3/type/impl.h>
-# include <uwvm2/object/impl.h>
+#include <uwvm2/utils/macro/push_macros.h>
+
+export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:define;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1.type;
+import uwvm2.parser.wasm.standard.wasm1p1.type;
+import uwvm2.parser.wasm.standard.wasm3.type;
+import uwvm2.object;
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
-# include <uwvm2/uwvm/runtime/storage/impl.h>
-#endif
-
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT
-#endif
-
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm 
-{
-}
+import uwvm2.uwvm.runtime.storage;
 
 #ifndef UWVM_MODULE
-// macro
-# include <uwvm2/utils/macro/pop_macros.h>
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "define.h"
+
