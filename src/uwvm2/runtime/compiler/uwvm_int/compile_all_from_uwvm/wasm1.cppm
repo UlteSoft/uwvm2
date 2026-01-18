@@ -39,6 +39,7 @@ import uwvm2.parser.wasm.standard.wasm3.type;
 import uwvm2.object;
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
 import uwvm2.uwvm.runtime.storage;
+import :define;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

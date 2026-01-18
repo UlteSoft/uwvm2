@@ -988,7 +988,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                         {
                             err.err_selectable.end_result_mismatch.actual_type = {};
                         }
-                        
+
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::end_result_mismatch;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
