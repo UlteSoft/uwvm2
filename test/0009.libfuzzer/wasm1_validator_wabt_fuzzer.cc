@@ -111,6 +111,244 @@ namespace
         return false;
     }
 
+    [[nodiscard]] static bool skip_name(::std::uint8_t const*& p, ::std::uint8_t const* end) noexcept
+    {
+        ::std::uint32_t name_len{};
+        if(!read_leb_u32(p, end, name_len)) { return false; }
+        if(static_cast<::std::size_t>(end - p) < static_cast<::std::size_t>(name_len)) { return false; }
+        p += name_len;
+        return true;
+    }
+
+    [[nodiscard]] static bool skip_limits(::std::uint8_t const*& p, ::std::uint8_t const* end) noexcept
+    {
+        if(p == end) { return false; }
+        auto const flags{*p++};
+        if(flags > 1u) { return false; }
+
+        ::std::uint32_t min{};
+        if(!read_leb_u32(p, end, min)) { return false; }
+
+        if(flags == 1u)
+        {
+            ::std::uint32_t max{};
+            if(!read_leb_u32(p, end, max)) { return false; }
+        }
+
+        return true;
+    }
+
+    // WABT's binary reader uses signed LEB128 decoding for some "type-like" fields (see `BinaryReader::ReadType`),
+    // which makes it accept multi-byte encodings that are not representable in Wasm1 MVP (where many of those fields
+    // are single-byte encodings, e.g. valtype/globaltype/elemtype/localtype/blocktype).
+    //
+    // This fuzzer targets MVP behaviour; filter out inputs that contain such non-MVP encodings to avoid false diffs.
+    [[nodiscard]] static bool has_non_mvp_type_field_encoding(::std::uint8_t const* data, ::std::size_t size) noexcept
+    {
+        if(!is_wasm_binfmt_ver1_mvp(data, size)) { return false; }
+
+        auto const* p{data + 8u};
+        auto const* const end{data + size};
+
+        while(p != end)
+        {
+            auto const section_id{*p++};
+
+            ::std::uint32_t section_size_u32{};
+            if(!read_leb_u32(p, end, section_size_u32)) { return false; }
+
+            auto const section_size{static_cast<::std::size_t>(section_size_u32)};
+            if(static_cast<::std::size_t>(end - p) < section_size) { return false; }
+
+            auto const* const payload_end{p + section_size};
+            auto const* q{p};
+
+            switch(section_id)
+            {
+                case 1u:  // type section
+                {
+                    ::std::uint32_t type_count{};
+                    if(!read_leb_u32(q, payload_end, type_count)) { return false; }
+
+                    for(::std::uint32_t i{}; i != type_count; ++i)
+                    {
+                        if(q == payload_end) { return false; }
+                        auto const form{*q++};
+                        if(form != 0x60u) { return false; }  // not MVP functype
+
+                        ::std::uint32_t param_count{};
+                        if(!read_leb_u32(q, payload_end, param_count)) { return false; }
+                        for(::std::uint32_t j{}; j != param_count; ++j)
+                        {
+                            if(q == payload_end) { return false; }
+                            if((*q & 0x80u) != 0u) { return true; }
+                            ++q;
+                        }
+
+                        ::std::uint32_t result_count{};
+                        if(!read_leb_u32(q, payload_end, result_count)) { return false; }
+                        for(::std::uint32_t j{}; j != result_count; ++j)
+                        {
+                            if(q == payload_end) { return false; }
+                            if((*q & 0x80u) != 0u) { return true; }
+                            ++q;
+                        }
+                    }
+                    break;
+                }
+                case 2u:  // import section
+                {
+                    ::std::uint32_t import_count{};
+                    if(!read_leb_u32(q, payload_end, import_count)) { return false; }
+
+                    for(::std::uint32_t i{}; i != import_count; ++i)
+                    {
+                        if(!skip_name(q, payload_end)) { return false; }  // module
+                        if(!skip_name(q, payload_end)) { return false; }  // name
+                        if(q == payload_end) { return false; }
+                        auto const kind{*q++};
+
+                        switch(kind)
+                        {
+                            case 0u:  // func (typeidx)
+                            {
+                                ::std::uint32_t idx{};
+                                if(!read_leb_u32(q, payload_end, idx)) { return false; }
+                                break;
+                            }
+                            case 1u:  // table
+                            {
+                                if(q == payload_end) { return false; }
+                                if((*q & 0x80u) != 0u) { return true; }  // non-MVP (LEB-encoded) elemtype
+                                ++q;
+                                if(!skip_limits(q, payload_end)) { return false; }
+                                break;
+                            }
+                            case 2u:  // memory
+                            {
+                                if(!skip_limits(q, payload_end)) { return false; }
+                                break;
+                            }
+                            case 3u:  // global
+                            {
+                                if(q == payload_end) { return false; }
+                                if((*q & 0x80u) != 0u) { return true; }  // non-MVP (LEB-encoded) globaltype
+                                ++q;
+                                if(q == payload_end) { return false; }
+                                ++q;  // mutability
+                                break;
+                            }
+                            default:
+                                return false;
+                        }
+                    }
+                    break;
+                }
+                case 4u:  // table section
+                {
+                    ::std::uint32_t table_count{};
+                    if(!read_leb_u32(q, payload_end, table_count)) { return false; }
+
+                    for(::std::uint32_t i{}; i != table_count; ++i)
+                    {
+                        if(q == payload_end) { return false; }
+                        if((*q & 0x80u) != 0u) { return true; }  // non-MVP (LEB-encoded) elemtype
+                        ++q;
+                        if(!skip_limits(q, payload_end)) { return false; }
+                    }
+                    break;
+                }
+                case 6u:  // global section
+                {
+                    ::std::uint32_t global_count{};
+                    if(!read_leb_u32(q, payload_end, global_count)) { return false; }
+
+                    for(::std::uint32_t i{}; i != global_count; ++i)
+                    {
+                        if(q == payload_end) { return false; }
+                        if((*q & 0x80u) != 0u) { return true; }  // non-MVP (LEB-encoded) globaltype
+                        ++q;
+
+                        if(q == payload_end) { return false; }
+                        ++q;  // mutability
+
+                        // Parse MVP init_expr until 0x0B (end).
+                        for(;;)
+                        {
+                            if(q == payload_end) { return false; }
+                            auto const op{*q++};
+                            if(op == 0x0Bu) { break; }
+                            switch(op)
+                            {
+                                case 0x41u:  // i32.const
+                                    if(!skip_leb_s32(q, payload_end)) { return false; }
+                                    break;
+                                case 0x42u:  // i64.const
+                                    if(!skip_leb_s64(q, payload_end)) { return false; }
+                                    break;
+                                case 0x43u:  // f32.const
+                                    if(static_cast<::std::size_t>(payload_end - q) < 4u) { return false; }
+                                    q += 4u;
+                                    break;
+                                case 0x44u:  // f64.const
+                                    if(static_cast<::std::size_t>(payload_end - q) < 8u) { return false; }
+                                    q += 8u;
+                                    break;
+                                case 0x23u:  // global.get
+                                {
+                                    ::std::uint32_t idx{};
+                                    if(!read_leb_u32(q, payload_end, idx)) { return false; }
+                                    break;
+                                }
+                                default:
+                                    // Treat non-MVP const-expr opcodes as out-of-scope for this fuzzer.
+                                    return true;
+                            }
+                        }
+                    }
+                    break;
+                }
+                case 10u:  // code section (locals)
+                {
+                    ::std::uint32_t func_count{};
+                    if(!read_leb_u32(q, payload_end, func_count)) { return false; }
+
+                    for(::std::uint32_t i{}; i != func_count; ++i)
+                    {
+                        ::std::uint32_t body_size_u32{};
+                        if(!read_leb_u32(q, payload_end, body_size_u32)) { return false; }
+
+                        auto const body_size{static_cast<::std::size_t>(body_size_u32)};
+                        if(static_cast<::std::size_t>(payload_end - q) < body_size) { return false; }
+
+                        auto const* const body_end{q + body_size};
+
+                        ::std::uint32_t local_decl_count{};
+                        if(!read_leb_u32(q, body_end, local_decl_count)) { return false; }
+
+                        for(::std::uint32_t j{}; j != local_decl_count; ++j)
+                        {
+                            ::std::uint32_t local_count{};
+                            if(!read_leb_u32(q, body_end, local_count)) { return false; }
+                            if(q == body_end) { return false; }
+                            if((*q & 0x80u) != 0u) { return true; }  // non-MVP (LEB-encoded) localtype
+                            ++q;
+                        }
+
+                        q = body_end;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            p = payload_end;
+        }
+
+        return false;
+    }
+
     // WABT may accept some post-MVP encodings (e.g. element segment flags/passive segments) even when features are disabled.
     // This fuzzer targets wasm1 MVP behaviour; filter out element sections that are not representable in MVP.
     [[nodiscard]] static bool has_non_mvp_element_section_encoding(::std::uint8_t const* data, ::std::size_t size) noexcept
@@ -392,6 +630,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         test_size = stripped.size();
     }
 
+    if(has_non_mvp_type_field_encoding(test_data, test_size)) { return 0; }
     if(has_non_mvp_element_section_encoding(test_data, test_size)) { return 0; }
 
     auto const uwvm_ok{validate_with_uwvm(test_data, test_size)};
