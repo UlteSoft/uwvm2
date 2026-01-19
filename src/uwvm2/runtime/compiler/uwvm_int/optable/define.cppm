@@ -29,14 +29,12 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 
-export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:define;
+export module uwvm2.runtime.compiler.uwvm_int.optable:define;
 
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
-/// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
-import uwvm2.uwvm.runtime.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

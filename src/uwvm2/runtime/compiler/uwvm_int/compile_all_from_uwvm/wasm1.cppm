@@ -41,7 +41,7 @@ import uwvm2.object;
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
 import uwvm2.uwvm.wasm;
 import uwvm2.uwvm.runtime.storage;
-import :define;
+import uwvm2.runtime.compiler.uwvm_int.optable;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

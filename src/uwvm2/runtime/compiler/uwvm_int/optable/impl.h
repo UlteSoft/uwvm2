@@ -23,6 +23,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+# include "define.h"
 # include "call.h"
 # include "compare.h"
 # include "conbine.h"

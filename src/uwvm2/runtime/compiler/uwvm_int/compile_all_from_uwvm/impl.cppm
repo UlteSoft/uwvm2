@@ -26,6 +26,8 @@ module;
 
 export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
 
+export import :wasm1;
+
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
 #endif

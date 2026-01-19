@@ -40,7 +40,7 @@
 /// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
 # include <uwvm2/uwvm/wasm/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
-# include "define.h"
+# include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -49,12 +49,12 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm
 {
-    template <::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::uwvm_interpreter_translate_option_t compile_option>
-    inline constexpr uwvm_interpreter_full_function_symbol_t compile_all_from_uwvm_single_func(
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t compile_option>
+    inline constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t compile_all_from_uwvm_single_func(
         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
         ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
-        uwvm_interpreter_full_function_symbol_t storage{};
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t storage{};
 
         // Note: This is a compiler-side, standalone copy of the wasm1 validator logic.
         // It validates decayed `wasm_module_storage_t` (not parser storage) and must not depend on the standard validator implementation.
@@ -180,7 +180,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             curr_operand_stack_type operand_stack{};
             bool is_polymorphic{};
 
-            local_func_storage_t local_func_symbol{};
+            ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
             local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count);
 
             // block type
@@ -606,6 +606,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 // opbase ...
                 // [safe] unsafe (could be the section_end)
                 // ^^ code_curr
+
+                using wasm1_code = ::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code;
 
                 wasm1_code curr_opbase;  // no initialize necessary
                 ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));

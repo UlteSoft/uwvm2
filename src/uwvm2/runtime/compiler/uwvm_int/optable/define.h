@@ -34,15 +34,13 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
-/// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
-# include <uwvm2/uwvm/runtime/storage/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
