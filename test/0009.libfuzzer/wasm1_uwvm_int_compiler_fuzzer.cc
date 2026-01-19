@@ -54,6 +54,28 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         module_storage =
             ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin, end, err, ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
 
+        // Resource guards for fuzzing: a valid wasm can still request enormous initial table/memory sizes.
+        // Building the runtime record would then attempt huge allocations and OOM the fuzzer process.
+        {
+            using wasm1_feature = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1;
+            auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<wasm1_feature>>(module_storage.sections)};
+            auto const& memorysec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<wasm1_feature>>(module_storage.sections)};
+
+            constexpr ::std::size_t max_table_min_elems{65536uz};
+            constexpr ::std::size_t max_memory_min_pages{256uz};  // 256 * 64KiB = 16MiB
+
+            for(auto const& table_type: tablesec.tables)
+            {
+                if(static_cast<::std::size_t>(table_type.limits.min) > max_table_min_elems) { return 0; }
+            }
+            for(auto const& memory_type: memorysec.memories)
+            {
+                if(static_cast<::std::size_t>(memory_type.limits.min) > max_memory_min_pages) { return 0; }
+            }
+        }
+
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
 
