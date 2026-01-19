@@ -202,7 +202,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
         ::uwvm2::validation::error::code_validation_error_impl compiler_err{};
         (void)::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<
-            ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::uwvm_interpreter_translate_option_t{}>(it->second, compiler_err);
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t{}>(it->second, compiler_err);
 
         if(std_code != compiler_err.err_code) [[unlikely]] { fuzz_trap(); }
 
