@@ -180,6 +180,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             curr_operand_stack_type operand_stack{};
             bool is_polymorphic{};
 
+            local_func_storage_t local_func_symbol{};
+            local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count);
+
             // block type
             using value_type_enum = curr_operand_stack_value_type;
             static constexpr value_type_enum i32_result_arr[1u]{value_type_enum::i32};
@@ -582,6 +585,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             // a WebAssembly function with type '() -> ()' (often written as returning “nil”) can have no meaningful code, but it still must have a valid
             // instruction sequence—at minimum an end.
+
+            ::std::size_t runtime_operand_stack_max{};
 
             for(;;)
             {
@@ -1138,6 +1143,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 err.err_code = code_validation_error_code::trailing_code_after_end;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
+
+                            local_func_symbol.operand_stack_max = runtime_operand_stack_max;
+                            storage.local_count = local_func_symbol.local_count;
+                            storage.operand_stack_max = runtime_operand_stack_max;
+                            storage.local_funcs.push_back(local_func_symbol);
 
                             return storage;
                         }
@@ -3537,6 +3547,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
                 }
+
+                if(!is_polymorphic) { runtime_operand_stack_max = ::std::max(runtime_operand_stack_max, operand_stack.size()); }
             }
         }
 
