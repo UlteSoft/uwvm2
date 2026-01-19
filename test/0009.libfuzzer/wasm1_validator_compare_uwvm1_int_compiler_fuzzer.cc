@@ -55,7 +55,7 @@ namespace
         ::fast_io::fast_terminate();
 #endif
     }
-}
+}  // namespace
 
 extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t size)
 {
@@ -113,13 +113,12 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
             ::uwvm2::validation::error::code_validation_error_impl v_err{};
             try
             {
-                ::uwvm2::validation::standard::wasm1::validate_code<Feature>(
-                    ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
-                    module_storage,
-                    import_func_count + local_idx,
-                    code_begin_ptr,
-                    code_end_ptr,
-                    v_err);
+                ::uwvm2::validation::standard::wasm1::validate_code<Feature>(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version{},
+                                                                             module_storage,
+                                                                             import_func_count + local_idx,
+                                                                             code_begin_ptr,
+                                                                             code_end_ptr,
+                                                                             v_err);
             }
             catch(::fast_io::error const&)
             {
@@ -132,7 +131,31 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         ::uwvm2::parser::wasm::base::error_impl rt_parse_err{};
         ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t rt_parsed_module_storage{};
         rt_parsed_module_storage =
-            ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin, end, rt_parse_err, ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
+            ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(begin,
+                                                              end,
+                                                              rt_parse_err,
+                                                              ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
+
+        // Resource guards for fuzzing: a valid wasm can still request enormous initial table/memory sizes.
+        // Building the runtime record would then attempt huge allocations and OOM the fuzzer process.
+        {
+            auto const& tablesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::table_section_storage_t<Feature>>(rt_parsed_module_storage.sections)};
+            auto const& memorysec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                ::uwvm2::parser::wasm::standard::wasm1::features::memory_section_storage_t<Feature>>(rt_parsed_module_storage.sections)};
+
+            constexpr ::std::size_t max_table_min_elems{65536uz};
+            constexpr ::std::size_t max_memory_min_pages{256uz};  // 256 * 64KiB = 16MiB
+
+            for(auto const& table_type: tablesec.tables)
+            {
+                if(static_cast<::std::size_t>(table_type.limits.min) > max_table_min_elems) { return 0; }
+            }
+            for(auto const& memory_type: memorysec.memories)
+            {
+                if(static_cast<::std::size_t>(memory_type.limits.min) > max_memory_min_pages) { return 0; }
+            }
+        }
 
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
@@ -161,7 +184,18 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
         if(::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles() != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) { return 0; }
 
-        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
+        // `initialize_runtime()` applies active element/data segments and treats out-of-bounds initialization
+        // as a fatal error (process termination). This fuzzer only compares *code* validation results, so
+        // build the per-module runtime record for the compiler path and skip full runtime initialization.
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(1uz);
+        ::uwvm2::uwvm::runtime::initializer::details::import_alias_sanity_checked = false;
+
+        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t rt{};
+        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = u8"fuzz";
+        ::uwvm2::uwvm::runtime::initializer::details::initialize_from_wasm_file(::uwvm2::uwvm::wasm::storage::execute_wasm, rt);
+        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = {};
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.try_emplace(u8"fuzz", ::std::move(rt));
 
         auto it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(u8"fuzz")};
         if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) { return 0; }
