@@ -48,6 +48,7 @@
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include "init_limit.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -83,6 +84,66 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         // This flag allows later resolution helpers to skip redundant cycle checks in the normal initialization pipeline,
         // while still remaining defensive if those helpers are used elsewhere.
         inline bool import_alias_sanity_checked{};  // [global]
+
+        inline constexpr void
+            fatal_reserve_limit_exceeded(::uwvm2::utils::container::u8string_view reserve_name, ::std::size_t requested, ::std::size_t limit) noexcept
+        {
+            if(current_initializing_module_name.empty())
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"initializer: Reserve limit exceeded (reserve=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    reserve_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", requested=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    requested,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", limit=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    limit,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                u8"[fatal] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"initializer: In module \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                current_initializing_module_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", reserve limit exceeded (reserve=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                reserve_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", requested=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                requested,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", limit=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                limit,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8").\n\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            ::fast_io::fast_terminate();
+        }
+
+        inline constexpr void check_reserve_limit(::uwvm2::utils::container::u8string_view reserve_name, ::std::size_t requested, ::std::size_t limit) noexcept
+        {
+            if(requested > limit) [[unlikely]] { fatal_reserve_limit_exceeded(reserve_name, requested, limit); }
+        }
 
         template <typename... Args>
         inline constexpr void verbose_module_info(Args&&... args) noexcept
@@ -2054,6 +2115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             // imported
             {
                 auto const& imported_funcs{importsec.importdesc.index_unchecked(importdesc_func_index)};
+                details::check_reserve_limit(u8"imported_functions", imported_funcs.size(), initializer_limit.max_imported_functions);
                 out.imported_function_vec_storage.reserve(imported_funcs.size());
                 for(auto const import_ptr: imported_funcs)
                 {
@@ -2064,6 +2126,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
             {
                 auto const& imported_tables{importsec.importdesc.index_unchecked(importdesc_table_index)};
+                details::check_reserve_limit(u8"imported_tables", imported_tables.size(), initializer_limit.max_imported_tables);
                 out.imported_table_vec_storage.reserve(imported_tables.size());
                 for(auto const import_ptr: imported_tables)
                 {
@@ -2074,6 +2137,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
             {
                 auto const& imported_memories{importsec.importdesc.index_unchecked(importdesc_memory_index)};
+                details::check_reserve_limit(u8"imported_memories", imported_memories.size(), initializer_limit.max_imported_memories);
                 out.imported_memory_vec_storage.reserve(imported_memories.size());
                 for(auto const import_ptr: imported_memories)
                 {
@@ -2084,6 +2148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
             {
                 auto const& imported_globals{importsec.importdesc.index_unchecked(importdesc_global_index)};
+                details::check_reserve_limit(u8"imported_globals", imported_globals.size(), initializer_limit.max_imported_globals);
                 out.imported_global_vec_storage.reserve(imported_globals.size());
                 for(auto const import_ptr: imported_globals)
                 {
@@ -2160,6 +2225,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
 
+                details::check_reserve_limit(u8"local_defined_functions", defined_func_count, initializer_limit.max_local_defined_functions);
+                details::check_reserve_limit(u8"local_defined_codes", defined_func_count, initializer_limit.max_local_defined_codes);
                 out.local_defined_function_vec_storage.reserve(defined_func_count);
                 out.local_defined_code_vec_storage.reserve(defined_func_count);
 
@@ -2211,6 +2278,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             // local defined table
             {
+                details::check_reserve_limit(u8"local_defined_tables", tablesec.tables.size(), initializer_limit.max_local_defined_tables);
                 out.local_defined_table_vec_storage.reserve(tablesec.tables.size());
                 for(auto const& table_type: tablesec.tables)
                 {
@@ -2225,6 +2293,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             // local defined memory
             {
+                details::check_reserve_limit(u8"local_defined_memories", memorysec.memories.size(), initializer_limit.max_local_defined_memories);
                 out.local_defined_memory_vec_storage.reserve(memorysec.memories.size());
                 for(auto const& memory_type: memorysec.memories)
                 {
@@ -2239,6 +2308,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             // local defined global
             {
+                details::check_reserve_limit(u8"local_defined_globals", globalsec.local_globals.size(), initializer_limit.max_local_defined_globals);
                 out.local_defined_global_vec_storage.reserve(globalsec.local_globals.size());
                 for(auto const& local_global: globalsec.local_globals)
                 {
@@ -2320,6 +2390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: element segments. "); }
             // element (wasm1: active segments)
             {
+                details::check_reserve_limit(u8"local_defined_elements", elemsec.elems.size(), initializer_limit.max_local_defined_elements);
                 out.local_defined_element_vec_storage.reserve(elemsec.elems.size());
                 for(auto const& elem: elemsec.elems)
                 {
@@ -2347,6 +2418,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: data segments. "); }
             // data (wasm1: active segments)
             {
+                details::check_reserve_limit(u8"local_defined_datas", datasec.datas.size(), initializer_limit.max_local_defined_datas);
                 out.local_defined_data_vec_storage.reserve(datasec.datas.size());
                 for(auto const& data: datasec.datas)
                 {
@@ -4554,6 +4626,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
         details::import_alias_sanity_checked = false;
         auto const all_module_size{::uwvm2::uwvm::wasm::storage::all_module.size()};
+        details::check_reserve_limit(u8"runtime_modules", all_module_size, initializer_limit.max_runtime_modules);
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(all_module_size);
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
         {

@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -24,32 +24,24 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <cstdlib>
 #include <limits>
-#include <memory>
-#include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.runtime.initializer:init;
+export module uwvm2.uwvm.cmdline.callback:wasm_set_initializer_limit;
 
 import fast_io;
 import uwvm2.utils.container;
-import uwvm2.utils.debug;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm.standard.wasm1.const_expr;
-import uwvm2.parser.wasm.standard.wasm1.opcode;
-import uwvm2.parser.wasm.standard.wasm1.features;
-import uwvm2.parser.wasm.standard.wasm1p1.type;
-import uwvm2.parser.wasm.standard.wasm3.type;
-import uwvm2.parser.wasm.binfmt.binfmt_ver1;
-import uwvm2.object;
+import uwvm2.utils.ansies;
+import uwvm2.utils.cmdline;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
-import uwvm2.uwvm.wasm;
-import uwvm2.uwvm.runtime.storage;
-import :init_limit;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.runtime.initializer;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -58,4 +50,5 @@ import :init_limit;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "init.h"
+#include "wasm_set_initializer_limit.h"
+

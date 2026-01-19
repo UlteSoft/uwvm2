@@ -38,6 +38,7 @@
 # include "wasm_register_dl.h"
 # include "wasm_depend_recursion_limit.h"
 # include "wasm_set_parser_limit.h"
+# include "wasm_set_initializer_limit.h"
 # include "wasm_list_weak_symbol_module.h"
 # include "wasm_memory_grow_strict.h"
 
