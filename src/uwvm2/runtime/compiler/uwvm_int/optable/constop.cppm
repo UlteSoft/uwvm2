@@ -29,7 +29,7 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 
-export module uwvm2.runtime.compiler.uwvm_int.optable:call;
+export module uwvm2.runtime.compiler.uwvm_int.optable:constop;
 
 import fast_io;
 import uwvm2.utils.container;
@@ -43,4 +43,4 @@ import uwvm2.object;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "call.h"
+#include "constop.h"
