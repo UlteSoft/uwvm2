@@ -83,7 +83,17 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
         if(::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles() != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) { return 0; }
 
-        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
+        // `initialize_runtime()` applies active element/data segments and treats out-of-bounds initialization
+        // as a fatal error (process termination). For this compiler fuzzer we only need the per-module runtime
+        // record to drive the compiler pipeline, so build it directly and skip full runtime initialization.
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(1uz);
+
+        ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t rt{};
+        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = u8"fuzz";
+        ::uwvm2::uwvm::runtime::initializer::details::initialize_from_wasm_file(::uwvm2::uwvm::wasm::storage::execute_wasm, rt);
+        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = {};
+        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.try_emplace(u8"fuzz", ::std::move(rt));
 
         auto it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(u8"fuzz")};
         if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) { return 0; }
@@ -99,4 +109,3 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         return 0;
     }
 }
-
