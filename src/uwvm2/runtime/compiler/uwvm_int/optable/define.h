@@ -30,6 +30,7 @@
 # include <concepts>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -190,9 +191,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         unreachable_func_t unreachable_func_p{};
     };
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+    using uwvm_interpreter_opfunc_t = UWVM_INTERPRETER_OPFUNC_MACRO void (*)(Type... type) UWVM_THROWS;
 }
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

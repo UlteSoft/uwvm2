@@ -57,8 +57,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func_p;  // no init
+        // curr_unreachable_opfunc unreachable_func ...
+        // safe
+        // ^^ type...[0]
 
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_unreachable_opfunc unreachable_func ...
+        // safe
+        //                         ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func_p;  // no init
         ::std::memcpy(::std::addressof(unreachable_func_p), type...[0], sizeof(unreachable_func_t));
 
         if(unreachable_func_p) { unreachable_func_p(); }
@@ -66,6 +75,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             ::fast_io::fast_terminate();
         }
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_uwvmint_br next_opfunc_ptr (jmp to next_opfunc) ...
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br next_opfunc_ptr (jmp to next_opfunc) ...
+        // safe
+        //                 ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        type...[0] = reinterpret_cast<::std::byte const*>(next_interpreter);
+
+        // next_opfunc ...
+        // safe
+        // ^^ type...[0]
+
+        if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
     }
 }
 
