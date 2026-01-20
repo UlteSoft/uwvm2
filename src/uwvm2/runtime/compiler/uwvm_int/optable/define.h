@@ -25,6 +25,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
 # include <concepts>
@@ -120,16 +121,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ///           }
         bool is_tail_call{};
 
-        /// @brief    local_stack_ptr_pos
-        /// @details  Represents the position within a variadic template parameter.
-        ///           SIZE_MAX = unknown
-        ::std::size_t local_stack_ptr_pos{SIZE_MAX};
-
-        /// @brief    operand_stack_ptr_pos
-        /// @details  Represents the position within a variadic template parameter.
-        ///           SIZE_MAX = unknown
-        ::std::size_t operand_stack_ptr_pos{SIZE_MAX};
-
         /// @details  `local_stack_ptr_pos` and `operand_stack_ptr_pos` can be merged; set one of them to `SIZE_MAX`, and the other will be used as the base
         ///           address. If both are set to `SIZE_MAX`, a compile‑time error will occur.
 
@@ -160,7 +151,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t f64_stack_top_begin_pos{SIZE_MAX};
         ::std::size_t f64_stack_top_end_pos{SIZE_MAX};
 
-#if 0
         /// @brief   v128 stack-top caching range (SIMD).
         /// @details v128 is a 128-bit SIMD value. On many mainstream ABIs/ISAs, SIMD registers share the same physical register file as floating-point
         ///          registers (e.g. x86 SSE XMM, AArch64/ARM NEON V registers). In such cases, v128 can be co-located with f32/f64 in the same top-of-stack
@@ -171,7 +161,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ///          must be handled separately.
         ::std::size_t v128_stack_top_begin_pos{SIZE_MAX};
         ::std::size_t v128_stack_top_end_pos{SIZE_MAX};
-#endif
     };
 
     template <typename Type>
@@ -194,6 +183,302 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
     using uwvm_interpreter_opfunc_t = UWVM_INTERPRETER_OPFUNC_MACRO void (*)(Type... type) UWVM_THROWS;
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type GetType,
+              ::std::size_t curr_stack_top,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
+    UWVM_ALWAYS_INLINE UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr GetType get_curr_stack_top_val(TypeRef && ... typeref) UWVM_THROWS
+    {
+        if constexpr(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
+        {
+            constexpr bool has_stack_top{CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos};
+
+            if constexpr(has_stack_top)
+            {
+                static_assert(CompileOption.i32_stack_top_begin_pos <= curr_stack_top && curr_stack_top < CompileOption.i32_stack_top_end_pos);
+                static_assert(sizeof...(TypeRef) >= CompileOption.i32_stack_top_end_pos);
+
+                constexpr bool is_i32_i64_merge{CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                CompileOption.i32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos};
+                constexpr bool is_i32_f32_merge{CompileOption.i32_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                                                CompileOption.i32_stack_top_end_pos == CompileOption.f32_stack_top_end_pos};
+                constexpr bool is_i32_f64_merge{CompileOption.i32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                                CompileOption.i32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
+                constexpr bool is_i32_f32_i64_f64_merge{is_i32_i64_merge && is_i32_f32_merge && is_i32_f64_merge};
+
+                using Type = ::std::remove_cvref_t<TypeRef...[curr_stack_top]>;
+
+                if constexpr(is_i32_f32_i64_f64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>);
+                    return typeref...[curr_stack_top].i32;
+                }
+                else if constexpr(is_i32_i64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_with_i64_u>);
+                    return typeref...[curr_stack_top].i32;
+                }
+                else if constexpr(is_i32_f32_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_with_f32_u>);
+                    return typeref...[curr_stack_top].i32;
+                }
+                else
+                {
+                    static_assert(!is_i32_f64_merge);
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>);
+                    return typeref...[curr_stack_top];
+                }
+            }
+            else
+            {
+                // args: [optable ptr, operand stack top, local base]
+
+                static_assert(sizeof...(TypeRef) >= 2uz);
+                using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+                static_assert(::std::same_as<Type, ::std::byte*>);
+
+                // last_val top_val (end)
+                // safe
+                //                  ^^ typeref...[1u]
+
+                typeref...[1u] -= sizeof(GetType);
+
+                // last_val top_val (end)
+                // safe
+                //          ^^ typeref...[1u]
+
+                GetType ret;  // no init
+                ::std::memcpy(::std::addressof(ret), typeref...[1u], sizeof(GetType));
+
+                return ret;
+            }
+        }
+        else if constexpr(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>)
+        {
+            constexpr bool has_stack_top{CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos};
+
+            if constexpr(has_stack_top)
+            {
+                static_assert(CompileOption.i64_stack_top_begin_pos <= curr_stack_top && curr_stack_top < CompileOption.i64_stack_top_end_pos);
+                static_assert(sizeof...(TypeRef) >= CompileOption.i64_stack_top_end_pos);
+
+                constexpr bool is_i64_i32_merge{CompileOption.i64_stack_top_begin_pos == CompileOption.i32_stack_top_begin_pos &&
+                                                CompileOption.i64_stack_top_end_pos == CompileOption.i32_stack_top_end_pos};
+                constexpr bool is_i64_f32_merge{CompileOption.i64_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                                                CompileOption.i64_stack_top_end_pos == CompileOption.f32_stack_top_end_pos};
+                constexpr bool is_i64_f64_merge{CompileOption.i64_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                                CompileOption.i64_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
+                constexpr bool is_i32_f32_i64_f64_merge{is_i64_i32_merge && is_i64_f32_merge && is_i64_f64_merge};
+
+                using Type = ::std::remove_cvref_t<TypeRef...[curr_stack_top]>;
+
+                if constexpr(is_i32_f32_i64_f64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>);
+                    return typeref...[curr_stack_top].i64;
+                }
+                else if constexpr(is_i64_i32_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_with_i64_u>);
+                    return typeref...[curr_stack_top].i64;
+                }
+                else
+                {
+                    static_assert(!(is_i64_f32_merge || is_i64_f64_merge));
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>);
+                    return typeref...[curr_stack_top];
+                }
+            }
+            else
+            {
+                static_assert(sizeof...(TypeRef) >= 2uz);
+                using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+                static_assert(::std::same_as<Type, ::std::byte*>);
+
+                typeref...[1u] -= sizeof(GetType);
+
+                GetType ret;  // no init
+                ::std::memcpy(::std::addressof(ret), typeref...[1u], sizeof(GetType));
+
+                return ret;
+            }
+        }
+        else if constexpr(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
+        {
+            constexpr bool has_stack_top{CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos};
+
+            if constexpr(has_stack_top)
+            {
+                static_assert(CompileOption.f32_stack_top_begin_pos <= curr_stack_top && curr_stack_top < CompileOption.f32_stack_top_end_pos);
+                static_assert(sizeof...(TypeRef) >= CompileOption.f32_stack_top_end_pos);
+
+                constexpr bool is_f32_i32_merge{CompileOption.f32_stack_top_begin_pos == CompileOption.i32_stack_top_begin_pos &&
+                                                CompileOption.f32_stack_top_end_pos == CompileOption.i32_stack_top_end_pos};
+                constexpr bool is_f32_i64_merge{CompileOption.f32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                CompileOption.f32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos};
+                constexpr bool is_f32_f64_merge{CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                                CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
+                constexpr bool is_f32_v128_merge{CompileOption.f32_stack_top_begin_pos == CompileOption.v128_stack_top_begin_pos &&
+                                                 CompileOption.f32_stack_top_end_pos == CompileOption.v128_stack_top_end_pos};
+                constexpr bool is_i32_f32_i64_f64_merge{is_f32_i32_merge && is_f32_i64_merge && is_f32_f64_merge};
+                constexpr bool is_f32_f64_v128_merge{is_f32_f64_merge && is_f32_v128_merge};
+
+                using Type = ::std::remove_cvref_t<TypeRef...[curr_stack_top]>;
+
+                if constexpr(is_f32_f64_v128_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
+                    return typeref...[curr_stack_top].f32;
+                }
+                else if constexpr(is_i32_f32_i64_f64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>);
+                    return typeref...[curr_stack_top].f32;
+                }
+                else if constexpr(is_f32_f64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_f32_with_f64_u>);
+                    return typeref...[curr_stack_top].f32;
+                }
+                else if constexpr(is_f32_i32_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_with_f32_u>);
+                    return typeref...[curr_stack_top].f32;
+                }
+                else
+                {
+                    static_assert(!is_f32_i64_merge);
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>);
+                    return typeref...[curr_stack_top];
+                }
+            }
+            else
+            {
+                static_assert(sizeof...(TypeRef) >= 2uz);
+                using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+                static_assert(::std::same_as<Type, ::std::byte*>);
+
+                typeref...[1u] -= sizeof(GetType);
+
+                GetType ret;  // no init
+                ::std::memcpy(::std::addressof(ret), typeref...[1u], sizeof(GetType));
+
+                return ret;
+            }
+        }
+        else if constexpr(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
+        {
+            constexpr bool has_stack_top{CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos};
+
+            if constexpr(has_stack_top)
+            {
+                static_assert(CompileOption.f64_stack_top_begin_pos <= curr_stack_top && curr_stack_top < CompileOption.f64_stack_top_end_pos);
+                static_assert(sizeof...(TypeRef) >= CompileOption.f64_stack_top_end_pos);
+
+                constexpr bool is_f64_i32_merge{CompileOption.f64_stack_top_begin_pos == CompileOption.i32_stack_top_begin_pos &&
+                                                CompileOption.f64_stack_top_end_pos == CompileOption.i32_stack_top_end_pos};
+                constexpr bool is_f64_i64_merge{CompileOption.f64_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                CompileOption.f64_stack_top_end_pos == CompileOption.i64_stack_top_end_pos};
+                constexpr bool is_f64_f32_merge{CompileOption.f64_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                                                CompileOption.f64_stack_top_end_pos == CompileOption.f32_stack_top_end_pos};
+                constexpr bool is_f64_v128_merge{CompileOption.f64_stack_top_begin_pos == CompileOption.v128_stack_top_begin_pos &&
+                                                 CompileOption.f64_stack_top_end_pos == CompileOption.v128_stack_top_end_pos};
+                constexpr bool is_i32_f32_i64_f64_merge{is_f64_i32_merge && is_f64_i64_merge && is_f64_f32_merge};
+                constexpr bool is_f32_f64_v128_merge{is_f64_f32_merge && is_f64_v128_merge};
+
+                using Type = ::std::remove_cvref_t<TypeRef...[curr_stack_top]>;
+
+                if constexpr(is_f32_f64_v128_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
+                    return typeref...[curr_stack_top].f64;
+                }
+                else if constexpr(is_i32_f32_i64_f64_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>);
+                    return typeref...[curr_stack_top].f64;
+                }
+                else if constexpr(is_f64_f32_merge)
+                {
+                    static_assert(::std::same_as<Type, wasm_stack_top_f32_with_f64_u>);
+                    return typeref...[curr_stack_top].f64;
+                }
+                else
+                {
+                    static_assert(!(is_f64_i32_merge || is_f64_i64_merge));
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>);
+                    return typeref...[curr_stack_top];
+                }
+            }
+            else
+            {
+                static_assert(sizeof...(TypeRef) >= 2uz);
+                using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+                static_assert(::std::same_as<Type, ::std::byte*>);
+
+                typeref...[1u] -= sizeof(GetType);
+
+                GetType ret;  // no init
+                ::std::memcpy(::std::addressof(ret), typeref...[1u], sizeof(GetType));
+
+                return ret;
+            }
+        }
+        else if constexpr(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>)
+        {
+            constexpr bool has_stack_top{CompileOption.v128_stack_top_begin_pos != CompileOption.v128_stack_top_end_pos};
+
+            if constexpr(has_stack_top)
+            {
+                static_assert(CompileOption.v128_stack_top_begin_pos <= curr_stack_top && curr_stack_top < CompileOption.v128_stack_top_end_pos);
+                static_assert(sizeof...(TypeRef) >= CompileOption.v128_stack_top_end_pos);
+
+                constexpr bool is_v128_i32_merge{CompileOption.v128_stack_top_begin_pos == CompileOption.i32_stack_top_begin_pos &&
+                                                 CompileOption.v128_stack_top_end_pos == CompileOption.i32_stack_top_end_pos};
+                constexpr bool is_v128_i64_merge{CompileOption.v128_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                 CompileOption.v128_stack_top_end_pos == CompileOption.i64_stack_top_end_pos};
+                constexpr bool is_v128_f32_merge{CompileOption.v128_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                                                 CompileOption.v128_stack_top_end_pos == CompileOption.f32_stack_top_end_pos};
+                constexpr bool is_v128_f64_merge{CompileOption.v128_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                                 CompileOption.v128_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
+
+                using Type = ::std::remove_cvref_t<TypeRef...[curr_stack_top]>;
+
+                static_assert(!(is_v128_i32_merge || is_v128_i64_merge));
+
+                if constexpr(is_v128_f32_merge || is_v128_f64_merge)
+                {
+                    static_assert(is_v128_f32_merge && is_v128_f64_merge);
+                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
+                    return typeref...[curr_stack_top].v128;
+                }
+                else
+                {
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>);
+                    return typeref...[curr_stack_top];
+                }
+            }
+            else
+            {
+                static_assert(sizeof...(TypeRef) >= 2uz);
+                using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+                static_assert(::std::same_as<Type, ::std::byte*>);
+
+                typeref...[1u] -= sizeof(GetType);
+
+                GetType ret;  // no init
+                ::std::memcpy(::std::addressof(ret), typeref...[1u], sizeof(GetType));
+
+                return ret;
+            }
+        }
+        else
+        {
+            static_assert(::std::same_as<GetType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>);
+        }
+    }
 }
 
 #ifndef UWVM_MODULE
