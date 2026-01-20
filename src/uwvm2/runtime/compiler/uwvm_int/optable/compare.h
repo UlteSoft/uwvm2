@@ -40,7 +40,12 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable {}
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable 
+{
+    
+
+
+}
 
 #ifndef UWVM_MODULE
 // macro

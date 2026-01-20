@@ -27,12 +27,14 @@
 # include <cstdint>
 # include <limits>
 # include <memory>
+# include <concepts>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
+# include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>
 # include <uwvm2/object/impl.h>
 #endif
 
@@ -73,12 +75,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
     };
 
+    union wasm_stack_top_i32_with_i64_u
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
+    };
+
+    union wasm_stack_top_f32_with_f64_u
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
+    };
+
     union wasm_stack_top_i32_i64_f32_f64_u
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
+    };
+
+    union wasm_stack_top_f32_f64_v128
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
+        ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v128;
     };
 
     struct uwvm_interpreter_translate_option_t
@@ -150,6 +171,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t v128_stack_top_begin_pos{SIZE_MAX};
         ::std::size_t v128_stack_top_end_pos{SIZE_MAX};
 #endif
+    };
+
+    template <typename Type>
+    concept uwvm_int_stack_top_type =
+        ::std::same_as<Type, ::std::byte const*> || ::std::same_as<Type, ::std::byte*> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
+        ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> || ::std::same_as<Type, wasm_stack_top_i32_with_f32_u> ||
+        ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_f32_with_f64_u> ||
+        ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u> || ::std::same_as<Type, wasm_stack_top_f32_f64_v128>;
+
+    using unreachable_func_t = void (*)() noexcept;
+
+    struct compile_option
+    {
+        unreachable_func_t unreachable_func_p{};
     };
 }
 

@@ -25,24 +25,52 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <limits>
 # include <memory>
+# include <concepts>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
+# include "define.h"
+#endif
+
+#if !(__cpp_pack_indexing >= 202311L)
+# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable {}
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
+{
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func_p;  // no init
+
+        ::std::memcpy(::std::addressof(unreachable_func_p), type...[0], sizeof(unreachable_func_t));
+
+        if(unreachable_func_p) { unreachable_func_p(); }
+        else
+        {
+            ::fast_io::fast_terminate();
+        }
+    }
+}
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
