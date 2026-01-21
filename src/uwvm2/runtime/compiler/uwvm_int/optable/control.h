@@ -74,6 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(unreachable_func_p) { unreachable_func_p(); }
         else
         {
+            // default crash the vm
             ::fast_io::fast_terminate();
         }
     }

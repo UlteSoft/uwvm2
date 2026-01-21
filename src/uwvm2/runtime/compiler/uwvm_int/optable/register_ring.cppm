@@ -24,6 +24,8 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <bit>
 #include <limits>
 #include <memory>
 // macro
