@@ -1255,33 +1255,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
     }  // namespace details
 
-    template <uwvm_interpreter_translate_option_t CompileOption,
-              uwvm_interpreter_stacktop_currpos_t CurrStackTop,
-              typename ValTuple,
-              uwvm_int_stack_top_type... TypeRef>
-        requires (::fast_io::is_tuple<ValTuple>)
-    UWVM_ALWAYS_INLINE inline constexpr ValTuple get_vals_from_operand_stack(TypeRef & ... typeref) noexcept
+    namespace manipulate
     {
-        details::check_uwvm_interpreter_stacktop_layout<CompileOption, CurrStackTop, TypeRef...>();
-        constexpr auto state{details::make_uwvm_interpreter_stacktop_initial_state<CompileOption, CurrStackTop>()};
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  uwvm_interpreter_stacktop_currpos_t CurrStackTop,
+                  typename ValTuple,
+                  uwvm_int_stack_top_type... TypeRef>
+            requires (::fast_io::is_tuple<ValTuple>)
+        UWVM_ALWAYS_INLINE inline constexpr ValTuple get_vals_from_operand_stack(TypeRef&... typeref) noexcept
+        {
+            ::uwvm2::runtime::compiler::uwvm_int::optable::details::check_uwvm_interpreter_stacktop_layout<CompileOption, CurrStackTop, TypeRef...>();
+            constexpr auto state{
+                ::uwvm2::runtime::compiler::uwvm_int::optable::details::make_uwvm_interpreter_stacktop_initial_state<CompileOption, CurrStackTop>()};
 
-        ValTuple ret;  // no init
-        details::fill_uwvm_interpreter_vals_from_operand_stack<CompileOption, state, ValTuple, 0uz>(ret, typeref...);
-        return ret;
-    }
+            ValTuple ret;  // no init
+            ::uwvm2::runtime::compiler::uwvm_int::optable::details::fill_uwvm_interpreter_vals_from_operand_stack<CompileOption, state, ValTuple, 0uz>(
+                ret,
+                typeref...);
+            return ret;
+        }
 
-    template <uwvm_interpreter_translate_option_t CompileOption,
-              uwvm_interpreter_stacktop_currpos_t CurrStackTop,
-              typename ValTuple,
-              uwvm_int_stack_top_type... TypeRef>
-        requires (::fast_io::is_tuple<ValTuple>)
-    inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef & ...) noexcept
-    {
-        details::check_uwvm_interpreter_stacktop_layout<CompileOption, CurrStackTop, TypeRef...>();
-        constexpr auto state{details::make_uwvm_interpreter_stacktop_initial_state<CompileOption, CurrStackTop>()};
-        constexpr auto final_state{details::calc_uwvm_interpreter_stacktop_state_after<CompileOption, state, ValTuple, 0uz>()};
-        return final_state.remain;
-    }
+        template <uwvm_interpreter_translate_option_t CompileOption,
+                  uwvm_interpreter_stacktop_currpos_t CurrStackTop,
+                  typename ValTuple,
+                  uwvm_int_stack_top_type... TypeRef>
+            requires (::fast_io::is_tuple<ValTuple>)
+        inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef&...) noexcept
+        {
+            ::uwvm2::runtime::compiler::uwvm_int::optable::details::check_uwvm_interpreter_stacktop_layout<CompileOption, CurrStackTop, TypeRef...>();
+            constexpr auto state{
+                ::uwvm2::runtime::compiler::uwvm_int::optable::details::make_uwvm_interpreter_stacktop_initial_state<CompileOption, CurrStackTop>()};
+            constexpr auto final_state{
+                ::uwvm2::runtime::compiler::uwvm_int::optable::details::calc_uwvm_interpreter_stacktop_state_after<CompileOption, state, ValTuple, 0uz>()};
+            return final_state.remain;
+        }
+    }  // namespace manipulate
 }
 
 #ifndef UWVM_MODULE
