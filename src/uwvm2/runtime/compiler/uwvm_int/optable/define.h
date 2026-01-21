@@ -171,7 +171,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #else
             // x86_64, ...
             auto const u32x4{::std::bit_cast<::uwvm2::utils::container::array<::std::uint_least32_t, 4uz>>(v)};
-            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(u32x4.begin_unchecked());
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(u32x4.front_unchecked());
 #endif
         }
 
@@ -200,14 +200,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             float64x2_t const d2{::std::bit_cast<float64x2_t>(v)};
             return __aarch64_vget_lane_any(d2, 0);
 # elif (defined(_MSC_VER) && !defined(__clang__))  // MSVC
-            return ::fast_io::intrinsics::msvc::arm::neon_dups64q(v, 0).n64_f64[0];  // __n128 -> f32
+            return ::fast_io::intrinsics::msvc::arm::neon_dups64q(v, 0).n64_f64[0];  // __n128 -> f64
 # else
 #  error "missing instruction"
 # endif
 #else
             // x86_64, ...
             auto const u64x2{::std::bit_cast<::uwvm2::utils::container::array<::std::uint_least64_t, 2uz>>(v)};
-            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(u64x2.begin_unchecked());
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(u64x2.front_unchecked());
 #endif
         }
     }  // namespace details
