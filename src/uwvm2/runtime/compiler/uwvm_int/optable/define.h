@@ -25,10 +25,14 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <bit>
 # include <cstring>
 # include <limits>
 # include <memory>
 # include <concepts>
+# if defined(__aarch64__) || defined(__AARCH64__)
+#  include <arm_neon.h>
+# endif
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -83,12 +87,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64;
     };
 
-    union wasm_stack_top_f32_with_f64_u
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
-    };
-
     union wasm_stack_top_i32_i64_f32_f64_u
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32;
@@ -97,12 +95,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
     };
 
-    union wasm_stack_top_f32_f64_v128
+    namespace details
     {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 f32;
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 f64;
-        ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v128;
-    };
+        
+        UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
+            get_f32_low_from_f64_slot(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 v) noexcept
+        {
+#if defined(__aarch64__) || defined(__AARCH64__)
+            float64x1_t d = vdup_n_f64(v);
+            float32x2_t s2 = vreinterpret_f32_f64(d);
+            return vget_lane_f32(s2, 0);
+#else
+            auto const u64 = ::std::bit_cast<::std::uint_least64_t>(v);
+            auto const u32 = static_cast<::std::uint_least32_t>(u64);
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(u32);
+#endif
+        }
+
+        UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
+            get_f32_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
+        {
+#if defined(__aarch64__) || defined(__AARCH64__)
+            auto const u8 = ::std::bit_cast<uint8x16_t>(v);
+            auto const s4 = vreinterpretq_f32_u8(u8);
+            return vgetq_lane_f32(s4, 0);
+#else
+            auto const u32x4 = ::std::bit_cast<::uwvm2::utils::container::array<::std::uint_least32_t, 4uz>>(v);
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(u32x4[0]);
+#endif
+        }
+
+        UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64
+            get_f64_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
+        {
+#if defined(__aarch64__) || defined(__AARCH64__)
+            auto const u8 = ::std::bit_cast<uint8x16_t>(v);
+            auto const d2 = vreinterpretq_f64_u8(u8);
+            return vgetq_lane_f64(d2, 0);
+#else
+            auto const u64x2 = ::std::bit_cast<::uwvm2::utils::container::array<::std::uint_least64_t, 2uz>>(v);
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(u64x2[0]);
+#endif
+        }
+    }  // namespace details
 
     struct uwvm_interpreter_translate_option_t
     {
@@ -189,8 +224,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32> ||
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64> ||
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> || ::std::same_as<Type, wasm_stack_top_i32_with_f32_u> ||
-        ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_f32_with_f64_u> ||
-        ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u> || ::std::same_as<Type, wasm_stack_top_f32_f64_v128>;
+        ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>;
 
     using unreachable_func_t = void (*)() noexcept;
 
@@ -347,8 +381,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 if constexpr(is_f32_f64_v128_merge)
                 {
-                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
-                    return typeref...[curr_stack_top].f32;
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>);
+                    return details::get_f32_low_from_v128_slot(typeref...[curr_stack_top]);
                 }
                 else if constexpr(is_i32_f32_i64_f64_merge)
                 {
@@ -357,8 +391,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else if constexpr(is_f32_f64_merge)
                 {
-                    static_assert(::std::same_as<Type, wasm_stack_top_f32_with_f64_u>);
-                    return typeref...[curr_stack_top].f32;
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>);
+                    return details::get_f32_low_from_f64_slot(typeref...[curr_stack_top]);
                 }
                 else if constexpr(is_f32_i32_merge)
                 {
@@ -410,8 +444,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 if constexpr(is_f32_f64_v128_merge)
                 {
-                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
-                    return typeref...[curr_stack_top].f64;
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>);
+                    return details::get_f64_low_from_v128_slot(typeref...[curr_stack_top]);
                 }
                 else if constexpr(is_i32_f32_i64_f64_merge)
                 {
@@ -420,8 +454,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
                 else if constexpr(is_f64_f32_merge)
                 {
-                    static_assert(::std::same_as<Type, wasm_stack_top_f32_with_f64_u>);
-                    return typeref...[curr_stack_top].f64;
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>);
+                    return typeref...[curr_stack_top];
                 }
                 else
                 {
@@ -469,8 +503,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if constexpr(is_v128_f32_merge || is_v128_f64_merge)
                 {
                     static_assert(is_v128_f32_merge && is_v128_f64_merge);
-                    static_assert(::std::same_as<Type, wasm_stack_top_f32_f64_v128>);
-                    return typeref...[curr_stack_top].v128;
+                    static_assert(::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128>);
+                    return typeref...[curr_stack_top];
                 }
                 else
                 {

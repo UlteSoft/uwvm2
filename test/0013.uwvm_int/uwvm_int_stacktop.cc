@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <bit>
 
 namespace uwvm_int_optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
 
@@ -17,6 +18,23 @@ template <typename T>
 inline bool memeq(T const& a, T const& b) noexcept
 {
     return ::std::memcmp(::std::addressof(a), ::std::addressof(b), sizeof(T)) == 0;
+}
+
+template <typename T>
+inline ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 make_v128_low(T v) noexcept
+{
+    using wasm_v128 = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128;
+    wasm_v128 out{};  // zero
+    ::std::memcpy(::std::addressof(out), ::std::addressof(v), sizeof(T));
+    return out;
+}
+
+inline ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 make_f64_low_f32(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 v) noexcept
+{
+    using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+    auto const u32 = ::std::bit_cast<::std::uint_least32_t>(v);
+    auto const u64 = static_cast<::std::uint_least64_t>(u32);
+    return ::std::bit_cast<wasm_f64>(u64);
 }
 
 consteval uwvm_int_optable::uwvm_interpreter_stacktop_remain_size_t remain_i32_only() noexcept
@@ -225,10 +243,8 @@ int main()
         ::std::byte* sp{mem};
         ::std::byte* local_base{};
 
-        uwvm_int_optable::wasm_stack_top_f32_f64_v128 f3{};
-        uwvm_int_optable::wasm_stack_top_f32_f64_v128 f4{};
-        f3.f64 = 1.25;
-        f4.f32 = 2.5f;
+        wasm_v128 f3 = make_v128_low(wasm_f64{1.25});
+        wasm_v128 f4 = make_v128_low(wasm_f32{2.5f});
 
         auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt,
                                                                         curr,
@@ -238,8 +254,8 @@ int main()
 
         // overflow to memory after 2 pops
         push_operand(sp, wasm_f32{3.5f});
-        f3.f64 = 1.25;
-        f4.f32 = 2.5f;
+        f3 = make_v128_low(wasm_f64{1.25});
+        f4 = make_v128_low(wasm_f32{2.5f});
         auto const vals2 = uwvm_int_optable::get_vals_from_operand_stack<opt,
                                                                          curr,
                                                                          ::fast_io::tuple<wasm_f32, wasm_f64, wasm_f32>>(op, sp, local_base, f3, f4);
@@ -247,7 +263,53 @@ int main()
         if(sp != mem) { return 12; }
     }
 
-    // Case 5: no stacktop => all from operand stack (cache path).
+    // Case 5: f32/f64 stacktop merge only (carrier = f64), [3,5), curr=4 => f32 from 4, f64 from 3.
+    {
+        constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{
+            .is_tail_call = false,
+            .i32_stack_top_begin_pos = SIZE_MAX,
+            .i32_stack_top_end_pos = SIZE_MAX,
+            .i64_stack_top_begin_pos = SIZE_MAX,
+            .i64_stack_top_end_pos = SIZE_MAX,
+            .f32_stack_top_begin_pos = 3uz,
+            .f32_stack_top_end_pos = 5uz,
+            .f64_stack_top_begin_pos = 3uz,
+            .f64_stack_top_end_pos = 5uz,
+            .v128_stack_top_begin_pos = SIZE_MAX,
+            .v128_stack_top_end_pos = SIZE_MAX};
+
+        constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{
+            .i32_stack_top_curr_pos = SIZE_MAX,
+            .i64_stack_top_curr_pos = SIZE_MAX,
+            .f32_stack_top_curr_pos = 4uz,
+            .f64_stack_top_curr_pos = 4uz,
+            .v128_stack_top_curr_pos = SIZE_MAX};
+
+        ::std::byte const* op{};
+        alignas(16) ::std::byte mem[128]{};
+        ::std::byte* sp{mem};
+        ::std::byte* local_base{};
+
+        wasm_f64 f3 = wasm_f64{1.25};
+        wasm_f64 f4 = make_f64_low_f32(wasm_f32{2.5f});
+
+        auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt,
+                                                                        curr,
+                                                                        ::fast_io::tuple<wasm_f32, wasm_f64>>(op, sp, local_base, f3, f4);
+        if(::fast_io::get<0>(vals) != 2.5f || ::fast_io::get<1>(vals) != 1.25) { return 20; }
+        if(sp != mem) { return 21; }
+
+        push_operand(sp, wasm_f32{3.5f});
+        f3 = wasm_f64{1.25};
+        f4 = make_f64_low_f32(wasm_f32{2.5f});
+        auto const vals2 = uwvm_int_optable::get_vals_from_operand_stack<opt,
+                                                                         curr,
+                                                                         ::fast_io::tuple<wasm_f32, wasm_f64, wasm_f32>>(op, sp, local_base, f3, f4);
+        if(::fast_io::get<0>(vals2) != 2.5f || ::fast_io::get<1>(vals2) != 1.25 || ::fast_io::get<2>(vals2) != 3.5f) { return 22; }
+        if(sp != mem) { return 23; }
+    }
+
+    // Case 6: no stacktop => all from operand stack (cache path).
     {
         constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{};
         constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{};
