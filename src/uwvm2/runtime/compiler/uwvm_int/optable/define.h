@@ -97,17 +97,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     namespace details
     {
-        
+#if defined(__clang__)
+        using float64x1_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
+        using float32x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
+#elif defined(__GNUC__)
+        using float64x1_t = __Float64x1_t;
+        using float32x2_t = __Float32x2_t;
+#elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
+        using float64x1_t = __n64;
+        using float32x2_t = __n64;
+#else
+# error "missing instruction"
+#endif
+
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
             get_f32_low_from_f64_slot(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 v) noexcept
         {
 #if defined(__aarch64__) || defined(__AARCH64__)
-            float64x1_t d = vdup_n_f64(v);
-            float32x2_t s2 = vreinterpret_f32_f64(d);
-            return vget_lane_f32(s2, 0);
+# if UWVM_HAS_BUILTIN(__builtin_neon_vget_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
+            float64x1_t const d{::std::bit_cast<float64x1_t>(v)};
+            float32x2_t s2{::std::bit_cast<float32x2_t>(d)};
+            if constexpr(::std::endian::native == ::std::endian::big) { s2 = __builtin_shufflevector(s2, s2, 1u, 0u); }
+            return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(__builtin_neon_vget_lane_f32(s2, 0));
+# elif UWVM_HAS_BUILTIN(__aarch64_vget_lane_any)  // GNUC
+            float64x1_t const d{::std::bit_cast<float64x1_t>(v)};
+            float32x2_t s2{::std::bit_cast<float32x2_t>(d)};
+            return __aarch64_vget_lane_any(s2, 0);
+# elif defined(_MSC_VER)
+            float64x1_t const d{::fast_io::intrinsics::msvc::arm::neon_duprf64(v)};
+            float32x2_t s2{d};
+            return ::fast_io::intrinsics::msvc::arm::neon_dups32(s2, 0);
+
+# else
+#  error "missing instruction"
+# endif
 #else
-            auto const u64 = ::std::bit_cast<::std::uint_least64_t>(v);
-            auto const u32 = static_cast<::std::uint_least32_t>(u64);
+            // x86_64, ...
+            auto const u64{::std::bit_cast<::std::uint_least64_t>(v)};
+            auto const u32{static_cast<::std::uint_least32_t>(u64)};
             return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(u32);
 #endif
         }
