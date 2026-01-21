@@ -26,5 +26,5 @@
 // #pragma once
 
 #pragma pop_macro("UWVM_INTERPRETER_OPFUNC_MACRO")
-#pragma pop_macro("UWVM_INTERPRETER_OPTYPE_MACRO")
+#pragma pop_macro("UWVM_INTERPRETER_OPFUNC_TYPE_MACRO")
 
