@@ -119,7 +119,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
     }
 
-#if 0
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
@@ -128,37 +127,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        // curr_uwvmint_br next_opfunc_ptr (jmp to next_opfunc) ...
+        // curr_uwvmint_br_if jmp_ip next_op_false
         // safe
         // ^^ type...[0]
 
         type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
-        // curr_uwvmint_br next_opfunc_ptr (jmp to next_opfunc) ...
+        // curr_uwvmint_br_if jmp_ip next_op_false
         // safe
-        //                 ^^ type...[0]
+        //                    ^^ type...[0]
 
-        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
 
-        if ()
+        type...[0] += sizeof(jmp_ip);
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        //                           ^^ type...[0]
+
+        auto const cond{
+            ::uwvm2::runtime::compiler::uwvm_int::optable::
+                get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
+
+        if(cond)
         {
+            type...[0] = jmp_ip;
 
+            // next_op_true (*jmp_ip) ...
+            // safe
+            // ^^ type...[0]
         }
-        else
-        {
-
-        }
-
-        type...[0] = reinterpret_cast<::std::byte const*>(next_interpreter);
 
         // next_opfunc ...
         // safe
         // ^^ type...[0]
 
-        if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
+        if constexpr(CompileOption.is_tail_call)
+        {
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
     }
-#endif
 }
 
 #ifndef UWVM_MODULE
