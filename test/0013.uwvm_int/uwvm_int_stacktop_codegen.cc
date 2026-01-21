@@ -30,14 +30,8 @@ template <typename T>
 {
 #if defined(__clang__) || defined(__GNUC__)
     using U = ::std::remove_cvref_t<T>;
-    if constexpr(::std::is_integral_v<U> || ::std::is_pointer_v<U>)
-    {
-        asm volatile("" : : "r"(v));
-    }
-    else if constexpr(::std::is_floating_point_v<U>)
-    {
-        asm volatile("" : : "w"(v));
-    }
+    if constexpr(::std::is_integral_v<U> || ::std::is_pointer_v<U>) { asm volatile("" : : "r"(v)); }
+    else if constexpr(::std::is_floating_point_v<U>) { asm volatile("" : : "w"(v)); }
     else
     {
         // e.g. wasm_v128 (vector type on AArch64) -> keep in SIMD/FP reg class.
@@ -56,9 +50,7 @@ struct codegen_i32_sp_t
 
 // Expectation (no stacktop, single value):
 // - Ideally becomes `ldr w0, [x1, #-4]!` (update sp) + ret, when sp is observed.
-[[gnu::noinline]] codegen_i32_sp_t codegen_pop_i32_tuple1_no_stacktop_keep_sp(::std::byte const* op,
-                                                                              ::std::byte* sp,
-                                                                              ::std::byte* local_base) noexcept
+[[gnu::noinline]] codegen_i32_sp_t codegen_pop_i32_tuple1_no_stacktop_keep_sp(::std::byte const* op, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
     constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{};
     constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{};
@@ -71,30 +63,25 @@ struct codegen_i32_sp_t
 }
 
 // Expectation (stacktop, single value): pure register move (no memory access).
-[[gnu::noinline]] wasm_i32 codegen_pop_i32_tuple1_stacktop(::std::byte const* op,
-                                                          ::std::byte* sp,
-                                                          ::std::byte* local_base,
-                                                          wasm_i32 r3) noexcept
+[[gnu::noinline]] wasm_i32 codegen_pop_i32_tuple1_stacktop(::std::byte const* op, ::std::byte* sp, ::std::byte* local_base, wasm_i32 r3) noexcept
 {
-    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{
-        .is_tail_call = false,
-        .i32_stack_top_begin_pos = 3uz,
-        .i32_stack_top_end_pos = 4uz,
-        .i64_stack_top_begin_pos = SIZE_MAX,
-        .i64_stack_top_end_pos = SIZE_MAX,
-        .f32_stack_top_begin_pos = SIZE_MAX,
-        .f32_stack_top_end_pos = SIZE_MAX,
-        .f64_stack_top_begin_pos = SIZE_MAX,
-        .f64_stack_top_end_pos = SIZE_MAX,
-        .v128_stack_top_begin_pos = SIZE_MAX,
-        .v128_stack_top_end_pos = SIZE_MAX};
+    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false,
+                                                                        .i32_stack_top_begin_pos = 3uz,
+                                                                        .i32_stack_top_end_pos = 4uz,
+                                                                        .i64_stack_top_begin_pos = SIZE_MAX,
+                                                                        .i64_stack_top_end_pos = SIZE_MAX,
+                                                                        .f32_stack_top_begin_pos = SIZE_MAX,
+                                                                        .f32_stack_top_end_pos = SIZE_MAX,
+                                                                        .f64_stack_top_begin_pos = SIZE_MAX,
+                                                                        .f64_stack_top_end_pos = SIZE_MAX,
+                                                                        .v128_stack_top_begin_pos = SIZE_MAX,
+                                                                        .v128_stack_top_end_pos = SIZE_MAX};
 
-    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{
-        .i32_stack_top_curr_pos = 3uz,
-        .i64_stack_top_curr_pos = SIZE_MAX,
-        .f32_stack_top_curr_pos = SIZE_MAX,
-        .f64_stack_top_curr_pos = SIZE_MAX,
-        .v128_stack_top_curr_pos = SIZE_MAX};
+    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{.i32_stack_top_curr_pos = 3uz,
+                                                                         .i64_stack_top_curr_pos = SIZE_MAX,
+                                                                         .f32_stack_top_curr_pos = SIZE_MAX,
+                                                                         .f64_stack_top_curr_pos = SIZE_MAX,
+                                                                         .v128_stack_top_curr_pos = SIZE_MAX};
 
     auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32>>(op, sp, local_base, r3);
     wasm_i32 const v = ::fast_io::get<0>(vals);
@@ -103,9 +90,7 @@ struct codegen_i32_sp_t
 }
 
 [[gnu::noinline]] wasm_i32 codegen_pop_i32_from_operand_stack(::std::byte const* op, ::std::byte* sp, ::std::byte* local_base) noexcept
-{
-    return uwvm_int_optable::get_curr_val_from_operand_stack_cache<wasm_i32>(op, sp, local_base);
-}
+{ return uwvm_int_optable::get_curr_val_from_operand_stack_cache<wasm_i32>(op, sp, local_base); }
 
 [[gnu::noinline]] codegen_i32_sp_t codegen_pop_i32_from_operand_stack_keep_sp(::std::byte const* op, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
@@ -126,38 +111,40 @@ struct codegen_i32_sp_t
 // i32/i64 merge uses stacktop slots [3,5) -> indices 3 and 4.
 // f32/f64/v128 merge uses stacktop slots [5,7) -> indices 5 and 6 (carrier = v128).
 [[gnu::noinline]] wasm_i32 codegen_mixed_pop(::std::byte const* op,
-                                            ::std::byte* sp,
-                                            ::std::byte* local_base,
-                                            uwvm_int_optable::wasm_stack_top_i32_with_i64_u s3,
-                                            uwvm_int_optable::wasm_stack_top_i32_with_i64_u s4,
-                                            wasm_v128 v5,
-                                            wasm_v128 v6) noexcept
+                                             ::std::byte* sp,
+                                             ::std::byte* local_base,
+                                             uwvm_int_optable::wasm_stack_top_i32_with_i64_u s3,
+                                             uwvm_int_optable::wasm_stack_top_i32_with_i64_u s4,
+                                             wasm_v128 v5,
+                                             wasm_v128 v6) noexcept
 {
-    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{
-        .is_tail_call = false,
-        .i32_stack_top_begin_pos = 3uz,
-        .i32_stack_top_end_pos = 5uz,
-        .i64_stack_top_begin_pos = 3uz,
-        .i64_stack_top_end_pos = 5uz,
-        .f32_stack_top_begin_pos = 5uz,
-        .f32_stack_top_end_pos = 7uz,
-        .f64_stack_top_begin_pos = 5uz,
-        .f64_stack_top_end_pos = 7uz,
-        .v128_stack_top_begin_pos = 5uz,
-        .v128_stack_top_end_pos = 7uz};
+    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false,
+                                                                        .i32_stack_top_begin_pos = 3uz,
+                                                                        .i32_stack_top_end_pos = 5uz,
+                                                                        .i64_stack_top_begin_pos = 3uz,
+                                                                        .i64_stack_top_end_pos = 5uz,
+                                                                        .f32_stack_top_begin_pos = 5uz,
+                                                                        .f32_stack_top_end_pos = 7uz,
+                                                                        .f64_stack_top_begin_pos = 5uz,
+                                                                        .f64_stack_top_end_pos = 7uz,
+                                                                        .v128_stack_top_begin_pos = 5uz,
+                                                                        .v128_stack_top_end_pos = 7uz};
 
-    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{
-        .i32_stack_top_curr_pos = 3uz,
-        .i64_stack_top_curr_pos = 3uz,
-        .f32_stack_top_curr_pos = 5uz,
-        .f64_stack_top_curr_pos = 5uz,
-        .v128_stack_top_curr_pos = 5uz};
+    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{.i32_stack_top_curr_pos = 3uz,
+                                                                         .i64_stack_top_curr_pos = 3uz,
+                                                                         .f32_stack_top_curr_pos = 5uz,
+                                                                         .f64_stack_top_curr_pos = 5uz,
+                                                                         .v128_stack_top_curr_pos = 5uz};
 
     // pop order: i32 (s3), i64 (s4), f32 (v5), v128 (v6), then i32/f32 from memory.
-    auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt,
-                                                                    curr,
-                                                                    ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(
-        op, sp, local_base, s3, s4, v5, v6);
+    auto const vals =
+        uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
+                                                                                                                                                sp,
+                                                                                                                                                local_base,
+                                                                                                                                                s3,
+                                                                                                                                                s4,
+                                                                                                                                                v5,
+                                                                                                                                                v6);
     // Prevent DCE (otherwise the optimizer may simplify this function to `return s3.i32;`).
     codegen_keep(::fast_io::get<0>(vals));
     codegen_keep(::fast_io::get<1>(vals));
@@ -184,30 +171,32 @@ struct codegen_mixed_mem_t
                                                                  wasm_v128 v5,
                                                                  wasm_v128 v6) noexcept
 {
-    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{
-        .is_tail_call = false,
-        .i32_stack_top_begin_pos = 3uz,
-        .i32_stack_top_end_pos = 5uz,
-        .i64_stack_top_begin_pos = 3uz,
-        .i64_stack_top_end_pos = 5uz,
-        .f32_stack_top_begin_pos = 5uz,
-        .f32_stack_top_end_pos = 7uz,
-        .f64_stack_top_begin_pos = 5uz,
-        .f64_stack_top_end_pos = 7uz,
-        .v128_stack_top_begin_pos = 5uz,
-        .v128_stack_top_end_pos = 7uz};
+    constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false,
+                                                                        .i32_stack_top_begin_pos = 3uz,
+                                                                        .i32_stack_top_end_pos = 5uz,
+                                                                        .i64_stack_top_begin_pos = 3uz,
+                                                                        .i64_stack_top_end_pos = 5uz,
+                                                                        .f32_stack_top_begin_pos = 5uz,
+                                                                        .f32_stack_top_end_pos = 7uz,
+                                                                        .f64_stack_top_begin_pos = 5uz,
+                                                                        .f64_stack_top_end_pos = 7uz,
+                                                                        .v128_stack_top_begin_pos = 5uz,
+                                                                        .v128_stack_top_end_pos = 7uz};
 
-    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{
-        .i32_stack_top_curr_pos = 3uz,
-        .i64_stack_top_curr_pos = 3uz,
-        .f32_stack_top_curr_pos = 5uz,
-        .f64_stack_top_curr_pos = 5uz,
-        .v128_stack_top_curr_pos = 5uz};
+    constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{.i32_stack_top_curr_pos = 3uz,
+                                                                         .i64_stack_top_curr_pos = 3uz,
+                                                                         .f32_stack_top_curr_pos = 5uz,
+                                                                         .f64_stack_top_curr_pos = 5uz,
+                                                                         .v128_stack_top_curr_pos = 5uz};
 
-    auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt,
-                                                                    curr,
-                                                                    ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(
-        op, sp, local_base, s3, s4, v5, v6);
+    auto const vals =
+        uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
+                                                                                                                                                sp,
+                                                                                                                                                local_base,
+                                                                                                                                                s3,
+                                                                                                                                                s4,
+                                                                                                                                                v5,
+                                                                                                                                                v6);
     codegen_keep(::fast_io::get<4>(vals));
     codegen_keep(::fast_io::get<5>(vals));
     codegen_keep(sp);
@@ -221,14 +210,8 @@ struct codegen_mixed_mem_t
 //
 // NOTE: For stack-top caching, uwvm uses `wasm_v128` as the carrier when f32/f64/v128 ranges are identical.
 // This function tests the ABI of passing those merged slots as `wasm_v128` (should use q0-q7 on AArch64).
-[[gnu::noinline]] void codegen_aarch64_8_f32_f64_v128_abi(wasm_v128 a0,
-                                                         wasm_v128 a1,
-                                                         wasm_v128 a2,
-                                                         wasm_v128 a3,
-                                                         wasm_v128 a4,
-                                                         wasm_v128 a5,
-                                                         wasm_v128 a6,
-                                                         wasm_v128 a7) noexcept
+[[gnu::noinline]] void
+    codegen_aarch64_8_f32_f64_v128_abi(wasm_v128 a0, wasm_v128 a1, wasm_v128 a2, wasm_v128 a3, wasm_v128 a4, wasm_v128 a5, wasm_v128 a6, wasm_v128 a7) noexcept
 {
     // Volatile stores prevent the compiler from deleting the arg uses and make the incoming ABI visible.
     alignas(16) volatile wasm_v128 v0 = a0;
@@ -336,13 +319,13 @@ struct codegen_mixed_mem_t
 [[gnu::noinline]] wasm_f32 codegen_aarch64_low32_f32_from_f64_reg_no_gpr(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 in) noexcept
 {
     wasm_f32 out{};
-#if defined(__clang__) || defined(__GNUC__)
+# if defined(__clang__) || defined(__GNUC__)
     asm volatile("fmov %s0, %s1" : "=w"(out) : "w"(in));
-#else
+# else
     // fallback: keeps buildable on non-GNU/Clang toolchains (not a performance path)
     auto const u = ::std::bit_cast<::std::uint_least64_t>(in);
     out = ::std::bit_cast<wasm_f32>(static_cast<::std::uint_least32_t>(u));
-#endif
+# endif
     codegen_keep(out);
     return out;
 }
@@ -351,30 +334,30 @@ struct codegen_mixed_mem_t
 // On AArch64 this should optimize to essentially just `ret` (return s0 view of the incoming d0/v0).
 [[gnu::noinline]] wasm_f32 codegen_aarch64_low32_f32_from_f64_neon_no_asm(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 in) noexcept
 {
-#if defined(__aarch64__) || defined(__AARCH64__)
+# if defined(__aarch64__) || defined(__AARCH64__)
     float64x1_t v = vdup_n_f64(in);
     float32x2_t v2 = vreinterpret_f32_f64(v);
     wasm_f32 out = vget_lane_f32(v2, 0);
     codegen_keep(out);
     return out;
-#else
+# else
     auto const u = ::std::bit_cast<::std::uint_least64_t>(in);
     wasm_f32 out = ::std::bit_cast<wasm_f32>(static_cast<::std::uint_least32_t>(u));
     codegen_keep(out);
     return out;
-#endif
+# endif
 }
 
 // -------- ABI probes for other merged-union slot types (AArch64) --------
 
 [[gnu::noinline]] void codegen_aarch64_8_i32_i64_union_abi(uwvm_int_optable::wasm_stack_top_i32_with_i64_u a0,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a1,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a2,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a3,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a4,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a5,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a6,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_i64_u a7) noexcept
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a1,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a2,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a3,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a4,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a5,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a6,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_i64_u a7) noexcept
 {
     alignas(8) volatile uwvm_int_optable::wasm_stack_top_i32_with_i64_u v0 = a0;
     alignas(8) volatile uwvm_int_optable::wasm_stack_top_i32_with_i64_u v1 = a1;
@@ -396,13 +379,13 @@ struct codegen_mixed_mem_t
 }
 
 [[gnu::noinline]] void codegen_aarch64_8_i32_f32_union_abi(uwvm_int_optable::wasm_stack_top_i32_with_f32_u a0,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a1,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a2,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a3,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a4,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a5,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a6,
-                                                          uwvm_int_optable::wasm_stack_top_i32_with_f32_u a7) noexcept
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a1,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a2,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a3,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a4,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a5,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a6,
+                                                           uwvm_int_optable::wasm_stack_top_i32_with_f32_u a7) noexcept
 {
     alignas(4) volatile uwvm_int_optable::wasm_stack_top_i32_with_f32_u v0 = a0;
     alignas(4) volatile uwvm_int_optable::wasm_stack_top_i32_with_f32_u v1 = a1;
@@ -424,13 +407,13 @@ struct codegen_mixed_mem_t
 }
 
 [[gnu::noinline]] void codegen_aarch64_8_i32_i64_f32_f64_union_abi(uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a0,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a1,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a2,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a3,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a4,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a5,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a6,
-                                                                  uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a7) noexcept
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a1,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a2,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a3,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a4,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a5,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a6,
+                                                                   uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u a7) noexcept
 {
     alignas(8) volatile uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u v0 = a0;
     alignas(8) volatile uwvm_int_optable::wasm_stack_top_i32_i64_f32_f64_u v1 = a1;
