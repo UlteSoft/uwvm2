@@ -209,7 +209,7 @@ int main()
             write_slot(slot_true, end_true);
 
             alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
-            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
+            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
             T0 jmp_ip = slot_true;
@@ -243,7 +243,7 @@ int main()
             write_slot(slot_true, end_true);
 
             alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
-            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
+            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
             T0 jmp_ip = slot_true;
@@ -285,7 +285,7 @@ int main()
 
             constexpr ::std::size_t max_size = 2uz;
             alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
-            opfunc_ref_t br_table_fn = &optable::uwvmint_br_table<opt, 0uz, T0, T1, T2>;
+            opfunc_ref_t br_table_fn = &optable::uwvmint_br_table<opt, T0, T1, T2>;
             write_slot(instr, br_table_fn);
             write_slot(instr + sizeof(opfunc_ref_t), max_size);
 
@@ -475,6 +475,59 @@ int main()
             optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp2 = &optable::uwvmint_br_if<opt_i32_cache, 7uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got2 != exp2) { return 202; }
+    }
+
+    // translate::get_uwvmint_br_table_fptr: select uwvmint_br_table specialization by i32 curr-pos (no lambdas; template recursion).
+    {
+        using op_cached_t = optable::uwvm_interpreter_opfunc_t<T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        optable::uwvm_interpreter_stacktop_currpos_t curr{};
+
+        curr.i32_stack_top_curr_pos = 5uz;
+        op_cached_t got0 =
+            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp0 = &optable::uwvmint_br_table<opt_i32_cache, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got0 != exp0) { return 210; }
+
+        curr.i32_stack_top_curr_pos = 6uz;
+        op_cached_t got1 =
+            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp1 = &optable::uwvmint_br_table<opt_i32_cache, 6uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got1 != exp1) { return 211; }
+
+        curr.i32_stack_top_curr_pos = 7uz;
+        op_cached_t got2 =
+            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp2 = &optable::uwvmint_br_table<opt_i32_cache, 7uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got2 != exp2) { return 212; }
+    }
+
+    // translate::get_uwvmint_return_fptr: no stacktop dependency, single version.
+    {
+        optable::uwvm_interpreter_stacktop_currpos_t curr{};
+
+        // tailcall
+        {
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            opfunc_t got = optable::translate::get_uwvmint_return_fptr<opt, T0, T1, T2>(curr);
+            opfunc_t exp = &optable::uwvmint_return<opt, T0, T1, T2>;
+            if(got != exp) { return 220; }
+
+            ::uwvm2::utils::container::tuple<T0, T1, T2> tup{};
+            opfunc_t got2 = optable::translate::get_uwvmint_return_fptr_from_tuple<opt>(curr, tup);
+            if(got2 != exp) { return 221; }
+        }
+
+        // non-tailcall
+        {
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            opfunc_ref_t got = optable::translate::get_uwvmint_return_fptr<opt, T0, T1, T2>(curr);
+            opfunc_ref_t exp = &optable::uwvmint_return<opt, T0, T1, T2>;
+            if(got != exp) { return 222; }
+
+            ::uwvm2::utils::container::tuple<T0, T1, T2> tup{};
+            opfunc_ref_t got2 = optable::translate::get_uwvmint_return_fptr_from_tuple<opt>(curr, tup);
+            if(got2 != exp) { return 223; }
+        }
     }
 
     return 0;
