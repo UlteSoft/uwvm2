@@ -66,6 +66,30 @@ static void end3(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base
     g_local_base = local_base;
 }
 
+static void end0_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+{
+    g_hit = 20;
+    g_ip = ip;
+    g_sp = sp;
+    g_local_base = local_base;
+}
+
+static void end1_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+{
+    g_hit = 21;
+    g_ip = ip;
+    g_sp = sp;
+    g_local_base = local_base;
+}
+
+static void end2_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+{
+    g_hit = 22;
+    g_ip = ip;
+    g_sp = sp;
+    g_local_base = local_base;
+}
+
 int main()
 {
     using T0 = ::std::byte const*;
@@ -73,6 +97,7 @@ int main()
     using T2 = ::std::byte*;
 
     using opfunc_t = optable::uwvm_interpreter_opfunc_t<T0, T1, T2>;
+    using opfunc_ref_t = optable::uwvm_interpreter_opfunc_byref_t<T0, T1, T2>;
 
     // br: jumps to jmp_ip (slot holding next opfunc).
     {
@@ -99,6 +124,156 @@ int main()
         if(g_ip != slot_end) { return 2; }
         if(g_sp != mem) { return 3; }
         if(g_local_base != mem) { return 4; }
+    }
+
+    // Non-tailcall br/br_if/br_table: update ip/sp via references and return to a higher-level loop.
+    {
+        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+
+        // br: updates ip -> slot_target, no call to next.
+        {
+            reset_state();
+
+            alignas(16) ::std::byte slot_target[sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t end_fn = &end0_ref;
+            write_slot(slot_target, end_fn);
+
+            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0)]{};
+            opfunc_ref_t br_fn = &optable::uwvmint_br<opt, T0, T1, T2>;
+            write_slot(instr, br_fn);
+
+            T0 jmp_ip = slot_target;
+            write_slot(instr + sizeof(opfunc_ref_t), jmp_ip);
+
+            alignas(16) ::std::byte mem[32]{};
+            T0 ip = instr;
+            ::std::byte* sp = mem;
+            ::std::byte* local_base = mem;
+
+            br_fn(ip, sp, local_base);
+            if(ip != slot_target) { return 11; }
+            if(sp != mem) { return 12; }
+
+            opfunc_ref_t next_fn{};
+            ::std::memcpy(::std::addressof(next_fn), ip, sizeof(next_fn));
+            next_fn(ip, sp, local_base);
+
+            if(g_hit != 20) { return 13; }
+            if(g_ip != slot_target) { return 14; }
+        }
+
+        // br_if: cond==0 uses fallthrough slot; cond!=0 uses jmp_ip slot.
+        {
+            // False case
+            reset_state();
+
+            alignas(16) ::std::byte slot_true[sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t end_true = &end1_ref;
+            write_slot(slot_true, end_true);
+
+            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
+            write_slot(instr, br_if_fn);
+
+            T0 jmp_ip = slot_true;
+            write_slot(instr + sizeof(opfunc_ref_t), jmp_ip);
+
+            opfunc_ref_t end_false = &end2_ref;
+            write_slot(instr + sizeof(opfunc_ref_t) + sizeof(T0), end_false);
+
+            alignas(16) ::std::byte mem[32]{};
+            T0 ip = instr;
+            ::std::byte* sp = mem;
+            ::std::byte* local_base = mem;
+            push_operand(sp, wasm_i32{0});
+
+            br_if_fn(ip, sp, local_base);
+            if(ip != (instr + sizeof(opfunc_ref_t) + sizeof(T0))) { return 15; }
+            if(sp != mem) { return 16; }
+
+            opfunc_ref_t next_fn{};
+            ::std::memcpy(::std::addressof(next_fn), ip, sizeof(next_fn));
+            next_fn(ip, sp, local_base);
+            if(g_hit != 22) { return 17; }
+        }
+
+        {
+            // True case
+            reset_state();
+
+            alignas(16) ::std::byte slot_true[sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t end_true = &end1_ref;
+            write_slot(slot_true, end_true);
+
+            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
+            write_slot(instr, br_if_fn);
+
+            T0 jmp_ip = slot_true;
+            write_slot(instr + sizeof(opfunc_ref_t), jmp_ip);
+
+            opfunc_ref_t end_false = &end2_ref;
+            write_slot(instr + sizeof(opfunc_ref_t) + sizeof(T0), end_false);
+
+            alignas(16) ::std::byte mem[32]{};
+            T0 ip = instr;
+            ::std::byte* sp = mem;
+            ::std::byte* local_base = mem;
+            push_operand(sp, wasm_i32{1});
+
+            br_if_fn(ip, sp, local_base);
+            if(ip != slot_true) { return 18; }
+            if(sp != mem) { return 19; }
+
+            opfunc_ref_t next_fn{};
+            ::std::memcpy(::std::addressof(next_fn), ip, sizeof(next_fn));
+            next_fn(ip, sp, local_base);
+            if(g_hit != 21) { return 20; }
+        }
+
+        // br_table: idx selects table[idx], out-of-range selects default (table[max_size]).
+        {
+            reset_state();
+
+            alignas(16) ::std::byte slot0[sizeof(opfunc_ref_t)]{};
+            alignas(16) ::std::byte slot1[sizeof(opfunc_ref_t)]{};
+            alignas(16) ::std::byte slotd[sizeof(opfunc_ref_t)]{};
+
+            opfunc_ref_t fn0 = &end0_ref;
+            opfunc_ref_t fn1 = &end1_ref;
+            opfunc_ref_t fnd = &end2_ref;
+            write_slot(slot0, fn0);
+            write_slot(slot1, fn1);
+            write_slot(slotd, fnd);
+
+            constexpr ::std::size_t max_size = 2uz;
+            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
+            opfunc_ref_t br_table_fn = &optable::uwvmint_br_table<opt, 0uz, T0, T1, T2>;
+            write_slot(instr, br_table_fn);
+            write_slot(instr + sizeof(opfunc_ref_t), max_size);
+
+            T0 const t0 = slot0;
+            T0 const t1 = slot1;
+            T0 const td = slotd;
+            write_slot(instr + sizeof(opfunc_ref_t) + sizeof(::std::size_t) + 0uz * sizeof(T0), t0);
+            write_slot(instr + sizeof(opfunc_ref_t) + sizeof(::std::size_t) + 1uz * sizeof(T0), t1);
+            write_slot(instr + sizeof(opfunc_ref_t) + sizeof(::std::size_t) + 2uz * sizeof(T0), td);
+
+            alignas(16) ::std::byte mem[32]{};
+            T0 ip = instr;
+            ::std::byte* sp = mem;
+            ::std::byte* local_base = mem;
+            push_operand(sp, wasm_i32{100});
+
+            br_table_fn(ip, sp, local_base);
+            if(ip != slotd) { return 21; }
+            if(sp != mem) { return 22; }
+
+            opfunc_ref_t next_fn{};
+            ::std::memcpy(::std::addressof(next_fn), ip, sizeof(next_fn));
+            next_fn(ip, sp, local_base);
+            if(g_hit != 22) { return 23; }
+        }
     }
 
     // br_if: cond == 0 -> fallthrough (next_op_false slot), cond != 0 -> jmp_ip slot.

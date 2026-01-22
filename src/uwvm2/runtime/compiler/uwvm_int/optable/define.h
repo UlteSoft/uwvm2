@@ -334,6 +334,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <uwvm_int_stack_top_type... Type>
     using uwvm_interpreter_opfunc_t = UWVM_INTERPRETER_OPFUNC_TYPE_MACRO void (*)(Type... type) UWVM_THROWS;
 
+    template <uwvm_int_stack_top_type... Type>
+    using uwvm_interpreter_opfunc_byref_t = UWVM_INTERPRETER_OPFUNC_TYPE_MACRO void (*)(Type&... type) UWVM_THROWS;
+
     template <uwvm_interpreter_translate_option_t CompileOption,
               uwvm_int_stack_top_type GetType,
               ::std::size_t curr_stack_top,
