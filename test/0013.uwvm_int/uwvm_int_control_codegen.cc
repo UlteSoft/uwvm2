@@ -28,6 +28,7 @@ using T0 = ::std::byte const*;
 using T1 = ::std::byte*;
 using T2 = ::std::byte*;
 using opfunc_t = optable::uwvm_interpreter_opfunc_t<T0, T1, T2>;
+using opfunc_ref_t = optable::uwvm_interpreter_opfunc_byref_t<T0, T1, T2>;
 
 template <typename T>
 inline void write_slot(::std::byte* p, T const& v) noexcept
@@ -60,6 +61,7 @@ inline void push_operand(::std::byte*& sp, T v) noexcept
 // - br: load jmp_ip and indirect tail-branch to next opfunc.
 // - br_if: load jmp_ip, pop i32 cond, conditional select between jmp_ip and fallthrough slot, then indirect tail-branch.
 // - br_table: pop i32 idx, clamp via min(max_size, idx), load table[idx], then indirect tail-branch.
+// - return: should compile to a plain return (tailcall mode) or `*ip=nullptr` (non-tailcall loop mode).
 
 [[gnu::noinline]] void codegen_br(T0 ip, T1 sp, T2 local_base)
 {
@@ -85,8 +87,12 @@ int main()
     opfunc_t f0 = &optable::uwvmint_br<optable::uwvm_interpreter_translate_option_t{.is_tail_call = true}, T0, T1, T2>;
     opfunc_t f1 = &optable::uwvmint_br_if<optable::uwvm_interpreter_translate_option_t{.is_tail_call = true}, 0uz, T0, T1, T2>;
     opfunc_t f2 = &optable::uwvmint_br_table<optable::uwvm_interpreter_translate_option_t{.is_tail_call = true}, 0uz, T0, T1, T2>;
+    opfunc_t f3 = &optable::uwvmint_return<optable::uwvm_interpreter_translate_option_t{.is_tail_call = true}, T0, T1, T2>;
+    opfunc_ref_t r3 = &optable::uwvmint_return<optable::uwvm_interpreter_translate_option_t{.is_tail_call = false}, T0, T1, T2>;
     codegen_keep(f0);
     codegen_keep(f1);
     codegen_keep(f2);
+    codegen_keep(f3);
+    codegen_keep(r3);
     return 0;
 }

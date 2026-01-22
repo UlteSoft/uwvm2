@@ -126,6 +126,39 @@ int main()
         if(g_local_base != mem) { return 4; }
     }
 
+    // return (tailcall): returns from interpreter without executing following opfuncs.
+    {
+        reset_state();
+
+        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+
+        alignas(16) ::std::byte return_ip[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
+        opfunc_t return_fn = &optable::uwvmint_return<opt, T0, T1, T2>;
+        write_slot(return_ip, return_fn);
+
+        // If uwvmint_return incorrectly tail-calls the next opfunc, this would be executed.
+        opfunc_t after_return = &end0;
+        write_slot(return_ip + sizeof(opfunc_t), after_return);
+
+        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(T0)]{};
+        opfunc_t br_fn = &optable::uwvmint_br<opt, T0, T1, T2>;
+        write_slot(instr, br_fn);
+
+        T0 jmp_ip = return_ip;
+        write_slot(instr + sizeof(opfunc_t), jmp_ip);
+
+        alignas(16) ::std::byte mem[32]{};
+        ::std::byte* sp = mem;
+        ::std::byte* local_base = mem;
+
+        br_fn(instr, sp, local_base);
+
+        if(g_hit != 0) { return 24; }
+        if(g_ip != nullptr) { return 25; }
+        if(g_sp != nullptr) { return 26; }
+        if(g_local_base != nullptr) { return 27; }
+    }
+
     // Non-tailcall br/br_if/br_table: update ip/sp via references and return to a higher-level loop.
     {
         constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
@@ -273,6 +306,28 @@ int main()
             ::std::memcpy(::std::addressof(next_fn), ip, sizeof(next_fn));
             next_fn(ip, sp, local_base);
             if(g_hit != 22) { return 23; }
+        }
+
+        // return: sets ip=nullptr to stop the outer interpreter loop.
+        {
+            reset_state();
+
+            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t)]{};
+            opfunc_ref_t ret_fn = &optable::uwvmint_return<opt, T0, T1, T2>;
+            write_slot(instr, ret_fn);
+
+            T0 ip = instr;
+            alignas(16) ::std::byte mem[32]{};
+            ::std::byte* sp = mem;
+            ::std::byte* local_base = mem;
+
+            opfunc_ref_t curr{};
+            ::std::memcpy(::std::addressof(curr), ip, sizeof(curr));
+            curr(ip, sp, local_base);
+
+            if(ip != nullptr) { return 28; }
+            if(sp != mem) { return 29; }
+            if(g_hit != 0) { return 30; }
         }
     }
 
