@@ -90,6 +90,10 @@ static void end2_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& loc
     g_local_base = local_base;
 }
 
+inline constexpr optable::uwvm_interpreter_translate_option_t opt_i32_cache{.is_tail_call = true,
+                                                                            .i32_stack_top_begin_pos = 5uz,
+                                                                            .i32_stack_top_end_pos = 8uz};
+
 int main()
 {
     using T0 = ::std::byte const*;
@@ -447,6 +451,30 @@ int main()
         if(int e = run_case(wasm_i32{100}, 12); e) { return e + 50; }
         // Negative indexes behave like unsigned (uint32_t) for this implementation and fall into default.
         if(int e = run_case(wasm_i32{-1}, 12); e) { return e + 60; }
+    }
+
+    // translate::get_uwvmint_br_if_fptr: select uwvmint_br_if specialization by i32 curr-pos (no lambdas; template recursion).
+    {
+        using op_cached_t = optable::uwvm_interpreter_opfunc_t<T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        optable::uwvm_interpreter_stacktop_currpos_t curr{};
+
+        curr.i32_stack_top_curr_pos = 5uz;
+        op_cached_t got0 =
+            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp0 = &optable::uwvmint_br_if<opt_i32_cache, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got0 != exp0) { return 200; }
+
+        curr.i32_stack_top_curr_pos = 6uz;
+        op_cached_t got1 =
+            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp1 = &optable::uwvmint_br_if<opt_i32_cache, 6uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got1 != exp1) { return 201; }
+
+        curr.i32_stack_top_curr_pos = 7uz;
+        op_cached_t got2 =
+            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t exp2 = &optable::uwvmint_br_if<opt_i32_cache, 7uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
+        if(got2 != exp2) { return 202; }
     }
 
     return 0;

@@ -367,6 +367,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Function calls are initiated by higher-level functions.
     }
 
+    namespace translate
+    {
+        namespace details
+        {
+            template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I32Curr,
+                      ::std::size_t I32End,
+                      ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_br_if_fptr_i32curr_impl(
+                ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            {
+                static_assert(I32Curr < I32End);
+                static_assert(CompileOption.i32_stack_top_begin_pos <= I32Curr && I32Curr < CompileOption.i32_stack_top_end_pos);
+
+                if(curr_stacktop.i32_stack_top_curr_pos == I32Curr) { return uwvmint_br_if<CompileOption, I32Curr, Type...>; }
+                else
+                {
+                    if constexpr(I32Curr + 1uz < I32End)
+                    {
+                        return get_uwvmint_br_if_fptr_i32curr_impl<CompileOption, I32Curr + 1uz, I32End, Type...>(curr_stacktop);
+                    }
+                    else
+                    {
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                    }
+                }
+            }
+        }  // namespace details
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_br_if_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::
+                    get_uwvmint_br_if_fptr_i32curr_impl<CompileOption, CompileOption.i32_stack_top_begin_pos, CompileOption.i32_stack_top_end_pos, Type...>(
+                        curr_stacktop);
+            }
+            else
+            {
+                return uwvmint_br_if<CompileOption, 0uz, Type...>;
+            }
+        }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_br_if_fptr_from_tuple(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_br_if_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_br_if_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_br_if<CompileOption, 0uz, Type...>; }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_br_if_fptr_from_tuple(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_br_if_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
+    }  // namespace translate
+
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
