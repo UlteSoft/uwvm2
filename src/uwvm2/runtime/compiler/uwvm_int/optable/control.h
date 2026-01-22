@@ -26,6 +26,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <algorithm>
 # include <limits>
 # include <memory>
 # include <concepts>
@@ -52,7 +53,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
     /// @note This function cannot be forced to [[noreturn]] because some implementations embedded as plugins may need to perform cleanup operations instead of
     /// immediately terminating the program. The default implementation terminates the program.
-    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
@@ -81,6 +84,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(Type & ... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_unreachable_opfunc unreachable_func ...
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_unreachable_opfunc unreachable_func ...
+        // safe
+        //                         ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func_p;  // no init
+        ::std::memcpy(::std::addressof(unreachable_func_p), type...[0], sizeof(unreachable_func_t));
+
+        if(unreachable_func_p) { unreachable_func_p(); }
+        else
+        {
+            // default crash the vm
+            ::fast_io::fast_terminate();
+        }
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
@@ -105,23 +138,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // safe
         // ^^ type...[0]
 
-        if constexpr(CompileOption.is_tail_call)
-        {
-            // next_opfunc (*jmp_ip) ...
-            // safe
-            // ^^ type...[0]
+        // `jmp_ip` may not be aligned for a function-pointer slot; always load via memcpy.
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
 
-            // `jmp_ip` may not be aligned for a function-pointer slot; always load via memcpy.
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
 
-            UWVM_MUSTTAIL return next_interpreter(type...);
-        }
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_uwvmint_br jmp_ip (jmp to next_opfunc) ...
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br jmp_ip (jmp to next_opfunc) ...
+        // safe
+        //                 ^^ type...[0]
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+
+        type...[0] = jmp_ip;
+
+        // next_opfunc (*jmp_ip) ...
+        // safe
+        // ^^ type...[0]
+
+        // Function calls are initiated by higher-level functions.
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
@@ -163,13 +220,155 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // safe
         // ^^ type...[0]
 
-        if constexpr(CompileOption.is_tail_call)
-        {
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
 
-            UWVM_MUSTTAIL return next_interpreter(type...);
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(Type & ... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        //                    ^^ type...[0]
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+
+        type...[0] += sizeof(jmp_ip);
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        //                           ^^ type...[0]
+
+        auto const cond{
+            ::uwvm2::runtime::compiler::uwvm_int::optable::
+                get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
+
+        if(cond)
+        {
+            type...[0] = jmp_ip;
+
+            // next_op_true (*jmp_ip) ...
+            // safe
+            // ^^ type...[0]
         }
+
+        // next_opfunc ...
+        // safe
+        // ^^ type...[0]
+
+        // Function calls are initiated by higher-level functions.
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        //                       ^^ type...[0]
+
+        ::std::size_t max_size;  // no init
+        ::std::memcpy(::std::addressof(max_size), type...[0], sizeof(max_size));
+
+        type...[0] += sizeof(max_size);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        //                                ^^ type...[0]
+
+        auto const curr{
+            ::uwvm2::runtime::compiler::uwvm_int::optable::
+                get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
+
+        ::std::size_t const curr_uz{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(curr))};
+        ::std::size_t const idx{::std::min(max_size, curr_uz)};
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
+
+        type...[0] = jmp_ip;
+
+        // next_opfunc (*jmp_ip) ...
+        // safe
+        // ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(Type & ... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        //                       ^^ type...[0]
+
+        ::std::size_t max_size;  // no init
+        ::std::memcpy(::std::addressof(max_size), type...[0], sizeof(max_size));
+
+        type...[0] += sizeof(max_size);
+
+        // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
+        // safe
+        //                                ^^ type...[0]
+
+        auto const curr{
+            ::uwvm2::runtime::compiler::uwvm_int::optable::
+                get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
+
+        ::std::size_t const curr_uz{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(curr))};
+        ::std::size_t const idx{::std::min(max_size, curr_uz)};
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
+
+        type...[0] = jmp_ip;
+
+        // next_opfunc (*jmp_ip) ...
+        // safe
+        // ^^ type...[0]
+
+        // Function calls are initiated by higher-level functions.
     }
 }
 
