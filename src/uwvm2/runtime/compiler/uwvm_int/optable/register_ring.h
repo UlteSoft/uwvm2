@@ -129,6 +129,13 @@
  * ;   cache[StartPos]                 = top (TOS)
  * ;   cache[ring_next_pos(StartPos)]  = next (NOS, deeper than TOS)
  * ;
+ * ; Important: TOS/NOS are not arbitrary two registers. They are *adjacent* in the ring by construction of
+ * ; the stack machine semantics (binary ops consume the top two values). Therefore, the code generator only
+ * ; needs to specialize by `StartPos` (and `Count`), not by an (i,j) pair:
+ * ;   - possible `StartPos` values: N
+ * ;   - NOS position is uniquely `ring_next_pos(StartPos)`
+ * ; This keeps specialization growth ~O(N) for 2-operand ops, rather than O(N^2) combinations.
+ * ;
  * ; Operands are already in registers/locals because cache slots are carried in the opfunc arguments.
  * ; No operand-stack memory load is needed here.
  * orq    %r_cache_nos, %r_cache_tos      ; TOS |= NOS   (exact operand order is opcode-specific)
