@@ -74,6 +74,19 @@
  * M3/Wasm3's "meta machine" maps a small fixed set of VM registers (pc/sp/mem/r0/fp0) to hardware registers
  * and relies on tail calls / indirect dispatch. That already removes the outer `switch` loop overhead.
  *
+ * ### ABI note (why modern ABIs matter)
+ * u2 benefits most on modern ABIs that pass many arguments in registers (integer + SIMD/FP), such as:
+ * - **x86_64 SysV ABI** (multiple GPR + XMM argument registers), and
+ * - **AArch64 AAPCS64** (x0–x7 for integer/pointers and v0–v7 for SIMD/FP arguments).
+ *
+ * On these ABIs, the opfunc argument pack can keep a wider stack-top cache segment in registers/locals, so
+ * more stack-machine operations stay on the cache-hit fast path (register-register ALU), and spill/fill is
+ * amortized over larger batches.
+ *
+ * By contrast, classic M3 typically models only a very small "register file" (pc/sp/mem/r0/fp0). That design
+ * already minimizes dispatch cost, but it still needs frequent operand-stack memory loads because most stack
+ * values are not resident in registers.
+ *
  * However, in a stack machine the dominant cost is often not dispatch but **operand stack traffic**.
  * For example, an M3 u64-or between `r0` and a stack operand typically performs an extra dependent memory load
  * for the stack operand every time:
@@ -87,13 +100,13 @@
  * The following micro-example is intentionally tiny: it shows why a stack-top cache can beat an M3-style
  * "one register + operand stack loads" topology on stack-heavy code.
  *
- * **Wasm source (wat):**
+ * **Wasm instruction snippet (wat, not a full function/module):**
  * @code{.wat}
- * (module
- *   (func (export "f") (param i64 i64) (result i64)
- *     local.get 0
- *     local.get 1
- *     i64.or))
+ * ;; ... inside some function body ...
+ * ;; stack effect: (i64 i64 -- i64)
+ * local.get 0
+ * local.get 1
+ * i64.or
  * @endcode
  *
  * **M3 (from the M3 docs, x86_64 SysV ABI):**
