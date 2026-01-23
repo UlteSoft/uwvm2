@@ -70,6 +70,85 @@
  * - Ranges can be **merged** (shared slots with union layouts) to reduce register pressure while still
  *   keeping fully compile-time selection and validation.
  *
+ * ## Why this beats classic M3-style threaded interpreters on x86_64 SysV ABI
+ * M3/Wasm3's "meta machine" maps a small fixed set of VM registers (pc/sp/mem/r0/fp0) to hardware registers
+ * and relies on tail calls / indirect dispatch. That already removes the outer `switch` loop overhead.
+ *
+ * However, in a stack machine the dominant cost is often not dispatch but **operand stack traffic**.
+ * For example, an M3 u64-or between `r0` and a stack operand typically performs an extra dependent memory load
+ * for the stack operand every time:
+ * - load an offset/immediate (from pc) → form an address → load the stack slot → ALU op
+ *
+ * UWVM's u2 interpreter instead caches multiple stack-top values in an explicit ring buffer (per value-category),
+ * so common stack ops become **register-register** ALU ops most of the time. Only when the cache boundary is hit
+ * (or at specific control-flow / memory-exposure points) do we spill/fill in bulk.
+ *
+ * ### Worked example (x86_64 SysV ABI): `i64.or` on two stack values
+ * The following micro-example is intentionally tiny: it shows why a stack-top cache can beat an M3-style
+ * "one register + operand stack loads" topology on stack-heavy code.
+ *
+ * **Wasm source (wat):**
+ * @code{.wat}
+ * (module
+ *   (func (export "f") (param i64 i64) (result i64)
+ *     local.get 0
+ *     local.get 1
+ *     i64.or))
+ * @endcode
+ *
+ * **M3 (from the M3 docs, x86_64 SysV ABI):**
+ * @code{.asm}
+ * m3`op_u64_Or_sr:
+ *     0x1000062c0 <+0>:  movslq (%rdi), %rax             ; load operand stack offset
+ *     0x1000062c3 <+3>:  orq    (%rsi,%rax,8), %rcx      ; or r0 with stack operand
+ *     0x1000062c7 <+7>:  movq   0x8(%rdi), %rax          ; fetch next operation
+ *     0x1000062cb <+11>: addq   $0x10, %rdi              ; increment program counter
+ *     0x1000062cf <+15>: jmpq   *%rax                    ; jump to next operation
+ * @endcode
+ *
+ * **u2 (expected shape when both operands hit in the stack-top cache ring):**
+ * @code{.asm}
+ * ; Preconditions for the cache-hit fast path (selected by `translate::get_*_fptr(...)`):
+ * ;   - curr_pos == StartPos  (StartPos denotes the logical top of the ring)
+ * ;   - remain_size >= 2      (at least two cached i64 values available)
+ * ;
+ * ; Stack-top cache ring mapping (i64 ring shown; indices are in the opfunc argument pack):
+ * ;   cache[StartPos]                 = top (TOS)
+ * ;   cache[ring_next_pos(StartPos)]  = next (NOS, deeper than TOS)
+ * ;
+ * ; Operands are already in registers/locals because cache slots are carried in the opfunc arguments.
+ * ; No operand-stack memory load is needed here.
+ * orq    %r_cache_nos, %r_cache_tos      ; TOS |= NOS   (exact operand order is opcode-specific)
+ *
+ * ; threaded dispatch (musttail-style): load next op + jump
+ * movq   0x8(%r_ip), %r_tmp             ; fetch next operation pointer
+ * addq   $0x10, %r_ip                   ; advance meta-machine pc
+ * jmpq   *%r_tmp
+ * @endcode
+ *
+ * @note The u2 block above is a *model* of the steady-state fast path (cache hit). The exact register names
+ * and instruction selection depend on the concrete opfunc signature and compiler, but the key property is:
+ * the stack operand is typically not loaded from memory at all.
+ *
+ * ### Rough cycle accounting (illustrative, L1-hit, predicted indirect jump)
+ * Assumptions (typical modern x86_64 core; exact numbers vary by micro-architecture):
+ * - L1 load-to-use latency: ~4 cycles
+ * - `or` ALU latency: ~1 cycle
+ * - Indirect `jmp *reg` predicted: ~1 cycle (front-end / predictor dependent)
+ *
+ * Critical-path intuition for M3 `Or_sr`:
+ * - `movslq (%rdi), %rax` (L1 load) → ~4 cycles
+ * - dependent address + `orq (%rsi,%rax,8), %rcx` (L1 load-to-use) → ~4 cycles
+ * - total operand-related dependency chain ≈ ~8 cycles, before considering dispatch/rename/front-end limits
+ *
+ * Critical-path intuition for u2 cache-hit:
+ * - `orq %r_op1, %r_op0` ≈ ~1 cycle (operands already available)
+ * - dispatch load+branch is shared across all ops and is not made worse by stack traffic
+ *
+ * **What this means:** for stack-heavy instruction streams where the stack-top cache hit-rate is high,
+ * u2 can remove ~2 dependent loads/op compared to M3, often translating to a **~1.5×–3×** speedup for the
+ * hot arithmetic/bitwise core (and smaller gains when cache misses force spill/fill).
+ *
  * @note Direction conventions (critical for correctness):
  * - Operand stack memory is laid out **deep → top** in **ascending addresses**.
  *   The stack pointer `sp` points to the byte **past** the top element (as a normal stack).
