@@ -154,20 +154,32 @@
  * Assumptions (typical modern x86_64 core; exact numbers vary by micro-architecture):
  * - L1 load-to-use latency: ~4 cycles
  * - `or` ALU latency: ~1 cycle
- * - Indirect `jmp *reg` predicted: ~1 cycle (front-end / predictor dependent)
+ * - `add` (pointer increment): ~1 cycle (often single-µop; may overlap)
+ * - Indirect `jmp *reg` predicted: ~1 cycle (front-end / predictor dependent; still not "free")
  *
- * Critical-path intuition for M3 `Or_sr`:
- * - `movslq (%rdi), %rax` (L1 load) → ~4 cycles
- * - dependent address + `orq (%rsi,%rax,8), %rcx` (L1 load-to-use) → ~4 cycles
- * - total operand-related dependency chain ≈ ~8 cycles, before considering dispatch/rename/front-end limits
+ * @note Yes: the `addq $0x10, %r_ip` and `jmpq *%r_tmp` style dispatch steps are unavoidable in both models.
+ * The comparison below focuses on the *extra* work caused by operand-stack traffic; dispatch cost largely
+ * cancels out because both M3 and u2 are threaded interpreters.
+ *
+ * Critical-path intuition for M3 `Or_sr` (steady-state, predicted):
+ * - Dispatch (shared baseline): `movq 0x8(%pc), %tmp` (~4) + `addq $0x10, %pc` (~1) + `jmp *%tmp` (~1)
+ * - Operand-stack traffic (extra vs u2 cache-hit):
+ *   - `movslq (%pc), %rax` (L1 load of offset) → ~4 cycles
+ *   - dependent address + `orq (%sp,%rax,8), %r0` (L1 load-to-use of stack operand) → ~4 cycles
+ * - Extra operand-related dependency chain ≈ ~8 cycles on top of the shared dispatch baseline.
  *
  * Critical-path intuition for u2 cache-hit:
- * - `orq %r_op1, %r_op0` ≈ ~1 cycle (operands already available)
- * - dispatch load+branch is shared across all ops and is not made worse by stack traffic
+ * - Operand compute: `orq %r_cache_nos, %r_cache_tos` ≈ ~1 cycle (operands already available)
+ * - Dispatch (shared baseline): `movq 0x8(%r_ip), %r_tmp` (~4) + `addq $0x10, %r_ip` (~1) + `jmp *%r_tmp` (~1)
+ * - No per-op operand-stack loads on the fast path.
  *
- * **What this means:** for stack-heavy instruction streams where the stack-top cache hit-rate is high,
- * u2 can remove ~2 dependent loads/op compared to M3, often translating to a **~1.5×–3×** speedup for the
- * hot arithmetic/bitwise core (and smaller gains when cache misses force spill/fill).
+ * **Bottom line (this example, cache-hit):**
+ * - M3 steady-state per-op cost ≈ shared dispatch (~6) + extra operand-stack chain (~8) ≈ **~14 cycles/op**
+ * - u2 steady-state per-op cost ≈ shared dispatch (~6) + register ALU (~1) ≈ **~7 cycles/op**
+ * - Estimated speedup for the hot op core: **~14 / 7 ≈ ~2.0×**
+ *
+ * In practice this varies with cache-hit rate, front-end/rename/AGU pressure, and whether the two M3 loads
+ * overlap off the critical path, but the key point holds: u2 removes the per-op operand-stack memory dependency.
  *
  * @note Direction conventions (critical for correctness):
  * - Operand stack memory is laid out **deep → top** in **ascending addresses**.
