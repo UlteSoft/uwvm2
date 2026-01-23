@@ -43,8 +43,51 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+/**
+ * @file register_ring.h
+ * @brief High-performance stack-top cache ⇄ operand stack materialization for the UWVM interpreter.
+ *
+ * @details
+ * ## What this provides (layer 1: "what is it doing?")
+ * WebAssembly is a stack machine. This header implements the "搬运 system" that moves values between:
+ * - The real operand stack in memory (`sp`), and
+ * - A cached stack-top segment ("stack-top cache") carried in the interpreter opfunc argument pack
+ *   (i.e. ABI-friendly locals / registers).
+ *
+ * The two main operations are:
+ * - **spill**: stack-top cache → operand stack (materialize to memory)
+ * - **fill**:  operand stack → stack-top cache (dematerialize from memory)
+ *
+ * ## Why it exists (layer 2: "why do we need it?")
+ * A naïve interpreter performs frequent loads/stores to the operand stack in memory. That is expensive due to
+ * cache misses and memory bandwidth. UWVM keeps the hottest part of the operand stack in registers/locals by
+ * treating a fixed set of opfunc argument slots as a **stack-top cache**.
+ *
+ * ## How it achieves performance (layer 3: "how is it fast?")
+ * - The stack-top cache is modeled as a **ring buffer** for each value-category (i32/i64/f32/f64/v128).
+ * - The spill/fill size, start position and (optionally) per-slot value types are known at compile time
+ *   and expanded via templates/`consteval` so runtime work reduces to pointer adjusts + `memcpy`.
+ * - Ranges can be **merged** (shared slots with union layouts) to reduce register pressure while still
+ *   keeping fully compile-time selection and validation.
+ *
+ * @note Direction conventions (critical for correctness):
+ * - Operand stack memory is laid out **deep → top** in **ascending addresses**.
+ *   The stack pointer `sp` points to the byte **past** the top element (as a normal stack).
+ * - In the stack-top cache ring, `StartPos` denotes the **logical top**.
+ *   Moving **towards deeper** stack elements uses `ring_next_pos()` (+1 with wrap).
+ *   Moving **towards the logical top** uses `ring_prev_pos()` (-1 with wrap).
+ */
+
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
+    /**
+     * @brief Internal compile-time utilities for the register-ring stack-top cache.
+     *
+     * @details
+     * This namespace contains only "plumbing": ring index arithmetic, type/slot layout helpers, and
+     * compile-time expanded spill/fill primitives. Public entry points live in `manipulate`.
+     */
+
     namespace details
     {
         inline consteval bool range_enabled(::std::size_t begin_pos, ::std::size_t end_pos) noexcept { return begin_pos != end_pos; }
@@ -52,11 +95,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline consteval bool in_range(::std::size_t pos, ::std::size_t begin_pos, ::std::size_t end_pos) noexcept
         { return range_enabled(begin_pos, end_pos) && begin_pos <= pos && pos < end_pos; }
 
+        /**
+         * @brief Advance one slot in the cache ring towards deeper stack elements.
+         *
+         * @details
+         * The stack-top cache is a ring over the half-open interval `[begin_pos, end_pos)`.
+         * `ring_next_pos()` moves in "depth direction" (away from the logical top):
+         * `end_pos-1 -> begin_pos` wraps around.
+         */
+
         inline consteval ::std::size_t ring_next_pos(::std::size_t curr_pos, ::std::size_t begin_pos, ::std::size_t end_pos) noexcept
         {
             // Ring order is [begin_pos, end_pos).
             // next_pos wraps end_pos-1 -> begin_pos.
             return (curr_pos + 1uz == end_pos) ? begin_pos : (curr_pos + 1uz);
+        }
+
+        /**
+         * @brief Retreat one slot in the cache ring towards the logical stack top.
+         *
+         * @details
+         * This is the inverse of `ring_next_pos()`:
+         * `begin_pos -> end_pos-1` wraps around.
+         */
+
+        inline consteval ::std::size_t ring_prev_pos(::std::size_t curr_pos, ::std::size_t begin_pos, ::std::size_t end_pos) noexcept
+        {
+            // Ring order is [begin_pos, end_pos).
+            // prev_pos wraps begin_pos -> end_pos-1.
+            return (curr_pos == begin_pos) ? (end_pos - 1uz) : (curr_pos - 1uz);
+        }
+
+        template <::std::size_t Pos, ::std::size_t Steps, ::std::size_t Begin, ::std::size_t End>
+        inline consteval ::std::size_t ring_advance_next_pos() noexcept
+        {
+            if constexpr(Steps == 0uz) { return Pos; }
+            else
+            {
+                static_assert(Begin < End);
+                static_assert(in_range(Pos, Begin, End));
+                constexpr ::std::size_t next_pos{ring_next_pos(Pos, Begin, End)};
+                return ring_advance_next_pos<next_pos, Steps - 1uz, Begin, End>();
+            }
         }
 
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64
@@ -94,6 +174,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
             return out;
         }
+
+        /**
+         * @brief Store a value into the stack-top cache slot at `WritePos`.
+         *
+         * @details
+         * The stack-top cache can be configured as multiple rings (i32/i64/f32/f64/v128), and ranges may be
+         * merged (shared slots) to reduce register pressure. When merged, a slot can be a union layout.
+         *
+         * This helper performs the correct compile-time slot selection and write (no runtime branching),
+         * ensuring ABI/layout correctness for merged configurations.
+         */
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename ValType, ::std::size_t WritePos, uwvm_int_stack_top_type... TypeRef>
         UWVM_ALWAYS_INLINE inline constexpr void set_curr_val_to_stacktop_cache(ValType v, TypeRef&... typeref) noexcept
@@ -392,21 +483,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   ::std::size_t RangeBegin,
                   ::std::size_t RangeEnd,
                   uwvm_int_stack_top_type... TypeRef>
-        UWVM_ALWAYS_INLINE inline constexpr void fill_stacktop_desc_from_operand_stack(::std::byte*& read_ptr, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void fill_stacktop_asc_from_operand_stack(::std::byte*& read_ptr, TypeRef&... typeref) noexcept
         {
             static_assert(Remaining != 0uz);
 
-            read_ptr -= sizeof(ValType);
             ValType v;  // no init
             ::std::memcpy(::std::addressof(v), read_ptr, sizeof(ValType));
+            read_ptr += sizeof(ValType);
             set_curr_val_to_stacktop_cache<CompileOption, ValType, WritePos>(v, typeref...);
 
             if constexpr(Remaining > 1uz)
             {
                 static_assert(RangeBegin < RangeEnd);
                 static_assert(in_range(WritePos, RangeBegin, RangeEnd));
-                constexpr ::std::size_t next_pos{ring_next_pos(WritePos, RangeBegin, RangeEnd)};
-                fill_stacktop_desc_from_operand_stack<ValType, CompileOption, next_pos, Remaining - 1uz, RangeBegin, RangeEnd>(read_ptr, typeref...);
+                constexpr ::std::size_t prev_pos{ring_prev_pos(WritePos, RangeBegin, RangeEnd)};
+                fill_stacktop_asc_from_operand_stack<ValType, CompileOption, prev_pos, Remaining - 1uz, RangeBegin, RangeEnd>(read_ptr, typeref...);
             }
         }
 
@@ -428,9 +519,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             using stack_ptr_t = ::std::remove_cvref_t<TypeRef...[1u]>;
             static_assert(::std::same_as<stack_ptr_t, ::std::byte*>);
 
-            ::std::byte* read_ptr{typeref...[1u]};
+            // Operand stack memory is laid out deep->top in ascending addresses.
+            // Load it in that order, and fill the ring in stack-top direction (towards StartPos).
             typeref...[1u] -= sizeof(ValType) * Count;
-            fill_stacktop_desc_from_operand_stack<ValType, CompileOption, StartPos, Count, RangeBegin, RangeEnd>(read_ptr, typeref...);
+            ::std::byte* read_ptr{typeref...[1u]};
+            constexpr ::std::size_t deepest_pos{ring_advance_next_pos<StartPos, Count - 1uz, RangeBegin, RangeEnd>()};
+            fill_stacktop_asc_from_operand_stack<ValType, CompileOption, deepest_pos, Count, RangeBegin, RangeEnd>(read_ptr, typeref...);
 
             static_assert(::std::same_as<decltype(read_ptr), ::std::byte*>);
         }
@@ -442,36 +536,69 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   typename ValType,
                   typename... RestValType,
                   uwvm_int_stack_top_type... TypeRef>
-        UWVM_ALWAYS_INLINE inline constexpr void fill_stacktop_desc_by_types_from_operand_stack(::std::byte*& read_ptr, TypeRef&... typeref) noexcept
+        UWVM_ALWAYS_INLINE inline constexpr void fill_stacktop_asc_by_types_from_operand_stack(::std::byte*& read_ptr, TypeRef&... typeref) noexcept
         {
             static_assert(is_uwvm_interpreter_valtype_supported<ValType>());
-
-            read_ptr -= sizeof(ValType);
-            ValType v;  // no init
-            ::std::memcpy(::std::addressof(v), read_ptr, sizeof(ValType));
-            set_curr_val_to_stacktop_cache<CompileOption, ValType, StartPos>(v, typeref...);
 
             if constexpr(sizeof...(RestValType) > 0uz)
             {
                 static_assert(RangeBegin < RangeEnd);
                 static_assert(in_range(StartPos, RangeBegin, RangeEnd));
                 constexpr ::std::size_t next_pos{ring_next_pos(StartPos, RangeBegin, RangeEnd)};
-                fill_stacktop_desc_by_types_from_operand_stack<CompileOption, next_pos, RangeBegin, RangeEnd, RestValType...>(read_ptr, typeref...);
+                fill_stacktop_asc_by_types_from_operand_stack<CompileOption, next_pos, RangeBegin, RangeEnd, RestValType...>(read_ptr, typeref...);
             }
+
+            ValType v;  // no init
+            ::std::memcpy(::std::addressof(v), read_ptr, sizeof(ValType));
+            read_ptr += sizeof(ValType);
+            set_curr_val_to_stacktop_cache<CompileOption, ValType, StartPos>(v, typeref...);
         }
     }  // namespace details
+
+    /**
+     * @brief Public spill/fill APIs for the interpreter stack-top cache.
+     *
+     * @details
+     * This layer provides stable, easy-to-call entry points (`spill_*` / `operand_stack_to_*`) which:
+     * - Validate the configured stack-top rings at compile time,
+     * - Select the correct underlying ring implementation (including merged/typed cases), and
+     * - Emit minimal runtime code (pointer math + `memcpy`).
+     *
+     * Design note (multi-ring advantage):
+     * - Separate rings per value category keep the hottest operand-stack values in registers/locals with
+     *   predictable layout, reducing memory traffic and avoiding per-op type dispatch.
+     * - Optional range merging allows trading some type separation for fewer live registers while keeping
+     *   compile-time validation of the shared slot layout.
+     */
 
     namespace manipulate
     {
 
-        // Spill (materialize) a contiguous cached stack-top segment back into the operand stack.
-        //
-        // `StartPos`/`Count` are indices in the opfunc argument pack (i.e. within the stack-top cache slots).
-        // The spill is processed in ring order: StartPos (top), next_pos(StartPos), ..., next_pos^(Count-1)(StartPos).
-        //
-        // Compile-time constraints:
-        // - StartPos must belong to exactly one enabled stack-top range (i32/i64/f32/f64/v128).
-        // - Count must not exceed the range size.
+        /**
+         * @brief Spill (materialize) a contiguous cached stack-top segment back into the operand stack.
+         *
+         * @details
+         * This is the "cache → memory" direction. It is typically needed when:
+         * - The interpreter must expose the operand stack to generic memory operations,
+         * - The cached segment is about to be overwritten, or
+         * - A control-flow boundary requires a consistent memory stack state.
+         *
+         * Semantics:
+         * - `StartPos`/`Count` refer to indices in the opfunc argument pack (stack-top cache slots).
+         * - The cached segment is traversed in **ring depth direction**:
+         *   `StartPos (top)`, `ring_next_pos(StartPos)`, ..., `ring_next_pos^(Count-1)(StartPos)`.
+         * - Operand stack memory is laid out deep→top in ascending addresses, so the implementation
+         *   adjusts `sp` once and stores values such that memory ends up in the correct order.
+         *
+         * Compile-time constraints:
+         * - `StartPos` must belong to exactly one enabled stack-top range (i32/i64/f32/f64/v128).
+         * - `Count` must not exceed the ring size for that range.
+         *
+         * @tparam CompileOption Interpreter translation options (stack-top ranges and merge layout).
+         * @tparam StartPos      Stack-top cache slot index for the logical top.
+         * @tparam Count         Number of cached slots to materialize.
+         */
+
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StartPos, ::std::size_t Count, uwvm_int_stack_top_type... TypeRef>
         UWVM_ALWAYS_INLINE inline constexpr void spill_stacktop_to_operand_stack(TypeRef&... typeref) noexcept
         {
@@ -614,10 +741,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(::std::same_as<decltype(write_ptr), ::std::byte*>);
         }
 
-        // Load (dematerialize) a contiguous segment from the operand stack into the cached stack-top slots.
-        //
-        // This is the inverse operation of `spill_stacktop_to_operand_stack`.
-        // It consumes (pops) values from the operand stack and writes them into the cache slots.
+        /**
+         * @brief Fill (dematerialize) a contiguous segment from the operand stack into the stack-top cache.
+         *
+         * @details
+         * This is the inverse of `spill_stacktop_to_operand_stack()` ("memory → cache").
+         * It consumes (pops) values from the operand stack and writes them into the stack-top cache ring.
+         *
+         * Direction conventions:
+         * - Operand stack memory is deep→top in ascending addresses.
+         * - `StartPos` denotes the logical top in the cache ring.
+         * - The fill reads memory in deep→top order and fills the ring **towards the logical top**
+         *   (using `ring_prev_pos()`), ending at `StartPos`.
+         */
+
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t StartPos, ::std::size_t Count, uwvm_int_stack_top_type... TypeRef>
         UWVM_ALWAYS_INLINE inline constexpr void operand_stack_to_stacktop(TypeRef&... typeref) noexcept
         {
@@ -747,15 +884,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert((sizeof...(RestValType) + 1uz) <= (range_end - range_begin), "Type list length exceeds ring size.");
 
             constexpr ::std::size_t total_size{(sizeof(FirstValType) + ... + sizeof(RestValType))};
-            ::std::byte* read_ptr{typeref...[1u]};
             typeref...[1u] -= total_size;
+            ::std::byte* read_ptr{typeref...[1u]};
             ::uwvm2::runtime::compiler::uwvm_int::optable::details::
-                fill_stacktop_desc_by_types_from_operand_stack<CompileOption, StartPos, range_begin, range_end, FirstValType, RestValType...>(read_ptr,
-                                                                                                                                              typeref...);
+                fill_stacktop_asc_by_types_from_operand_stack<CompileOption, StartPos, range_begin, range_end, FirstValType, RestValType...>(read_ptr,
+                                                                                                                                             typeref...);
 
             static_assert(::std::same_as<decltype(read_ptr), ::std::byte*>);
         }
     }  // namespace manipulate
+
+    /**
+     * @brief Interpreter opfunc: spill stack-top cache to operand stack and tail-call the next opfunc.
+     *
+     * @details
+     * This is a real threaded-interpreter instruction. The stack-top cache lives in the opfunc argument pack,
+     * and this op materializes (`spill`) a contiguous segment to memory, advances the instruction pointer,
+     * loads the next opfunc pointer, then performs a `UWVM_MUSTTAIL` tail-call.
+     */
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t StartPos,
@@ -784,6 +930,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
     }
+
+    /**
+     * @brief Interpreter opfunc: fill stack-top cache from operand stack and tail-call the next opfunc.
+     *
+     * @details
+     * Symmetric to `uwvmint_stacktop_to_operand_stack`: it dematerializes (`fill`) a contiguous segment from
+     * memory into the cache, advances the instruction pointer, loads the next opfunc pointer, then `musttail`
+     * calls it.
+     */
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t StartPos,
@@ -815,6 +970,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     namespace translate
     {
+        /**
+         * @brief Compile-time specialization selector for stack-top spill/fill ops.
+         *
+         * @details
+         * The interpreter maintains runtime state:
+         * - current ring position (`curr_pos`) and
+         * - remaining cached slots (`remain_size`)
+         *
+         * This code maps that runtime state to a concrete, fully-specialized opfunc instantiation
+         * `uwvmint_{stacktop_to_operand_stack|operand_stack_to_stacktop}<CompileOption, StartPos, Count, ...>`.
+         *
+         * The selection is implemented via `constexpr` recursion to avoid runtime switch tables and to keep the
+         * generated opfunc bodies branch-free (aside from the interpreter dispatch itself).
+         */
+
         namespace details
         {
             template <typename ValType>
