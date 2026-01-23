@@ -83,12 +83,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(Type & ... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(TypeRef & ... typeref) UWVM_THROWS
     {
-        static_assert(sizeof...(Type) >= 1uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(sizeof...(TypeRef) >= 1uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -97,16 +97,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // curr_unreachable_opfunc unreachable_func ...
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
-        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<Type...>);
+        typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         // curr_unreachable_opfunc unreachable_func ...
         // safe
-        //                         ^^ type...[0]
+        //                         ^^ typeref...[0]
 
         ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func_p;  // no init
-        ::std::memcpy(::std::addressof(unreachable_func_p), type...[0], sizeof(unreachable_func_t));
+        ::std::memcpy(::std::addressof(unreachable_func_p), typeref...[0], sizeof(unreachable_func_t));
 
         if(unreachable_func_p) { unreachable_func_p(); }
         else
@@ -190,12 +190,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(Type & ... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(TypeRef & ... typeref) UWVM_THROWS
     {
-        static_assert(sizeof...(Type) >= 1uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(sizeof...(TypeRef) >= 1uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -204,22 +204,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // curr_uwvmint_br jmp_ip (jmp to next_opfunc) ...
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
-        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<Type...>);
+        typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         // curr_uwvmint_br jmp_ip (jmp to next_opfunc) ...
         // safe
-        //                 ^^ type...[0]
+        //                 ^^ typeref...[0]
 
         ::std::byte const* jmp_ip;  // no init
-        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
 
-        type...[0] = jmp_ip;
+        typeref...[0] = jmp_ip;
 
         // next_opfunc (*jmp_ip) ...
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
         // Function calls are initiated by higher-level functions.
     }
@@ -315,12 +315,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(Type & ... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(TypeRef & ... typeref) UWVM_THROWS
     {
-        static_assert(sizeof...(Type) >= 1uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(sizeof...(TypeRef) >= 1uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -329,39 +329,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // curr_uwvmint_br_if jmp_ip next_op_false
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
-        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<Type...>);
+        typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         // curr_uwvmint_br_if jmp_ip next_op_false
         // safe
-        //                    ^^ type...[0]
+        //                    ^^ typeref...[0]
 
         ::std::byte const* jmp_ip;  // no init
-        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+        ::std::memcpy(::std::addressof(jmp_ip), typeref...[0], sizeof(jmp_ip));
 
-        type...[0] += sizeof(jmp_ip);
+        typeref...[0] += sizeof(jmp_ip);
 
         // curr_uwvmint_br_if jmp_ip next_op_false
         // safe
-        //                           ^^ type...[0]
+        //                           ^^ typeref...[0]
 
         auto const cond{
             ::uwvm2::runtime::compiler::uwvm_int::optable::get_curr_val_from_operand_stack_cache<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(
-                type...)};
+                typeref...)};
 
         if(cond)
         {
-            type...[0] = jmp_ip;
+            typeref...[0] = jmp_ip;
 
             // next_op_true (*jmp_ip) ...
             // safe
-            // ^^ type...[0]
+            // ^^ typeref...[0]
         }
 
         // next_opfunc ...
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
         // Function calls are initiated by higher-level functions.
     }
@@ -492,12 +492,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(Type & ... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(TypeRef & ... typeref) UWVM_THROWS
     {
-        static_assert(sizeof...(Type) >= 1uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(sizeof...(TypeRef) >= 1uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -506,38 +506,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
-        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<Type...>);
+        typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
         // safe
-        //                       ^^ type...[0]
+        //                       ^^ typeref...[0]
 
         ::std::size_t max_size;  // no init
-        ::std::memcpy(::std::addressof(max_size), type...[0], sizeof(max_size));
+        ::std::memcpy(::std::addressof(max_size), typeref...[0], sizeof(max_size));
 
-        type...[0] += sizeof(max_size);
+        typeref...[0] += sizeof(max_size);
 
         // curr_uwvmint_br_table max_size table[0] table[1] ... table[max_size]
         // safe
-        //                                ^^ type...[0]
+        //                                ^^ typeref...[0]
 
         auto const curr{
             ::uwvm2::runtime::compiler::uwvm_int::optable::get_curr_val_from_operand_stack_cache<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(
-                type...)};
+                typeref...)};
 
         ::std::size_t const curr_uz{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(curr))};
         ::std::size_t const idx{::std::min(max_size, curr_uz)};
 
         ::std::byte const* jmp_ip;  // no init
-        ::std::memcpy(::std::addressof(jmp_ip), type...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
+        ::std::memcpy(::std::addressof(jmp_ip), typeref...[0] + idx * sizeof(jmp_ip), sizeof(jmp_ip));
 
-        type...[0] = jmp_ip;
+        typeref...[0] = jmp_ip;
 
         // next_opfunc (*jmp_ip) ...
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
         // Function calls are initiated by higher-level functions.
     }
@@ -640,12 +640,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_return(Type & ... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_return(TypeRef & ... typeref) UWVM_THROWS
     {
-        static_assert(sizeof...(Type) >= 1uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(sizeof...(TypeRef) >= 1uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -654,9 +654,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // curr_uwvmint_return (end)
         // safe
-        // ^^ type...[0]
+        // ^^ typeref...[0]
 
-        type...[0] = nullptr;
+        typeref...[0] = nullptr;
 
         // The upper-level function loop in the interpreter checks whether the interpreter function is set to nullptr as the condition for exiting the loop.
     }
