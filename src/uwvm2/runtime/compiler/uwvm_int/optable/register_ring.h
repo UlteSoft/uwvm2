@@ -194,6 +194,33 @@
  * dominant cost is dispatch itself. At that point u2 is already approaching the practical performance ceiling
  * for a non-JIT interpreter on modern ABIs.
  *
+ * ### Superscalar / OoO cores (why this gap persists on modern x86)
+ * Modern x86_64 cores (e.g. Skylake-family, Zen-family, Raptor Lake-family) are wide and out-of-order:
+ * they can decode/issue multiple µops per cycle and hide *independent* latency via a large reorder window.
+ * However, **L1 load-to-use latency (≈4 cycles)** is largely fixed, and **dependent** load→use chains remain
+ * hard to hide.
+ *
+ * In this worked example:
+ * - u2 cache-hit is dominated by register-register ALU + shared dispatch. The ALU op is 1-cycle latency and
+ *   can often overlap with the dispatch sequence on an OoO core.
+ * - M3-style `Or_sr` pays extra operand-stack traffic: an offset/immediate load feeding an indexed load feeding
+ *   the ALU. This forms a dependent chain that consumes load/AGU resources and exposes the ~4-cycle L1 latency.
+ *
+ * A compact comparison for the hot path (illustrative):
+ * @code{.txt}
+ * Dimension             u2 (cache hit)                      M3 (default)
+ * -------------------  ----------------------------------  -----------------------------------------
+ * Stack value access    register/locals (adjacent ring)     load offset + dependent indexed load
+ * Latency chain         ~1c ALU (often overlaps)            ~4c + ~4c dependent load-to-use chain
+ * µop/port pressure     ALU/branch heavy, few loads         more load/AGU/LSQ pressure
+ * OoO headroom          high (few hard deps)                limited by true deps on loads
+ * Front-end bandwidth   smaller steady-state instruction    more instructions/uops per opcode
+ * @endcode
+ *
+ * @note Exact numbers depend on micro-architecture and cache-hit behavior. The key structural point is that
+ * u2 shifts hot stack-machine ops from "load-dependent" to "register-dependent", which scales better with
+ * wider pipelines and larger OoO windows.
+ *
  * @note Direction conventions (critical for correctness):
  * - Operand stack memory is laid out **deep → top** in **ascending addresses**.
  *   The stack pointer `sp` points to the byte **past** the top element (as a normal stack).
