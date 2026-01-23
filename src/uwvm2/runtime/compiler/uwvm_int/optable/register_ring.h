@@ -181,6 +181,19 @@
  * In practice this varies with cache-hit rate, front-end/rename/AGU pressure, and whether the two M3 loads
  * overlap off the critical path, but the key point holds: u2 removes the per-op operand-stack memory dependency.
  *
+ * ### Relation to JIT (why u2 is near the interpreter ceiling)
+ * A baseline/optimizing JIT commonly turns a hot `i64.or` (with operands already in registers) into a single
+ * machine instruction (e.g. `orq reg, reg`) inside a straight-line block; there is no per-op interpreter
+ * dispatch to pay.
+ *
+ * In a threaded interpreter, however, the **dispatch sequence** (fetch next-op pointer + advance pc + indirect
+ * tail-jump) is structural and shared by almost every opcode. It is difficult to eliminate without turning the
+ * interpreter into a JIT (or aggressively fusing long opcode sequences).
+ *
+ * Therefore, once operand-stack traffic is removed on the cache-hit fast path (as u2 does), the remaining
+ * dominant cost is dispatch itself. At that point u2 is already approaching the practical performance ceiling
+ * for a non-JIT interpreter on modern ABIs.
+ *
  * @note Direction conventions (critical for correctness):
  * - Operand stack memory is laid out **deep → top** in **ascending addresses**.
  *   The stack pointer `sp` points to the byte **past** the top element (as a normal stack).
