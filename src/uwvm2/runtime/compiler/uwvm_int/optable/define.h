@@ -324,11 +324,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::same_as<Type, ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128> || ::std::same_as<Type, wasm_stack_top_i32_with_f32_u> ||
         ::std::same_as<Type, wasm_stack_top_i32_with_i64_u> || ::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>;
 
+    /// @details Functions called when unreachable do not require the `noreturn` keyword, as some embedded plugin systems cannot utilize this option.
     using unreachable_func_t = void (*)() noexcept;
+
+    /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
+    ///          the arguments and writes the return result back onto the operand stack.
+    using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) noexcept;
 
     struct compile_option
     {
         unreachable_func_t unreachable_func_p{};
+        // Indicates the module number of the currently compiled WASM, used for external function calls.
+        ::std::size_t curr_wasm_id{};
     };
 
     template <uwvm_int_stack_top_type... Type>
