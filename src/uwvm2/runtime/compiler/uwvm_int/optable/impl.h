@@ -24,6 +24,7 @@
 
 #ifndef UWVM_MODULE
 # include "define.h"
+# include "storage.h"
 # include "call.h"
 # include "compare.h"
 # include "conbine.h"

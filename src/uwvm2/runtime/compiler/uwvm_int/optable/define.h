@@ -333,7 +333,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     struct compile_option
     {
-        unreachable_func_t unreachable_func_p{};
         // Indicates the module number of the currently compiled WASM, used for external function calls.
         ::std::size_t curr_wasm_id{};
     };

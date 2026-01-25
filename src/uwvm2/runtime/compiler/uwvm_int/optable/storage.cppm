@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-23
  * @copyright   APL-2.0 License
  */
 
@@ -20,14 +19,31 @@
  *                                      *
  ****************************************/
 
-/// @brief      The following are the macros used by uwvm.
-/// @details    Use `push_macro` to avoid side effects on existing macros. Please use `pop_macro` in conjunction.
+module;
 
-// #pragma once
+// std
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 
-#pragma pop_macro("UWVM_UWVM_INT_STRICT_FP_END")
-#pragma pop_macro("UWVM_UWVM_INT_STRICT_FP_BEGIN")
-#pragma pop_macro("UWVM_UWVM_INT_PRAGMA")
+export module uwvm2.runtime.compiler.uwvm_int.optable:storage;
 
-#pragma pop_macro("UWVM_INTERPRETER_OPFUNC_MACRO")
-#pragma pop_macro("UWVM_INTERPRETER_OPFUNC_TYPE_MACRO")
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1;
+import uwvm2.object;
+import :define;
+
+#ifndef UWVM_MODULE
+# define UWVM_MODULE
+#endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "storage.h"

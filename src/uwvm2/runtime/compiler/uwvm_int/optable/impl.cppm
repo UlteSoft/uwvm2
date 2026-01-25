@@ -27,6 +27,7 @@ module;
 export module uwvm2.runtime.compiler.uwvm_int.optable;
 
 export import :define;
+export import :storage;
 export import :call;
 export import :compare;
 export import :conbine;

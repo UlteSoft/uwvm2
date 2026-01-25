@@ -37,6 +37,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 # include "define.h"
+# include "storage.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -45,21 +46,35 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
-    namespace manipulate
+    namespace details
     {
-        inline ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_call_func_t call_func{};  // [global]
-
-        UWVM_ALWAYS_INLINE inline constexpr void
+        /// @brief Runtime call bridge: performs a single Wasm function call.
+        /// @details
+        /// - Stack-top optimization: not applicable (this is only a thin wrapper around `call_func`; stack-top caching is constrained by `uwvmint_call`).
+        /// - `type[0]` layout: not applicable (this helper does not read/advance the bytecode stream pointer).
+        /// @note `call_func` must be set during interpreter initialization; debug builds may trap on null.
+        UWVM_GNU_HOT inline constexpr void
             call(::std::size_t curr_module_id, ::std::size_t call_function, ::std::byte** uwvm_int_operand_stack_top_ptr) UWVM_THROWS
         {
+            if(::uwvm2::runtime::compiler::uwvm_int::optable::call_func == nullptr) [[unlikely]]
+            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(call_func == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
 
-            call_func(curr_module_id, call_function, uwvm_int_operand_stack_top_ptr);
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func(curr_module_id, call_function, uwvm_int_operand_stack_top_ptr);
         }
     }  // namespace manipulate
 
+    /// @brief `call` opcode (tail-call): calls a function and then tail-calls the next interpreter op.
+    /// @details
+    /// - Stack-top optimization: not supported. Because argument/return types are variable, this opcode requires all arguments to reside in the operand stack,
+    ///   therefore stack-top caching is forcibly disabled (see the `static_assert`s).
+    /// - `type[0]` layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]` (reads two `size_t` immediates, then loads the next opfunc pointer).
+    /// @note `type...[0]` may be unaligned for function-pointer / `size_t` slots; always load via `memcpy` as done here.
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -104,7 +119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         //                                                ^^ type...[0]
 
         // call function
-        manipulate::call(curr_module_id, call_function, ::std::addressof(type...[1]));
+        details::call(curr_module_id, call_function, ::std::addressof(type...[1]));
 
         // next op
         ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
@@ -113,6 +128,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
 
+    /// @brief `call` opcode (non-tail-call/byref): advances `typeref...[0]` and triggers the call.
+    /// @details
+    /// - Stack-top optimization: not supported (byref mode disables stack-top caching, and `call` requires arguments on the operand stack).
+    /// - `type[0]` layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]`; after execution `typeref...[0]` points at `next_opfunc_ptr`,
+    ///   and the upper-level dispatcher continues execution.
+    /// @note In non-tail-call mode, the next-op dispatch is driven by the outer interpreter loop, so this function does not load/call `next_opfunc_ptr`.
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
@@ -155,13 +176,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         //                                                ^^ type...[0]
 
         // call function
-        manipulate::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
+        details::call(curr_module_id, call_function, ::std::addressof(typeref...[1]));
 
         // Function calls are initiated by higher-level functions.
     }
 
     namespace translate
     {
+        /// @brief Translator: returns the interpreter function pointer for `call` (tail-call).
+        /// @details
+        /// - Stack-top optimization: not applicable (`call` always disables stack-top caching; this only returns a function pointer).
+        /// - `type[0]` layout: not applicable (translation does not manipulate the bytecode stream pointer).
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -172,6 +197,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return uwvmint_call<CompileOption, Type...>;
         }
 
+        /// @brief Translator: infers types from a tuple and returns the `call` function pointer (tail-call).
+        /// @details
+        /// - Stack-top optimization: not applicable; `type[0]` layout: not applicable.
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
@@ -180,6 +208,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_call_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
 
+        /// @brief Translator: returns the interpreter function pointer for `call` (non-tail-call/byref).
+        /// @details
+        /// - Stack-top optimization: not applicable (byref mode disables stack-top caching).
+        /// - `type[0]` layout: not applicable.
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
@@ -190,6 +222,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return uwvmint_call<CompileOption, Type...>;
         }
 
+        /// @brief Translator: infers types from a tuple and returns the `call` function pointer (non-tail-call/byref).
+        /// @details
+        /// - Stack-top optimization: not applicable; `type[0]` layout: not applicable.
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)

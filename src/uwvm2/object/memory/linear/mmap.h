@@ -68,9 +68,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     };
 
     // max_full_protection_wasm64_length not supported
-    inline constexpr ::std::uint_least64_t max_partial_protection_wasm64_length{static_cast<::std::uint_least64_t>(1u) << 48u};  // 256 TB
-    inline constexpr ::std::uint_least64_t max_full_protection_wasm32_length{static_cast<::std::uint_least64_t>(1u) << 33u};     // 8 GB
-    inline constexpr ::std::uint_least32_t max_partial_protection_wasm32_length{static_cast<::std::uint_least32_t>(1u) << 28u};  // 256 MB
+
+    inline constexpr unsigned max_partial_protection_wasm64_index{40u};
+    inline constexpr unsigned max_full_protection_wasm32_index{33u};
+    inline constexpr unsigned max_partial_protection_wasm32_index{28u};
+
+    inline constexpr ::std::uint_least64_t max_partial_protection_wasm64_length{static_cast<::std::uint_least64_t>(1u)
+                                                                                << max_partial_protection_wasm64_index};  // 1 TB
+    inline constexpr ::std::uint_least64_t max_full_protection_wasm32_length{static_cast<::std::uint_least64_t>(1u)
+                                                                             << max_full_protection_wasm32_index};  // 8 GB
+    inline constexpr ::std::uint_least32_t max_partial_protection_wasm32_length{static_cast<::std::uint_least32_t>(1u)
+                                                                                << max_partial_protection_wasm32_index};  // 256 MB
 
     /// @note      Memory safety model for the mmap-backed linear memory:
     ///            - The base pointer `memory_begin` is stable for the lifetime of the instance; growth commits additional virtual address space instead of
