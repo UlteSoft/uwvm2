@@ -654,7 +654,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -701,7 +700,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -750,7 +748,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -799,7 +796,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -837,7 +833,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.load` opcode (tail-call): loads a 32-bit little-endian value from linear memory.
     /// @details
     /// - Stack-top optimization: supported for the i32 address operand and for the i32 result when i32 stack-top caching is enabled.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
+    /// - `align` is validated during translation and ignored in the interpreter bytecode.
     /// @note The effective address is computed with wasm32 modulo-2^32 arithmetic; bounds checks are performed before the load.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -878,7 +875,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Stack-top optimization: supported for the i32 address operand and for the i64 result when i32 stack-top caching is enabled; requires i32 and i64
     /// stack-top
     ///   ranges to be merged because the i64 result is written back into the scalar ring slot.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load(Type... type) UWVM_THROWS
@@ -918,7 +915,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Stack-top optimization: supported for the i32 address operand and for the f32 result when i32 stack-top caching is enabled; requires i32 and f32
     /// stack-top
     ///   ranges to be merged because the f32 result is written back into the scalar ring slot.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load(Type... type) UWVM_THROWS
@@ -958,7 +955,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Stack-top optimization: supported for the i32 address operand and for the f64 result when i32 stack-top caching is enabled; requires scalar stack-top
     /// ranges
     ///   to be fully merged because the f64 result is written back into the scalar ring slot.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load(Type... type) UWVM_THROWS
@@ -1013,7 +1010,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1066,7 +1062,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1123,7 +1118,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1183,7 +1177,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1246,7 +1239,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1294,7 +1286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.load8_{s,u}` core (tail-call): loads 1 byte and extends to i32.
     /// @details
     /// - Stack-top optimization: supported for address and i32 result when enabled.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_load8(Type... type) UWVM_THROWS
@@ -1303,7 +1295,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.load16_{s,u}` core (tail-call): loads 2 bytes and extends to i32.
     /// @details
     /// - Stack-top optimization: supported for address and i32 result when enabled.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_load16(Type... type) UWVM_THROWS
@@ -1312,7 +1304,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.load8_{s,u}` core (tail-call): loads 1 byte and extends to i64.
     /// @details
     /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load8(Type... type) UWVM_THROWS
@@ -1321,7 +1313,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.load16_{s,u}` core (tail-call): loads 2 bytes and extends to i64.
     /// @details
     /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load16(Type... type) UWVM_THROWS
@@ -1330,7 +1322,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.load32_{s,u}` core (tail-call): loads 4 bytes and extends to i64.
     /// @details
     /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load32(Type... type) UWVM_THROWS
@@ -1352,7 +1344,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1389,7 +1380,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i64 value{};
@@ -1441,7 +1431,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_f32 value{};
@@ -1493,7 +1482,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_f64 value{};
@@ -1549,7 +1537,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
@@ -1601,7 +1588,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
             wasm_i64 value{};
@@ -1658,7 +1644,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: required; the implementation reads both `value` and `addr` from the i32 stack-top ring (value at `curr_i32_stack_top`, addr at
     /// `ring_next_pos`).
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     /// @note Stores perform bounds checks and use endian-safe stores as needed.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -1698,7 +1684,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: supported when i64 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged so the address can be read
     /// from the same ring.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store(Type... type) UWVM_THROWS
@@ -1737,7 +1723,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: supported when f32 stack-top caching is enabled; requires i32 and f32 stack-top ranges to be merged so the address can be read
     /// from the same ring.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store(Type... type) UWVM_THROWS
@@ -1776,7 +1762,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details
     /// - Stack-top optimization: supported when f64 stack-top caching is enabled; requires scalar stack-top ranges to be fully merged so the address can be
     /// read from the same ring.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store(Type... type) UWVM_THROWS
@@ -1814,7 +1800,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.store{8,16}` core (tail-call): stores the low N bytes of an i32 value to linear memory.
     /// @details
     /// - Stack-top optimization: required; reads `value` and `addr` from the i32 stack-top ring.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <unsigned StoreBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_storeN(Type... type) UWVM_THROWS
@@ -1823,7 +1809,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.store{8,16,32}` core (tail-call): stores the low N bytes of an i64 value to linear memory.
     /// @details
     /// - Stack-top optimization: supported when i64 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
-    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][align:u32][offset:u32][next_opfunc_ptr]`.
+    /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
     template <unsigned StoreBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_storeN(Type... type) UWVM_THROWS
@@ -1938,6 +1924,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Stack-top optimization: not supported (byref mode disables stack-top caching; all stack-top ranges must be `SIZE_MAX`).
     /// - `type[0]` layout: loads/stores still consume the same immediates as tail-call mode, but use `[opfunc_byref_ptr]` instead of `[opfunc_ptr]` and do not
     ///   dispatch the next opfunc (the outer interpreter loop drives execution).
+    /// - `align` is validated during translation and ignored in the interpreter bytecode.
 
     /// @brief `i32.load` opcode (non-tail-call/byref): loads a 32-bit little-endian value from linear memory.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -1954,7 +1941,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -1986,7 +1972,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2018,7 +2003,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2050,7 +2034,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2081,7 +2064,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2119,7 +2101,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2161,7 +2142,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2200,7 +2180,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2242,7 +2221,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const addr{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2282,7 +2260,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const value{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2311,7 +2288,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i64 const value{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
@@ -2340,7 +2316,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_f32 const value{get_curr_val_from_operand_stack_cache<wasm_f32>(typeref...)};
@@ -2369,7 +2344,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_f64 const value{get_curr_val_from_operand_stack_cache<wasm_f64>(typeref...)};
@@ -2398,7 +2372,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i32 const value{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
@@ -2437,7 +2410,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
         native_memory_t* memory_p{details::read_imm<native_memory_t*>(typeref...[0])};
-        [[maybe_unused]] wasm_u32 const align{details::read_imm<wasm_u32>(typeref...[0])};
         wasm_u32 const offset{details::read_imm<wasm_u32>(typeref...[0])};
 
         wasm_i64 const value{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
