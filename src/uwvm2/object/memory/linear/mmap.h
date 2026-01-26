@@ -176,15 +176,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         inline constexpr bool require_dynamic_determination_memory_size() const noexcept
         {
-            auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
-            if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if UWVM_IF_NOT_CONSTEVAL
+            {
+                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
+                if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(page_size == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            // UB will never appear; it has been preemptively checked.
-            auto const custom_page_size{1uz << this->custom_page_size_log2};
+                // UB will never appear; it has been preemptively checked.
+                auto const custom_page_size{1uz << this->custom_page_size_log2};
 
-            // When `custom_page_size` is less than one page, `mmap` can only guarantee the stability of the starting address and cannot provide page protection
-            // checks. Additional dynamic verification is required.
-            return custom_page_size < page_size;
+                // When `custom_page_size` is less than one platform page, `mmap` can only guarantee the stability of the starting address and cannot provide
+                // page-protection checks at the custom-page granularity. Additional dynamic verification is required.
+                return custom_page_size < page_size;
+            }
+            else
+            {
+                // The platform page size cannot be queried during constant evaluation.
+                return false;
+            }
         }
 
         inline constexpr bool is_full_page_protection() const noexcept
