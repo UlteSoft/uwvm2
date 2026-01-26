@@ -26,6 +26,7 @@
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <concepts>
 # include <limits>
 # include <memory>
 // macro
@@ -78,7 +79,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         /// @brief Converts a C++ `bool` into a Wasm i32 boolean (`0` or `1`).
         /// @details This is used by all compare operators to materialize the Wasm boolean result.
-        /// @note The C++ standard specifies that when converting a bool to an int, the result must be either 0 or 1, so directly static_cast
+        /// @note The C++ standard guarantees `static_cast<int>(bool)` is either `0` or `1`, so directly `static_cast<wasm_i32>(cond)` is sufficient.
 
         /// @brief Evaluates an integer comparison for the given signed/unsigned view.
         /// @details `SignedT` is used for signed compares and equality; unsigned compares reinterpret via `UnsignedT`.

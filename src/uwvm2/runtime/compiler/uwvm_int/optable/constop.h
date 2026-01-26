@@ -76,6 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
+            static_assert(sizeof...(Type) >= range_end);
             static_assert(range_begin <= curr_i32_stack_top && curr_i32_stack_top < range_end);
 
             constexpr ::std::size_t new_pos{details::ring_prev_pos(curr_i32_stack_top, range_begin, range_end)};
@@ -120,6 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
+            static_assert(sizeof...(Type) >= range_end);
             static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
 
             constexpr ::std::size_t new_pos{details::ring_prev_pos(curr_i64_stack_top, range_begin, range_end)};
@@ -163,6 +165,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
+            static_assert(sizeof...(Type) >= range_end);
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
             constexpr ::std::size_t new_pos{details::ring_prev_pos(curr_f32_stack_top, range_begin, range_end)};
@@ -206,6 +209,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
+            static_assert(sizeof...(Type) >= range_end);
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
             constexpr ::std::size_t new_pos{details::ring_prev_pos(curr_f64_stack_top, range_begin, range_end)};
@@ -239,6 +243,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -267,6 +272,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -295,6 +301,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
@@ -323,6 +330,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
         static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
         static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);

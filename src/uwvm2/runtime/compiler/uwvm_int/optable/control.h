@@ -58,7 +58,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @details
         /// - Stack-top optimization: not applicable.
         /// - Bytecode layout: not applicable (this helper does not read/advance the bytecode stream pointer).
-        /// @note `unreachable_func` is expected to be set during interpreter initialization. If it is null, we terminate as a safe fallback.
+        /// @note `unreachable_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a safe
+        /// fallback.
         UWVM_GNU_COLD inline constexpr void unreachable() UWVM_THROWS
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func == nullptr) [[unlikely]]
@@ -71,6 +72,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func();
+
+            // Unreachable must not continue execution. If the embedding callback returns, terminate as a safety net.
+            ::fast_io::fast_terminate();
         }
     }  // namespace details
 
@@ -92,7 +96,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // ^^ type...[0]
 
         // Advance to the end of the current instruction for better diagnostics/debugging in case the trap is handled non-fatally by the embedding.
-        // nonecessary to: type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+        // not necessary to: type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
         details::unreachable();
     }

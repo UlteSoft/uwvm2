@@ -27,6 +27,7 @@
 # include <cstdint>
 # include <cstring>
 # include <bit>
+# include <concepts>
 # include <limits>
 # include <memory>
 // macro
@@ -124,6 +125,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @brief Trap helper used by float-to-int truncation when the conversion is invalid.
         /// @details This is the implementation for Wasm's "invalid conversion to integer" trap.
         /// @note There's no need for `noreturn`; let the calling function handle it.
+        /// @note `unreachable_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a safe
+        ///       fallback.
         UWVM_GNU_COLD inline void trap_invalid_conversion_to_integer() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func == nullptr) [[unlikely]]
@@ -136,6 +139,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func();
+
+            // Unreachable must not continue execution. If the embedding callback returns, terminate as a safety net.
+            ::fast_io::fast_terminate();
         }
 
         /// @brief Reinterprets a Wasm i32 value as unsigned bits.
