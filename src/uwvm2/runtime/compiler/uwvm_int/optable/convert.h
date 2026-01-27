@@ -58,10 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT>
         inline consteval ::std::size_t stacktop_begin_pos() noexcept
         {
-            if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
-            {
-                return CompileOption.i32_stack_top_begin_pos;
-            }
+            if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>) { return CompileOption.i32_stack_top_begin_pos; }
             else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>)
             {
                 return CompileOption.i64_stack_top_begin_pos;
@@ -83,22 +80,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT>
         inline consteval ::std::size_t stacktop_end_pos() noexcept
         {
-            if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
-            {
-                return CompileOption.i32_stack_top_end_pos;
-            }
-            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>)
-            {
-                return CompileOption.i64_stack_top_end_pos;
-            }
-            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
-            {
-                return CompileOption.f32_stack_top_end_pos;
-            }
-            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
-            {
-                return CompileOption.f64_stack_top_end_pos;
-            }
+            if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>) { return CompileOption.i32_stack_top_end_pos; }
+            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>) { return CompileOption.i64_stack_top_end_pos; }
+            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>) { return CompileOption.f32_stack_top_end_pos; }
+            else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>) { return CompileOption.f64_stack_top_end_pos; }
             else
             {
                 return SIZE_MAX;
@@ -237,7 +222,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // Float-to-int truncation must retain strict IEEE semantics even when the whole project is built with -ffast-math.
         // (These helpers may be inlined, but correctness must not rely on inlining.)
-        UWVM_UWVM_INT_STRICT_FP_BEGIN
 
         template <typename IntOut, typename FloatIn>
         UWVM_ALWAYS_INLINE inline IntOut trunc_float_to_int_s(FloatIn x) noexcept
@@ -270,7 +254,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return UIntOut{};
         }
 
-        UWVM_UWVM_INT_STRICT_FP_END
     }  // namespace details
 
     // =========================
@@ -661,8 +644,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
-
-    UWVM_UWVM_INT_STRICT_FP_BEGIN
 
     // ---- float<->float ----
 
@@ -2198,8 +2179,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
 
-    UWVM_UWVM_INT_STRICT_FP_END
-
     // =========================
     // Non-tailcall (byref only)
     // =========================
@@ -2236,8 +2215,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
-
-    UWVM_UWVM_INT_STRICT_FP_BEGIN
 
     /// @brief `i32.trunc_f32_s` (non-tail-call/byref): truncates f32 to signed i32, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
@@ -2856,8 +2833,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         typeref...[1u] += sizeof(out);
     }
 
-    UWVM_UWVM_INT_STRICT_FP_END
-
     /// @brief Translation helpers for convert opcodes.
     /// @details
     /// - Tail-call mode: returns a specialized `uwvm_interpreter_opfunc_t<...>` based on the current stack-top cursor position so that stack-top cached
@@ -2872,7 +2847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             /// @brief Compile-time selector for stack-top-aware opfuncs (tail-call).
             /// @details
             /// - `pos` is a runtime cursor (e.g., `curr_stacktop.i32_stack_top_curr_pos`) used to choose the matching `Curr` specialization.
-            /// - `OpWrapper` must provide `template <Opt, Pos, Type...> static constexpr uwvm_interpreter_opfunc_t<Type...> fptr()`.
+            /// - `OpWrapper` must provide `template <Opt, Pos, Type...> inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr()`.
             template <uwvm_interpreter_translate_option_t CompileOption,
                       ::std::size_t Curr,
                       ::std::size_t End,
@@ -2899,10 +2874,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <typename OperandT>
             inline constexpr ::std::size_t stacktop_currpos(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
             {
-                if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
-                {
-                    return curr_stacktop.i32_stack_top_curr_pos;
-                }
+                if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>) { return curr_stacktop.i32_stack_top_curr_pos; }
                 else if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>)
                 {
                     return curr_stacktop.i64_stack_top_curr_pos;
@@ -2929,8 +2901,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       typename OpWrapper,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_2d(::std::size_t out_pos,
-                                                                                                       ::std::size_t in_pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
             {
                 static_assert(OutCurr < OutEnd);
                 static_assert(InCurr < InEnd);
@@ -2943,7 +2914,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         if constexpr(InCurr + 1uz < InEnd)
                         {
                             return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutCurr, OutEnd, InCurr + 1uz, InEnd, OpWrapper, Type...>(out_pos,
-                                                                                                                                                 in_pos);
+                                                                                                                                                    in_pos);
                         }
                         else
                         {
@@ -2958,7 +2929,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     if constexpr(OutCurr + 1uz < OutEnd)
                     {
-                        return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutCurr + 1uz, OutEnd, InCurr, InEnd, OpWrapper, Type...>(out_pos, in_pos);
+                        return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutCurr + 1uz, OutEnd, InCurr, InEnd, OpWrapper, Type...>(out_pos,
+                                                                                                                                                in_pos);
                     }
                     else
                     {
@@ -2990,7 +2962,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         if constexpr(::uwvm2::runtime::compiler::uwvm_int::optable::details::stacktop_ranges_merged<CompileOption, InT, OutT>())
                         {
-                            return select_stacktop_fptr_by_currpos_impl<CompileOption, InBegin, InEnd, OpWrapper1D, Type...>(stacktop_currpos<InT>(curr_stacktop));
+                            return select_stacktop_fptr_by_currpos_impl<CompileOption, InBegin, InEnd, OpWrapper1D, Type...>(
+                                stacktop_currpos<InT>(curr_stacktop));
                         }
                         else
                         {
@@ -3008,7 +2981,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     if constexpr(OutBegin != OutEnd)
                     {
-                        return select_stacktop_fptr_by_currpos_impl<CompileOption, OutBegin, OutEnd, OpWrapperOutOnly, Type...>(stacktop_currpos<OutT>(curr_stacktop));
+                        return select_stacktop_fptr_by_currpos_impl<CompileOption, OutBegin, OutEnd, OpWrapperOutOnly, Type...>(
+                            stacktop_currpos<OutT>(curr_stacktop));
                     }
                     else
                     {
@@ -3020,175 +2994,175 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             struct i32_wrap_i64_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_wrap_i64<Opt, Pos, Type...>; }
             };
 
             struct i32_trunc_f32_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_s<Opt, Pos, Type...>; }
             };
 
             struct i32_trunc_f32_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_u<Opt, Pos, Type...>; }
             };
 
             struct i32_trunc_f64_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_s<Opt, Pos, Type...>; }
             };
 
             struct i32_trunc_f64_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_u<Opt, Pos, Type...>; }
             };
 
             struct i64_extend_i32_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_s<Opt, Pos, Type...>; }
             };
 
             struct i64_extend_i32_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_u<Opt, Pos, Type...>; }
             };
 
             struct i64_trunc_f32_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_s<Opt, Pos, Type...>; }
             };
 
             struct i64_trunc_f32_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_u<Opt, Pos, Type...>; }
             };
 
             struct i64_trunc_f64_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_s<Opt, Pos, Type...>; }
             };
 
             struct i64_trunc_f64_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_u<Opt, Pos, Type...>; }
             };
 
             struct f32_convert_i32_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_s<Opt, Pos, Type...>; }
             };
 
             struct f32_convert_i32_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_u<Opt, Pos, Type...>; }
             };
 
             struct f32_convert_i64_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_s<Opt, Pos, Type...>; }
             };
 
             struct f32_convert_i64_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_u<Opt, Pos, Type...>; }
             };
 
             struct f32_demote_f64_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_demote_f64<Opt, Pos, Type...>; }
             };
 
             struct f64_convert_i32_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_s<Opt, Pos, Type...>; }
             };
 
             struct f64_convert_i32_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_u<Opt, Pos, Type...>; }
             };
 
             struct f64_convert_i64_s_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_s<Opt, Pos, Type...>; }
             };
 
             struct f64_convert_i64_u_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_u<Opt, Pos, Type...>; }
             };
 
             struct f64_promote_f32_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_promote_f32<Opt, Pos, Type...>; }
             };
 
             struct i32_reinterpret_f32_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_reinterpret_f32<Opt, Pos, Type...>; }
             };
 
             struct i64_reinterpret_f64_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_reinterpret_f64<Opt, Pos, Type...>; }
             };
 
             struct f32_reinterpret_i32_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_reinterpret_i32<Opt, Pos, Type...>; }
             };
 
             struct f64_reinterpret_i64_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_reinterpret_i64<Opt, Pos, Type...>; }
             };
 
@@ -3202,350 +3176,350 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             struct i32_wrap_i64_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_wrap_i64<Opt, I64Pos, I32Pos, Type...>; }
             };
 
             struct i32_wrap_i64_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_wrap_i64<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f32_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_s<Opt, F32Pos, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f32_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_s<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f32_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_u<Opt, F32Pos, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f32_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f32_u<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f64_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_s<Opt, F64Pos, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f64_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_s<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f64_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_u<Opt, F64Pos, I32Pos, Type...>; }
             };
 
             struct i32_trunc_f64_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_trunc_f64_u<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i64_extend_i32_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_s<Opt, I32Pos, I64Pos, Type...>; }
             };
 
             struct i64_extend_i32_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_s<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct i64_extend_i32_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_u<Opt, I32Pos, I64Pos, Type...>; }
             };
 
             struct i64_extend_i32_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_extend_i32_u<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f32_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_s<Opt, F32Pos, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f32_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_s<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f32_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_u<Opt, F32Pos, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f32_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f32_u<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f64_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_s<Opt, F64Pos, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f64_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_s<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f64_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_u<Opt, F64Pos, I64Pos, Type...>; }
             };
 
             struct i64_trunc_f64_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_trunc_f64_u<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct f32_convert_i32_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_s<Opt, I32Pos, F32Pos, Type...>; }
             };
 
             struct f32_convert_i32_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_s<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f32_convert_i32_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_u<Opt, I32Pos, F32Pos, Type...>; }
             };
 
             struct f32_convert_i32_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i32_u<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f32_convert_i64_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_s<Opt, I64Pos, F32Pos, Type...>; }
             };
 
             struct f32_convert_i64_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_s<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f32_convert_i64_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_u<Opt, I64Pos, F32Pos, Type...>; }
             };
 
             struct f32_convert_i64_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_convert_i64_u<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f32_demote_f64_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_demote_f64<Opt, F64Pos, F32Pos, Type...>; }
             };
 
             struct f32_demote_f64_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_demote_f64<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f64_convert_i32_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_s<Opt, I32Pos, F64Pos, Type...>; }
             };
 
             struct f64_convert_i32_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_s<Opt, 0uz, F64Pos, Type...>; }
             };
 
             struct f64_convert_i32_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_u<Opt, I32Pos, F64Pos, Type...>; }
             };
 
             struct f64_convert_i32_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i32_u<Opt, 0uz, F64Pos, Type...>; }
             };
 
             struct f64_convert_i64_s_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_s<Opt, I64Pos, F64Pos, Type...>; }
             };
 
             struct f64_convert_i64_s_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_s<Opt, 0uz, F64Pos, Type...>; }
             };
 
             struct f64_convert_i64_u_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_u<Opt, I64Pos, F64Pos, Type...>; }
             };
 
             struct f64_convert_i64_u_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_convert_i64_u<Opt, 0uz, F64Pos, Type...>; }
             };
 
             struct f64_promote_f32_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_promote_f32<Opt, F32Pos, F64Pos, Type...>; }
             };
 
             struct f64_promote_f32_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_promote_f32<Opt, 0uz, F64Pos, Type...>; }
             };
 
             struct i32_reinterpret_f32_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_reinterpret_f32<Opt, F32Pos, I32Pos, Type...>; }
             };
 
             struct i32_reinterpret_f32_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i32_reinterpret_f32<Opt, 0uz, I32Pos, Type...>; }
             };
 
             struct i64_reinterpret_f64_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_reinterpret_f64<Opt, F64Pos, I64Pos, Type...>; }
             };
 
             struct i64_reinterpret_f64_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_i64_reinterpret_f64<Opt, 0uz, I64Pos, Type...>; }
             };
 
             struct f32_reinterpret_i32_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_reinterpret_i32<Opt, I32Pos, F32Pos, Type...>; }
             };
 
             struct f32_reinterpret_i32_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f32_reinterpret_i32<Opt, 0uz, F32Pos, Type...>; }
             };
 
             struct f64_reinterpret_i64_op_2d
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_reinterpret_i64<Opt, I64Pos, F64Pos, Type...>; }
             };
 
             struct f64_reinterpret_i64_op_out_only
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
-                static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return uwvmint_f64_reinterpret_i64<Opt, 0uz, F64Pos, Type...>; }
             };
         }  // namespace details

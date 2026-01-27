@@ -25,9 +25,5 @@
 
 // #pragma once
 
-#pragma pop_macro("UWVM_UWVM_INT_STRICT_FP_END")
-#pragma pop_macro("UWVM_UWVM_INT_STRICT_FP_BEGIN")
-#pragma pop_macro("UWVM_UWVM_INT_PRAGMA")
-
 #pragma pop_macro("UWVM_INTERPRETER_OPFUNC_MACRO")
 #pragma pop_macro("UWVM_INTERPRETER_OPFUNC_TYPE_MACRO")

@@ -79,6 +79,9 @@ function windows_target()
             add_cxflags(march_target)
         end    
     else -- msvc
+
+        error("uwvm2 does not currently support the msvc compiler.")
+
         if is_kind("binary") then
             set_extension(".exe")
         end

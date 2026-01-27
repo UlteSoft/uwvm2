@@ -1143,7 +1143,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         namespace details
         {
             template <typename ValType>
-            UWVM_ALWAYS_INLINE inline constexpr ::std::size_t get_currpos(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+            inline constexpr ::std::size_t get_currpos(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
             {
                 if constexpr(::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>) { return curr.i32_stack_top_curr_pos; }
                 else if constexpr(::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>) { return curr.i64_stack_top_curr_pos; }
@@ -1158,7 +1158,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             template <typename ValType>
-            UWVM_ALWAYS_INLINE inline constexpr ::std::size_t get_remain(uwvm_interpreter_stacktop_remain_size_t const& remain) noexcept
+            inline constexpr ::std::size_t get_remain(uwvm_interpreter_stacktop_remain_size_t const& remain) noexcept
             {
                 if constexpr(::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>) { return remain.i32_stack_top_remain_size; }
                 else if constexpr(::std::same_as<ValType, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>) { return remain.i64_stack_top_remain_size; }
@@ -1181,8 +1181,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       ::std::size_t CountEnd,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                get_uwvmint_stacktop_to_operand_stack_fptr_count_impl(::std::size_t count) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_stacktop_to_operand_stack_fptr_count_impl(::std::size_t count) noexcept
             {
                 static_assert(CountCurr < CountEnd);
 
@@ -1209,8 +1208,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       ::std::size_t StartPosCurr,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                get_uwvmint_stacktop_to_operand_stack_fptr_startpos_impl(::std::size_t start_pos, ::std::size_t count) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_stacktop_to_operand_stack_fptr_startpos_impl(::std::size_t start_pos,
+                                                                                                                         ::std::size_t count) noexcept
             {
                 static_assert(RangeBegin < RangeEnd);
                 static_assert(StartPosCurr < RangeEnd);
@@ -1245,8 +1244,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       ::std::size_t CountEnd,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                get_uwvmint_operand_stack_to_stacktop_fptr_count_impl(::std::size_t count) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_operand_stack_to_stacktop_fptr_count_impl(::std::size_t count) noexcept
             {
                 static_assert(CountCurr < CountEnd);
 
@@ -1273,8 +1271,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       ::std::size_t StartPosCurr,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                get_uwvmint_operand_stack_to_stacktop_fptr_startpos_impl(::std::size_t start_pos, ::std::size_t count) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_operand_stack_to_stacktop_fptr_startpos_impl(::std::size_t start_pos,
+                                                                                                                         ::std::size_t count) noexcept
             {
                 static_assert(RangeBegin < RangeEnd);
                 static_assert(StartPosCurr < RangeEnd);

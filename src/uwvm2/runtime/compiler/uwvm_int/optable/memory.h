@@ -2858,7 +2858,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             namespace op_details = ::uwvm2::runtime::compiler::uwvm_int::optable::details;
 
             template <typename OperandT>
-            UWVM_ALWAYS_INLINE inline constexpr ::std::size_t stacktop_currpos(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            inline constexpr ::std::size_t stacktop_currpos(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
             {
                 if constexpr(::std::same_as<OperandT, op_details::wasm_i32>) { return curr_stacktop.i32_stack_top_curr_pos; }
                 else if constexpr(::std::same_as<OperandT, op_details::wasm_i64>) { return curr_stacktop.i64_stack_top_curr_pos; }
@@ -2918,8 +2918,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       template <uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWrapper2D,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_2d(::std::size_t out_pos,
-                                                                                                                      ::std::size_t in_pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
             {
                 if constexpr(OutBegin != OutEnd && InBegin != InEnd)
                 {
@@ -2959,7 +2958,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWrapper,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default(::std::size_t pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default(::std::size_t pos) noexcept
             {
                 if constexpr(Begin != End) { return select_stacktop_fptr_by_currpos_impl<CompileOption, Begin, End, OpWrapper, Type...>(pos); }
                 else
@@ -3003,7 +3002,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       auto Extra,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_with(::std::size_t pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_with(::std::size_t pos) noexcept
             {
                 if constexpr(Begin != End)
                 {
@@ -3084,8 +3083,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 auto Extra,
                 uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_with_2d(::std::size_t out_pos,
-                                                                                                                           ::std::size_t in_pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_with_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
             {
                 if constexpr(OutBegin != OutEnd && InBegin != InEnd)
                 {
@@ -3113,7 +3111,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 judge
             };
 
-            UWVM_ALWAYS_INLINE inline constexpr mmap_variant select_mmap_variant(op_details::native_memory_t const& memory) noexcept
+            inline constexpr mmap_variant select_mmap_variant(op_details::native_memory_t const& memory) noexcept
             {
                 if(memory.require_dynamic_determination_memory_size()) { return mmap_variant::judge; }
 
@@ -3138,8 +3136,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       auto Extra,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                select_mem_fptr_or_default(::std::size_t pos, op_details::native_memory_t const& memory) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_mem_fptr_or_default(::std::size_t pos,
+                                                                                           op_details::native_memory_t const& memory) noexcept
             {
 #if defined(UWVM_SUPPORT_MMAP)
                 switch(select_mmap_variant(memory))
@@ -3202,7 +3200,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 auto Extra,
                 uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...>
                 select_mem_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos, op_details::native_memory_t const& memory) noexcept
             {
 #if defined(UWVM_SUPPORT_MMAP)
@@ -3469,8 +3467,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 auto Extra,
                 uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                select_unary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop, op_details::native_memory_t const& memory) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_unary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                                                                      op_details::native_memory_t const& memory) noexcept
             {
                 if constexpr(InBegin != InEnd)
                 {
@@ -3526,8 +3524,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 auto Extra,
                 uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                select_binary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop, op_details::native_memory_t const& memory) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_binary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                                                                       op_details::native_memory_t const& memory) noexcept
             {
                 if constexpr(TopBegin != TopEnd)
                 {
@@ -3742,8 +3740,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpOutOnly,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                select_unary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_unary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
             {
                 if constexpr(InBegin != InEnd)
                 {
@@ -3790,8 +3787,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpOtherOnly,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
-                select_binary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_binary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
             {
                 if constexpr(TopBegin != TopEnd)
                 {

@@ -34,9 +34,14 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+// platform
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  include <cfenv>
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
 # include "define.h"
@@ -318,8 +323,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
-        UWVM_UWVM_INT_STRICT_FP_BEGIN
-
         template <float_unop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
         {
@@ -328,7 +331,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == float_unop::ceil) { return ::std::ceil(v); }
             else if constexpr(Op == float_unop::floor) { return ::std::floor(v); }
             else if constexpr(Op == float_unop::trunc) { return ::std::trunc(v); }
-            else if constexpr(Op == float_unop::nearest) { return ::std::nearbyint(v); }
+            else if constexpr(Op == float_unop::nearest)
+            {
+                // NOTE:
+                // WebAssembly `nearest` has fixed, environment-independent semantics:
+                // round to nearest integer, ties to even.
+                //
+                // The C++ standard library does NOT provide a function with equivalent
+                // fixed semantics. In particular, std::nearbyint (and std::rint) are
+                // specified to round according to the *current* floating-point rounding
+                // mode and therefore remain fenv-dependent in both GCC and Clang.
+                //
+                // For targets that provide a hardware instruction with an encoded
+                // rounding mode (e.g. SSE4.1 `roundss/roundsd` with imm = 8, or AArch64
+                // `frinti`), we explicitly use compiler builtins/intrinsics to force
+                // round-to-nearest, ties-to-even semantics independent of the FP environment.
+                //
+                // The std::nearbyint fallback is used only on targets where no such
+                // instruction is available. In that case, correctness relies on the
+                // runtime invariant that the default rounding mode (FE_TONEAREST)
+                // is in effect and not modified.
+
+#if defined(__SSE4_1__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && (defined(__builtin_ia32_roundss) && defined(__builtin_ia32_roundsd))
+                if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
+                {
+                    using f32x4simd [[__gnu__::__vector_size__(16)]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+                    f32x4simd const tmp{v, 0.0f, 0.0f, 0.0f};
+                    return __builtin_ia32_roundss(tmp, tmp, 8)[0];
+                }
+                else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
+                {
+                    using f64x2simd [[__gnu__::__vector_size__(16)]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+                    f64x2simd const tmp{v, 0.0};
+                    return __builtin_ia32_roundsd(tmp, tmp, 8)[0];
+                }
+                else
+                {
+                    // platform
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+# endif
+                    return ::std::nearbyint(v);
+                }
+#else
+
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+# endif
+                return ::std::nearbyint(v);
+#endif
+            }
             else if constexpr(Op == float_unop::sqrt) { return ::std::sqrt(v); }
             else
             {
@@ -339,6 +391,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <float_binop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_binop(FloatT lhs, FloatT rhs) noexcept
         {
+            // NOTE:
+            // Do NOT use std::fmin / std::fmax here.
+            //
+            // std::fmin follows the C math library semantics, where if exactly one
+            // operand is NaN, the other operand is returned. This behavior is useful
+            // for numerical algorithms, but it is NOT the same as the WebAssembly MVP
+            // floating-point operator semantics.
+            //
+            // In WebAssembly (and IEEE 754 min/max operators), if either operand is NaN,
+            // the result must be NaN. In addition, the handling of signed zero is
+            // observable and required to be precise (e.g. min(+0, -0) == -0).
+            //
+            // Therefore, using std::fmin/std::fmax would silently introduce incorrect
+            // NaN propagation and break strict WebAssembly FP semantics.
+            //
+            // We must implement min/max using explicit comparisons (or std::min with
+            // controlled ordering) so that NaN and signed-zero behavior exactly matches
+            // the WebAssembly specification.
+
             if constexpr(Op == float_binop::add) { return lhs + rhs; }
             else if constexpr(Op == float_binop::sub) { return lhs - rhs; }
             else if constexpr(Op == float_binop::mul) { return lhs * rhs; }
@@ -346,23 +417,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == float_binop::copysign) { return ::std::copysign(lhs, rhs); }
             else if constexpr(Op == float_binop::min)
             {
-                if(::std::isnan(lhs)) { return lhs; }
-                if(::std::isnan(rhs)) { return rhs; }
-                return ::std::fmin(lhs, rhs);
+                if(::std::isnan(lhs) || ::std::isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(lhs == rhs) { return ::std::signbit(lhs) ? lhs : rhs; }
+                return ::std::min(lhs, rhs);
             }
             else if constexpr(Op == float_binop::max)
             {
-                if(::std::isnan(lhs)) { return lhs; }
-                if(::std::isnan(rhs)) { return rhs; }
-                return ::std::fmax(lhs, rhs);
+                if(::std::isnan(lhs) || ::std::isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(lhs == rhs) { return ::std::signbit(lhs) ? rhs : lhs; }
+                return ::std::max(lhs, rhs);
             }
             else
             {
                 return {};
             }
         }
-
-        UWVM_UWVM_INT_STRICT_FP_END
 
         template <uwvm_interpreter_translate_option_t CompileOption,
                   typename OperandT,
@@ -458,8 +527,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
-        UWVM_UWVM_INT_STRICT_FP_BEGIN
-
         template <uwvm_interpreter_translate_option_t CompileOption,
                   typename OperandT,
                   float_unop Op,
@@ -523,8 +590,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 typeref...[1u] += sizeof(out);
             }
         }
-
-        UWVM_UWVM_INT_STRICT_FP_END
 
     }  // namespace numeric_details
 
@@ -1012,8 +1077,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // f32/f64 numeric (strict-fp)
     // ========================
 
-    UWVM_UWVM_INT_STRICT_FP_BEGIN
-
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_unop Op, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_unop(Type... type) UWVM_THROWS
@@ -1415,8 +1478,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_copysign(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_binop<CompileOption, numeric_details::float_binop::copysign>(typeref...); }
-
-    UWVM_UWVM_INT_STRICT_FP_END
 
     // ========================
     // translate helpers

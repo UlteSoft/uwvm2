@@ -136,6 +136,14 @@ function def_build()
 		add_cxflags("-Wimplicit-fallthrough", { force = true })
 	end
 
+	-- @todo Consider compiling the runtime execution unit into a separate object file, then linking and merging it via the linker.
+
+	-- Required by the interpreter: disables observable floating-point side effects
+	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve
+	-- WebAssembly MVP–compatible floating-point semantics and per-instruction rounding.
+	-- Based on precise FP model assumptions.
+	add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
+
 	before_build(
 		function(target)
 			try

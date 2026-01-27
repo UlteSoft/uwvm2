@@ -33,11 +33,16 @@ module;
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+// platform
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# include <cfenv>
+#endif
 
 export module uwvm2.runtime.compiler.uwvm_int.optable:numeric;
 
 import fast_io;
 import uwvm2.utils.container;
+import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
 import :define;
