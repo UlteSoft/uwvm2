@@ -331,6 +331,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     ///          the arguments and writes the return result back onto the operand stack.
     using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) noexcept;
 
+    /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
+    ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
+    using interpreter_call_indirect_func_t =
+        void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) noexcept;
+
     struct compile_option
     {
         // Indicates the module number of the currently compiled WASM, used for external function calls.

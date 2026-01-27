@@ -685,7 +685,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_load(Type... type) UWVM_THROWS
         {
@@ -701,15 +705,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.load requires i32 and i64 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -718,9 +715,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_i64_le(details::ptr_add_u64(memory.memory_begin, eff))};
             details::exit_memory_operation_memory_lock(memory);
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                if constexpr(details::i32_i64_ranges_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_i64_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t i64_begin{CompileOption.i64_stack_top_begin_pos};
+                    constexpr ::std::size_t i64_end{CompileOption.i64_stack_top_end_pos};
+                    static_assert(i64_begin <= curr_i64_stack_top && curr_i64_stack_top < i64_end);
+                    constexpr ::std::size_t new_i64_pos{details::ring_prev_pos(curr_i64_stack_top, i64_begin, i64_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, new_i64_pos>(out, type...);
+                }
             }
             else
             {
@@ -733,7 +742,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void f32_load(Type... type) UWVM_THROWS
         {
@@ -749,15 +762,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::i32_f32_ranges_merged<CompileOption>(),
-                              "register_ring memory f32.load requires i32 and f32 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -766,9 +772,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
             details::exit_memory_operation_memory_lock(memory);
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f32, curr_i32_stack_top>(out, type...);
+                if constexpr(details::i32_f32_ranges_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_f32_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f32, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t f32_begin{CompileOption.f32_stack_top_begin_pos};
+                    constexpr ::std::size_t f32_end{CompileOption.f32_stack_top_end_pos};
+                    static_assert(f32_begin <= curr_f32_stack_top && curr_f32_stack_top < f32_end);
+                    constexpr ::std::size_t new_f32_pos{details::ring_prev_pos(curr_f32_stack_top, f32_begin, f32_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f32, new_f32_pos>(out, type...);
+                }
             }
             else
             {
@@ -781,7 +799,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void f64_load(Type... type) UWVM_THROWS
         {
@@ -797,15 +819,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::scalar_ranges_all_merged<CompileOption>(),
-                              "register_ring memory f64.load requires i32/i64/f32/f64 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -814,9 +829,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
             details::exit_memory_operation_memory_lock(memory);
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f64, curr_i32_stack_top>(out, type...);
+                if constexpr(details::scalar_ranges_all_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_f64_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f64, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t f64_begin{CompileOption.f64_stack_top_begin_pos};
+                    constexpr ::std::size_t f64_end{CompileOption.f64_stack_top_end_pos};
+                    static_assert(f64_begin <= curr_f64_stack_top && curr_f64_stack_top < f64_end);
+                    constexpr ::std::size_t new_f64_pos{details::ring_prev_pos(curr_f64_stack_top, f64_begin, f64_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_f64, new_f64_pos>(out, type...);
+                }
             }
             else
             {
@@ -872,81 +899,115 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `i64.load` opcode (tail-call): loads a 64-bit little-endian value from linear memory.
     /// @details
-    /// - Stack-top optimization: supported for the i32 address operand and for the i64 result when i32 stack-top caching is enabled; requires i32 and i64
-    /// stack-top
-    ///   ranges to be merged because the i64 result is written back into the scalar ring slot.
+    /// - Stack-top optimization: supported for the i32 address operand and i64 result when i32 stack-top caching is enabled and the i32/i64 stack-top ranges
+    ///   are merged; otherwise the opcode falls back to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 # endif
 #endif
 
     /// @brief `f32.load` opcode (tail-call): loads a 32-bit little-endian float from linear memory.
     /// @details
-    /// - Stack-top optimization: supported for the i32 address operand and for the f32 result when i32 stack-top caching is enabled; requires i32 and f32
-    /// stack-top
-    ///   ranges to be merged because the f32 result is written back into the scalar ring slot.
+    /// - Stack-top optimization: supported for the i32 address operand and f32 result when i32 stack-top caching is enabled and the i32/f32 stack-top ranges
+    ///   are merged; otherwise the opcode falls back to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>(type...); }
 # endif
 #endif
 
@@ -956,37 +1017,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// ranges
     ///   to be fully merged because the f64 result is written back into the scalar ring slot.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_mmap_full, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_mmap_path, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_load_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>(type...); }
 # endif
 #endif
 
@@ -1103,6 +1182,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool Signed,
                   uwvm_interpreter_translate_option_t CompileOption,
                   ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_load8(Type... type) UWVM_THROWS
@@ -1119,15 +1199,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.load* requires i32 and i64 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -1143,9 +1216,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 out = static_cast<wasm_i64>(static_cast<::std::uint_least64_t>(b));
             }
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                if constexpr(details::i32_i64_ranges_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_i64_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t i64_begin{CompileOption.i64_stack_top_begin_pos};
+                    constexpr ::std::size_t i64_end{CompileOption.i64_stack_top_end_pos};
+                    static_assert(i64_begin <= curr_i64_stack_top && curr_i64_stack_top < i64_end);
+                    constexpr ::std::size_t new_i64_pos{details::ring_prev_pos(curr_i64_stack_top, i64_begin, i64_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, new_i64_pos>(out, type...);
+                }
             }
             else
             {
@@ -1162,6 +1247,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool Signed,
                   uwvm_interpreter_translate_option_t CompileOption,
                   ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_load16(Type... type) UWVM_THROWS
@@ -1178,15 +1264,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.load* requires i32 and i64 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -1205,9 +1284,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 out = static_cast<wasm_i64>(static_cast<::std::uint_least64_t>(tmp));
             }
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                if constexpr(details::i32_i64_ranges_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_i64_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t i64_begin{CompileOption.i64_stack_top_begin_pos};
+                    constexpr ::std::size_t i64_end{CompileOption.i64_stack_top_end_pos};
+                    static_assert(i64_begin <= curr_i64_stack_top && curr_i64_stack_top < i64_end);
+                    constexpr ::std::size_t new_i64_pos{details::ring_prev_pos(curr_i64_stack_top, i64_begin, i64_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, new_i64_pos>(out, type...);
+                }
             }
             else
             {
@@ -1224,6 +1315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   bool Signed,
                   uwvm_interpreter_translate_option_t CompileOption,
                   ::std::size_t curr_i32_stack_top,
+                  ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_load32(Type... type) UWVM_THROWS
@@ -1240,15 +1332,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
-
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
-            {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.load* requires i32 and i64 stack-top ranges to be merged");
-            }
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
@@ -1267,9 +1352,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 out = static_cast<wasm_i64>(static_cast<::std::uint_least64_t>(tmp));
             }
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
             {
-                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                if constexpr(details::i32_i64_ranges_merged<CompileOption>())
+                {
+                    static_assert(curr_i32_stack_top == curr_i64_stack_top);
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i32_stack_top>(out, type...);
+                }
+                else
+                {
+                    constexpr ::std::size_t i64_begin{CompileOption.i64_stack_top_begin_pos};
+                    constexpr ::std::size_t i64_end{CompileOption.i64_stack_top_end_pos};
+                    static_assert(i64_begin <= curr_i64_stack_top && curr_i64_stack_top < i64_end);
+                    constexpr ::std::size_t new_i64_pos{details::ring_prev_pos(curr_i64_stack_top, i64_begin, i64_end)};
+                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, new_i64_pos>(out, type...);
+                }
             }
             else
             {
@@ -1303,30 +1400,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `i64.load8_{s,u}` core (tail-call): loads 1 byte and extends to i64.
     /// @details
-    /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
+    /// - Stack-top optimization: supported when i32 stack-top caching is enabled and the i32/i64 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <bool Signed,
+              uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load8(Type... type) UWVM_THROWS
-    { return details::memop::i64_load8<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load8<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
     /// @brief `i64.load16_{s,u}` core (tail-call): loads 2 bytes and extends to i64.
     /// @details
-    /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
+    /// - Stack-top optimization: supported when i32 stack-top caching is enabled and the i32/i64 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <bool Signed,
+              uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load16(Type... type) UWVM_THROWS
-    { return details::memop::i64_load16<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load16<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
     /// @brief `i64.load32_{s,u}` core (tail-call): loads 4 bytes and extends to i64.
     /// @details
-    /// - Stack-top optimization: supported when i32 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
+    /// - Stack-top optimization: supported when i32 stack-top caching is enabled and the i32/i64 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <bool Signed, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <bool Signed,
+              uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load32(Type... type) UWVM_THROWS
-    { return details::memop::i64_load32<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return details::memop::i64_load32<details::bounds_check_generic, Signed, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
     namespace details::memop
     {
@@ -1365,7 +1477,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i64_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_store(Type... type) UWVM_THROWS
         {
@@ -1382,25 +1498,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
-            wasm_i64 value{};
+            wasm_i64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
+
             wasm_i32 addr{};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::i32_i64_ranges_merged<CompileOption>())
             {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.store* requires i32 and i64 stack-top ranges to be merged");
-
+                static_assert(curr_i32_stack_top == curr_i64_stack_top);
                 constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
+                static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
-
-                value = get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...);
                 addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
             }
             else
             {
-                value = get_curr_val_from_operand_stack_cache<wasm_i64>(type...);
-                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
             }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1416,7 +1529,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_f32_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void f32_store(Type... type) UWVM_THROWS
         {
@@ -1433,25 +1550,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
-            wasm_f32 value{};
+            wasm_f32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
+
             wasm_i32 addr{};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::i32_f32_ranges_merged<CompileOption>())
             {
-                static_assert(details::i32_f32_ranges_merged<CompileOption>(),
-                              "register_ring memory f32.store requires i32 and f32 stack-top ranges to be merged");
-
+                static_assert(curr_i32_stack_top == curr_f32_stack_top);
                 constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
+                static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f32_stack_top, range_begin, range_end)};
-
-                value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...);
                 addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
             }
             else
             {
-                value = get_curr_val_from_operand_stack_cache<wasm_f32>(type...);
-                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
             }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1467,7 +1581,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+        template <auto BoundsCheckFn,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_f64_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+                  uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void f64_store(Type... type) UWVM_THROWS
         {
@@ -1484,25 +1602,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
-            wasm_f64 value{};
+            wasm_f64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
+
             wasm_i32 addr{};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::scalar_ranges_all_merged<CompileOption>())
             {
-                static_assert(details::scalar_ranges_all_merged<CompileOption>(),
-                              "register_ring memory f64.store requires i32/i64/f32/f64 stack-top ranges to be merged");
-
+                static_assert(curr_i32_stack_top == curr_f64_stack_top);
                 constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
+                static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f64_stack_top, range_begin, range_end)};
-
-                value = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...);
                 addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
             }
             else
             {
-                value = get_curr_val_from_operand_stack_cache<wasm_f64>(type...);
-                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
             }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1572,6 +1687,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                   unsigned StoreBytes,
                   uwvm_interpreter_translate_option_t CompileOption,
                   ::std::size_t curr_i64_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
                   uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         UWVM_ALWAYS_INLINE inline constexpr void i64_storeN(Type... type) UWVM_THROWS
@@ -1590,25 +1706,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
             wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
 
-            wasm_i64 value{};
+            wasm_i64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
+
             wasm_i32 addr{};
-
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::i32_i64_ranges_merged<CompileOption>())
             {
-                static_assert(details::i32_i64_ranges_merged<CompileOption>(),
-                              "register_ring memory i64.store* requires i32 and i64 stack-top ranges to be merged");
-
+                static_assert(curr_i32_stack_top == curr_i64_stack_top);
                 constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
+                static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
-
-                value = get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...);
                 addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
             }
             else
             {
-                value = get_curr_val_from_operand_stack_cache<wasm_i64>(type...);
-                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
             }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1682,79 +1795,115 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `i64.store` opcode (tail-call): stores a 64-bit value to linear memory.
     /// @details
-    /// - Stack-top optimization: supported when i64 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged so the address can be read
-    /// from the same ring.
+    /// - Stack-top optimization: supported when i64 stack-top caching is enabled and the i32/i64 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_generic, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_generic, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_mmap_full, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_mmap_full, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_mmap_path, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_mmap_path, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_mmap_judge, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_mmap_judge, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 # endif
 #endif
 
     /// @brief `f32.store` opcode (tail-call): stores a 32-bit float to linear memory.
     /// @details
-    /// - Stack-top optimization: supported when f32 stack-top caching is enabled; requires i32 and f32 stack-top ranges to be merged so the address can be read
-    /// from the same ring.
+    /// - Stack-top optimization: supported when f32 stack-top caching is enabled and the i32/f32 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_generic, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_generic, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_mmap_full, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_mmap_full, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_mmap_path, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_mmap_path, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_mmap_judge, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_mmap_judge, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_store_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, Type...>(type...); }
+    { return details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...); }
 # endif
 #endif
 
@@ -1763,37 +1912,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Stack-top optimization: supported when f64 stack-top caching is enabled; requires scalar stack-top ranges to be fully merged so the address can be
     /// read from the same ring.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_generic, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_generic, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
 #if defined(UWVM_SUPPORT_MMAP)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store_mmap_full(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_mmap_full, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_mmap_full, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store_mmap_path(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_mmap_path, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_mmap_path, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store_mmap_judge(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_mmap_judge, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_mmap_judge, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store_multithread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 # else
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_store_singlethread_allocator(Type... type) UWVM_THROWS
-    { return details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, Type...>(type...); }
+    { return details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...); }
 # endif
 #endif
 
@@ -1808,12 +1975,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `i64.store{8,16,32}` core (tail-call): stores the low N bytes of an i64 value to linear memory.
     /// @details
-    /// - Stack-top optimization: supported when i64 stack-top caching is enabled; requires i32 and i64 stack-top ranges to be merged.
+    /// - Stack-top optimization: supported when i64 stack-top caching is enabled and the i32/i64 stack-top ranges are merged; otherwise the opcode falls back
+    ///   to operand-stack execution.
     /// - `type[0]` layout: `[opfunc_ptr][native_memory_t*][offset:u32][next_opfunc_ptr]`.
-    template <unsigned StoreBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <unsigned StoreBytes,
+              uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_storeN(Type... type) UWVM_THROWS
-    { return details::memop::i64_storeN<details::bounds_check_generic, StoreBytes, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return details::memop::i64_storeN<details::bounds_check_generic, StoreBytes, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
     /// @brief `memory.size` opcode (tail-call): returns the current memory size in pages.
     /// @details
@@ -2516,35 +2688,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_load16_u(Type... type) UWVM_THROWS
     { return uwvmint_i32_load16<false, CompileOption, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load8_s(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load8<true, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load8<true, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load8_u(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load8<false, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load8<false, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load16_s(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load16<true, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load16<true, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load16_u(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load16<false, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load16<false, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load32_s(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load32<true, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load32<true, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load32_u(Type... type) UWVM_THROWS
-    { return uwvmint_i64_load32<false, CompileOption, curr_i32_stack_top, Type...>(type...); }
+    { return uwvmint_i64_load32<false, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>(type...); }
 
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -2556,20 +2746,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_store16(Type... type) UWVM_THROWS
     { return uwvmint_i32_storeN<2u, CompileOption, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store8(Type... type) UWVM_THROWS
-    { return uwvmint_i64_storeN<1u, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return uwvmint_i64_storeN<1u, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store16(Type... type) UWVM_THROWS
-    { return uwvmint_i64_storeN<2u, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return uwvmint_i64_storeN<2u, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
-    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i64_stack_top,
+              ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_store32(Type... type) UWVM_THROWS
-    { return uwvmint_i64_storeN<4u, CompileOption, curr_i64_stack_top, Type...>(type...); }
+    { return uwvmint_i64_storeN<4u, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...); }
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
@@ -2658,6 +2857,80 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             namespace op_details = ::uwvm2::runtime::compiler::uwvm_int::optable::details;
 
+            template <typename OperandT>
+            UWVM_ALWAYS_INLINE inline constexpr ::std::size_t stacktop_currpos(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            {
+                if constexpr(::std::same_as<OperandT, op_details::wasm_i32>) { return curr_stacktop.i32_stack_top_curr_pos; }
+                else if constexpr(::std::same_as<OperandT, op_details::wasm_i64>) { return curr_stacktop.i64_stack_top_curr_pos; }
+                else if constexpr(::std::same_as<OperandT, op_details::wasm_f32>) { return curr_stacktop.f32_stack_top_curr_pos; }
+                else if constexpr(::std::same_as<OperandT, op_details::wasm_f64>) { return curr_stacktop.f64_stack_top_curr_pos; }
+                else
+                {
+                    return SIZE_MAX;
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t OutCurr,
+                      ::std::size_t OutEnd,
+                      ::std::size_t InCurr,
+                      ::std::size_t InEnd,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWrapper2D,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
+            {
+                if(out_pos == OutCurr)
+                {
+                    if(in_pos == InCurr) { return OpWrapper2D<CompileOption, OutCurr, InCurr, Type...>; }
+                    else
+                    {
+                        if constexpr(InCurr + 1uz < InEnd)
+                        {
+                            return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutCurr, OutEnd, InCurr + 1uz, InEnd, OpWrapper2D, Type...>(out_pos,
+                                                                                                                                                      in_pos);
+                        }
+                        else
+                        {
+                            return OpWrapper2D<CompileOption, OutCurr, InCurr, Type...>;
+                        }
+                    }
+                }
+                else
+                {
+                    if constexpr(OutCurr + 1uz < OutEnd)
+                    {
+                        return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutCurr + 1uz, OutEnd, InCurr, InEnd, OpWrapper2D, Type...>(out_pos,
+                                                                                                                                                  in_pos);
+                    }
+                    else
+                    {
+                        return OpWrapper2D<CompileOption, OutCurr, InCurr, Type...>;
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t OutBegin,
+                      ::std::size_t OutEnd,
+                      ::std::size_t InBegin,
+                      ::std::size_t InEnd,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWrapper2D,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_2d(::std::size_t out_pos,
+                                                                                                                      ::std::size_t in_pos) noexcept
+            {
+                if constexpr(OutBegin != OutEnd && InBegin != InEnd)
+                {
+                    return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutBegin, OutEnd, InBegin, InEnd, OpWrapper2D, Type...>(out_pos, in_pos);
+                }
+                else
+                {
+                    return OpWrapper2D<CompileOption, 0uz, 0uz, Type...>;
+                }
+            }
+
             /// @brief Compile-time selector for stack-top-aware opfuncs (tail-call).
             /// @details `OpWrapper` is a variable template that evaluates to the target function pointer:
             /// `OpWrapper<Opt, Pos, Type...> -> uwvm_interpreter_opfunc_t<Type...>`.
@@ -2739,6 +3012,96 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else
                 {
                     return OpWithBoundsCheck<BoundsCheckFn, Extra, CompileOption, 0uz, Type...>;
+                }
+            }
+
+            template <
+                uwvm_interpreter_translate_option_t CompileOption,
+                ::std::size_t OutCurr,
+                ::std::size_t OutEnd,
+                ::std::size_t InCurr,
+                ::std::size_t InEnd,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck2D,
+                auto BoundsCheckFn,
+                auto Extra,
+                uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_with_impl_2d(::std::size_t out_pos,
+                                                                                                             ::std::size_t in_pos) noexcept
+            {
+                if(out_pos == OutCurr)
+                {
+                    if(in_pos == InCurr) { return OpWithBoundsCheck2D<BoundsCheckFn, Extra, CompileOption, OutCurr, InCurr, Type...>; }
+                    else
+                    {
+                        if constexpr(InCurr + 1uz < InEnd)
+                        {
+                            return select_stacktop_fptr_by_currpos_with_impl_2d<CompileOption,
+                                                                                OutCurr,
+                                                                                OutEnd,
+                                                                                InCurr + 1uz,
+                                                                                InEnd,
+                                                                                OpWithBoundsCheck2D,
+                                                                                BoundsCheckFn,
+                                                                                Extra,
+                                                                                Type...>(out_pos, in_pos);
+                        }
+                        else
+                        {
+                            return OpWithBoundsCheck2D<BoundsCheckFn, Extra, CompileOption, OutCurr, InCurr, Type...>;
+                        }
+                    }
+                }
+                else
+                {
+                    if constexpr(OutCurr + 1uz < OutEnd)
+                    {
+                        return select_stacktop_fptr_by_currpos_with_impl_2d<CompileOption,
+                                                                            OutCurr + 1uz,
+                                                                            OutEnd,
+                                                                            InCurr,
+                                                                            InEnd,
+                                                                            OpWithBoundsCheck2D,
+                                                                            BoundsCheckFn,
+                                                                            Extra,
+                                                                            Type...>(out_pos, in_pos);
+                    }
+                    else
+                    {
+                        return OpWithBoundsCheck2D<BoundsCheckFn, Extra, CompileOption, OutCurr, InCurr, Type...>;
+                    }
+                }
+            }
+
+            template <
+                uwvm_interpreter_translate_option_t CompileOption,
+                ::std::size_t OutBegin,
+                ::std::size_t OutEnd,
+                ::std::size_t InBegin,
+                ::std::size_t InEnd,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck2D,
+                auto BoundsCheckFn,
+                auto Extra,
+                uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_with_2d(::std::size_t out_pos,
+                                                                                                                           ::std::size_t in_pos) noexcept
+            {
+                if constexpr(OutBegin != OutEnd && InBegin != InEnd)
+                {
+                    return select_stacktop_fptr_by_currpos_with_impl_2d<CompileOption,
+                                                                        OutBegin,
+                                                                        OutEnd,
+                                                                        InBegin,
+                                                                        InEnd,
+                                                                        OpWithBoundsCheck2D,
+                                                                        BoundsCheckFn,
+                                                                        Extra,
+                                                                        Type...>(out_pos, in_pos);
+                }
+                else
+                {
+                    return OpWithBoundsCheck2D<BoundsCheckFn, Extra, CompileOption, 0uz, 0uz, Type...>;
                 }
             }
 
@@ -2829,6 +3192,85 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
             }
 
+            template <
+                uwvm_interpreter_translate_option_t CompileOption,
+                ::std::size_t OutBegin,
+                ::std::size_t OutEnd,
+                ::std::size_t InBegin,
+                ::std::size_t InEnd,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck2D,
+                auto Extra,
+                uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                select_mem_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos, op_details::native_memory_t const& memory) noexcept
+            {
+#if defined(UWVM_SUPPORT_MMAP)
+                switch(select_mmap_variant(memory))
+                {
+                    case mmap_variant::full:
+                    {
+                        return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                                       OutBegin,
+                                                                       OutEnd,
+                                                                       InBegin,
+                                                                       InEnd,
+                                                                       OpWithBoundsCheck2D,
+                                                                       &op_details::bounds_check_mmap_full,
+                                                                       Extra,
+                                                                       Type...>(out_pos, in_pos);
+                    }
+                    case mmap_variant::path:
+                    {
+                        return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                                       OutBegin,
+                                                                       OutEnd,
+                                                                       InBegin,
+                                                                       InEnd,
+                                                                       OpWithBoundsCheck2D,
+                                                                       &op_details::bounds_check_mmap_path,
+                                                                       Extra,
+                                                                       Type...>(out_pos, in_pos);
+                    }
+                    case mmap_variant::judge:
+                    {
+                        return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                                       OutBegin,
+                                                                       OutEnd,
+                                                                       InBegin,
+                                                                       InEnd,
+                                                                       OpWithBoundsCheck2D,
+                                                                       &op_details::bounds_check_mmap_judge,
+                                                                       Extra,
+                                                                       Type...>(out_pos, in_pos);
+                    }
+                    [[unlikely]] default:
+                    {
+                        return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                                       OutBegin,
+                                                                       OutEnd,
+                                                                       InBegin,
+                                                                       InEnd,
+                                                                       OpWithBoundsCheck2D,
+                                                                       &op_details::bounds_check_mmap_path,
+                                                                       Extra,
+                                                                       Type...>(out_pos, in_pos);
+                    }
+                }
+#else
+                (void)memory;
+                return select_stacktop_fptr_or_default_with_2d<CompileOption,
+                                                               OutBegin,
+                                                               OutEnd,
+                                                               InBegin,
+                                                               InEnd,
+                                                               OpWithBoundsCheck2D,
+                                                               &op_details::bounds_check_allocator,
+                                                               Extra,
+                                                               Type...>(out_pos, in_pos);
+#endif
+            }
+
             // ===== Memory-aware op wrappers (bounds policy is chosen by translator) =====
 
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -2837,11 +3279,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op_with{op_details::memop::i64_load<BoundsCheckFn, CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op_with_2d{
+                op_details::memop::i64_load<BoundsCheckFn, CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op_with_out_only{
+                op_details::memop::i64_load<BoundsCheckFn, CompileOption, 0uz, I64Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op_with{op_details::memop::f32_load<BoundsCheckFn, CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t F32Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op_with_2d{
+                op_details::memop::f32_load<BoundsCheckFn, CompileOption, I32Pos, F32Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op_with_out_only{
+                op_details::memop::f32_load<BoundsCheckFn, CompileOption, 0uz, F32Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op_with{op_details::memop::f64_load<BoundsCheckFn, CompileOption, Pos, Type...>};
+
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t F64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op_with_2d{
+                op_details::memop::f64_load<BoundsCheckFn, CompileOption, I32Pos, F64Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op_with_out_only{
+                op_details::memop::f64_load<BoundsCheckFn, CompileOption, 0uz, F64Pos, Type...>};
 
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_load8_op_with{
@@ -2855,13 +3336,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_op_with{
                 op_details::memop::i64_load8<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_op_with_2d{
+                op_details::memop::i64_load8<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_op_with_out_only{
+                op_details::memop::i64_load8<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, 0uz, I64Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_op_with{
                 op_details::memop::i64_load16<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_op_with_2d{
+                op_details::memop::i64_load16<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_op_with_out_only{
+                op_details::memop::i64_load16<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, 0uz, I64Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_op_with{
                 op_details::memop::i64_load32<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, Pos, Type...>};
+
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_op_with_2d{
+                op_details::memop::i64_load32<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_op_with_out_only{
+                op_details::memop::i64_load32<BoundsCheckFn, static_cast<bool>(Extra), CompileOption, 0uz, I64Pos, Type...>};
 
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_store_op_with{op_details::memop::i32_store<BoundsCheckFn, CompileOption, Pos, Type...>};
@@ -2869,11 +3389,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op_with{op_details::memop::i64_store<BoundsCheckFn, CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op_with_2d{
+                op_details::memop::i64_store<BoundsCheckFn, CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op_with_i32_only{
+                op_details::memop::i64_store<BoundsCheckFn, CompileOption, 0uz, I32Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op_with{op_details::memop::f32_store<BoundsCheckFn, CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t F32Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op_with_2d{
+                op_details::memop::f32_store<BoundsCheckFn, CompileOption, F32Pos, I32Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op_with_i32_only{
+                op_details::memop::f32_store<BoundsCheckFn, CompileOption, 0uz, I32Pos, Type...>};
+
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op_with{op_details::memop::f64_store<BoundsCheckFn, CompileOption, Pos, Type...>};
+
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t F64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op_with_2d{
+                op_details::memop::f64_store<BoundsCheckFn, CompileOption, F64Pos, I32Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op_with_i32_only{
+                op_details::memop::f64_store<BoundsCheckFn, CompileOption, 0uz, I32Pos, Type...>};
 
             template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_storeN_op_with{
@@ -2883,6 +3442,133 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_storeN_op_with{
                 op_details::memop::i64_storeN<BoundsCheckFn, static_cast<unsigned>(Extra), CompileOption, Pos, Type...>};
 
+            template <auto BoundsCheckFn,
+                      auto Extra,
+                      uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t I64Pos,
+                      ::std::size_t I32Pos,
+                      uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_storeN_op_with_2d{
+                op_details::memop::i64_storeN<BoundsCheckFn, static_cast<unsigned>(Extra), CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_storeN_op_with_i32_only{
+                op_details::memop::i64_storeN<BoundsCheckFn, static_cast<unsigned>(Extra), CompileOption, 0uz, I32Pos, Type...>};
+
+            template <
+                uwvm_interpreter_translate_option_t CompileOption,
+                typename InT,
+                typename OutT,
+                ::std::size_t InBegin,
+                ::std::size_t InEnd,
+                ::std::size_t OutBegin,
+                ::std::size_t OutEnd,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck1D,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck2D,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheckOutOnly,
+                auto Extra,
+                uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                select_unary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop, op_details::native_memory_t const& memory) noexcept
+            {
+                if constexpr(InBegin != InEnd)
+                {
+                    if constexpr(OutBegin != OutEnd)
+                    {
+                        if constexpr(InBegin == OutBegin && InEnd == OutEnd)
+                        {
+                            return select_mem_fptr_or_default<CompileOption, InBegin, InEnd, OpWithBoundsCheck1D, Extra, Type...>(
+                                stacktop_currpos<InT>(curr_stacktop),
+                                memory);
+                        }
+                        else
+                        {
+                            return select_mem_fptr_or_default_2d<CompileOption, OutBegin, OutEnd, InBegin, InEnd, OpWithBoundsCheck2D, Extra, Type...>(
+                                stacktop_currpos<OutT>(curr_stacktop),
+                                stacktop_currpos<InT>(curr_stacktop),
+                                memory);
+                        }
+                    }
+                    else
+                    {
+                        return select_mem_fptr_or_default<CompileOption, InBegin, InEnd, OpWithBoundsCheck1D, Extra, Type...>(
+                            stacktop_currpos<InT>(curr_stacktop),
+                            memory);
+                    }
+                }
+                else
+                {
+                    if constexpr(OutBegin != OutEnd)
+                    {
+                        return select_mem_fptr_or_default<CompileOption, OutBegin, OutEnd, OpWithBoundsCheckOutOnly, Extra, Type...>(
+                            stacktop_currpos<OutT>(curr_stacktop),
+                            memory);
+                    }
+                    else
+                    {
+                        return select_mem_fptr_or_default<CompileOption, 0uz, 0uz, OpWithBoundsCheck1D, Extra, Type...>(0uz, memory);
+                    }
+                }
+            }
+
+            template <
+                uwvm_interpreter_translate_option_t CompileOption,
+                typename TopT,
+                typename OtherT,
+                ::std::size_t TopBegin,
+                ::std::size_t TopEnd,
+                ::std::size_t OtherBegin,
+                ::std::size_t OtherEnd,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck1D,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheck2D,
+                template <auto, auto, uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpWithBoundsCheckOtherOnly,
+                auto Extra,
+                uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                select_binary_mem_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop, op_details::native_memory_t const& memory) noexcept
+            {
+                if constexpr(TopBegin != TopEnd)
+                {
+                    if constexpr(OtherBegin != OtherEnd)
+                    {
+                        if constexpr(TopBegin == OtherBegin && TopEnd == OtherEnd)
+                        {
+                            return select_mem_fptr_or_default<CompileOption, TopBegin, TopEnd, OpWithBoundsCheck1D, Extra, Type...>(
+                                stacktop_currpos<TopT>(curr_stacktop),
+                                memory);
+                        }
+                        else
+                        {
+                            return select_mem_fptr_or_default_2d<CompileOption, TopBegin, TopEnd, OtherBegin, OtherEnd, OpWithBoundsCheck2D, Extra, Type...>(
+                                stacktop_currpos<TopT>(curr_stacktop),
+                                stacktop_currpos<OtherT>(curr_stacktop),
+                                memory);
+                        }
+                    }
+                    else
+                    {
+                        return select_mem_fptr_or_default<CompileOption, TopBegin, TopEnd, OpWithBoundsCheck1D, Extra, Type...>(
+                            stacktop_currpos<TopT>(curr_stacktop),
+                            memory);
+                    }
+                }
+                else
+                {
+                    if constexpr(OtherBegin != OtherEnd)
+                    {
+                        return select_mem_fptr_or_default<CompileOption, OtherBegin, OtherEnd, OpWithBoundsCheckOtherOnly, Extra, Type...>(
+                            stacktop_currpos<OtherT>(curr_stacktop),
+                            memory);
+                    }
+                    else
+                    {
+                        return select_mem_fptr_or_default<CompileOption, 0uz, 0uz, OpWithBoundsCheck1D, Extra, Type...>(0uz, memory);
+                    }
+                }
+            }
+
             // ===== Default (non-memory-aware) op wrappers =====
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -2891,11 +3577,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op{uwvmint_i64_load<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op_2d{uwvmint_i64_load<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load_op_out_only{uwvmint_i64_load<CompileOption, 0uz, I64Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op{uwvmint_f32_load<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F32Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op_2d{uwvmint_f32_load<CompileOption, I32Pos, F32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_load_op_out_only{uwvmint_f32_load<CompileOption, 0uz, F32Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op{uwvmint_f64_load<CompileOption, Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op_2d{uwvmint_f64_load<CompileOption, I32Pos, F64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_load_op_out_only{uwvmint_f64_load<CompileOption, 0uz, F64Pos, Type...>};
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_load8_s_op{uwvmint_i32_load8_s<CompileOption, Pos, Type...>};
@@ -2915,11 +3619,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_u_op{uwvmint_i64_load8_u<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_s_op_2d{uwvmint_i64_load8_s<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_u_op_2d{uwvmint_i64_load8_u<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_s_op_out_only{uwvmint_i64_load8_s<CompileOption, 0uz, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load8_u_op_out_only{uwvmint_i64_load8_u<CompileOption, 0uz, I64Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_s_op{uwvmint_i64_load16_s<CompileOption, Pos, Type...>};
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_u_op{uwvmint_i64_load16_u<CompileOption, Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_s_op_2d{uwvmint_i64_load16_s<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_u_op_2d{uwvmint_i64_load16_u<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_s_op_out_only{uwvmint_i64_load16_s<CompileOption, 0uz, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load16_u_op_out_only{uwvmint_i64_load16_u<CompileOption, 0uz, I64Pos, Type...>};
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_s_op{uwvmint_i64_load32_s<CompileOption, Pos, Type...>};
@@ -2927,17 +3655,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_u_op{uwvmint_i64_load32_u<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_s_op_2d{uwvmint_i64_load32_s<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_u_op_2d{uwvmint_i64_load32_u<CompileOption, I32Pos, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_s_op_out_only{uwvmint_i64_load32_s<CompileOption, 0uz, I64Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_load32_u_op_out_only{uwvmint_i64_load32_u<CompileOption, 0uz, I64Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_store_op{uwvmint_i32_store<CompileOption, Pos, Type...>};
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op{uwvmint_i64_store<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op_2d{uwvmint_i64_store<CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store_op_i32_only{uwvmint_i64_store<CompileOption, 0uz, I32Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op{uwvmint_f32_store<CompileOption, Pos, Type...>};
 
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F32Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op_2d{uwvmint_f32_store<CompileOption, F32Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f32_store_op_i32_only{uwvmint_f32_store<CompileOption, 0uz, I32Pos, Type...>};
+
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op{uwvmint_f64_store<CompileOption, Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t F64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op_2d{uwvmint_f64_store<CompileOption, F64Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> f64_store_op_i32_only{uwvmint_f64_store<CompileOption, 0uz, I32Pos, Type...>};
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i32_store8_op{uwvmint_i32_store8<CompileOption, Pos, Type...>};
@@ -2953,6 +3711,121 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store32_op{uwvmint_i64_store32<CompileOption, Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store8_op_2d{uwvmint_i64_store8<CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store16_op_2d{uwvmint_i64_store16<CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I64Pos, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store32_op_2d{uwvmint_i64_store32<CompileOption, I64Pos, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store8_op_i32_only{uwvmint_i64_store8<CompileOption, 0uz, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store16_op_i32_only{uwvmint_i64_store16<CompileOption, 0uz, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t I32Pos, uwvm_int_stack_top_type... Type>
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> i64_store32_op_i32_only{uwvmint_i64_store32<CompileOption, 0uz, I32Pos, Type...>};
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      typename InT,
+                      typename OutT,
+                      ::std::size_t InBegin,
+                      ::std::size_t InEnd,
+                      ::std::size_t OutBegin,
+                      ::std::size_t OutEnd,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto Op1D,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto Op2D,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpOutOnly,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                select_unary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            {
+                if constexpr(InBegin != InEnd)
+                {
+                    if constexpr(OutBegin != OutEnd)
+                    {
+                        if constexpr(InBegin == OutBegin && InEnd == OutEnd)
+                        {
+                            return select_stacktop_fptr_or_default<CompileOption, InBegin, InEnd, Op1D, Type...>(stacktop_currpos<InT>(curr_stacktop));
+                        }
+                        else
+                        {
+                            return select_stacktop_fptr_or_default_2d<CompileOption, OutBegin, OutEnd, InBegin, InEnd, Op2D, Type...>(
+                                stacktop_currpos<OutT>(curr_stacktop),
+                                stacktop_currpos<InT>(curr_stacktop));
+                        }
+                    }
+                    else
+                    {
+                        return select_stacktop_fptr_or_default<CompileOption, InBegin, InEnd, Op1D, Type...>(stacktop_currpos<InT>(curr_stacktop));
+                    }
+                }
+                else
+                {
+                    if constexpr(OutBegin != OutEnd)
+                    {
+                        return select_stacktop_fptr_or_default<CompileOption, OutBegin, OutEnd, OpOutOnly, Type...>(stacktop_currpos<OutT>(curr_stacktop));
+                    }
+                    else
+                    {
+                        return Op1D<CompileOption, 0uz, Type...>;
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      typename TopT,
+                      typename OtherT,
+                      ::std::size_t TopBegin,
+                      ::std::size_t TopEnd,
+                      ::std::size_t OtherBegin,
+                      ::std::size_t OtherEnd,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto Op1D,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, ::std::size_t, uwvm_int_stack_top_type...> auto Op2D,
+                      template <uwvm_interpreter_translate_option_t, ::std::size_t, uwvm_int_stack_top_type...> auto OpOtherOnly,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            UWVM_ALWAYS_INLINE inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                select_binary_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
+            {
+                if constexpr(TopBegin != TopEnd)
+                {
+                    if constexpr(OtherBegin != OtherEnd)
+                    {
+                        if constexpr(TopBegin == OtherBegin && TopEnd == OtherEnd)
+                        {
+                            return select_stacktop_fptr_or_default<CompileOption, TopBegin, TopEnd, Op1D, Type...>(stacktop_currpos<TopT>(curr_stacktop));
+                        }
+                        else
+                        {
+                            return select_stacktop_fptr_or_default_2d<CompileOption, TopBegin, TopEnd, OtherBegin, OtherEnd, Op2D, Type...>(
+                                stacktop_currpos<TopT>(curr_stacktop),
+                                stacktop_currpos<OtherT>(curr_stacktop));
+                        }
+                    }
+                    else
+                    {
+                        return select_stacktop_fptr_or_default<CompileOption, TopBegin, TopEnd, Op1D, Type...>(stacktop_currpos<TopT>(curr_stacktop));
+                    }
+                }
+                else
+                {
+                    if constexpr(OtherBegin != OtherEnd)
+                    {
+                        return select_stacktop_fptr_or_default<CompileOption, OtherBegin, OtherEnd, OpOtherOnly, Type...>(
+                            stacktop_currpos<OtherT>(curr_stacktop));
+                    }
+                    else
+                    {
+                        return Op1D<CompileOption, 0uz, Type...>;
+                    }
+                }
+            }
 
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
             inline constexpr uwvm_interpreter_opfunc_t<Type...> memory_size_op{uwvmint_memory_size<CompileOption, Pos, Type...>};
@@ -2990,12 +3863,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                       details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load_op_with,
+                                                  details::i64_load_op_with_2d,
+                                                  details::i64_load_op_with_out_only,
+                                                  0uz,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3010,12 +3889,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                       details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::f32_load_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_f32,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.f32_stack_top_begin_pos,
+                                                  CompileOption.f32_stack_top_end_pos,
+                                                  details::f32_load_op_with,
+                                                  details::f32_load_op_with_2d,
+                                                  details::f32_load_op_with_out_only,
+                                                  0uz,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3030,12 +3915,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f64_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                       details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::f64_load_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_f64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.f64_stack_top_begin_pos,
+                                                  CompileOption.f64_stack_top_end_pos,
+                                                  details::f64_load_op_with,
+                                                  details::f64_load_op_with_2d,
+                                                  details::f64_load_op_with_out_only,
+                                                  0uz,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3130,12 +4021,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load8_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                          details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load8_op_with,
-                                                       true,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load8_op_with,
+                                                  details::i64_load8_op_with_2d,
+                                                  details::i64_load8_op_with_out_only,
+                                                  true,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3150,12 +4047,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load8_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                          details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load8_op_with,
-                                                       false,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load8_op_with,
+                                                  details::i64_load8_op_with_2d,
+                                                  details::i64_load8_op_with_out_only,
+                                                  false,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3170,12 +4073,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load16_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                           details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load16_op_with,
-                                                       true,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load16_op_with,
+                                                  details::i64_load16_op_with_2d,
+                                                  details::i64_load16_op_with_out_only,
+                                                  true,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3190,12 +4099,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load16_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                           details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load16_op_with,
-                                                       false,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load16_op_with,
+                                                  details::i64_load16_op_with_2d,
+                                                  details::i64_load16_op_with_out_only,
+                                                  false,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3210,12 +4125,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load32_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                           details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load32_op_with,
-                                                       true,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load32_op_with,
+                                                  details::i64_load32_op_with_2d,
+                                                  details::i64_load32_op_with_out_only,
+                                                  true,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3230,12 +4151,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load32_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                           details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i32_stack_top_begin_pos,
-                                                       CompileOption.i32_stack_top_end_pos,
-                                                       details::i64_load32_op_with,
-                                                       false,
-                                                       Type...>(curr_stacktop.i32_stack_top_curr_pos, memory);
+            return details::select_unary_mem_fptr<CompileOption,
+                                                  details::op_details::wasm_i32,
+                                                  details::op_details::wasm_i64,
+                                                  CompileOption.i32_stack_top_begin_pos,
+                                                  CompileOption.i32_stack_top_end_pos,
+                                                  CompileOption.i64_stack_top_begin_pos,
+                                                  CompileOption.i64_stack_top_end_pos,
+                                                  details::i64_load32_op_with,
+                                                  details::i64_load32_op_with_2d,
+                                                  details::i64_load32_op_with_out_only,
+                                                  false,
+                                                  Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3270,12 +4197,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                        details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i64_stack_top_begin_pos,
-                                                       CompileOption.i64_stack_top_end_pos,
-                                                       details::i64_store_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.i64_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_i64,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.i64_stack_top_begin_pos,
+                                                   CompileOption.i64_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::i64_store_op_with,
+                                                   details::i64_store_op_with_2d,
+                                                   details::i64_store_op_with_i32_only,
+                                                   0uz,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3290,12 +4223,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                        details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.f32_stack_top_begin_pos,
-                                                       CompileOption.f32_stack_top_end_pos,
-                                                       details::f32_store_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.f32_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_f32,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.f32_stack_top_begin_pos,
+                                                   CompileOption.f32_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::f32_store_op_with,
+                                                   details::f32_store_op_with_2d,
+                                                   details::f32_store_op_with_i32_only,
+                                                   0uz,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3310,12 +4249,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f64_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                        details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.f64_stack_top_begin_pos,
-                                                       CompileOption.f64_stack_top_end_pos,
-                                                       details::f64_store_op_with,
-                                                       0uz,
-                                                       Type...>(curr_stacktop.f64_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_f64,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.f64_stack_top_begin_pos,
+                                                   CompileOption.f64_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::f64_store_op_with,
+                                                   details::f64_store_op_with_2d,
+                                                   details::f64_store_op_with_i32_only,
+                                                   0uz,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3370,12 +4315,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store8_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                         details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i64_stack_top_begin_pos,
-                                                       CompileOption.i64_stack_top_end_pos,
-                                                       details::i64_storeN_op_with,
-                                                       1u,
-                                                       Type...>(curr_stacktop.i64_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_i64,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.i64_stack_top_begin_pos,
+                                                   CompileOption.i64_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::i64_storeN_op_with,
+                                                   details::i64_storeN_op_with_2d,
+                                                   details::i64_storeN_op_with_i32_only,
+                                                   1u,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3390,12 +4341,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store16_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                          details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i64_stack_top_begin_pos,
-                                                       CompileOption.i64_stack_top_end_pos,
-                                                       details::i64_storeN_op_with,
-                                                       2u,
-                                                       Type...>(curr_stacktop.i64_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_i64,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.i64_stack_top_begin_pos,
+                                                   CompileOption.i64_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::i64_storeN_op_with,
+                                                   details::i64_storeN_op_with_2d,
+                                                   details::i64_storeN_op_with_i32_only,
+                                                   2u,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3410,12 +4367,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                                                                          details::op_details::native_memory_t const& memory) noexcept
         {
-            return details::select_mem_fptr_or_default<CompileOption,
-                                                       CompileOption.i64_stack_top_begin_pos,
-                                                       CompileOption.i64_stack_top_end_pos,
-                                                       details::i64_storeN_op_with,
-                                                       4u,
-                                                       Type...>(curr_stacktop.i64_stack_top_curr_pos, memory);
+            return details::select_binary_mem_fptr<CompileOption,
+                                                   details::op_details::wasm_i64,
+                                                   details::op_details::wasm_i32,
+                                                   CompileOption.i64_stack_top_begin_pos,
+                                                   CompileOption.i64_stack_top_end_pos,
+                                                   CompileOption.i32_stack_top_begin_pos,
+                                                   CompileOption.i32_stack_top_end_pos,
+                                                   details::i64_storeN_op_with,
+                                                   details::i64_storeN_op_with_2d,
+                                                   details::i64_storeN_op_with_i32_only,
+                                                   4u,
+                                                   Type...>(curr_stacktop, memory);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3453,18 +4416,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load_op,
+                                              details::i64_load_op_2d,
+                                              details::i64_load_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3477,18 +4439,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::f32_load_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_f32_load<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_f32,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.f32_stack_top_begin_pos,
+                                              CompileOption.f32_stack_top_end_pos,
+                                              details::f32_load_op,
+                                              details::f32_load_op_2d,
+                                              details::f32_load_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3501,18 +4462,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f64_load_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::f64_load_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_f64_load<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_f64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.f64_stack_top_begin_pos,
+                                              CompileOption.f64_stack_top_end_pos,
+                                              details::f64_load_op,
+                                              details::f64_load_op_2d,
+                                              details::f64_load_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3623,18 +4583,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load8_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load8_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load8_s<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load8_s_op,
+                                              details::i64_load8_s_op_2d,
+                                              details::i64_load8_s_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3647,18 +4606,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load8_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load8_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load8_u<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load8_u_op,
+                                              details::i64_load8_u_op_2d,
+                                              details::i64_load8_u_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3671,18 +4629,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load16_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load16_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load16_s<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load16_s_op,
+                                              details::i64_load16_s_op_2d,
+                                              details::i64_load16_s_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3695,18 +4652,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load16_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load16_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load16_u<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load16_u_op,
+                                              details::i64_load16_u_op_2d,
+                                              details::i64_load16_u_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3719,18 +4675,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load32_s_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load32_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load32_s<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load32_s_op,
+                                              details::i64_load32_s_op_2d,
+                                              details::i64_load32_s_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3743,18 +4698,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_load32_u_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i64_load32_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_load32_u<CompileOption, 0uz, Type...>;
-            }
+            return details::select_unary_fptr<CompileOption,
+                                              details::op_details::wasm_i32,
+                                              details::op_details::wasm_i64,
+                                              CompileOption.i32_stack_top_begin_pos,
+                                              CompileOption.i32_stack_top_end_pos,
+                                              CompileOption.i64_stack_top_begin_pos,
+                                              CompileOption.i64_stack_top_end_pos,
+                                              details::i64_load32_u_op,
+                                              details::i64_load32_u_op_2d,
+                                              details::i64_load32_u_op_out_only,
+                                              Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3791,18 +4745,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i64_stack_top_begin_pos,
-                                                                     CompileOption.i64_stack_top_end_pos,
-                                                                     details::i64_store_op,
-                                                                     Type...>(curr_stacktop.i64_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_store<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_i64,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.i64_stack_top_begin_pos,
+                                               CompileOption.i64_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::i64_store_op,
+                                               details::i64_store_op_2d,
+                                               details::i64_store_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3815,18 +4768,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.f32_stack_top_begin_pos,
-                                                                     CompileOption.f32_stack_top_end_pos,
-                                                                     details::f32_store_op,
-                                                                     Type...>(curr_stacktop.f32_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_f32_store<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_f32,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.f32_stack_top_begin_pos,
+                                               CompileOption.f32_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::f32_store_op,
+                                               details::f32_store_op_2d,
+                                               details::f32_store_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3839,18 +4791,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f64_store_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.f64_stack_top_begin_pos,
-                                                                     CompileOption.f64_stack_top_end_pos,
-                                                                     details::f64_store_op,
-                                                                     Type...>(curr_stacktop.f64_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_f64_store<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_f64,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.f64_stack_top_begin_pos,
+                                               CompileOption.f64_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::f64_store_op,
+                                               details::f64_store_op_2d,
+                                               details::f64_store_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3911,18 +4862,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store8_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i64_stack_top_begin_pos,
-                                                                     CompileOption.i64_stack_top_end_pos,
-                                                                     details::i64_store8_op,
-                                                                     Type...>(curr_stacktop.i64_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_store8<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_i64,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.i64_stack_top_begin_pos,
+                                               CompileOption.i64_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::i64_store8_op,
+                                               details::i64_store8_op_2d,
+                                               details::i64_store8_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3935,18 +4885,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store16_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i64_stack_top_begin_pos,
-                                                                     CompileOption.i64_stack_top_end_pos,
-                                                                     details::i64_store16_op,
-                                                                     Type...>(curr_stacktop.i64_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_store16<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_i64,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.i64_stack_top_begin_pos,
+                                               CompileOption.i64_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::i64_store16_op,
+                                               details::i64_store16_op_2d,
+                                               details::i64_store16_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
@@ -3959,18 +4908,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_store32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop) noexcept
         {
-            if constexpr(CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos)
-            {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i64_stack_top_begin_pos,
-                                                                     CompileOption.i64_stack_top_end_pos,
-                                                                     details::i64_store32_op,
-                                                                     Type...>(curr_stacktop.i64_stack_top_curr_pos);
-            }
-            else
-            {
-                return uwvmint_i64_store32<CompileOption, 0uz, Type...>;
-            }
+            return details::select_binary_fptr<CompileOption,
+                                               details::op_details::wasm_i64,
+                                               details::op_details::wasm_i32,
+                                               CompileOption.i64_stack_top_begin_pos,
+                                               CompileOption.i64_stack_top_end_pos,
+                                               CompileOption.i32_stack_top_begin_pos,
+                                               CompileOption.i32_stack_top_end_pos,
+                                               details::i64_store32_op,
+                                               details::i64_store32_op_2d,
+                                               details::i64_store32_op_i32_only,
+                                               Type...>(curr_stacktop);
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>

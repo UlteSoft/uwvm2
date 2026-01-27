@@ -55,7 +55,7 @@ struct codegen_i32_sp_t
     constexpr uwvm_int_optable::uwvm_interpreter_translate_option_t opt{};
     constexpr uwvm_int_optable::uwvm_interpreter_stacktop_currpos_t curr{};
 
-    auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32>>(op, sp, local_base);
+    auto const vals = uwvm_int_optable::manipulate::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32>>(op, sp, local_base);
     wasm_i32 const v = ::fast_io::get<0>(vals);
     codegen_keep(v);
     codegen_keep(sp);
@@ -83,7 +83,7 @@ struct codegen_i32_sp_t
                                                                          .f64_stack_top_curr_pos = SIZE_MAX,
                                                                          .v128_stack_top_curr_pos = SIZE_MAX};
 
-    auto const vals = uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32>>(op, sp, local_base, r3);
+    auto const vals = uwvm_int_optable::manipulate::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32>>(op, sp, local_base, r3);
     wasm_i32 const v = ::fast_io::get<0>(vals);
     codegen_keep(v);
     return v;
@@ -138,7 +138,7 @@ struct codegen_i32_sp_t
 
     // pop order: i32 (s3), i64 (s4), f32 (v5), v128 (v6), then i32/f32 from memory.
     auto const vals =
-        uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
+        uwvm_int_optable::manipulate::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
                                                                                                                                                 sp,
                                                                                                                                                 local_base,
                                                                                                                                                 s3,
@@ -190,7 +190,7 @@ struct codegen_mixed_mem_t
                                                                          .v128_stack_top_curr_pos = 5uz};
 
     auto const vals =
-        uwvm_int_optable::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
+        uwvm_int_optable::manipulate::get_vals_from_operand_stack<opt, curr, ::fast_io::tuple<wasm_i32, wasm_i64, wasm_f32, wasm_v128, wasm_i32, wasm_f32>>(op,
                                                                                                                                                 sp,
                                                                                                                                                 local_base,
                                                                                                                                                 s3,

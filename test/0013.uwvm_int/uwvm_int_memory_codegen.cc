@@ -9,6 +9,8 @@
 namespace optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
 
 using slot_scalar = optable::wasm_stack_top_i32_i64_f32_f64_u;
+using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 
 template <typename T>
 [[gnu::always_inline]] inline void codegen_keep(T const& v) noexcept
@@ -60,6 +62,20 @@ static constexpr optable::uwvm_interpreter_translate_option_t opt_scalar_cache{
     .v128_stack_top_end_pos = SIZE_MAX,
 };
 
+static constexpr optable::uwvm_interpreter_translate_option_t opt_i32_f32_split{
+    .is_tail_call = true,
+    .i32_stack_top_begin_pos = 3uz,
+    .i32_stack_top_end_pos = 5uz,
+    .i64_stack_top_begin_pos = SIZE_MAX,
+    .i64_stack_top_end_pos = SIZE_MAX,
+    .f32_stack_top_begin_pos = 5uz,
+    .f32_stack_top_end_pos = 7uz,
+    .f64_stack_top_begin_pos = SIZE_MAX,
+    .f64_stack_top_end_pos = SIZE_MAX,
+    .v128_stack_top_begin_pos = SIZE_MAX,
+    .v128_stack_top_end_pos = SIZE_MAX,
+};
+
 [[gnu::noinline]] void codegen_i32_load_cached(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
 #if defined(UWVM_SUPPORT_MMAP)
@@ -88,12 +104,12 @@ static constexpr optable::uwvm_interpreter_translate_option_t opt_scalar_cache{
 [[gnu::noinline]] void codegen_i64_load_cached(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
 #if defined(UWVM_SUPPORT_MMAP)
-    optable::uwvmint_i64_load_mmap_full<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_load_mmap_full<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    optable::uwvmint_i64_load_multithread_allocator<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_load_multithread_allocator<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 # else
-    optable::uwvmint_i64_load_singlethread_allocator<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_load_singlethread_allocator<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 # endif
 #endif
 }
@@ -101,24 +117,24 @@ static constexpr optable::uwvm_interpreter_translate_option_t opt_scalar_cache{
 #if defined(UWVM_SUPPORT_MMAP)
 [[gnu::noinline]] void codegen_i64_load_cached_mmap_path(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
-    optable::uwvmint_i64_load_mmap_path<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_load_mmap_path<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 }
 
 [[gnu::noinline]] void codegen_i64_load_cached_mmap_judge(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
-    optable::uwvmint_i64_load_mmap_judge<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_load_mmap_judge<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 }
 #endif
 
 [[gnu::noinline]] void codegen_i64_store_cached(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
 #if defined(UWVM_SUPPORT_MMAP)
-    optable::uwvmint_i64_store_mmap_full<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_store_mmap_full<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-    optable::uwvmint_i64_store_multithread_allocator<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_store_multithread_allocator<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 # else
-    optable::uwvmint_i64_store_singlethread_allocator<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_store_singlethread_allocator<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 # endif
 #endif
 }
@@ -126,14 +142,40 @@ static constexpr optable::uwvm_interpreter_translate_option_t opt_scalar_cache{
 #if defined(UWVM_SUPPORT_MMAP)
 [[gnu::noinline]] void codegen_i64_store_cached_mmap_path(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
-    optable::uwvmint_i64_store_mmap_path<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_store_mmap_path<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 }
 
 [[gnu::noinline]] void codegen_i64_store_cached_mmap_judge(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
-    optable::uwvmint_i64_store_mmap_judge<opt_scalar_cache, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
+    optable::uwvmint_i64_store_mmap_judge<opt_scalar_cache, 3uz, 3uz, T0, T1, T2, slot_scalar, slot_scalar>(ip, sp, local_base, s3, s4);
 }
 #endif
+
+[[gnu::noinline]] void codegen_f32_load_split(T0 ip, T1 sp, T2 local_base, wasm_i32 s3, wasm_i32 s4, wasm_f32 s5, wasm_f32 s6)
+{
+#if defined(UWVM_SUPPORT_MMAP)
+    optable::uwvmint_f32_load_mmap_full<opt_i32_f32_split, 3uz, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+#else
+# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+    optable::uwvmint_f32_load_multithread_allocator<opt_i32_f32_split, 3uz, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+# else
+    optable::uwvmint_f32_load_singlethread_allocator<opt_i32_f32_split, 3uz, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+# endif
+#endif
+}
+
+[[gnu::noinline]] void codegen_f32_store_split(T0 ip, T1 sp, T2 local_base, wasm_i32 s3, wasm_i32 s4, wasm_f32 s5, wasm_f32 s6)
+{
+#if defined(UWVM_SUPPORT_MMAP)
+    optable::uwvmint_f32_store_mmap_full<opt_i32_f32_split, 5uz, 3uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+#else
+# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+    optable::uwvmint_f32_store_multithread_allocator<opt_i32_f32_split, 5uz, 3uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+# else
+    optable::uwvmint_f32_store_singlethread_allocator<opt_i32_f32_split, 5uz, 3uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_f32, wasm_f32>(ip, sp, local_base, s3, s4, s5, s6);
+# endif
+#endif
+}
 
 [[gnu::noinline]] void codegen_memory_size_cached(T0 ip, T1 sp, T2 local_base, slot_scalar s3, slot_scalar s4)
 {
