@@ -596,3 +596,13 @@
 #if defined(__ELF__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__used__)
 # define UWVM_SUPPORT_WEAK_SYMBOL
 #endif
+
+#pragma push_macro("UWVM_NOINLINE")
+#undef UWVM_NOINLINE
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__noinline__)
+# define UWVM_NOINLINE [[__gnu__::__noinline__]]
+#elif UWVM_HAS_CPP_ATTRIBUTE(msvc::noinline)
+# define UWVM_NOINLINE [[msvc::noinline]]
+#else
+# define UWVM_NOINLINE
+#endif

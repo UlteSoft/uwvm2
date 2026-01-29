@@ -125,7 +125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
-        UWVM_GNU_COLD inline void trap_integer_divide_by_zero() noexcept
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_integer_divide_by_zero() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func == nullptr) [[unlikely]]
             {
@@ -139,7 +139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
-        UWVM_GNU_COLD inline void trap_integer_overflow() noexcept
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_integer_overflow() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func == nullptr) [[unlikely]]
             {

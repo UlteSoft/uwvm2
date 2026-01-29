@@ -294,7 +294,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
         }
 
-        UWVM_ALWAYS_INLINE UWVM_GNU_COLD [[noreturn]] inline void memory_oob_terminate(::std::size_t memory_idx,
+        UWVM_GNU_COLD [[noreturn]] inline void memory_oob_terminate(::std::size_t memory_idx,
                                                                                        ::std::uint_least64_t memory_static_offset,
                                                                                        memory_offset_t effective_offset,
                                                                                        ::std::size_t memory_length,

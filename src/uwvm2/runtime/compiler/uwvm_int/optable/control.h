@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// - Bytecode layout: not applicable (this helper does not read/advance the bytecode stream pointer).
         /// @note `unreachable_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a safe
         /// fallback.
-        UWVM_GNU_COLD inline constexpr void unreachable() UWVM_THROWS
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline constexpr void unreachable() UWVM_THROWS
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func == nullptr) [[unlikely]]
             {

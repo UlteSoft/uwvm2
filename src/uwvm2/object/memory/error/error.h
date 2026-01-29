@@ -122,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::error
 #endif
     }
 
-    [[noreturn]] inline void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
+    UWVM_GNU_COLD [[noreturn]] inline void output_memory_error_and_terminate(memory_error_t const& memerr) noexcept
     {
         output_memory_error(memerr);
         ::fast_io::fast_terminate();
