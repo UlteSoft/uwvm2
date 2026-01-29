@@ -353,23 +353,61 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // runtime invariant that the default rounding mode (FE_TONEAREST)
                 // is in effect and not modified.
 
-#if defined(__ARM_NEON)
+#if defined(__loongarch_asx)
+                using f64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+                using f32x8simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+
+                if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
+                {
+# if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_s)
+                    f32x8simd tmp{v, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+                    return __builtin_lasx_xvfrintrne_s(tmp)[0u];
+# else
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
+                    return ::std::nearbyint(v);
+# endif
+                }
+                else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
+                {
+# if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_d)
+                    f64x4simd tmp{v, 0.0, 0.0, 0.0};
+                    return __builtin_lasx_xvfrintrne_d(tmp)[0u];
+# else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
+                    return ::std::nearbyint(v);
+# endif
+                }
+                else
+                {
+                    // platform
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+# endif
+                    return ::std::nearbyint(v);
+                }
+
+#elif defined(__ARM_NEON)
 # if defined(__clang__)
-                using float64x1_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
-                using float64x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
-                using float32x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
-                using float32x4_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(4)]];
-                using int8x8_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i8 [[clang::neon_vector_type(8)]];
+                using float64x1_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
+                using float64x2_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
+                using float32x2_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
+                using float32x4_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(4)]];
+                using int8x8_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i8 [[clang::neon_vector_type(8)]];
 # elif (defined(__GNUC__) && !defined(__clang__))  // gcc
-                using float64x1_t = __Float64x1_t;
-                using float64x2_t = __Float64x2_t;
-                using float32x2_t = __Float32x2_t;
-                using float32x4_t = __Float32x4_t;
+                using float64x1_t [[maybe_unused]] = __Float64x1_t;
+                using float64x2_t [[maybe_unused]] = __Float64x2_t;
+                using float32x2_t [[maybe_unused]] = __Float32x2_t;
+                using float32x4_t [[maybe_unused]] = __Float32x4_t;
 # elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
-                using float64x1_t = __n64;
-                using float64x2_t = __n128;
-                using float32x2_t = __n64;
-                using float32x4_t = __n128;
+                using float64x1_t [[maybe_unused]] = __n64;
+                using float64x2_t [[maybe_unused]] = __n128;
+                using float32x2_t [[maybe_unused]] = __n64;
+                using float32x4_t [[maybe_unused]] = __n128;
 # endif
 
                 if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
