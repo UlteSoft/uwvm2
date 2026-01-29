@@ -47,7 +47,6 @@
 # include "define.h"
 # include "storage.h"
 # include "register_ring.h"
-# include <arm_neon.h>
 #endif
 
 #if !(__cpp_pack_indexing >= 202311L)
