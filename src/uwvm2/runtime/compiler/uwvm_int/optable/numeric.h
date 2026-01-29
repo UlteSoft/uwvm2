@@ -47,6 +47,7 @@
 # include "define.h"
 # include "storage.h"
 # include "register_ring.h"
+# include <arm_neon.h>
 #endif
 
 #if !(__cpp_pack_indexing >= 202311L)
@@ -352,7 +353,64 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // runtime invariant that the default rounding mode (FE_TONEAREST)
                 // is in effect and not modified.
 
-#if defined(__SSE4_1__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && (defined(__builtin_ia32_roundss) && defined(__builtin_ia32_roundsd))
+#if defined(__ARM_NEON)
+# if defined(__clang__)
+                using float64x1_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
+                using float64x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
+                using float32x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
+                using float32x4_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(4)]];
+                using int8x8_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i8 [[clang::neon_vector_type(8)]];
+# elif (defined(__GNUC__) && !defined(__clang__))  // gcc
+                using float64x1_t = __Float64x1_t;
+                using float64x2_t = __Float64x2_t;
+                using float32x2_t = __Float32x2_t;
+                using float32x4_t = __Float32x4_t;
+# elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
+                using float64x1_t = __n64;
+                using float64x2_t = __n128;
+                using float32x2_t = __n64;
+                using float32x4_t = __n128;
+# endif
+
+                if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
+                {
+# if UWVM_HAS_BUILTIN(__builtin_neon_vrndns_f32)
+                    return __builtin_neon_vrndns_f32(v);
+# elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevensf)
+                    return __builtin_aarch64_roundevensf(v);
+# else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
+                    return ::std::nearbyint(v);
+# endif
+                }
+                else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
+                {
+# if UWVM_HAS_BUILTIN(__builtin_neon_vrndn_v)
+                    return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(__builtin_neon_vrndn_v(::std::bit_cast<int8x8_t>(v), 10));
+# elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevendf)
+                    return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(
+                        __builtin_aarch64_roundevendf(::std::bit_cast<float64x1_t>(v)));
+# else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#  endif
+                    return ::std::nearbyint(v);
+# endif
+                }
+                else
+                {
+                    // platform
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+# endif
+                    return ::std::nearbyint(v);
+                }
+
+#elif defined(__SSE4_1__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && (defined(__builtin_ia32_roundss) && defined(__builtin_ia32_roundsd))
                 if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
                 {
                     using f32x4simd [[__gnu__::__vector_size__(16)]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
