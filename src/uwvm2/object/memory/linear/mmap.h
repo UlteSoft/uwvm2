@@ -126,6 +126,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         // The number of platform pages can be obtained by rounding up the memory size to the nearest integer multiple of the platform page size.
 
         unsigned custom_page_size_log2{};
+        
+        // Cached answer for `require_dynamic_determination_memory_size()`.
+        // Hot paths (load/store) call this through bounds checks, so it must not query platform page size per access.
+        bool require_dynamic_determination_memory_size_cached{};
+
         mmap_memory_status_t status{};
 
         // This lock is used to prevent multithreaded growth.
@@ -153,6 +158,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->custom_page_size_log2 = default_wasm_page_size_log2;
 
             this->status = mmap_memory_status_t::wasm32;
+
+            // storage page size
+            if UWVM_IF_NOT_CONSTEVAL
+            {
+                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
+                if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(page_size == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                auto const custom_page_size{1uz << this->custom_page_size_log2};
+                this->require_dynamic_determination_memory_size_cached = custom_page_size < page_size;
+            }
         }
 
         inline constexpr mmap_memory_t(::std::size_t custom_page_size, mmap_memory_status_t memory_status) noexcept
@@ -172,28 +188,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->custom_page_size_log2 = ::std::countr_zero(custom_page_size);
 
             this->status = memory_status;
-        }
 
-        inline constexpr bool require_dynamic_determination_memory_size() const noexcept
-        {
             if UWVM_IF_NOT_CONSTEVAL
             {
                 auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
                 if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
                 if(page_size == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-                // UB will never appear; it has been preemptively checked.
-                auto const custom_page_size{1uz << this->custom_page_size_log2};
+                this->require_dynamic_determination_memory_size_cached = custom_page_size < page_size;
+            }
+        }
 
-                // When `custom_page_size` is less than one platform page, `mmap` can only guarantee the stability of the starting address and cannot provide
-                // page-protection checks at the custom-page granularity. Additional dynamic verification is required.
-                return custom_page_size < page_size;
-            }
-            else
-            {
-                // The platform page size cannot be queried during constant evaluation.
-                return false;
-            }
+        inline constexpr bool require_dynamic_determination_memory_size() const noexcept
+        {
+            // When `custom_page_size` is less than one platform page, `mmap` can only guarantee the stability of the starting address and cannot provide
+            // page-protection checks at the custom-page granularity. Additional dynamic verification is required.
+            if UWVM_IF_NOT_CONSTEVAL { return this->require_dynamic_determination_memory_size_cached; }
+            return false;
         }
 
         inline constexpr bool is_full_page_protection() const noexcept
@@ -880,6 +891,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length_p = other.memory_length_p;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->require_dynamic_determination_memory_size_cached = other.require_dynamic_determination_memory_size_cached;
             this->status = other.status;
             this->growing_mutex_p = other.growing_mutex_p;
 
@@ -888,6 +900,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             other.memory_begin = nullptr;
             other.memory_length_p = nullptr;
             other.custom_page_size_log2 = 0u;
+            other.require_dynamic_determination_memory_size_cached = false;
             other.status = mmap_memory_status_t{};
             other.growing_mutex_p = nullptr;
         }
@@ -904,6 +917,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = other.memory_begin;
             this->memory_length_p = other.memory_length_p;
             this->custom_page_size_log2 = other.custom_page_size_log2;
+            this->require_dynamic_determination_memory_size_cached = other.require_dynamic_determination_memory_size_cached;
             this->status = other.status;
             this->growing_mutex_p = other.growing_mutex_p;
 
@@ -912,6 +926,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             other.memory_begin = nullptr;
             other.memory_length_p = nullptr;
             other.custom_page_size_log2 = 0u;
+            other.require_dynamic_determination_memory_size_cached = false;
             other.status = mmap_memory_status_t{};
             other.growing_mutex_p = nullptr;
 
@@ -1110,6 +1125,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_begin = nullptr;
             this->memory_length_p = nullptr;
             this->custom_page_size_log2 = 0u;
+            this->require_dynamic_determination_memory_size_cached = false;
             this->status = mmap_memory_status_t{};
             this->growing_mutex_p = nullptr;
         }
