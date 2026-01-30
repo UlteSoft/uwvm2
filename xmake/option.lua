@@ -181,6 +181,15 @@ option("enable-debug-int", function()
     set_default(true)
 end)
 
+option("enable-uwvm-int-heavy-combine-ops", function()
+    set_description
+    (
+        "Enable heavy combined opcodes for uwvm-int (dense_compute / rare fusion patterns).",
+        "default = true"
+    )
+    set_default(true)
+end)
+
 option("detailed-debug-check", function()
     set_description
     (

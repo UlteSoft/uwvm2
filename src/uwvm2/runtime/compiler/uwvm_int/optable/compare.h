@@ -122,7 +122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @brief Compile-time check: whether stack-top caching is enabled for the given operand type.
         /// @details Returns `true` iff the corresponding `[begin,end)` range in `CompileOption` is non-empty.
         template <uwvm_interpreter_translate_option_t CompileOption, typename OperandT>
-        inline consteval bool stacktop_enabled_for() noexcept
+        inline consteval bool stacktop_enabled_for_compare() noexcept
         {
             if constexpr(::std::same_as<OperandT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>)
             {
@@ -194,7 +194,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
@@ -311,7 +311,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
@@ -359,7 +359,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i64>())
         {
             constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
@@ -372,7 +372,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_int_cmp<Cmp, wasm_i64, wasm_u64>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_i64>())
                 {
@@ -402,7 +402,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_int_cmp<Cmp, wasm_i64, wasm_u64>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 constexpr ::std::size_t i32_begin{CompileOption.i32_stack_top_begin_pos};
                 constexpr ::std::size_t i32_end{CompileOption.i32_stack_top_end_pos};
@@ -544,7 +544,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i64>())
         {
             constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
@@ -553,7 +553,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
             wasm_i32 const out{static_cast<wasm_i32>(v == wasm_i64{0})};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_i64>())
                 {
@@ -580,7 +580,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i64 const v{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
             wasm_i32 const out{static_cast<wasm_i32>(v == wasm_i64{0})};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 constexpr ::std::size_t i32_begin{CompileOption.i32_stack_top_begin_pos};
                 constexpr ::std::size_t i32_end{CompileOption.i32_stack_top_end_pos};
@@ -623,7 +623,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
@@ -636,7 +636,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_f32>())
                 {
@@ -664,7 +664,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 constexpr ::std::size_t i32_begin{CompileOption.i32_stack_top_begin_pos};
                 constexpr ::std::size_t i32_end{CompileOption.i32_stack_top_end_pos};
@@ -767,7 +767,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
-        if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>())
+        if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
@@ -780,7 +780,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_f64>())
                 {
@@ -810,7 +810,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs))};
 
-            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            if constexpr(details::stacktop_enabled_for_compare<CompileOption, wasm_i32>())
             {
                 constexpr ::std::size_t i32_begin{CompileOption.i32_stack_top_begin_pos};
                 constexpr ::std::size_t i32_end{CompileOption.i32_stack_top_end_pos};
@@ -1301,14 +1301,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       typename OpWrapper,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl(::std::size_t pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_compare(::std::size_t pos) noexcept
             {
                 static_assert(Curr < End);
 
                 if(pos == Curr) { return OpWrapper::template fptr<CompileOption, Curr, Type...>(); }
                 else
                 {
-                    if constexpr(Curr + 1uz < End) { return select_stacktop_fptr_by_currpos_impl<CompileOption, Curr + 1uz, End, OpWrapper, Type...>(pos); }
+                    if constexpr(Curr + 1uz < End)
+                    {
+                        return select_stacktop_fptr_by_currpos_impl_compare<CompileOption, Curr + 1uz, End, OpWrapper, Type...>(pos);
+                    }
                     else
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1327,7 +1330,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                       typename OpWrapper,
                       uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
-            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_2d(::std::size_t i32_pos, ::std::size_t op_pos) noexcept
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_compare_2d(::std::size_t i32_pos,
+                                                                                                                ::std::size_t op_pos) noexcept
             {
                 static_assert(I32Curr < I32End);
                 static_assert(OpCurr < OpEnd);
@@ -1339,8 +1343,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         if constexpr(OpCurr + 1uz < OpEnd)
                         {
-                            return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, I32Curr, I32End, OpCurr + 1uz, OpEnd, OpWrapper, Type...>(i32_pos,
-                                                                                                                                                    op_pos);
+                            return select_stacktop_fptr_by_currpos_impl_compare_2d<CompileOption, I32Curr, I32End, OpCurr + 1uz, OpEnd, OpWrapper, Type...>(
+                                i32_pos,
+                                op_pos);
                         }
                         else
                         {
@@ -1355,8 +1360,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     if constexpr(I32Curr + 1uz < I32End)
                     {
-                        return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, I32Curr + 1uz, I32End, OpCurr, OpEnd, OpWrapper, Type...>(i32_pos,
-                                                                                                                                                op_pos);
+                        return select_stacktop_fptr_by_currpos_impl_compare_2d<CompileOption, I32Curr + 1uz, I32End, OpCurr, OpEnd, OpWrapper, Type...>(i32_pos,
+                                                                                                                                                        op_pos);
                     }
                     else
                     {
@@ -1389,25 +1394,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     {
                         if constexpr(i32_range_matches_operand_range<CompileOption, OperandT>())
                         {
-                            return select_stacktop_fptr_by_currpos_impl<CompileOption, OpBegin, OpEnd, OpWrapper1D, Type...>(op_pos);
+                            return select_stacktop_fptr_by_currpos_impl_compare<CompileOption, OpBegin, OpEnd, OpWrapper1D, Type...>(op_pos);
                         }
                         else
                         {
-                            return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, I32Begin, I32End, OpBegin, OpEnd, OpWrapper2D, Type...>(
+                            return select_stacktop_fptr_by_currpos_impl_compare_2d<CompileOption, I32Begin, I32End, OpBegin, OpEnd, OpWrapper2D, Type...>(
                                 curr_stacktop.i32_stack_top_curr_pos,
                                 op_pos);
                         }
                     }
                     else
                     {
-                        return select_stacktop_fptr_by_currpos_impl<CompileOption, OpBegin, OpEnd, OpWrapper1D, Type...>(op_pos);
+                        return select_stacktop_fptr_by_currpos_impl_compare<CompileOption, OpBegin, OpEnd, OpWrapper1D, Type...>(op_pos);
                     }
                 }
                 else
                 {
                     if constexpr(I32Begin != I32End)
                     {
-                        return select_stacktop_fptr_by_currpos_impl<CompileOption, I32Begin, I32End, OpWrapperOutOnly, Type...>(
+                        return select_stacktop_fptr_by_currpos_impl_compare<CompileOption, I32Begin, I32End, OpWrapperOutOnly, Type...>(
                             curr_stacktop.i32_stack_top_curr_pos);
                     }
                     else
@@ -1992,11 +1997,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_eq_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_eq_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2016,11 +2021,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_ne_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_ne_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2040,11 +2045,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_lt_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_lt_s_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2064,11 +2069,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_lt_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_lt_u_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2088,11 +2093,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_gt_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_gt_s_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2112,11 +2117,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_gt_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_gt_u_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2136,11 +2141,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_le_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_le_s_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2160,11 +2165,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_le_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_le_u_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2184,11 +2189,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_ge_s_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_ge_s_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2208,11 +2213,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_ge_u_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_ge_u_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
@@ -2232,11 +2237,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
             {
-                return details::select_stacktop_fptr_by_currpos_impl<CompileOption,
-                                                                     CompileOption.i32_stack_top_begin_pos,
-                                                                     CompileOption.i32_stack_top_end_pos,
-                                                                     details::i32_eqz_op,
-                                                                     Type...>(curr_stacktop.i32_stack_top_curr_pos);
+                return details::select_stacktop_fptr_by_currpos_impl_compare<CompileOption,
+                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                             details::i32_eqz_op,
+                                                                             Type...>(curr_stacktop.i32_stack_top_curr_pos);
             }
             else
             {
