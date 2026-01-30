@@ -398,6 +398,65 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         template <typename MemoryT>
+        UWVM_ALWAYS_INLINE inline constexpr bool should_trap_oob_unlocked([[maybe_unused]] MemoryT const& memory,
+                                                                          [[maybe_unused]] memory_offset_t effective_offset,
+                                                                          [[maybe_unused]] ::std::size_t wasm_bytes) noexcept
+        {
+            if constexpr(MemoryT::can_mmap)
+            {
+                if(memory.require_dynamic_determination_memory_size())
+                {
+                    auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
+                    return effective_offset.offset_65_bit || wasm_bytes > memory_length ||
+                           effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes);
+                }
+
+                if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+                {
+#if defined(UWVM_SUPPORT_MMAP)
+                    if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64)
+                    {
+                        return effective_offset.offset_65_bit ||
+                               !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index>(effective_offset.offset);
+                    }
+#endif
+                    return false;
+                }
+                else
+                {
+#if defined(UWVM_SUPPORT_MMAP)
+                    return effective_offset.offset_65_bit ||
+                           !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm32_index>(effective_offset.offset);
+#else
+                    return true;
+#endif
+                }
+            }
+            else
+            {
+                auto const memory_length{memory.memory_length};
+                return effective_offset.offset_65_bit || wasm_bytes > memory_length ||
+                       effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes);
+            }
+        }
+
+        template <typename MemoryT>
+        UWVM_ALWAYS_INLINE inline ::std::size_t load_memory_length_for_oob_unlocked(MemoryT const& memory) noexcept
+        {
+            if constexpr(requires { memory.memory_length_p; })
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#endif
+                return memory.memory_length_p->load(::std::memory_order_acquire);
+            }
+            else
+            {
+                return memory.memory_length;
+            }
+        }
+
+        template <typename MemoryT>
         UWVM_ALWAYS_INLINE inline auto lock_memory(MemoryT const& memory) noexcept
         {
             // Only allocator-backed memories may relocate `memory_begin` during grow(), so only they need the memory_operation_guard.
@@ -640,9 +699,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     namespace details::memop
     {
-        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+        template <::std::size_t WasmBytes, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_ALWAYS_INLINE inline constexpr void i32_load(Type... type) UWVM_THROWS
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32addr(Type... type) UWVM_THROWS
         {
             using wasm_i32 = details::wasm_i32;
             using wasm_u32 = details::wasm_u32;
@@ -660,8 +719,232 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
             auto const& memory{*memory_p};
+            auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+
+            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, WasmBytes);
+        }
+
+        template <::std::size_t StoreBytes,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i32_stack_top,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i32_store(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(StoreBytes == 1uz || StoreBytes == 2uz || StoreBytes == 4uz);
+            static_assert(sizeof...(Type) >= 2uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            wasm_i32 addr{};
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            {
+                (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+                constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
+                constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
+                constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i32_stack_top, range_begin, range_end)};
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+            }
+            else
+            {
+                (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+            }
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+
+            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+        }
+
+        template <::std::size_t StoreBytes,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_i64_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_i64_store(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_i64 = details::wasm_i64;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(StoreBytes == 1uz || StoreBytes == 2uz || StoreBytes == 4uz || StoreBytes == 8uz);
+            static_assert(sizeof...(Type) >= 2uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...);
+
+            wasm_i32 addr{};
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::i32_i64_ranges_merged<CompileOption>())
+            {
+                static_assert(curr_i32_stack_top == curr_i64_stack_top);
+                constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
+                constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
+                static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
+                constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+            }
+            else
+            {
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+            }
+
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+
+            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+        }
+
+        template <::std::size_t StoreBytes,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_f32_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f32_store(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_f32 = details::wasm_f32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(StoreBytes == 4uz);
+            static_assert(sizeof...(Type) >= 2uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...);
+
+            wasm_i32 addr{};
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::i32_f32_ranges_merged<CompileOption>())
+            {
+                static_assert(curr_i32_stack_top == curr_f32_stack_top);
+                constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
+                constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
+                static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
+                constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f32_stack_top, range_begin, range_end)};
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+            }
+            else
+            {
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+            }
+
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+
+            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+        }
+
+        template <::std::size_t StoreBytes,
+                  uwvm_interpreter_translate_option_t CompileOption,
+                  ::std::size_t curr_f64_stack_top,
+                  ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
+                  uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_oob_f64_store(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_f64 = details::wasm_f64;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(StoreBytes == 8uz);
+            static_assert(sizeof...(Type) >= 2uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...);
+
+            wasm_i32 addr{};
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                         details::scalar_ranges_all_merged<CompileOption>())
+            {
+                static_assert(curr_i32_stack_top == curr_f64_stack_top);
+                constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
+                constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
+                static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
+                constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f64_stack_top, range_begin, range_end)};
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+            }
+            else
+            {
+                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
+            }
+
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+
+            details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, StoreBytes);
+        }
+
+        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_ALWAYS_INLINE inline constexpr void i32_load(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(sizeof...(Type) >= 2uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+            auto const op_begin{type...[0]};
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -701,6 +984,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -710,7 +994,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<8uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_i64_le(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -758,6 +1054,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -767,7 +1064,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_f32_le(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -815,6 +1124,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -824,7 +1134,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<8uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -1086,6 +1408,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1096,7 +1419,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 1uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<1uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             ::std::uint_least8_t b{details::load_u8(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -1138,6 +1473,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1148,7 +1484,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 2uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<2uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             ::std::uint_least16_t tmp;  // no init
@@ -1195,6 +1543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1204,7 +1553,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 1uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<1uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 1uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             ::std::uint_least8_t b{details::load_u8(details::ptr_add_u64(memory.memory_begin, eff))};
@@ -1260,6 +1621,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1269,7 +1631,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 2uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<2uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 2uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             ::std::uint_least16_t tmp;  // no init
@@ -1328,6 +1702,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1337,7 +1712,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i32addr<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
 
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             ::std::uint_least32_t tmp;  // no init
@@ -1453,6 +1840,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1467,7 +1855,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32) * 2uz; }
+                    UWVM_MUSTTAIL return trap_oob_i32_store<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             details::store_i32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
             details::exit_memory_operation_memory_lock(memory);
@@ -1493,6 +1893,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1519,7 +1920,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i64_store<8uz, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             details::store_i64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
             details::exit_memory_operation_memory_lock(memory);
@@ -1545,6 +1959,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1571,7 +1986,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f32>()) { type...[1u] += sizeof(wasm_f32); }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_f32_store<4uz, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             details::store_f32_le(details::ptr_add_u64(memory.memory_begin, eff), value);
             details::exit_memory_operation_memory_lock(memory);
@@ -1597,6 +2025,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1623,7 +2052,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 8uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f64>()) { type...[1u] += sizeof(wasm_f64); }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_f64_store<8uz, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
             details::store_f64_le(details::ptr_add_u64(memory.memory_begin, eff), value);
             details::exit_memory_operation_memory_lock(memory);
@@ -1649,6 +2091,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1663,7 +2106,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, static_cast<::std::size_t>(StoreBytes));
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, static_cast<::std::size_t>(StoreBytes))) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32) * 2uz; }
+                    UWVM_MUSTTAIL return trap_oob_i32_store<static_cast<::std::size_t>(StoreBytes), CompileOption, curr_i32_stack_top, Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, static_cast<::std::size_t>(StoreBytes));
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
 
             if constexpr(StoreBytes == 1u)
@@ -1701,6 +2156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             static_assert(sizeof...(Type) >= 2uz);
             static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
+            auto const op_begin{type...[0]};
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
@@ -1727,7 +2183,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             auto const& memory{*memory_p};
             details::enter_memory_operation_memory_lock(memory);
-            BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, static_cast<::std::size_t>(StoreBytes));
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, static_cast<::std::size_t>(StoreBytes))) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    UWVM_MUSTTAIL return trap_oob_i64_store<static_cast<::std::size_t>(StoreBytes),
+                                                            CompileOption,
+                                                            curr_i64_stack_top,
+                                                            curr_i32_stack_top,
+                                                            Type...>(type...);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, static_cast<::std::size_t>(StoreBytes));
+            }
             ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
 
             if constexpr(StoreBytes == 1u)
