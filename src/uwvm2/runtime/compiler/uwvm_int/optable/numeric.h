@@ -152,6 +152,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
+        // Why this wrapper exists:
+        // - In the threaded interpreter, opfuncs must keep the hot path strictly leaf so they can dispatch with `br` without setting up a frame.
+        // - A direct trap call would compile to `bl ...`, which clobbers `x30` (LR) on AArch64 and typically forces an entry prologue
+        //   (`stp x29, x30, ...`) even though the trap is cold and `[[noreturn]]`.
+        // - By tail-calling this cold, noinline wrapper, the compiler emits a plain `b ...` from the opfunc to this helper, keeping the opfunc leaf.
+        //   The wrapper may build a frame and call the user-provided trap hook; that cost is paid only on the exceptional path.
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_divide_by_zero_tail(Type... /*type*/) UWVM_THROWS
+        { trap_integer_divide_by_zero(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_overflow_tail(Type... /*type*/) UWVM_THROWS
+        { trap_integer_overflow(); }
+
         enum class int_unop
         {
             clz,
@@ -823,7 +839,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_div_s(Type... type) UWVM_THROWS
-    { return uwvmint_i32_binop<CompileOption, numeric_details::int_binop::div_s, curr_stack_top>(type...); }
+    {
+        using wasm_i32 = numeric_details::wasm_i32;
+
+        if constexpr(numeric_details::stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            constexpr ::std::size_t begin{numeric_details::range_begin<CompileOption, wasm_i32>()};
+            constexpr ::std::size_t end{numeric_details::range_end<CompileOption, wasm_i32>()};
+            static_assert(begin <= curr_stack_top && curr_stack_top < end);
+
+            constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
+
+            wasm_i32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_stack_top>(type...)};
+            wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...)};
+
+            if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+            if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+            {
+                UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+            }
+
+            wasm_i32 const out{static_cast<wasm_i32>(lhs / rhs)};
+            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+        }
+        else
+        {
+            wasm_i32 const rhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
+            wasm_i32 const lhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
+
+            if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+            if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+            {
+                UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+            }
+
+            wasm_i32 const out{static_cast<wasm_i32>(lhs / rhs)};
+            ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            type...[1u] += sizeof(out);
+        }
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_div_s(TypeRef & ... typeref) UWVM_THROWS
@@ -1063,7 +1122,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_div_s(Type... type) UWVM_THROWS
-    { return uwvmint_i64_binop<CompileOption, numeric_details::int_binop::div_s, curr_stack_top>(type...); }
+    {
+        using wasm_i64 = numeric_details::wasm_i64;
+
+        if constexpr(numeric_details::stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            constexpr ::std::size_t begin{numeric_details::range_begin<CompileOption, wasm_i64>()};
+            constexpr ::std::size_t end{numeric_details::range_end<CompileOption, wasm_i64>()};
+            static_assert(begin <= curr_stack_top && curr_stack_top < end);
+
+            constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
+
+            wasm_i64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_stack_top>(type...)};
+            wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...)};
+
+            if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+            if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+            {
+                UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+            }
+
+            wasm_i64 const out{static_cast<wasm_i64>(lhs / rhs)};
+            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, next_pos>(out, type...);
+        }
+        else
+        {
+            wasm_i64 const rhs{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
+            wasm_i64 const lhs{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
+
+            if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+            if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+            {
+                UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+            }
+
+            wasm_i64 const out{static_cast<wasm_i64>(lhs / rhs)};
+            ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            type...[1u] += sizeof(out);
+        }
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_div_s(TypeRef & ... typeref) UWVM_THROWS
