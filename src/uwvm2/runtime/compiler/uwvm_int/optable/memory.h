@@ -2740,7 +2740,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         details::check_memory_bounds_unlocked(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 8uz);
 
         ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
-        auto const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
+        wasm_f64 const out{details::load_f64_le(details::ptr_add_u64(memory.memory_begin, eff))};
         ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
         typeref...[1u] += sizeof(out);
     }
@@ -3341,26 +3341,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
             }
 
-            template <uwvm_interpreter_translate_option_t CompileOption,
-                      ::std::size_t OutBegin,
-                      ::std::size_t OutEnd,
-                      ::std::size_t InBegin,
-                      ::std::size_t InEnd,
-                      typename OpWrapper2D,
-                      uwvm_int_stack_top_type... Type>
-                requires (CompileOption.is_tail_call)
-            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
-            {
-                if constexpr(OutBegin != OutEnd && InBegin != InEnd)
-                {
-                    return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutBegin, OutEnd, InBegin, InEnd, OpWrapper2D, Type...>(out_pos, in_pos);
-                }
-                else
-                {
-                    return OpWrapper2D::template fptr<CompileOption, 0uz, 0uz, Type...>();
-                }
-            }
-
             /// @brief Compile-time selector for stack-top-aware opfuncs (tail-call).
             /// @details `OpWrapper` is a variable template that evaluates to the target function pointer:
             /// `OpWrapper<Opt, Pos, Type...> -> uwvm_interpreter_opfunc_t<Type...>`.
@@ -3384,6 +3364,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
                         ::fast_io::fast_terminate();
                     }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t OutBegin,
+                      ::std::size_t OutEnd,
+                      ::std::size_t InBegin,
+                      ::std::size_t InEnd,
+                      typename OpWrapper2D,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos) noexcept
+            {
+                if constexpr(OutBegin != OutEnd && InBegin != InEnd)
+                {
+                    return select_stacktop_fptr_by_currpos_impl_2d<CompileOption, OutBegin, OutEnd, InBegin, InEnd, OpWrapper2D, Type...>(out_pos, in_pos);
+                }
+                else
+                {
+                    return OpWrapper2D::template fptr<CompileOption, 0uz, 0uz, Type...>();
                 }
             }
 
