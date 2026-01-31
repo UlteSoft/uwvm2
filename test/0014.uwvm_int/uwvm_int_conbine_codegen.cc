@@ -5,6 +5,7 @@
 #endif
 
 #include <uwvm2/runtime/compiler/uwvm_int/optable/conbine.h>
+#include <uwvm2/runtime/compiler/uwvm_int/optable/conbine_heavy.h>
 
 #include <cstddef>
 #include <type_traits>

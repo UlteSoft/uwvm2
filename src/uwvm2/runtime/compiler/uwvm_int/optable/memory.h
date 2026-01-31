@@ -2657,10 +2657,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_load(TypeRef & ... typeref) UWVM_THROWS
     {
-        using wasm_i32 = details::wasm_i32;
-        using wasm_i64 = details::wasm_i64;
-        using wasm_u32 = details::wasm_u32;
-        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+        using wasm_i32 [[maybe_unused]] = details::wasm_i32;
+        using wasm_i64 [[maybe_unused]] = details::wasm_i64;
+        using wasm_u32 [[maybe_unused]] = details::wasm_u32;
+        using native_memory_t [[maybe_unused]] = ::uwvm2::object::memory::linear::native_memory_t;
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -2688,10 +2688,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_load(TypeRef & ... typeref) UWVM_THROWS
     {
-        using wasm_i32 = details::wasm_i32;
-        using wasm_f32 = details::wasm_f32;
-        using wasm_u32 = details::wasm_u32;
-        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+        using wasm_i32 [[maybe_unused]] = details::wasm_i32;
+        using wasm_f32 [[maybe_unused]] = details::wasm_f32;
+        using wasm_u32 [[maybe_unused]] = details::wasm_u32;
+        using native_memory_t [[maybe_unused]] = ::uwvm2::object::memory::linear::native_memory_t;
 
         static_assert(sizeof...(TypeRef) >= 2uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
