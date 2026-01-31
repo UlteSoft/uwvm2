@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
  * @copyright   APL-2.0 License
  */
 
@@ -20,21 +19,36 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+
+export module uwvm2.runtime.compiler.uwvm_int.optable:conbine_heavy;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1;
+import uwvm2.object;
+import :define;
+import :register_ring;
+import :memory;
+import :numeric;
+import :compare;
+import :variable;
+import :conbine;
 
 #ifndef UWVM_MODULE
-# include "define.h"
-# include "storage.h"
-# include "call.h"
-# include "compare.h"
-# include "constop.h"
-# include "control.h"
-# include "convert.h"
-# include "lazy.h"
-# include "memory.h"
-# include "numeric.h"
-# include "stack.h"
-# include "variable.h"
-# include "conbine.h"
-# include "conbine_heavy.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "conbine_heavy.h"

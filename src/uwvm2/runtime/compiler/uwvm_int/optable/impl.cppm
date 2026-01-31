@@ -30,7 +30,6 @@ export import :define;
 export import :storage;
 export import :call;
 export import :compare;
-export import :conbine;
 export import :constop;
 export import :control;
 export import :convert;
@@ -39,6 +38,8 @@ export import :memory;
 export import :numeric;
 export import :stack;
 export import :variable;
+export import :conbine;
+export import :conbine_heavy;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
