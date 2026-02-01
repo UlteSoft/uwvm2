@@ -24,6 +24,7 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 // macro
@@ -41,6 +42,7 @@ import :register_ring;
 import :memory;
 import :numeric;
 import :compare;
+import :convert;
 import :variable;
 import :conbine;
 
