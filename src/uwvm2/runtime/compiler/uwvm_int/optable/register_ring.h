@@ -1087,6 +1087,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     /**
+     * @brief Interpreter opfunc: typed single-value spill from stack-top cache to operand stack.
+     *
+     * @details
+     * Supports **merged** stack-top ranges by taking the value type (`ValType`) explicitly.
+     *
+     * @note This is intentionally kept as a specialization of the original spill opfunc name
+     * (`uwvmint_stacktop_to_operand_stack`) to avoid introducing a separate opcode family.
+     */
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t StartPos,
+              ::std::size_t Count,
+              typename ValType,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_stacktop_to_operand_stack(Type... type) UWVM_THROWS
+    {
+        static_assert(Count == 1uz, "Typed spill opfunc is only intended for single-value materialization.");
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+
+        manipulate::spill_stacktop_to_operand_stack<CompileOption, StartPos, Count, ValType, Type...>(type...);
+
+        // curr_uwvmint_op ...
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_op next_interpreter
+        // safe
+        //                 ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
+    }
+
+    /**
      * @brief Interpreter opfunc: fill stack-top cache from operand stack and tail-call the next opfunc.
      *
      * @details
@@ -1123,8 +1164,190 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
     }
 
+    /**
+     * @brief Interpreter opfunc: typed single-value fill from operand stack into stack-top cache.
+     *
+     * @details
+     * Supports **merged** stack-top ranges by taking the value type (`ValType`) explicitly.
+     *
+     * @note This is intentionally kept as a specialization of the original fill opfunc name
+     * (`uwvmint_operand_stack_to_stacktop`) to avoid introducing a separate opcode family.
+     */
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t StartPos,
+              ::std::size_t Count,
+              typename ValType,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_operand_stack_to_stacktop(Type... type) UWVM_THROWS
+    {
+        static_assert(Count == 1uz, "Typed fill opfunc is only intended for single-value dematerialization.");
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+
+        manipulate::operand_stack_to_stacktop<CompileOption, StartPos, Count, ValType, Type...>(type...);
+
+        // curr_uwvmint_op ...
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_op next_interpreter
+        // safe
+        //                 ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        if constexpr(CompileOption.is_tail_call) { UWVM_MUSTTAIL return next_interpreter(type...); }
+    }
+
     namespace translate
     {
+        namespace details
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      typename ValType,
+                      ::std::size_t StartPosCurr,
+                      ::std::size_t RangeEnd,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                get_uwvmint_stacktop_to_operand_stack_typed_single_fptr_startpos_impl(::std::size_t start_pos) noexcept
+            {
+                static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+                static_assert(StartPosCurr < RangeEnd);
+
+                if(start_pos == StartPosCurr) { return uwvmint_stacktop_to_operand_stack<CompileOption, StartPosCurr, 1uz, ValType, Type...>; }
+                else
+                {
+                    if constexpr(StartPosCurr + 1uz < RangeEnd)
+                    {
+                        return get_uwvmint_stacktop_to_operand_stack_typed_single_fptr_startpos_impl<CompileOption,
+                                                                                                     ValType,
+                                                                                                     StartPosCurr + 1uz,
+                                                                                                     RangeEnd,
+                                                                                                     Type...>(start_pos);
+                    }
+                    else
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      typename ValType,
+                      ::std::size_t StartPosCurr,
+                      ::std::size_t RangeEnd,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...>
+                get_uwvmint_operand_stack_to_stacktop_typed_single_fptr_startpos_impl(::std::size_t start_pos) noexcept
+            {
+                static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+                static_assert(StartPosCurr < RangeEnd);
+
+                if(start_pos == StartPosCurr) { return uwvmint_operand_stack_to_stacktop<CompileOption, StartPosCurr, 1uz, ValType, Type...>; }
+                else
+                {
+                    if constexpr(StartPosCurr + 1uz < RangeEnd)
+                    {
+                        return get_uwvmint_operand_stack_to_stacktop_typed_single_fptr_startpos_impl<CompileOption,
+                                                                                                     ValType,
+                                                                                                     StartPosCurr + 1uz,
+                                                                                                     RangeEnd,
+                                                                                                     Type...>(start_pos);
+                    }
+                    else
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+        }  // namespace details
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename ValType, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_stacktop_to_operand_stack_typed_single_fptr(::std::size_t start_pos) noexcept
+        {
+            static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+
+            constexpr ::std::size_t range_begin{::uwvm2::runtime::compiler::uwvm_int::optable::details::stacktop_range_begin_pos<CompileOption, ValType>()};
+            constexpr ::std::size_t range_end{::uwvm2::runtime::compiler::uwvm_int::optable::details::stacktop_range_end_pos<CompileOption, ValType>()};
+
+            if constexpr(!::uwvm2::runtime::compiler::uwvm_int::optable::details::range_enabled(range_begin, range_end))
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            if(start_pos < range_begin || start_pos >= range_end)
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            return details::get_uwvmint_stacktop_to_operand_stack_typed_single_fptr_startpos_impl<CompileOption, ValType, range_begin, range_end, Type...>(
+                start_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename ValType, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_stacktop_to_operand_stack_typed_single_fptr_from_tuple(::std::size_t start_pos,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_stacktop_to_operand_stack_typed_single_fptr<CompileOption, ValType, TypeInTuple...>(start_pos); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename ValType, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_operand_stack_to_stacktop_typed_single_fptr(::std::size_t start_pos) noexcept
+        {
+            static_assert(::uwvm2::runtime::compiler::uwvm_int::optable::details::is_uwvm_interpreter_valtype_supported<ValType>());
+
+            constexpr ::std::size_t range_begin{::uwvm2::runtime::compiler::uwvm_int::optable::details::stacktop_range_begin_pos<CompileOption, ValType>()};
+            constexpr ::std::size_t range_end{::uwvm2::runtime::compiler::uwvm_int::optable::details::stacktop_range_end_pos<CompileOption, ValType>()};
+
+            if constexpr(!::uwvm2::runtime::compiler::uwvm_int::optable::details::range_enabled(range_begin, range_end))
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            if(start_pos < range_begin || start_pos >= range_end)
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+
+            return details::get_uwvmint_operand_stack_to_stacktop_typed_single_fptr_startpos_impl<CompileOption, ValType, range_begin, range_end, Type...>(
+                start_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename ValType, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_operand_stack_to_stacktop_typed_single_fptr_from_tuple(::std::size_t start_pos,
+                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_operand_stack_to_stacktop_typed_single_fptr<CompileOption, ValType, TypeInTuple...>(start_pos); }
+
         /**
          * @brief Compile-time specialization selector for stack-top spill/fill ops.
          *
