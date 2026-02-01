@@ -92,8 +92,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `call` opcode (tail-call): calls a function and then tail-calls the next interpreter op.
     /// @details
-    /// - Stack-top optimization: not supported. Because argument/return types are variable, this opcode requires all arguments to reside in the operand stack,
-    ///   therefore stack-top caching is forcibly disabled (see the `static_assert`s).
+    /// - Stack-top optimization: requires all arguments to reside in the operand stack memory. When stack-top caching is enabled, the compiler must emit
+    ///   stack-top spills so `type...[1u]` points at the full operand stack before executing `call`.
     /// - `type[0]` layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]` (reads two `size_t` immediates, then loads the next opfunc pointer).
     /// @note `type...[0]` may be unaligned for function-pointer / `size_t` slots; always load via `memcpy` as done here.
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
@@ -101,15 +101,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_call(Type... type) UWVM_THROWS
     {
-        // Due to the variability of types, the call function strictly requires all arguments to be on the stack rather than in the top-of-stack register.
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        // This prevents binary bloat caused by differing template options.
-        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
         // curr_uwvmint_call curr_module_id call_function next_op
         // safe
@@ -151,8 +144,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @brief `call_indirect` opcode (tail-call): calls a function through a table entry and then tail-calls the next interpreter op.
     /// @details
-    /// - Stack-top optimization: not supported. Like `call`, this opcode requires all arguments (and the table index operand) to reside in the operand stack,
-    ///   so stack-top caching is forcibly disabled.
+    /// - Stack-top optimization: requires all arguments (and the table index operand) to reside in the operand stack memory. When stack-top caching is enabled,
+    ///   the compiler must emit stack-top spills so `type...[1u]` points at the full operand stack before executing `call_indirect`.
     /// - `type[0]` layout: `[opfunc_ptr][curr_module_id][type_index][table_index][next_opfunc_ptr]`.
     /// @note The actual bounds/null/type checks are performed by `call_indirect_func` provided by the runtime.
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
@@ -162,11 +155,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         static_assert(sizeof...(Type) >= 2uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
 
         type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
