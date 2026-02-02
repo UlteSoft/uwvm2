@@ -280,6 +280,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             ::std::size_t stacktop_cache_f32_count_at_else_entry{};
             ::std::size_t stacktop_cache_f64_count_at_else_entry{};
 
+            // Stack-top cache snapshot at then-path end (used when else-path is unreachable but then-path reaches `end`).
+            // Only meaningful for `if-else` frames when scalar stack-top caching is enabled.
+            bool stacktop_has_then_end_state{};
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t stacktop_currpos_at_then_end{};
+            ::std::size_t stacktop_memory_count_at_then_end{};
+            ::std::size_t stacktop_cache_count_at_then_end{};
+            ::std::size_t stacktop_cache_i32_count_at_then_end{};
+            ::std::size_t stacktop_cache_i64_count_at_then_end{};
+            ::std::size_t stacktop_cache_f32_count_at_then_end{};
+            ::std::size_t stacktop_cache_f64_count_at_then_end{};
+
             // Translation labels:
             // - For `block`/`if`/`else`/`function`: `end_label_id` is the branch target.
             // - For `loop`: `start_label_id` is the branch target, `end_label_id` is the fallthrough target.
@@ -3766,6 +3777,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         if_frame.then_polymorphic_end = is_polymorphic;
 
+                        if constexpr(stacktop_enabled)
+                        {
+                            if(!if_frame.polymorphic_base)
+                            {
+                                // If the then-path is reachable, record its stack-top state at the end label.
+                                // This is required when the else-path becomes unreachable before `end` (only then reaches `end`).
+                                if_frame.stacktop_has_then_end_state = !is_polymorphic;
+                                if(!is_polymorphic)
+                                {
+                                    if_frame.stacktop_currpos_at_then_end = curr_stacktop;
+                                    if_frame.stacktop_memory_count_at_then_end = stacktop_memory_count;
+                                    if_frame.stacktop_cache_count_at_then_end = stacktop_cache_count;
+                                    if_frame.stacktop_cache_i32_count_at_then_end = stacktop_cache_i32_count;
+                                    if_frame.stacktop_cache_i64_count_at_then_end = stacktop_cache_i64_count;
+                                    if_frame.stacktop_cache_f32_count_at_then_end = stacktop_cache_f32_count;
+                                    if_frame.stacktop_cache_f64_count_at_then_end = stacktop_cache_f64_count;
+                                }
+                            }
+                        }
+
                         // Lower `else` marker:
                         // - then-path must skip else body, so we emit an unconditional `br` to the end label here.
                         // - else-label is the start of else body, which is *after* this `br`.
@@ -3937,10 +3968,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
                         for(::std::size_t i{}; i != expected_count; ++i) { operand_stack.push_back({frame.result.begin[i]}); }
 
-                        if(frame.type == block_type::else_) { is_polymorphic = frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic); }
-                        else
+                        bool const polymorphic_end_before_merge{is_polymorphic};
+                        bool const new_polymorphic_after_end{frame.type == block_type::else_
+                                                                 ? (frame.polymorphic_base || (frame.then_polymorphic_end && is_polymorphic))
+                                                                 : frame.polymorphic_base};
+                        is_polymorphic = new_polymorphic_after_end;
+
+                        if constexpr(stacktop_enabled)
                         {
-                            is_polymorphic = frame.polymorphic_base;
+                            // If the current fallthrough path is unreachable at `end`, but the construct is reachable due to
+                            // an earlier branch to this `end` label, restore the stack-top model to the reachable path state.
+                            if(!new_polymorphic_after_end && polymorphic_end_before_merge)
+                            {
+                                if(frame.type == block_type::if_ && !frame.polymorphic_base)
+                                {
+                                    // `if` without `else` can be reachable after `end` via the condition-false path,
+                                    // even if the then-path became unreachable before `end`.
+                                    curr_stacktop = frame.stacktop_currpos_at_else_entry;
+                                    stacktop_memory_count = frame.stacktop_memory_count_at_else_entry;
+                                    stacktop_cache_count = frame.stacktop_cache_count_at_else_entry;
+                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_else_entry;
+                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_else_entry;
+                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_else_entry;
+                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_else_entry;
+                                    codegen_operand_stack = operand_stack;
+                                }
+                                else if(frame.type == block_type::else_ && !frame.then_polymorphic_end && frame.stacktop_has_then_end_state)
+                                {
+                                    // `if-else`: else-path is unreachable at `end`, but then-path reaches `end`.
+                                    curr_stacktop = frame.stacktop_currpos_at_then_end;
+                                    stacktop_memory_count = frame.stacktop_memory_count_at_then_end;
+                                    stacktop_cache_count = frame.stacktop_cache_count_at_then_end;
+                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_then_end;
+                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_then_end;
+                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_then_end;
+                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_then_end;
+                                    codegen_operand_stack = operand_stack;
+                                }
+                            }
                         }
 
                         control_flow_stack.pop_back_unchecked();
@@ -4887,6 +4952,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 err.err_selectable.br_cond_type_not_i32.cond_type = static_cast<wasm_value_type_u>(idx.type);
                                 err.err_code = code_validation_error_code::br_cond_type_not_i32;
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            }
+                        }
+
+                        if constexpr(stacktop_enabled)
+                        {
+                            if(!is_polymorphic)
+                            {
+                                // `br_table` consumes the i32 selector index. It is a compile-time stack-top pop (no runtime stack pointer update).
+                                stacktop_commit_pop_n(1uz);
+                                codegen_stack_pop_n(1uz);
                             }
                         }
 
