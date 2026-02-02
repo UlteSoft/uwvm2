@@ -19,38 +19,28 @@
  *                                      *
  ****************************************/
 
-module;
+#pragma once
 
-// std
-#include <bit>
 #include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-
-export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:wasm1;
-
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.parser.wasm.base;
-import uwvm2.parser.wasm.standard.wasm1;
-import uwvm2.validation.error;
-import uwvm2.object;
-import uwvm2.uwvm.wasm.feature;
-import uwvm2.uwvm.wasm.type;
-import uwvm2.uwvm.runtime.storage;
-import uwvm2.runtime.compiler.uwvm_int.optable;
 
 #ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
+# include <uwvm2/utils/container/impl.h>
 #endif
 
-#include "wasm1.h"
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::uwvm_int
+{
+    struct full_compile_run_config
+    {
+        ::uwvm2::utils::container::u8string_view entry_export_name{u8"_start"};
+        bool prefer_start_section{true};
+    };
+
+    /// @brief Full-compile and run the main module using the uwvm_int interpreter backend.
+    /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
+    void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config const& cfg = {}) noexcept;
+}  // namespace uwvm2::runtime::uwvm_int
+

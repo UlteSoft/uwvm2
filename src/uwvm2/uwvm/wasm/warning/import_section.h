@@ -46,7 +46,6 @@
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/utils/memory/impl.h>
-# include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>

@@ -40,8 +40,8 @@
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/object/impl.h>
-/// @note This requires a dependency after uwvm2.uwvm.runtime.storage.
-# include <uwvm2/uwvm/wasm/impl.h>
+# include <uwvm2/uwvm/wasm/feature/impl.h>
+# include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 #endif
@@ -907,14 +907,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     return pos;
                 }};
 
-            auto const stacktop_ring_advance_prev{
+#if 0
+            [[maybe_unused]] auto const stacktop_ring_advance_prev{
                 [&](::std::size_t pos, ::std::size_t n, ::std::size_t begin_pos, ::std::size_t end_pos) constexpr noexcept -> ::std::size_t
                 {
                     for(::std::size_t i{}; i != n; ++i) { pos = stacktop_ring_prev(pos, begin_pos, end_pos); }
                     return pos;
                 }};
+#endif
 
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const stacktop_runtime_depth{[&]() constexpr noexcept -> ::std::size_t { return stacktop_memory_count + stacktop_cache_count; }};
+#endif
 
             auto const stacktop_assert_invariants{
                 [&]() constexpr noexcept
@@ -1266,15 +1270,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                }
                                                            }};
 
-            auto const stacktop_commit_push1_if_reachable{[&](curr_operand_stack_value_type vt) constexpr noexcept
-                                                          {
-                                                              if constexpr(!stacktop_enabled) { return; }
-                                                              else
-                                                              {
-                                                                  if(is_polymorphic) { return; }
-                                                                  stacktop_commit_push1_typed(vt);
-                                                              }
-                                                          }};
+            [[maybe_unused]] auto const stacktop_commit_push1_if_reachable{[&](curr_operand_stack_value_type vt) constexpr noexcept
+                                                                           {
+                                                                               if constexpr(!stacktop_enabled) { return; }
+                                                                               else
+                                                                               {
+                                                                                   if(is_polymorphic) { return; }
+                                                                                   stacktop_commit_push1_typed(vt);
+                                                                               }
+                                                                           }};
 
             [[maybe_unused]] auto const stacktop_commit_push1_typed_if_reachable{[&](curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                                                                  {

@@ -32,6 +32,10 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
+// platform
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#  include <uwvm2/runtime/lib/uwvm_int_runtime.h>
+# endif
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -220,8 +224,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
                             {
-                                // not supported yet
-                                ::fast_io::fast_terminate();
+                                // full compile + uwvm_int interpreter backend
+                                ::uwvm2::runtime::uwvm_int::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
 
                                 break;
                             }

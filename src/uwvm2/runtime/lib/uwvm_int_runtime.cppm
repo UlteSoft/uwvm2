@@ -1,4 +1,3 @@
-﻿
 /*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
@@ -24,34 +23,10 @@ module;
 
 // std
 #include <cstddef>
-#include <cstdint>
-#include <climits>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.wasm.warning:global_section;
+export module uwvm2.uwvm.runtime.storage:storage;
 
-import fast_io;
 import uwvm2.utils.container;
-import uwvm2.utils.ansies;
-import uwvm2.utils.debug;
-import uwvm2.utils.madvise;
-import uwvm2.utils.utf;
-import uwvm2.parser.wasm.base;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard;
-import uwvm2.parser.wasm.binfmt.base;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.utils.ansies;
-import uwvm2.uwvm.utils.memory;
-import uwvm2.uwvm.wasm.base;
-import uwvm2.uwvm.wasm.type;
-import uwvm2.uwvm.wasm.storage;
-import uwvm2.uwvm.wasm.feature;
-import uwvm2.uwvm.wasm.custom;
-import :warn_storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -60,4 +35,5 @@ import :warn_storage;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "global_section.h"
+#include "uwvm_int_runtime.h"
+
