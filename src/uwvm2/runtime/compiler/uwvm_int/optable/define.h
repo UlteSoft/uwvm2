@@ -1304,6 +1304,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return final_state.remain;
         }
     }  // namespace manipulate
+
+    // Backward-compatible aliases (tests and older call sites).
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              uwvm_interpreter_stacktop_currpos_t CurrStackTop,
+              typename ValTuple,
+              uwvm_int_stack_top_type... TypeRef>
+        requires (::fast_io::is_tuple<ValTuple>)
+    UWVM_ALWAYS_INLINE inline constexpr ValTuple get_vals_from_operand_stack(TypeRef&... typeref) noexcept
+    {
+        return manipulate::get_vals_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...);
+    }
+
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              uwvm_interpreter_stacktop_currpos_t CurrStackTop,
+              typename ValTuple,
+              uwvm_int_stack_top_type... TypeRef>
+        requires (::fast_io::is_tuple<ValTuple>)
+    inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef&... typeref) noexcept
+    {
+        return manipulate::get_remain_size_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...);
+    }
 }
 
 #ifndef UWVM_MODULE
