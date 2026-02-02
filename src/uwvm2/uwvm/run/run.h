@@ -61,6 +61,60 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+    inline ::std::size_t resolve_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
+    {
+        using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+        using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
+        using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+
+        // Prefer start section when present.
+        if(auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)}; it != ::uwvm2::uwvm::wasm::storage::all_module.end())
+        {
+            auto const& am{it->second};
+            if(am.type == module_type_t::exec_wasm || am.type == module_type_t::preloaded_wasm)
+            {
+                auto const* wf{am.module_storage_ptr.wf};
+                if(wf != nullptr && wf->binfmt_ver == 1u)
+                {
+                    auto const& mod{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
+                    auto const& startsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(mod.sections)};
+
+                    auto const span{startsec.sec_span};
+                    auto const size{static_cast<::std::size_t>(span.sec_end - span.sec_begin)};
+                    if(size != 0uz) { return static_cast<::std::size_t>(startsec.start_idx); }
+                }
+            }
+        }
+
+        // Otherwise, fall back to exported entrypoints.
+        ::std::size_t idx{};
+        auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
+        if(mit != ::uwvm2::uwvm::wasm::storage::all_module_export.end())
+        {
+            auto const try_export{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+                                  {
+                                      auto const eit{mit->second.find(export_name)};
+                                      if(eit == mit->second.end()) { return false; }
+
+                                      auto const& ex{eit->second};
+                                      if(ex.type != module_type_t::exec_wasm && ex.type != module_type_t::preloaded_wasm) { return false; }
+
+                                      auto const* exp{ex.storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                                      if(exp == nullptr || exp->type != external_types::func) { return false; }
+
+                                      idx = static_cast<::std::size_t>(exp->storage.func_idx);
+                                      return true;
+                                  }};
+
+            if(try_export(::uwvm2::utils::container::u8string_view{u8"_start"})) { return idx; }
+            if(try_export(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
+        }
+
+        ::fast_io::fast_terminate();
+    }
+#endif
+
     inline int run() noexcept
     {
         // already preload wasm module
@@ -225,7 +279,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
                             {
                                 // full compile + uwvm_int interpreter backend
-                                ::uwvm2::runtime::uwvm_int::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                                ::uwvm2::runtime::uwvm_int::full_compile_run_config cfg{};
+                                cfg.entry_function_index = resolve_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                                ::uwvm2::runtime::uwvm_int::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;
                             }

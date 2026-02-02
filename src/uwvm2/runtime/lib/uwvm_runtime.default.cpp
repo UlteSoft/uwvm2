@@ -49,7 +49,6 @@ namespace uwvm2::runtime::uwvm_int
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
-        using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
 
         using runtime_module_storage_t = ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t;
         using runtime_imported_func_storage_t = ::uwvm2::uwvm::runtime::storage::imported_function_storage_t;
@@ -768,61 +767,9 @@ namespace uwvm2::runtime::uwvm_int
             }
         }
 
-        [[nodiscard]] inline constexpr wasm_u32 get_start_function_index(::uwvm2::utils::container::u8string_view main_module_name, bool& has_start) noexcept
-        {
-            has_start = false;
-            auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)};
-            if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) { return wasm_u32{}; }
-
-            auto const& am{it->second};
-            if(am.type != ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm && am.type != ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm)
-            {
-                return wasm_u32{};
-            }
-
-            auto const* wf{am.module_storage_ptr.wf};
-            if(wf == nullptr || wf->binfmt_ver != 1u) { return wasm_u32{}; }
-
-            auto const& mod{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
-            using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
-            auto const& startsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(mod.sections)};
-
-            auto const span{startsec.sec_span};
-            auto const size{static_cast<::std::size_t>(span.sec_end - span.sec_begin)};
-            if(size == 0uz) { return wasm_u32{}; }
-
-            has_start = true;
-            return startsec.start_idx;
-        }
-
-        [[nodiscard]] inline constexpr wasm_u32 get_exported_func_index(::uwvm2::utils::container::u8string_view main_module_name,
-                                                                        ::uwvm2::utils::container::u8string_view export_name,
-                                                                        bool& found) noexcept
-        {
-            found = false;
-
-            auto const mit{::uwvm2::uwvm::wasm::storage::all_module_export.find(main_module_name)};
-            if(mit == ::uwvm2::uwvm::wasm::storage::all_module_export.end()) { return wasm_u32{}; }
-            auto const eit{mit->second.find(export_name)};
-            if(eit == mit->second.end()) { return wasm_u32{}; }
-
-            auto const& ex{eit->second};
-            if(ex.type != ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm && ex.type != ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm)
-            {
-                return wasm_u32{};
-            }
-
-            auto const* exp{ex.storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
-            if(exp == nullptr) { return wasm_u32{}; }
-
-            if(exp->type != ::uwvm2::parser::wasm::standard::wasm1::type::external_types::func) { return wasm_u32{}; }
-
-            found = true;
-            return exp->storage.func_idx;
-        }
     }  // namespace
 
-    void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config const& cfg) noexcept
+    void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
     {
         compile_all_modules_if_needed();
 
@@ -830,42 +777,23 @@ namespace uwvm2::runtime::uwvm_int
         if(it == g_module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
         auto const main_id{it->second};
 
+        auto const* const main_module{g_modules.index_unchecked(main_id).runtime_module};
+        if(main_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const import_n{main_module->imported_function_vec_storage.size()};
+        if(cfg.entry_function_index < import_n) [[unlikely]]
+        {
+            // Entry function must not be imported.
+            ::fast_io::fast_terminate();
+        }
+
+        auto const total_n{import_n + main_module->local_defined_function_vec_storage.size()};
+        if(cfg.entry_function_index >= total_n) [[unlikely]] { ::fast_io::fast_terminate(); }
+
         ::std::byte stack_buf_storage[8uz * 8uz]{};  // enough for common start/_start
         ::std::byte* stack_top{stack_buf_storage};
         ::std::byte* stack_top_ptr{stack_top};
 
-        bool has_start{};
-        auto const start_idx{get_start_function_index(main_module_name, has_start)};
-
-        if(cfg.prefer_start_section && has_start)
-        {
-            call_bridge(main_id, static_cast<::std::size_t>(start_idx), ::std::addressof(stack_top_ptr));
-            return;
-        }
-
-        bool found{};
-        auto const fn_idx{get_exported_func_index(main_module_name, cfg.entry_export_name, found)};
-        if(found)
-        {
-            call_bridge(main_id, static_cast<::std::size_t>(fn_idx), ::std::addressof(stack_top_ptr));
-            return;
-        }
-
-        // Fallback to "main" for non-WASI modules.
-        auto const main_fn_idx{get_exported_func_index(main_module_name, u8"main", found)};
-        if(found)
-        {
-            call_bridge(main_id, static_cast<::std::size_t>(main_fn_idx), ::std::addressof(stack_top_ptr));
-            return;
-        }
-
-        // If the caller didn't prefer start section, still fall back to it when no export entrypoint was found.
-        if(has_start)
-        {
-            call_bridge(main_id, static_cast<::std::size_t>(start_idx), ::std::addressof(stack_top_ptr));
-            return;
-        }
-
-        ::fast_io::fast_terminate();
+        call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
     }
 }  // namespace uwvm2::runtime::uwvm_int

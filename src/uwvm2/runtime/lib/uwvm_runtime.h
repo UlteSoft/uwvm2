@@ -35,13 +35,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::uwvm_int
 {
     struct full_compile_run_config
     {
-        ::uwvm2::utils::container::u8string_view entry_export_name{u8"_start"};
-        bool prefer_start_section{true};
+        /// @brief The first function index to enter in the main module.
+        /// @note  This is the WASM function index space (imports first, then local-defined).
+        /// @note  If this points to an imported function, the runtime will fast_terminate().
+        ::std::size_t entry_function_index{};
     };
 
     /// @brief Full-compile and run the main module using the uwvm_int interpreter backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name,
-                                                       full_compile_run_config const& cfg = {}) noexcept;
+                                                       full_compile_run_config) noexcept;
 }  // namespace uwvm2::runtime::uwvm_int
-
