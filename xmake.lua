@@ -313,7 +313,7 @@ target_end()
 -- uwvm_int: build the interpreter/runtime execution unit separately so it can use its own FP flags.
 if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
 	target("uwvm_int")
-		set_kind("static")
+		set_kind("object")
 		def_build()
 			
 		-- Interpreter/runtime execution unit: disable observable floating-point side effects
