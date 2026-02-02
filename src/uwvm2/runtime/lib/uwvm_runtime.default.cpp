@@ -82,6 +82,8 @@ namespace uwvm2::runtime::uwvm_int
             ::std::size_t function_index{};
             runtime_local_func_storage_t const* runtime_func{};
             compiled_local_func_t const* compiled_func{};
+            ::std::size_t param_bytes{};
+            ::std::size_t result_bytes{};
         };
 
         struct compiled_module_record
@@ -104,37 +106,6 @@ namespace uwvm2::runtime::uwvm_int
         };
 
         inline ::uwvm2::utils::container::vector<call_stack_frame> g_call_stack{};
-
-        // Precomputed import dispatch table for O(1) imported calls.
-        // This is built once before execution (after uwvm runtime initialization + compilation).
-        struct cached_import_target
-        {
-            enum class kind : unsigned
-            {
-                defined,
-                local_imported,
-                dl,
-                weak_symbol
-            };
-
-            kind k{};
-            call_stack_frame frame{};
-
-            union
-            {
-                struct
-                {
-                    runtime_local_func_storage_t const* runtime_func{};
-                    compiled_local_func_t const* compiled_func{};
-                } defined;
-
-                runtime_imported_func_storage_t::local_imported_target_t local_imported;
-
-                capi_function_t const* capi_ptr;
-            } u{};
-        };
-
-        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<cached_import_target>> g_import_call_cache{};
 
         struct call_stack_guard
         {
@@ -330,8 +301,8 @@ namespace uwvm2::runtime::uwvm_int
 
                 if(kind == valtype_kind::raw_u8)
                 {
-                    auto const p{reinterpret_cast<::std::uint_least8_t const*>(data)};
-                    return p[i];
+                    // `data` is a byte view over raw type-code bytes; read via `std::byte` to avoid strict-aliasing UB.
+                    return ::std::to_integer<::std::uint_least8_t>(data[i]);
                 }
                 else
                 {
@@ -346,6 +317,40 @@ namespace uwvm2::runtime::uwvm_int
             valtype_vec_view params{};
             valtype_vec_view results{};
         };
+
+        // Precomputed import dispatch table for O(1) imported calls.
+        // This is built once before execution (after uwvm runtime initialization + compilation).
+        struct cached_import_target
+        {
+            enum class kind : unsigned
+            {
+                defined,
+                local_imported,
+                dl,
+                weak_symbol
+            };
+
+            kind k{};
+            call_stack_frame frame{};
+            func_sig_view sig{};
+            ::std::size_t param_bytes{};
+            ::std::size_t result_bytes{};
+
+            union
+            {
+                struct
+                {
+                    runtime_local_func_storage_t const* runtime_func{};
+                    compiled_local_func_t const* compiled_func{};
+                } defined;
+
+                runtime_imported_func_storage_t::local_imported_target_t local_imported;
+
+                capi_function_t const* capi_ptr;
+            } u{};
+        };
+
+        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<cached_import_target>> g_import_call_cache{};
 
         [[nodiscard]] inline constexpr ::std::size_t valtype_size(::std::uint_least8_t code) noexcept
         {
@@ -554,73 +559,62 @@ namespace uwvm2::runtime::uwvm_int
 
         using opfunc_byref_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<::std::byte const*, ::std::byte*, ::std::byte*>;
 
-        inline void execute_compiled_defined(runtime_local_func_storage_t const* runtime_func,
+        using byte_allocator = ::fast_io::native_thread_local_allocator;
+
+        struct heap_buf_guard
+        {
+            void* ptr{};
+
+            inline constexpr ~heap_buf_guard()
+            {
+                if(ptr) { byte_allocator::deallocate(ptr); }
+            }
+        };
+
+        [[nodiscard]] inline ::std::byte* alloc_zeroed_bytes_nonnull(::std::size_t bytes, heap_buf_guard& guard) noexcept
+        {
+            if(bytes == 0uz) { bytes = 1uz; }
+            if(bytes < 1024uz) [[likely]]
+            {
+#if UWVM_HAS_BUILTIN(__builtin_alloca)
+                void* const p{__builtin_alloca(bytes)};
+#elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
+                void* const p{_alloca(bytes)};
+#else
+                void* const p{alloca(bytes)};
+#endif
+                ::std::memset(p, 0, bytes);
+                return static_cast<::std::byte*>(p);
+            }
+            void* const p{byte_allocator::allocate_zero(bytes)};
+            guard.ptr = p;
+            return static_cast<::std::byte*>(p);
+        }
+
+        inline void execute_compiled_defined([[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
                                              compiled_local_func_t const* compiled_func,
+                                             ::std::size_t param_bytes,
+                                             ::std::size_t result_bytes,
                                              ::std::byte** caller_stack_top_ptr) noexcept
         {
-            auto const sig{func_sig_from_defined(runtime_func)};
-            auto const param_bytes{total_abi_bytes(sig.params)};
-            auto const result_bytes{total_abi_bytes(sig.results)};
-            if((param_bytes == 0uz && sig.params.size != 0uz) || (result_bytes == 0uz && sig.results.size != 0uz)) [[unlikely]] { ::fast_io::fast_terminate(); }
-
             auto caller_stack_top{*caller_stack_top_ptr};
             auto const caller_args_begin{caller_stack_top - param_bytes};
             // Pop params from the caller stack first (so nested calls can't see them).
             *caller_stack_top_ptr = caller_args_begin;
 
-            using byte_allocator = ::fast_io::native_thread_local_allocator;
-
-            struct heap_buf_guard
-            {
-                void* ptr{};
-
-                inline constexpr ~heap_buf_guard()
-                {
-                    if(ptr) { byte_allocator::deallocate(ptr); }
-                }
-            };
-
-            auto const alloc_zeroed_bytes{[&](::std::size_t bytes, heap_buf_guard& guard) noexcept -> ::std::byte*
-                                          {
-                                              if(bytes == 0uz) { bytes = 1uz; }
-                                              if(bytes < 1024uz) [[likely]]
-                                              {
-#if UWVM_HAS_BUILTIN(__builtin_alloca)
-                                                  void* const p{__builtin_alloca(bytes)};
-#elif defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__)
-                                                  void* const p{_alloca(bytes)};
-#else
-                                                  void* const p{alloca(bytes)};
-#endif
-                                                  ::std::memset(p, 0, bytes);
-                                                  return static_cast<::std::byte*>(p);
-                                              }
-                                              void* const p{byte_allocator::allocate_zero(bytes)};
-                                              guard.ptr = p;
-                                              return static_cast<::std::byte*>(p);
-                                          }};
-
             // Allocate locals as a packed byte buffer (i32/f32=4, i64/f64=8, plus the internal temp local).
             heap_buf_guard locals_guard{};
-            ::std::byte* local_base{alloc_zeroed_bytes(compiled_func->local_bytes_max, locals_guard)};
+            ::std::byte* local_base{alloc_zeroed_bytes_nonnull(compiled_func->local_bytes_max, locals_guard)};
 
-            // Copy params into locals sequentially (packed layout).
-            ::std::byte const* argp{caller_args_begin};
-            ::std::size_t local_off{};
-            for(::std::size_t i{}; i != sig.params.size; ++i)
-            {
-                auto const sz{valtype_size(sig.params.at(i))};
-                ::std::memcpy(local_base + local_off, argp, sz);
-                argp += sz;
-                local_off += sz;
-            }
+            if(param_bytes > compiled_func->local_bytes_max) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(param_bytes != 0uz) { ::std::memcpy(local_base, caller_args_begin, param_bytes); }
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
             heap_buf_guard operand_guard{};
             auto const stack_cap_raw{compiled_func->operand_stack_byte_max != 0uz ? compiled_func->operand_stack_byte_max
                                                                                   : operand_stack_capacity_bytes(compiled_func->operand_stack_max)};
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-            ::std::byte* const operand_base{alloc_zeroed_bytes(stack_cap_raw, operand_guard)};
+            ::std::byte* const operand_base{alloc_zeroed_bytes_nonnull(stack_cap_raw, operand_guard)};
 
             ::std::byte const* ip{compiled_func->op.operands.data()};
             ::std::byte* stack_top{operand_base};
@@ -640,6 +634,50 @@ namespace uwvm2::runtime::uwvm_int
             *caller_stack_top_ptr += result_bytes;
         }
 
+        inline void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,
+                                          ::std::size_t para_bytes,
+                                          ::std::size_t res_bytes,
+                                          ::std::byte** caller_stack_top_ptr) noexcept
+        {
+            local_imported_t const* m{tgt.module_ptr};
+            if(m == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const caller_stack_top{*caller_stack_top_ptr};
+            auto const caller_args_begin{caller_stack_top - para_bytes};
+            *caller_stack_top_ptr = caller_args_begin;
+
+            heap_buf_guard res_guard{};
+            heap_buf_guard par_guard{};
+            ::std::byte* const resbuf{alloc_zeroed_bytes_nonnull(res_bytes, res_guard)};
+            ::std::byte* const parbuf{alloc_zeroed_bytes_nonnull(para_bytes, par_guard)};
+            if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
+
+            m->call_func_index(tgt.index, resbuf, parbuf);
+
+            if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
+            *caller_stack_top_ptr += res_bytes;
+        }
+
+        inline void invoke_capi(capi_function_t const* f, ::std::size_t para_bytes, ::std::size_t res_bytes, ::std::byte** caller_stack_top_ptr) noexcept
+        {
+            if(f == nullptr || f->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const caller_stack_top{*caller_stack_top_ptr};
+            auto const caller_args_begin{caller_stack_top - para_bytes};
+            *caller_stack_top_ptr = caller_args_begin;
+
+            heap_buf_guard res_guard{};
+            heap_buf_guard par_guard{};
+            ::std::byte* const resbuf{alloc_zeroed_bytes_nonnull(res_bytes, res_guard)};
+            ::std::byte* const parbuf{alloc_zeroed_bytes_nonnull(para_bytes, par_guard)};
+            if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
+
+            f->func_ptr(resbuf, parbuf);
+
+            if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
+            *caller_stack_top_ptr += res_bytes;
+        }
+
         inline void invoke_resolved(resolved_func const& rf, ::std::byte** caller_stack_top_ptr) noexcept
         {
             switch(rf.k)
@@ -648,7 +686,11 @@ namespace uwvm2::runtime::uwvm_int
                 {
                     auto it{g_defined_func_map.find(rf.u.defined_ptr)};
                     if(it == g_defined_func_map.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    execute_compiled_defined(it->second.runtime_func, it->second.compiled_func, caller_stack_top_ptr);
+                    execute_compiled_defined(it->second.runtime_func,
+                                             it->second.compiled_func,
+                                             it->second.param_bytes,
+                                             it->second.result_bytes,
+                                             caller_stack_top_ptr);
                     return;
                 }
                 case resolved_func::kind::local_imported:
@@ -663,21 +705,7 @@ namespace uwvm2::runtime::uwvm_int
                     {
                         ::fast_io::fast_terminate();
                     }
-
-                    auto const caller_stack_top{*caller_stack_top_ptr};
-                    auto const caller_args_begin{caller_stack_top - para_bytes};
-                    *caller_stack_top_ptr = caller_args_begin;
-
-                    ::uwvm2::utils::container::vector<::std::byte> resbuf{};
-                    ::uwvm2::utils::container::vector<::std::byte> parbuf{};
-                    resbuf.resize(res_bytes);
-                    parbuf.resize(para_bytes);
-                    ::std::memcpy(parbuf.data(), caller_args_begin, para_bytes);
-
-                    m->call_func_index(rf.u.local_imported.index, resbuf.data(), parbuf.data());
-
-                    ::std::memcpy(*caller_stack_top_ptr, resbuf.data(), res_bytes);
-                    *caller_stack_top_ptr += res_bytes;
+                    invoke_local_imported(rf.u.local_imported, para_bytes, res_bytes, caller_stack_top_ptr);
                     return;
                 }
                 case resolved_func::kind::dl:
@@ -692,21 +720,7 @@ namespace uwvm2::runtime::uwvm_int
                     {
                         ::fast_io::fast_terminate();
                     }
-
-                    auto const caller_stack_top{*caller_stack_top_ptr};
-                    auto const caller_args_begin{caller_stack_top - para_bytes};
-                    *caller_stack_top_ptr = caller_args_begin;
-
-                    ::uwvm2::utils::container::vector<::std::byte> resbuf{};
-                    ::uwvm2::utils::container::vector<::std::byte> parbuf{};
-                    resbuf.resize(res_bytes);
-                    parbuf.resize(para_bytes);
-                    ::std::memcpy(parbuf.data(), caller_args_begin, para_bytes);
-
-                    f->func_ptr(resbuf.data(), parbuf.data());
-
-                    ::std::memcpy(*caller_stack_top_ptr, resbuf.data(), res_bytes);
-                    *caller_stack_top_ptr += res_bytes;
+                    invoke_capi(f, para_bytes, res_bytes, caller_stack_top_ptr);
                     return;
                 }
                 [[unlikely]] default:
@@ -813,31 +827,22 @@ namespace uwvm2::runtime::uwvm_int
                 {
                     case cached_import_target::kind::defined:
                     {
-                        execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, stack_top_ptr);
+                        execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                         return;
                     }
                     case cached_import_target::kind::local_imported:
                     {
-                        resolved_func rf{};
-                        rf.k = resolved_func::kind::local_imported;
-                        rf.u.local_imported = tgt.u.local_imported;
-                        invoke_resolved(rf, stack_top_ptr);
+                        invoke_local_imported(tgt.u.local_imported, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                         return;
                     }
                     case cached_import_target::kind::dl:
                     {
-                        resolved_func rf{};
-                        rf.k = resolved_func::kind::dl;
-                        rf.u.capi_ptr = tgt.u.capi_ptr;
-                        invoke_resolved(rf, stack_top_ptr);
+                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                         return;
                     }
                     case cached_import_target::kind::weak_symbol:
                     {
-                        resolved_func rf{};
-                        rf.k = resolved_func::kind::weak_symbol;
-                        rf.u.capi_ptr = tgt.u.capi_ptr;
-                        invoke_resolved(rf, stack_top_ptr);
+                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                         return;
                     }
                     [[unlikely]] default:
@@ -849,11 +854,10 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const local_index{func_index - import_n};
             auto const lf{::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index))};
-            resolved_func rf{};
-            rf.k = resolved_func::kind::defined;
-            rf.u.defined_ptr = lf;
             call_stack_guard g{wasm_module_id, func_index};
-            invoke_resolved(rf, stack_top_ptr);
+            auto const it{g_defined_func_map.find(lf)};
+            if(it == g_defined_func_map.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            execute_compiled_defined(it->second.runtime_func, it->second.compiled_func, it->second.param_bytes, it->second.result_bytes, stack_top_ptr);
         }
 
         inline void
@@ -878,6 +882,7 @@ namespace uwvm2::runtime::uwvm_int
             auto const& elem{table->elems.index_unchecked(static_cast<::std::size_t>(selector_u32))};
             resolved_func rf{};
             func_sig_view actual_sig{};
+            cached_import_target const* cached_tgt{};
 
             switch(elem.type)
             {
@@ -903,7 +908,8 @@ namespace uwvm2::runtime::uwvm_int
                         if(wasm_module_id >= g_import_call_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
                         auto const& cache{g_import_call_cache.index_unchecked(wasm_module_id)};
                         if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                        auto const& tgt{cache.index_unchecked(idx)};
+                        cached_tgt = ::std::addressof(cache.index_unchecked(idx));
+                        auto const& tgt{*cached_tgt};
 
                         switch(tgt.k)
                         {
@@ -911,15 +917,14 @@ namespace uwvm2::runtime::uwvm_int
                             {
                                 rf.k = resolved_func::kind::defined;
                                 rf.u.defined_ptr = tgt.u.defined.runtime_func;
-                                actual_sig = func_sig_from_defined(rf.u.defined_ptr);
+                                actual_sig = tgt.sig;
                                 break;
                             }
                             case cached_import_target::kind::local_imported:
                             {
                                 rf.k = resolved_func::kind::local_imported;
                                 rf.u.local_imported = tgt.u.local_imported;
-                                local_imported_t const* m{rf.u.local_imported.module_ptr};
-                                actual_sig = func_sig_from_local_imported(m, rf.u.local_imported.index);
+                                actual_sig = tgt.sig;
                                 break;
                             }
                             case cached_import_target::kind::dl:
@@ -927,7 +932,7 @@ namespace uwvm2::runtime::uwvm_int
                             {
                                 rf.k = (tgt.k == cached_import_target::kind::dl) ? resolved_func::kind::dl : resolved_func::kind::weak_symbol;
                                 rf.u.capi_ptr = tgt.u.capi_ptr;
-                                actual_sig = func_sig_from_capi(rf.u.capi_ptr);
+                                actual_sig = tgt.sig;
                                 break;
                             }
                             [[unlikely]] default:
@@ -974,6 +979,35 @@ namespace uwvm2::runtime::uwvm_int
             if(!expected_ok) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             if(!func_sig_equal(expected_sig, actual_sig)) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            if(cached_tgt != nullptr)
+            {
+                auto const& tgt{*cached_tgt};
+                call_stack_guard g{tgt.frame.module_id, tgt.frame.function_index};
+                switch(tgt.k)
+                {
+                    case cached_import_target::kind::defined:
+                    {
+                        execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        return;
+                    }
+                    case cached_import_target::kind::local_imported:
+                    {
+                        invoke_local_imported(tgt.u.local_imported, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        return;
+                    }
+                    case cached_import_target::kind::dl:
+                    case cached_import_target::kind::weak_symbol:
+                    {
+                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        return;
+                    }
+                    [[unlikely]] default:
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
 
             if(rf.k == resolved_func::kind::defined)
             {
@@ -1084,11 +1118,21 @@ namespace uwvm2::runtime::uwvm_int
                 {
                     auto const runtime_func{::std::addressof(rec.runtime_module->local_defined_function_vec_storage.index_unchecked(i))};
                     auto const compiled_func{::std::addressof(rec.compiled.local_funcs.index_unchecked(i))};
+
+                    auto const sig{func_sig_from_defined(runtime_func)};
+                    auto const param_bytes{total_abi_bytes(sig.params)};
+                    auto const result_bytes{total_abi_bytes(sig.results)};
+                    if((param_bytes == 0uz && sig.params.size != 0uz) || (result_bytes == 0uz && sig.results.size != 0uz)) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
                     g_defined_func_map.emplace(runtime_func,
                                                compiled_defined_func_info{opt.curr_wasm_id,
                                                                           rec.runtime_module->imported_function_vec_storage.size() + i,
                                                                           runtime_func,
-                                                                          compiled_func});
+                                                                          compiled_func,
+                                                                          param_bytes,
+                                                                          result_bytes});
                 }
             }
 
@@ -1125,6 +1169,9 @@ namespace uwvm2::runtime::uwvm_int
                             tgt.k = cached_import_target::kind::defined;
                             tgt.frame.module_id = it->second.module_id;
                             tgt.frame.function_index = it->second.function_index;
+                            tgt.sig = func_sig_from_defined(it->second.runtime_func);
+                            tgt.param_bytes = it->second.param_bytes;
+                            tgt.result_bytes = it->second.result_bytes;
                             tgt.u.defined.runtime_func = it->second.runtime_func;
                             tgt.u.defined.compiled_func = it->second.compiled_func;
                             break;
@@ -1133,18 +1180,39 @@ namespace uwvm2::runtime::uwvm_int
                         {
                             tgt.k = cached_import_target::kind::local_imported;
                             tgt.u.local_imported = rf.u.local_imported;
+                            tgt.sig = func_sig_from_local_imported(tgt.u.local_imported.module_ptr, tgt.u.local_imported.index);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
                             break;
                         }
                         case resolved_func::kind::dl:
                         {
                             tgt.k = cached_import_target::kind::dl;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
                             break;
                         }
                         case resolved_func::kind::weak_symbol:
                         {
                             tgt.k = cached_import_target::kind::weak_symbol;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
                             break;
                         }
                         [[unlikely]] default:

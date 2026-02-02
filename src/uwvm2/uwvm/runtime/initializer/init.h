@@ -334,7 +334,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             else if(op.opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
             {
                 // wasm1.0 allows `global.get` (imported immutable globals only), but evaluation requires import-linking.
-                // Keep a placeholder here; `finalize_wasm1_offsets_after_linking()` will evaluate the real value.
+                // Keep a placeholder here; after import-linking + global finalization, segment application will evaluate the real value.
                 out = 0u;
                 return;
             }
@@ -2732,14 +2732,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     if(elem.element_type_ptr == nullptr) [[unlikely]] { continue; }
                     auto const& expr{elem.element_type_ptr->storage.table_idx.expr};
-                    try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, elem.element.offset);
+                    if(expr.opcodes.size() == 1uz &&
+                       expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
+                    {
+                        try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, elem.element.offset);
+                    }
                 }
 
                 for(auto& data: curr_rt.local_defined_data_vec_storage)
                 {
                     if(data.data_type_ptr == nullptr) [[unlikely]] { continue; }
                     auto const& expr{data.data_type_ptr->storage.memory_idx.expr};
-                    try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, data.data.offset);
+                    if(expr.opcodes.size() == 1uz &&
+                       expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
+                    {
+                        try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, data.data.offset);
+                    }
                 }
 
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -2840,11 +2848,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 ::std::size_t data_active_applied{};
 
                 // element (wasm1: active segments)
-                for(auto const& elem_seg: curr_rt.local_defined_element_vec_storage)
+                for(auto& elem_seg: curr_rt.local_defined_element_vec_storage)
                 {
-                    auto const& elem{elem_seg.element};
+                    auto& elem{elem_seg.element};
                     if(elem.kind != ::uwvm2::uwvm::runtime::storage::wasm_element_segment_kind::active || elem.dropped) { continue; }
                     ++elem_active_applied;
+
+                    if(elem_seg.element_type_ptr != nullptr)
+                    {
+                        auto const& expr{elem_seg.element_type_ptr->storage.table_idx.expr};
+                        if(expr.opcodes.size() == 1uz &&
+                           expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
+                        {
+                            try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, elem.offset);
+                        }
+                    }
 
                     auto const table_idx{safe_u32_to_size_t(elem.table_idx)};
                     auto const imported_table_count{curr_rt.imported_table_vec_storage.size()};
@@ -3022,11 +3040,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
 
                 // data (wasm1: active segments)
-                for(auto const& data_seg: curr_rt.local_defined_data_vec_storage)
+                for(auto& data_seg: curr_rt.local_defined_data_vec_storage)
                 {
-                    auto const& data{data_seg.data};
+                    auto& data{data_seg.data};
                     if(data.kind != ::uwvm2::uwvm::runtime::storage::wasm_data_segment_kind::active || data.dropped) { continue; }
                     ++data_active_applied;
+
+                    if(data_seg.data_type_ptr != nullptr)
+                    {
+                        auto const& expr{data_seg.data_type_ptr->storage.memory_idx.expr};
+                        if(expr.opcodes.size() == 1uz &&
+                           expr.opcodes.front_unchecked().opcode == ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic::global_get)
+                        {
+                            try_eval_wasm1_const_expr_offset_after_linking(expr, curr_rt, data.offset);
+                        }
+                    }
 
                     auto const mem_idx{safe_u32_to_size_t(data.memory_idx)};
                     auto const imported_mem_count{curr_rt.imported_memory_vec_storage.size()};
@@ -4748,9 +4776,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"initializer: Finalize wasm1 globals. "); }
         details::finalize_wasm1_globals_after_linking();
-
-        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"initializer: Finalize wasm1 offsets. "); }
-        details::finalize_wasm1_offsets_after_linking();
 
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"initializer: Apply wasm1 active elem/data segments. "); }
         details::apply_wasm1_active_element_and_data_segments_after_linking();
