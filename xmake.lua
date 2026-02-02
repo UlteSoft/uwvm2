@@ -303,16 +303,16 @@ target("uwvm")
 		add_files("src/uwvm2/uwvm/main.default.cpp")
 	end
 
-	-- uwvm_int (uwvm_int interpreter runtime unit)
+	-- uwvm_runtime (uwvm_runtime interpreter runtime unit)
 	if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
-		add_deps("uwvm_int")
+		add_deps("uwvm_runtime")
 	end
 
 target_end()
 
--- uwvm_int: build the interpreter/runtime execution unit separately so it can use its own FP flags.
+-- uwvm_runtime: build the interpreter/runtime execution unit separately so it can use its own FP flags.
 if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
-	target("uwvm_int")
+	target("uwvm_runtime")
 		set_kind("object")
 		def_build()
 			
@@ -354,10 +354,10 @@ if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "defaul
 
 		if enable_cxx_module then
 			-- uwvm int main
-			add_files("src/uwvm2/runtime/lib/uwvm_int_runtime.module.cpp")
+			add_files("src/uwvm2/runtime/lib/uwvm_runtime.module.cpp")
 		else
 			-- uwvm int main
-			add_files("src/uwvm2/runtime/lib/uwvm_int_runtime.default.cpp")
+			add_files("src/uwvm2/runtime/lib/uwvm_runtime.default.cpp")
 		end
 		
 	target_end()

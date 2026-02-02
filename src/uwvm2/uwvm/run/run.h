@@ -34,7 +34,7 @@
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#  include <uwvm2/runtime/lib/uwvm_int_runtime.h>
+#  include <uwvm2/runtime/lib/uwvm_runtime.h>
 # endif
 // import
 # include <fast_io.h>

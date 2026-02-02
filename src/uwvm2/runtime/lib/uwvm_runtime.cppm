@@ -19,17 +19,21 @@
  *                                      *
  ****************************************/
 
-import fast_io;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard.wasm1.features;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm.standard.wasm1p1.type;
-import uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
-import uwvm2.runtime.compiler.uwvm_int.optable;
-import uwvm2.utils.container;
-import uwvm2.uwvm.wasm.feature;
-import uwvm2.uwvm.wasm.type;
-import uwvm2.uwvm.wasm.storage;
-import uwvm2.uwvm.runtime.storage;
+module;
 
-#include "uwvm_int_runtime.default.cpp"
+// std
+#include <cstddef>
+
+export module uwvm2.uwvm.runtime.storage:storage;
+
+import uwvm2.utils.container;
+
+#ifndef UWVM_MODULE
+# define UWVM_MODULE
+#endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "uwvm_runtime.h"
+
