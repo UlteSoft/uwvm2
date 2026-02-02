@@ -398,13 +398,130 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             wasm_u32 all_local_count_with_internal{all_local_count + internal_temp_local_count};
             local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count_with_internal);
 
-            using local_offset_t = ::std::size_t;
-            constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
-            static_assert(local_slot_size != 0uz);
+	            using local_offset_t = ::std::size_t;
+	            constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
+	            static_assert(local_slot_size != 0uz);
+	            constexpr local_offset_t internal_temp_local_size{8uz};
+	            static_assert(local_slot_size == internal_temp_local_size);
 
-            // Local index -> byte offset from `local_base` (type...[2u]).
-            auto const local_offset_from_index{[&](wasm_u32 local_index) constexpr noexcept -> local_offset_t
-                                               { return static_cast<local_offset_t>(local_index) * local_slot_size; }};
+	            // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
+	            // We track the exact max byte usage during validation so the runtime can allocate precisely.
+	            auto const operand_stack_valtype_size{[&](wasm_value_type t) constexpr noexcept -> ::std::size_t
+                                                  {
+                                                      switch(t)
+                                                      {
+                                                          case wasm_value_type::i32:
+                                                          {
+                                                              return 4uz;
+                                                          }
+                                                          case wasm_value_type::i64:
+                                                          {
+                                                              return 8uz;
+                                                          }
+                                                          case wasm_value_type::f32:
+                                                          {
+                                                              return 4uz;
+                                                          }
+                                                          case wasm_value_type::f64:
+                                                          {
+                                                              return 8uz;
+                                                          }
+                                                          [[unlikely]] default:
+                                                          {
+                                                              return 0uz;
+                                                          }
+                                                      }
+                                                  }};
+
+            auto const operand_stack_size_bytes{[&]() constexpr noexcept -> ::std::size_t
+                                                {
+                                                    ::std::size_t sum{};
+                                                    for(auto const& v: operand_stack)
+                                                    {
+                                                        auto const add{operand_stack_valtype_size(v.type)};
+                                                        if(add == 0uz) [[unlikely]]
+                                                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                                            ::fast_io::fast_terminate();
+                                                        }
+
+                                                        if(add > (::std::numeric_limits<::std::size_t>::max() - sum)) [[unlikely]]
+                                                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                                            ::fast_io::fast_terminate();
+                                                        }
+
+	                                                        sum += add;
+	                                                    }
+	                                                    return sum;
+	                                                }};
+
+	            // Local storage is byte-packed too (same scalar sizes). We emit local offsets as immediates, so runtime only
+	            // needs the total local byte size to allocate and zero-initialize.
+	            ::uwvm2::utils::container::vector<local_offset_t> local_offsets{};
+	            local_offsets.resize(static_cast<::std::size_t>(all_local_count_with_internal));
+
+	            auto const local_bytes_add{[&](local_offset_t& acc, local_offset_t add) constexpr noexcept
+	                                       {
+	                                           if(add > (::std::numeric_limits<local_offset_t>::max() - acc)) [[unlikely]]
+	                                           {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+	                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+	                                               ::fast_io::fast_terminate();
+	                                           }
+	                                           acc += add;
+	                                       }};
+
+	            local_offset_t local_bytes{};
+	            ::std::size_t local_fill_idx{};
+	            for(wasm_u32 i{}; i != func_parameter_count_u32; ++i)
+	            {
+	                local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+	                local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(func_parameter_begin[i])));
+	                ++local_fill_idx;
+	            }
+	            for(auto const& local_part: curr_code_locals)
+	            {
+	                for(wasm_u32 j{}; j != local_part.count; ++j)
+	                {
+	                    local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+	                    local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(local_part.type)));
+	                    ++local_fill_idx;
+	                }
+	            }
+
+	            if(local_fill_idx != static_cast<::std::size_t>(all_local_count)) [[unlikely]]
+	            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+	                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+	                ::fast_io::fast_terminate();
+	            }
+
+	            // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
+	            local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+	            local_bytes_add(local_bytes, internal_temp_local_size);
+
+	            local_func_symbol.local_bytes_max = local_bytes;
+
+	            // Local index -> byte offset from `local_base` (type...[2u]).
+	            auto const local_offset_from_index{[&](wasm_u32 local_index) constexpr noexcept -> local_offset_t
+	                                               {
+	                                                   auto const idx{static_cast<::std::size_t>(local_index)};
+	                                                   if(idx >= local_offsets.size()) [[unlikely]]
+	                                                   {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+	                                                       ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+	                                                       ::fast_io::fast_terminate();
+	                                                   }
+	                                                   return local_offsets.index_unchecked(idx);
+	                                               }};
 
             // Internal temp local is the first slot after all Wasm-visible locals.
             local_offset_t const internal_temp_local_off{local_offset_from_index(all_local_count)};
@@ -584,7 +701,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                     constexpr ::std::size_t mul{16uz};
                                                     if(code_size > (::std::numeric_limits<::std::size_t>::max() / mul))
                                                     {
-                                                        return ::std::numeric_limits<::std::size_t>::max();
+                                                        // Overflow-safe fallback: skip the multiplier rather than attempting an impossible reserve().
+                                                        return code_size;
                                                     }
                                                     return code_size * mul;
                                                 }()};
@@ -593,6 +711,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             auto const ensure_vec_capacity{[&](bytecode_vec_t& dst, ::std::size_t add_bytes) constexpr UWVM_THROWS
                                            {
                                                auto const curr{dst.size()};
+                                               if(add_bytes > (::std::numeric_limits<::std::size_t>::max() - curr)) [[unlikely]]
+                                               {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                   ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                                   ::fast_io::fast_terminate();
+                                               }
                                                auto const need{curr + add_bytes};
                                                if(need <= dst.capacity()) { return; }
 
@@ -613,17 +738,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const emit_bytes_to{[&](bytecode_vec_t& dst, ::std::byte const* src, ::std::size_t n) constexpr UWVM_THROWS
                                      {
+                                         if(n == 0uz) { return; }
                                          ensure_vec_capacity(dst, n);
-                                         // Safe: ensured `dst.size() + n <= dst.capacity()`.
-                                         for(::std::size_t i{}; i != n; ++i) { dst.push_back_unchecked(src[i]); }
+                                         auto* const out{dst.imp.curr_ptr};
+                                         dst.imp.curr_ptr += n;
+                                         ::std::memcpy(out, src, n);
                                      }};
 
             auto const emit_imm_to{[&]<typename T>(bytecode_vec_t& dst, T const& v) constexpr UWVM_THROWS
                                    {
                                        static_assert(::std::is_trivially_copyable_v<T>);
-                                       ::std::byte tmp[sizeof(T)];
-                                       ::std::memcpy(tmp, ::std::addressof(v), sizeof(T));
-                                       emit_bytes_to(dst, tmp, sizeof(T));
+                                       ensure_vec_capacity(dst, sizeof(T));
+                                       auto* const out{dst.imp.curr_ptr};
+                                       dst.imp.curr_ptr += sizeof(T);
+                                       ::std::memcpy(out, ::std::addressof(v), sizeof(T));
                                    }};
 
             auto const emit_imm{[&]<typename T>(T const& v) constexpr UWVM_THROWS { emit_imm_to(bytecode, v); }};
@@ -3245,6 +3373,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 }};
 
             ::std::size_t runtime_operand_stack_max{};
+            ::std::size_t runtime_operand_stack_byte_max{};
             bool finished_current_func{};
 
             for(;;)
@@ -4073,10 +4202,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(ptr_bits), sizeof(ptr_bits));
                             }
 
-                            local_func_symbol.operand_stack_max = runtime_operand_stack_max;
-                            storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
-                            storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
-                            storage.local_funcs.push_back(local_func_symbol);
+	                            local_func_symbol.operand_stack_max = runtime_operand_stack_max;
+	                            local_func_symbol.operand_stack_byte_max = runtime_operand_stack_byte_max;
+	                            storage.local_bytes_max = ::std::max(storage.local_bytes_max, local_func_symbol.local_bytes_max);
+	                            storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
+	                            storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
+	                            storage.operand_stack_byte_max = ::std::max(storage.operand_stack_byte_max, runtime_operand_stack_byte_max);
+	                            storage.local_funcs.push_back(local_func_symbol);
 
                             finished_current_func = true;
                             break;
@@ -4086,7 +4218,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::br:
                     {
-
                         // br     label_index ...
                         // [safe] unsafe (could be the section_end)
                         // ^^ code_curr
@@ -10555,7 +10686,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 }
 
                 if(finished_current_func) { break; }
-                if(!is_polymorphic) { runtime_operand_stack_max = ::std::max(runtime_operand_stack_max, operand_stack.size()); }
+                if(!is_polymorphic)
+                {
+                    runtime_operand_stack_max = ::std::max(runtime_operand_stack_max, operand_stack.size());
+                    runtime_operand_stack_byte_max = ::std::max(runtime_operand_stack_byte_max, operand_stack_size_bytes());
+                }
             }
         }
 

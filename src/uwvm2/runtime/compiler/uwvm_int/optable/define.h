@@ -58,7 +58,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     struct local_func_storage_t
     {
         ::std::size_t local_count{};
+        ::std::size_t local_bytes_max{};
         ::std::size_t operand_stack_max{};
+        ::std::size_t operand_stack_byte_max{};
 
         uwvm_interpreter_function_operands_t op{};
     };
@@ -66,7 +68,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     struct uwvm_interpreter_full_function_symbol_t
     {
         ::std::size_t local_count{};
+        ::std::size_t local_bytes_max{};
         ::std::size_t operand_stack_max{};
+        ::std::size_t operand_stack_byte_max{};
 
         ::uwvm2::utils::container::vector<local_func_storage_t const*> imported_func_operands_ptrs{};
         ::uwvm2::utils::container::vector<local_func_storage_t> local_funcs{};
