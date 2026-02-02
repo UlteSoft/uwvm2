@@ -41,6 +41,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::uwvm_int
 
     /// @brief Full-compile and run the main module using the uwvm_int interpreter backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
-    void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config const& cfg = {}) noexcept;
+    extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name,
+                                                       full_compile_run_config const& cfg = {}) noexcept;
 }  // namespace uwvm2::runtime::uwvm_int
 

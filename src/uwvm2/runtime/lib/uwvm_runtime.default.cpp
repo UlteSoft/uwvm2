@@ -40,16 +40,11 @@
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/runtime/lib/uwvm_runtime.h>
 #endif
 
 namespace uwvm2::runtime::uwvm_int
 {
-    struct full_compile_run_config
-    {
-        ::uwvm2::utils::container::u8string_view entry_export_name{u8"_start"};
-        bool prefer_start_section{true};
-    };
-
     namespace
     {
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
