@@ -398,15 +398,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             wasm_u32 all_local_count_with_internal{all_local_count + internal_temp_local_count};
             local_func_symbol.local_count = static_cast<::std::size_t>(all_local_count_with_internal);
 
-	            using local_offset_t = ::std::size_t;
-	            constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
-	            static_assert(local_slot_size != 0uz);
-	            constexpr local_offset_t internal_temp_local_size{8uz};
-	            static_assert(local_slot_size == internal_temp_local_size);
+            using local_offset_t = ::std::size_t;
+            constexpr local_offset_t local_slot_size{sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::wasm_stack_top_i32_i64_f32_f64_u)};
+            static_assert(local_slot_size != 0uz);
+            constexpr local_offset_t internal_temp_local_size{8uz};
+            static_assert(local_slot_size == internal_temp_local_size);
 
-	            // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
-	            // We track the exact max byte usage during validation so the runtime can allocate precisely.
-	            auto const operand_stack_valtype_size{[&](wasm_value_type t) constexpr noexcept -> ::std::size_t
+            // Operand stack is byte-packed in byref mode: i32/f32 are 4 bytes, i64/f64 are 8 bytes.
+            // We track the exact max byte usage during validation so the runtime can allocate precisely.
+            auto const operand_stack_valtype_size{[&](wasm_value_type t) constexpr noexcept -> ::std::size_t
                                                   {
                                                       switch(t)
                                                       {
@@ -433,95 +433,107 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                       }
                                                   }};
 
-            auto const operand_stack_size_bytes{[&]() constexpr noexcept -> ::std::size_t
-                                                {
-                                                    ::std::size_t sum{};
-                                                    for(auto const& v: operand_stack)
-                                                    {
-                                                        auto const add{operand_stack_valtype_size(v.type)};
-                                                        if(add == 0uz) [[unlikely]]
-                                                        {
+            // Current operand stack size in bytes (byte-packed: i32/f32=4, i64/f64=8).
+            // Maintained incrementally to avoid O(n^2) rescans during compilation.
+            ::std::size_t operand_stack_bytes{};
+
+            auto const operand_stack_push{[&](curr_operand_stack_value_type vt) constexpr UWVM_THROWS
+                                          {
+                                              operand_stack.push_back({vt});
+                                              auto const add{operand_stack_valtype_size(vt)};
+                                              if(add == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                                              if(add > (::std::numeric_limits<::std::size_t>::max() - operand_stack_bytes)) [[unlikely]]
+                                              {
+                                                  ::fast_io::fast_terminate();
+                                              }
+                                              operand_stack_bytes += add;
+                                          }};
+
+            auto const operand_stack_pop_unchecked{[&]() constexpr noexcept
+                                                   {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                       if(operand_stack.empty()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-                                                            ::fast_io::fast_terminate();
-                                                        }
+                                                       if(operand_stack.empty()) { return; }
+                                                       auto const vt{operand_stack.back_unchecked().type};
+                                                       operand_stack.pop_back_unchecked();
+                                                       auto const sub{operand_stack_valtype_size(vt)};
+                                                       if(sub == 0uz || sub > operand_stack_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+                                                       operand_stack_bytes -= sub;
+                                                   }};
 
-                                                        if(add > (::std::numeric_limits<::std::size_t>::max() - sum)) [[unlikely]]
-                                                        {
+            auto const operand_stack_pop_n{[&](::std::size_t n) constexpr noexcept
+                                           {
+                                               while(n-- != 0uz && !operand_stack.empty()) { operand_stack_pop_unchecked(); }
+                                           }};
+
+            auto const operand_stack_truncate_to{[&](::std::size_t new_size) constexpr noexcept
+                                                 {
+                                                     while(operand_stack.size() > new_size) { operand_stack_pop_unchecked(); }
+                                                 }};
+
+            // Local storage is byte-packed too (same scalar sizes). We emit local offsets as immediates, so runtime only
+            // needs the total local byte size to allocate and zero-initialize.
+            ::uwvm2::utils::container::vector<local_offset_t> local_offsets{};
+            local_offsets.resize(static_cast<::std::size_t>(all_local_count_with_internal));
+
+            auto const local_bytes_add{[&](local_offset_t& acc, local_offset_t add) constexpr noexcept
+                                       {
+                                           if(add > (::std::numeric_limits<local_offset_t>::max() - acc)) [[unlikely]]
+                                           {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                                                            ::fast_io::fast_terminate();
-                                                        }
+                                               ::fast_io::fast_terminate();
+                                           }
+                                           acc += add;
+                                       }};
 
-	                                                        sum += add;
-	                                                    }
-	                                                    return sum;
-	                                                }};
+            local_offset_t local_bytes{};
+            ::std::size_t local_fill_idx{};
+            for(wasm_u32 i{}; i != func_parameter_count_u32; ++i)
+            {
+                local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+                local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(func_parameter_begin[i])));
+                ++local_fill_idx;
+            }
+            for(auto const& local_part: curr_code_locals)
+            {
+                for(wasm_u32 j{}; j != local_part.count; ++j)
+                {
+                    local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+                    local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(local_part.type)));
+                    ++local_fill_idx;
+                }
+            }
 
-	            // Local storage is byte-packed too (same scalar sizes). We emit local offsets as immediates, so runtime only
-	            // needs the total local byte size to allocate and zero-initialize.
-	            ::uwvm2::utils::container::vector<local_offset_t> local_offsets{};
-	            local_offsets.resize(static_cast<::std::size_t>(all_local_count_with_internal));
-
-	            auto const local_bytes_add{[&](local_offset_t& acc, local_offset_t add) constexpr noexcept
-	                                       {
-	                                           if(add > (::std::numeric_limits<local_offset_t>::max() - acc)) [[unlikely]]
-	                                           {
+            if(local_fill_idx != static_cast<::std::size_t>(all_local_count)) [[unlikely]]
+            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-	                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-	                                               ::fast_io::fast_terminate();
-	                                           }
-	                                           acc += add;
-	                                       }};
+                ::fast_io::fast_terminate();
+            }
 
-	            local_offset_t local_bytes{};
-	            ::std::size_t local_fill_idx{};
-	            for(wasm_u32 i{}; i != func_parameter_count_u32; ++i)
-	            {
-	                local_offsets.index_unchecked(local_fill_idx) = local_bytes;
-	                local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(func_parameter_begin[i])));
-	                ++local_fill_idx;
-	            }
-	            for(auto const& local_part: curr_code_locals)
-	            {
-	                for(wasm_u32 j{}; j != local_part.count; ++j)
-	                {
-	                    local_offsets.index_unchecked(local_fill_idx) = local_bytes;
-	                    local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(local_part.type)));
-	                    ++local_fill_idx;
-	                }
-	            }
+            // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
+            local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+            local_bytes_add(local_bytes, internal_temp_local_size);
 
-	            if(local_fill_idx != static_cast<::std::size_t>(all_local_count)) [[unlikely]]
-	            {
+            local_func_symbol.local_bytes_max = local_bytes;
+
+            // Local index -> byte offset from `local_base` (type...[2u]).
+            auto const local_offset_from_index{[&](wasm_u32 local_index) constexpr noexcept -> local_offset_t
+                                               {
+                                                   auto const idx{static_cast<::std::size_t>(local_index)};
+                                                   if(idx >= local_offsets.size()) [[unlikely]]
+                                                   {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-	                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                                       ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-	                ::fast_io::fast_terminate();
-	            }
-
-	            // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
-	            local_offsets.index_unchecked(local_fill_idx) = local_bytes;
-	            local_bytes_add(local_bytes, internal_temp_local_size);
-
-	            local_func_symbol.local_bytes_max = local_bytes;
-
-	            // Local index -> byte offset from `local_base` (type...[2u]).
-	            auto const local_offset_from_index{[&](wasm_u32 local_index) constexpr noexcept -> local_offset_t
-	                                               {
-	                                                   auto const idx{static_cast<::std::size_t>(local_index)};
-	                                                   if(idx >= local_offsets.size()) [[unlikely]]
-	                                                   {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-	                                                       ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
-	                                                       ::fast_io::fast_terminate();
-	                                                   }
-	                                                   return local_offsets.index_unchecked(idx);
-	                                               }};
+                                                       ::fast_io::fast_terminate();
+                                                   }
+                                                   return local_offsets.index_unchecked(idx);
+                                               }};
 
             // Internal temp local is the first slot after all Wasm-visible locals.
             local_offset_t const internal_temp_local_off{local_offset_from_index(all_local_count)};
@@ -1769,7 +1781,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         operand_from_stack = true;
                         operand_type = operand_stack.back_unchecked().type;
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
                     }
 
                     if(!is_polymorphic && operand_from_stack && operand_type != expected_operand_type) [[unlikely]]
@@ -1782,7 +1794,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    operand_stack.push_back({result_type});
+                    operand_stack_push(result_type);
                 }};
 
             auto const validate_numeric_binary{
@@ -1823,7 +1835,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         rhs_from_stack = true;
                         rhs_type = operand_stack.back_unchecked().type;
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
                     }
 
                     if(!is_polymorphic && rhs_from_stack && rhs_type != expected_operand_type) [[unlikely]]
@@ -1843,7 +1855,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         lhs_from_stack = true;
                         lhs_type = operand_stack.back_unchecked().type;
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
                     }
 
                     if(!is_polymorphic && lhs_from_stack && lhs_type != expected_operand_type) [[unlikely]]
@@ -1856,7 +1868,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
 
-                    operand_stack.push_back({result_type});
+                    operand_stack_push(result_type);
                 }};
 
             auto const validate_mem_load{
@@ -1958,7 +1970,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         auto const addr{operand_stack.back_unchecked()};
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
 
                         if(addr.type != wasm_value_type_u::i32) [[unlikely]]
                         {
@@ -1971,10 +1983,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     else
                     {
-                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_pop_unchecked();
                     }
 
-                    operand_stack.push_back({result_type});
+                    operand_stack_push(result_type);
 
                     return offset;
                 }};
@@ -2079,9 +2091,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         auto const value{operand_stack.back_unchecked()};
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
                         auto const addr{operand_stack.back_unchecked()};
-                        operand_stack.pop_back_unchecked();
+                        operand_stack_pop_unchecked();
 
                         if(addr.type != wasm_value_type_u::i32) [[unlikely]]
                         {
@@ -2104,8 +2116,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     else
                     {
-                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
-                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_pop_unchecked();
+                        operand_stack_pop_unchecked();
                     }
 
                     return offset;
@@ -3432,7 +3444,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!control_flow_stack.empty())
                         {
                             auto const base{control_flow_stack.back_unchecked().operand_stack_base};
-                            while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
+                            operand_stack_truncate_to(base);
                         }
 
                         is_polymorphic = true;
@@ -3731,7 +3743,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!operand_stack.empty())
                         {
                             auto const cond{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                             {
                                 err.err_curr = op_begin;
@@ -3936,7 +3948,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         emit_br_to(bytecode, if_frame.end_label_id, false);
                         set_label_offset(if_frame.else_label_id, bytecode.size());
 
-                        while(operand_stack.size() > if_frame.operand_stack_base) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_truncate_to(if_frame.operand_stack_base);
                         is_polymorphic = if_frame.polymorphic_base;
                         if constexpr(stacktop_enabled)
                         {
@@ -4098,8 +4110,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if(frame.else_label_id != SIZE_MAX) { set_label_offset(frame.else_label_id, bytecode.size()); }
                         }
 
-                        while(operand_stack.size() > base) { operand_stack.pop_back_unchecked(); }
-                        for(::std::size_t i{}; i != expected_count; ++i) { operand_stack.push_back({frame.result.begin[i]}); }
+                        operand_stack_truncate_to(base);
+                        for(::std::size_t i{}; i != expected_count; ++i) { operand_stack_push(frame.result.begin[i]); }
 
                         bool const polymorphic_end_before_merge{is_polymorphic};
                         bool const new_polymorphic_after_end{frame.type == block_type::else_
@@ -4202,13 +4214,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(ptr_bits), sizeof(ptr_bits));
                             }
 
-	                            local_func_symbol.operand_stack_max = runtime_operand_stack_max;
-	                            local_func_symbol.operand_stack_byte_max = runtime_operand_stack_byte_max;
-	                            storage.local_bytes_max = ::std::max(storage.local_bytes_max, local_func_symbol.local_bytes_max);
-	                            storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
-	                            storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
-	                            storage.operand_stack_byte_max = ::std::max(storage.operand_stack_byte_max, runtime_operand_stack_byte_max);
-	                            storage.local_funcs.push_back(local_func_symbol);
+                            local_func_symbol.operand_stack_max = runtime_operand_stack_max;
+                            local_func_symbol.operand_stack_byte_max = runtime_operand_stack_byte_max;
+                            storage.local_bytes_max = ::std::max(storage.local_bytes_max, local_func_symbol.local_bytes_max);
+                            storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
+                            storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
+                            storage.operand_stack_byte_max = ::std::max(storage.operand_stack_byte_max, runtime_operand_stack_byte_max);
+                            storage.local_funcs.push_back(local_func_symbol);
 
                             finished_current_func = true;
                             break;
@@ -4341,13 +4353,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_br_to(bytecode, target_label_id, false);
                         }
 
-                        if(target_arity != 0uz)
-                        {
-                            auto n{target_arity};
-                            while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
-                        }
+                        if(target_arity != 0uz) { operand_stack_pop_n(target_arity); }
                         auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
-                        while(operand_stack.size() > curr_frame_base) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_truncate_to(curr_frame_base);
                         is_polymorphic = true;
 
                         break;
@@ -4419,7 +4427,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!operand_stack.empty())
                         {
                             auto const cond{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             if(!is_polymorphic && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
                             {
                                 err.err_curr = op_begin;
@@ -5079,7 +5087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!operand_stack.empty())
                         {
                             auto const idx{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
                             {
                                 err.err_curr = op_begin;
@@ -5188,13 +5196,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 
-                        if(expected_arity != 0uz)
-                        {
-                            auto n{expected_arity};
-                            while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
-                        }
+                        if(expected_arity != 0uz) { operand_stack_pop_n(expected_arity); }
                         auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
-                        while(operand_stack.size() > curr_frame_base) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_truncate_to(curr_frame_base);
                         is_polymorphic = true;
 
                         break;
@@ -5283,14 +5287,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 
-                        if(return_arity != 0uz)
-                        {
-                            auto n{return_arity};
-                            while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
-                        }
+                        if(return_arity != 0uz) { operand_stack_pop_n(return_arity); }
 
                         auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
-                        while(operand_stack.size() > curr_frame_base) { operand_stack.pop_back_unchecked(); }
+                        operand_stack_truncate_to(curr_frame_base);
                         is_polymorphic = true;
 
                         break;
@@ -5600,15 +5600,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         // Update the validation operand stack after the `call` is encoded.
-                        if(param_count != 0uz)
-                        {
-                            auto n{param_count};
-                            while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
-                        }
+                        if(param_count != 0uz) { operand_stack_pop_n(param_count); }
                         ::std::size_t const effective_result_count{(fuse_call_drop || fuse_call_local_set) ? 0uz : result_count};
                         if(effective_result_count != 0uz)
                         {
-                            for(::std::size_t i{}; i != effective_result_count; ++i) { operand_stack.push_back({callee_type.result.begin[i]}); }
+                            for(::std::size_t i{}; i != effective_result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
                         }
 
                         if constexpr(stacktop_enabled)
@@ -5806,15 +5802,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         // Update the validation operand stack after the `call_indirect` is encoded.
-                        if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }  // pop selector index
-                        if(param_count != 0uz)
-                        {
-                            auto n{param_count};
-                            while(!operand_stack.empty() && n-- != 0uz) { operand_stack.pop_back_unchecked(); }
-                        }
+                        operand_stack_pop_unchecked();  // pop selector index
+                        if(param_count != 0uz) { operand_stack_pop_n(param_count); }
                         if(result_count != 0uz)
                         {
-                            for(::std::size_t i{}; i != result_count; ++i) { operand_stack.push_back({callee_type.result.begin[i]}); }
+                            for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
                         }
 
                         if constexpr(stacktop_enabled)
@@ -5892,7 +5884,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             have_drop_operand = true;
                             drop_operand_type = operand_stack.back_unchecked().type;
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                         }
 
                         // Translate: typed `drop`.
@@ -5933,7 +5925,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!operand_stack.empty())
                         {
                             auto const cond{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             cond_from_stack = true;
                             cond_type = cond.type;
                         }
@@ -5951,7 +5943,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!operand_stack.empty())
                         {
                             auto const v2{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             v2_from_stack = true;
                             v2_type = v2.type;
                         }
@@ -6025,7 +6017,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // Stack-top cache model: `select` consumes (v2, cond) and keeps v1 (net -2).
                         if(v1_from_stack) { stacktop_after_pop_n_if_reachable(bytecode, 2uz); }
 
-                        if(!v1_from_stack && v2_from_stack) { operand_stack.push_back({v2_type}); }
+                        if(!v1_from_stack && v2_from_stack) { operand_stack_push(v2_type); }
 
                         break;
                     }
@@ -6108,7 +6100,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 
-                        operand_stack.push_back({curr_local_type});
+                        operand_stack_push(curr_local_type);
 
                         // Conbine: delay `local.get` emission to enable `local.get + ...` fusions.
                         auto const local_off{local_offset_from_index(local_index)};
@@ -6446,7 +6438,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::select_after_select && conbine_pending.vt == curr_local_type &&
                            (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::f32))
                         {
-                            if(have_set_operand) { operand_stack.pop_back_unchecked(); }
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             if(curr_local_type == curr_operand_stack_value_type::i32)
                             {
@@ -6474,7 +6466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::mac_after_add && conbine_pending.vt == curr_local_type &&
                            local_off == conbine_pending.off1)
                         {
-                            if(have_set_operand) { operand_stack.pop_back_unchecked(); }
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             switch(curr_local_type)
                             {
@@ -6530,7 +6522,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(curr_local_type == curr_operand_stack_value_type::i32 &&
                            conbine_pending.kind == conbine_pending_kind::i32_add_imm_local_settee_same && local_off == conbine_pending.off1)
                         {
-                            if(have_set_operand) { operand_stack.pop_back_unchecked(); }
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             emit_opfunc_to(bytecode,
                                            translate::get_uwvmint_i32_add_imm_local_set_same_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
@@ -6549,7 +6541,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 #endif
 
-                        if(have_set_operand) { operand_stack.pop_back_unchecked(); }
+                        if(have_set_operand) { operand_stack_pop_unchecked(); }
 
                         emit_local_set_typed_to(bytecode, curr_local_type, local_off);
                         break;
@@ -6646,7 +6638,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                operand_stack.push_back({curr_local_type});
+                                operand_stack_push(curr_local_type);
                             }
                         }
                         else
@@ -6840,7 +6832,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             curr_global_type = local_global_ptr->type;
                         }
 
-                        operand_stack.push_back({curr_global_type});
+                        operand_stack_push(curr_global_type);
                         {
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
@@ -6995,7 +6987,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         else
                         {
                             auto const value{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
                             if(value.type != curr_global_type) [[unlikely]]
                             {
                                 err.err_curr = op_begin;
@@ -7924,7 +7916,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         emit_imm_to(bytecode, resolved_memory0.memory_p);
                         stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32);
 
-                        operand_stack.push_back({wasm_value_type_u::i32});
+                        operand_stack_push(wasm_value_type_u::i32);
                         break;
                     }
                     case wasm1_code::memory_grow:
@@ -7999,7 +7991,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
 
                             auto const delta{operand_stack.back_unchecked()};
-                            operand_stack.pop_back_unchecked();
+                            operand_stack_pop_unchecked();
 
                             if(delta.type != wasm_value_type_u::i32) [[unlikely]]
                             {
@@ -8011,7 +8003,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
                         else
                         {
-                            if(!operand_stack.empty()) { operand_stack.pop_back_unchecked(); }
+                            operand_stack_pop_unchecked();
                         }
 
                         ensure_memory0_resolved();
@@ -8020,7 +8012,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         emit_imm_to(bytecode, resolved_memory0.memory_p);
                         emit_imm_to(bytecode, resolved_memory0.max_limit_memory_length);
 
-                        operand_stack.push_back({wasm_value_type_u::i32});
+                        operand_stack_push(wasm_value_type_u::i32);
                         break;
                     }
                     case wasm1_code::i32_const:
@@ -8123,7 +8115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
                         }
 
-                        operand_stack.push_back({wasm_value_type_u::i32});
+                        operand_stack_push(wasm_value_type_u::i32);
                         break;
                     }
                     case wasm1_code::i64_const:
@@ -8183,7 +8175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
                         }
 
-                        operand_stack.push_back({wasm_value_type_u::i64});
+                        operand_stack_push(wasm_value_type_u::i64);
                         break;
                     }
                     case wasm1_code::f32_const:
@@ -8248,7 +8240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
                         }
 
-                        operand_stack.push_back({wasm_value_type_u::f32});
+                        operand_stack_push(wasm_value_type_u::f32);
                         break;
                     }
                     case wasm1_code::f64_const:
@@ -8308,7 +8300,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
                         }
 
-                        operand_stack.push_back({wasm_value_type_u::f64});
+                        operand_stack_push(wasm_value_type_u::f64);
                         break;
                     }
                     case wasm1_code::i32_eqz:
@@ -10689,7 +10681,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 if(!is_polymorphic)
                 {
                     runtime_operand_stack_max = ::std::max(runtime_operand_stack_max, operand_stack.size());
-                    runtime_operand_stack_byte_max = ::std::max(runtime_operand_stack_byte_max, operand_stack_size_bytes());
+                    runtime_operand_stack_byte_max = ::std::max(runtime_operand_stack_byte_max, operand_stack_bytes);
                 }
             }
         }

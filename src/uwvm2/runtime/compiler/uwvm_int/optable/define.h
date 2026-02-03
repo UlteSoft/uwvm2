@@ -333,12 +333,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     /// @details This function is specialized by the interpreter, assuming complete function arguments exist on the operand stack. After the call, it removes
     ///          the arguments and writes the return result back onto the operand stack.
-    using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) noexcept;
+    using interpreter_call_func_t = void (*)(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
     /// @details `call_indirect` requires resolving a table element and validating the signature at runtime.
     ///          The interpreter provides a callback bridge so the runtime can implement the full semantics (bounds/null/type checks + call).
     using interpreter_call_indirect_func_t =
-        void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) noexcept;
+        void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
     struct compile_option
     {

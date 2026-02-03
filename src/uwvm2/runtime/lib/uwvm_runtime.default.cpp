@@ -128,10 +128,18 @@ namespace uwvm2::runtime::uwvm_int
 
         enum class trap_kind : unsigned
         {
+            // opfunc
             unreachable,
             invalid_conversion_to_integer,
             integer_divide_by_zero,
-            integer_overflow
+            integer_overflow,
+            // call_indirect (wasm1.0 MVP)
+            call_indirect_table_out_of_bounds,
+            call_indirect_null_element,
+            call_indirect_type_mismatch,
+            // uncatched int error (wasm 3.0, exception)
+            uncatched_int_tag
+
         };
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view trap_kind_name(trap_kind k) noexcept
@@ -153,6 +161,22 @@ namespace uwvm2::runtime::uwvm_int
                 case trap_kind::integer_overflow:
                 {
                     return ::uwvm2::utils::container::u8string_view{u8"integer overflow"};
+                }
+                case trap_kind::call_indirect_table_out_of_bounds:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"call_indirect: table index out of bounds"};
+                }
+                case trap_kind::call_indirect_null_element:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"call_indirect: uninitialized element"};
+                }
+                case trap_kind::call_indirect_type_mismatch:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"call_indirect: signature mismatch"};
+                }
+                case trap_kind::uncatched_int_tag:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"tag: uncatched wasm exception"};
                 }
                 [[unlikely]] default:
                 {
@@ -282,6 +306,90 @@ namespace uwvm2::runtime::uwvm_int
 
             ::fast_io::fast_terminate();
         }
+
+#ifdef UWVM_CPP_EXCEPTIONS
+        [[noreturn]] inline void print_and_terminate_compile_validation_error(::uwvm2::utils::container::u8string_view module_name,
+                                                                              ::uwvm2::validation::error::code_validation_error_impl const& v_err) noexcept
+        {
+            // Try to print detailed validator diagnostics (same format as `uwvm/runtime/validator/validate.h`).
+            auto const fallback_and_terminate{
+                [&]() noexcept
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                        u8"[error] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Validation error during compilation (module=\"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        module_name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\").\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }};
+
+            auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+            if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { fallback_and_terminate(); }
+
+            using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+            auto const& am{it->second};
+            if(am.type != module_type_t::exec_wasm && am.type != module_type_t::preloaded_wasm) [[unlikely]] { fallback_and_terminate(); }
+
+            auto const* const wf{am.module_storage_ptr.wf};
+            if(wf == nullptr || wf->binfmt_ver != 1u) [[unlikely]] { fallback_and_terminate(); }
+
+            auto const file_name{wf->file_name};
+            auto const& module_storage{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
+
+            auto const* const module_begin{module_storage.module_span.module_begin};
+            auto const* const module_end{module_storage.module_span.module_end};
+            if(module_begin == nullptr || module_end == nullptr) [[unlikely]] { fallback_and_terminate(); }
+
+            ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{module_begin, v_err.err_curr, module_end};
+
+            ::uwvm2::validation::error::error_output_t errout{};
+            errout.module_begin = module_begin;
+            errout.err = v_err;
+            errout.flag.enable_ansi = static_cast<::std::uint_least8_t>(::uwvm2::uwvm::utils::ansies::put_color);
+# if defined(_WIN32) && (_WIN32_WINNT < 0x0A00 || defined(_WIN32_WINDOWS))
+            errout.flag.win32_use_text_attr = static_cast<::std::uint_least8_t>(!::uwvm2::uwvm::utils::ansies::log_win32_use_ansi_b);
+# endif
+
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                // 1
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Validation error in WebAssembly Code (module=\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                module_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", file=\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                file_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\").\n",
+                                // 2
+                                errout,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\n"
+                                // 3
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                u8"[info]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Validator Memory Indication: ",
+                                memory_printer,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
+                                u8"\n\n");
+
+            ::fast_io::fast_terminate();
+        }
+#endif
 
         enum class valtype_kind : unsigned
         {
@@ -802,7 +910,7 @@ namespace uwvm2::runtime::uwvm_int
 
         inline void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
-        inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) noexcept
+        inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
             compile_all_modules_if_needed();
 
@@ -861,7 +969,7 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         inline void
-            call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) noexcept
+            call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
             compile_all_modules_if_needed();
 
@@ -877,7 +985,7 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const table{resolve_table(module, table_index)};
             if(table == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-            if(selector_u32 >= table->elems.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(selector_u32 >= table->elems.size()) [[unlikely]] { trap_fatal(trap_kind::call_indirect_table_out_of_bounds); }
 
             auto const& elem{table->elems.index_unchecked(static_cast<::std::size_t>(selector_u32))};
             resolved_func rf{};
@@ -888,7 +996,7 @@ namespace uwvm2::runtime::uwvm_int
             {
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_defined:
                 {
-                    if(elem.storage.defined_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(elem.storage.defined_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
                     rf.k = resolved_func::kind::defined;
                     rf.u.defined_ptr = elem.storage.defined_ptr;
                     actual_sig = func_sig_from_defined(elem.storage.defined_ptr);
@@ -896,7 +1004,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported:
                 {
-                    if(elem.storage.imported_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(elem.storage.imported_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
 
                     // Fast path: table element points to this module's import slot.
                     auto const imp_ptr{elem.storage.imported_ptr};
@@ -978,7 +1086,7 @@ namespace uwvm2::runtime::uwvm_int
             auto const expected_sig{expected_sig_from_type_index(module, type_index, expected_ok)};
             if(!expected_ok) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            if(!func_sig_equal(expected_sig, actual_sig)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(!func_sig_equal(expected_sig, actual_sig)) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
 
             if(cached_tgt != nullptr)
             {
@@ -1059,13 +1167,32 @@ namespace uwvm2::runtime::uwvm_int
             if(g_bridges_initialized) { return; }
             g_bridges_initialized = true;
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func = &unreachable_trap;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = &trap_invalid_conversion_to_integer;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = &trap_integer_divide_by_zero;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = &trap_integer_overflow;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func = unreachable_trap;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = &call_bridge;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = &call_indirect_bridge;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
+        }
+
+        inline consteval ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t get_curr_target_tranopt() noexcept
+        {
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
+
+#if !(defined(__pdp11) || (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+            res.is_tail_call = true;
+#endif
+
+#if defined(__ARM_PCS_AAPCS64)
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+#else
+#endif
+
+            return res;
         }
 
         inline void compile_all_modules_if_needed() noexcept
@@ -1095,7 +1222,7 @@ namespace uwvm2::runtime::uwvm_int
                 ++id;
             }
 
-            constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t kTranslateOpt{.is_tail_call = false};
+            constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t kTranslateOpt{get_curr_target_tranopt()};
 
             // Compile modules and build function map.
             for(auto& rec: g_modules)
@@ -1106,10 +1233,22 @@ namespace uwvm2::runtime::uwvm_int
                 opt.curr_wasm_id = it->second;
 
                 ::uwvm2::validation::error::code_validation_error_impl err{};
-                rec.compiled =
-                    ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<kTranslateOpt>(*rec.runtime_module,
-                                                                                                                                  opt,
-                                                                                                                                  err);
+
+#ifdef UWVM_CPP_EXCEPTIONS
+                try
+#endif
+                {
+                    rec.compiled =
+                        ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<kTranslateOpt>(*rec.runtime_module,
+                                                                                                                                      opt,
+                                                                                                                                      err);
+                }
+#ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    print_and_terminate_compile_validation_error(rec.module_name, err);
+                }
+#endif
 
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
                 if(local_n != rec.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1253,7 +1392,18 @@ namespace uwvm2::runtime::uwvm_int
         ::std::byte* stack_top{stack_buf_storage};
         ::std::byte* stack_top_ptr{stack_top};
 
-        call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+#ifdef UWVM_CPP_EXCEPTIONS
+        try
+#endif
+        {
+            call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+        }
+#ifdef UWVM_CPP_EXCEPTIONS
+        catch(::fast_io::error)
+        {
+            trap_fatal(trap_kind::uncatched_int_tag);
+        }
+#endif
     }
 }  // namespace uwvm2::runtime::uwvm_int
 

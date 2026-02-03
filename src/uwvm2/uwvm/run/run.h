@@ -111,6 +111,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             if(try_export(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
         }
 
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
         ::fast_io::fast_terminate();
     }
 #endif
