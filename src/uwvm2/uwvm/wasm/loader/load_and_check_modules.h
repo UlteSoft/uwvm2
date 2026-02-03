@@ -332,7 +332,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                             {
                                 auto get_exec_wasm_module_storage_exportsec_from_feature_tuple{
                                     [&exec_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                                     {
                                         return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                             ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(
@@ -361,7 +361,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                             auto get_exec_wasm_module_storage_importsec_from_feature_tuple{
                                 [&exec_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                                    ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                                    ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                                 {
                                     return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                         ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(exec_wasm_module_storage.sections);
@@ -441,7 +441,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 auto const& imported_wasm_module_storage{imported_wasm_ptr->wasm_module_storage.wasm_binfmt_ver1_storage};
                                                 auto get_imported_wasm_module_storage_exportsec_from_feature_tuple{
                                                     [&imported_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                                                     {
                                                         return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                                             ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(

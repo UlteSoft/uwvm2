@@ -195,7 +195,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                     auto get_exportsec_from_feature_tuple{
                         [&mod]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                            ::uwvm2::utils::container::tuple<Fs...> const&) constexpr noexcept -> decltype(auto)
+                            ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                         {
                             return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                 ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(mod.sections);
