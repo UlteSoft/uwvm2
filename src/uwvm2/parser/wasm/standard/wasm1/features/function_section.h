@@ -4658,7 +4658,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              if(remaining < sizeof(unsigned)) [[unlikely]] { return false; }
 
                                              // wasm_byte is uint_least8_t, so it is safe to reinterpret_cast
-                                             auto const* bytes{reinterpret_cast<wasm_byte const*>(p)};
+                                             auto bytes{reinterpret_cast<wasm_byte const*>(p)};
 
                                              unsigned word{};
                                              ::std::memcpy(::std::addressof(word), bytes, sizeof(word));

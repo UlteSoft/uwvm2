@@ -61,8 +61,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-    inline ::std::size_t resolve_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
+    inline ::std::size_t resolve_default_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
         using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
@@ -74,16 +73,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             auto const& am{it->second};
             if(am.type == module_type_t::exec_wasm || am.type == module_type_t::preloaded_wasm)
             {
-                auto const* wf{am.module_storage_ptr.wf};
+                auto const wf{am.module_storage_ptr.wf};
                 if(wf != nullptr && wf->binfmt_ver == 1u)
                 {
                     auto const& mod{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
                     auto const& startsec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<start_section_t>(mod.sections)};
 
-                    auto const span{startsec.sec_span};
-                    auto const size{static_cast<::std::size_t>(span.sec_end - span.sec_begin)};
-                    if(size != 0uz) { return static_cast<::std::size_t>(startsec.start_idx); }
+                    // Note: do not subtract pointers here; the default (absent) span is {nullptr, nullptr} and pointer
+                    // subtraction would be UB. `sec_begin != nullptr` is the parser's "section present" flag.
+                    if(startsec.sec_span.sec_begin != nullptr)
+                    {
+                        // Runtime currently requires the entry to be a local-defined function (not an imported one).
+                        if(auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+                           rt_it != ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end())
+                        {
+                            auto const import_n{rt_it->second.imported_function_vec_storage.size()};
+                            auto const idx{static_cast<::std::size_t>(startsec.start_idx)};
+                            if(idx >= import_n) { return idx; }
+                        }
+                    }
                 }
+
+                static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
             }
         }
 
@@ -100,10 +111,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                       auto const& ex{eit->second};
                                       if(ex.type != module_type_t::exec_wasm && ex.type != module_type_t::preloaded_wasm) { return false; }
 
-                                      auto const* exp{ex.storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
+                                      auto const exp{ex.storage.wasm_file_export_storage_ptr.storage.wasm_binfmt_ver1_export_storage_ptr};
                                       if(exp == nullptr || exp->type != external_types::func) { return false; }
 
-                                      idx = static_cast<::std::size_t>(exp->storage.func_idx);
+                                      auto const resolved{static_cast<::std::size_t>(exp->storage.func_idx)};
+
+                                      // Runtime currently requires the entry to be a local-defined function (not an imported one).
+                                      auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+                                      if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return false; }
+                                      auto const import_n{rt_it->second.imported_function_vec_storage.size()};
+                                      auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
+                                      if(resolved < import_n || resolved >= total_n) { return false; }
+
+                                      idx = resolved;
                                       return true;
                                   }};
 
@@ -111,12 +131,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             if(try_export(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
         }
 
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-# endif
+#endif
         ::fast_io::fast_terminate();
     }
-#endif
 
     inline int run() noexcept
     {
@@ -283,7 +302,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             {
                                 // full compile + uwvm_int interpreter backend
                                 ::uwvm2::runtime::uwvm_int::full_compile_run_config cfg{};
-                                cfg.entry_function_index = resolve_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                                cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
                                 ::uwvm2::runtime::uwvm_int::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;

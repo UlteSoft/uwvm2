@@ -20,6 +20,7 @@
  ****************************************/
 
 // std
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -95,7 +96,19 @@ namespace uwvm2::runtime::uwvm_int
 
         inline ::uwvm2::utils::container::vector<compiled_module_record> g_modules{};
         inline ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view, ::std::size_t> g_module_name_to_id{};
-        inline ::uwvm2::utils::container::unordered_flat_map<runtime_local_func_storage_t const*, compiled_defined_func_info> g_defined_func_map{};
+        // Full-compile: keep the hot local-call path O(1) by indexing local funcs with vectors (not hash maps).
+        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<compiled_defined_func_info>> g_defined_func_cache{};
+
+        struct defined_func_ptr_range
+        {
+            ::std::uintptr_t begin{};
+            ::std::uintptr_t end{};
+            ::std::size_t module_id{};
+        };
+
+        // For indirect calls / import-alias resolution that only has `local_defined_function_storage_t*`,
+        // map pointer-address to {module_id, local_index} via a sorted range table.
+        inline ::uwvm2::utils::container::vector<defined_func_ptr_range> g_defined_func_ptr_ranges{};
         inline bool g_bridges_initialized{};
         inline bool g_compiled_all{};
 
@@ -106,6 +119,37 @@ namespace uwvm2::runtime::uwvm_int
         };
 
         inline ::uwvm2::utils::container::vector<call_stack_frame> g_call_stack{};
+
+        [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
+        {
+            if(f == nullptr) [[unlikely]] { return nullptr; }
+            if(g_defined_func_ptr_ranges.empty()) [[unlikely]] { return nullptr; }
+
+            ::std::uintptr_t const addr{reinterpret_cast<::std::uintptr_t>(f)};
+            auto const it{::std::upper_bound(g_defined_func_ptr_ranges.begin(),
+                                            g_defined_func_ptr_ranges.end(),
+                                            addr,
+                                            [](auto const a, defined_func_ptr_range const& r) constexpr noexcept { return a < r.begin; })};
+            if(it == g_defined_func_ptr_ranges.begin()) [[unlikely]] { return nullptr; }
+
+            auto const& r{*(it - 1)};
+            if(addr < r.begin || addr >= r.end) [[unlikely]] { return nullptr; }
+
+            constexpr ::std::size_t elem_size{sizeof(runtime_local_func_storage_t)};
+            static_assert(elem_size != 0uz);
+
+            ::std::uintptr_t const off_bytes{addr - r.begin};
+            if((off_bytes % elem_size) != 0u) [[unlikely]] { return nullptr; }
+            auto const local_idx{static_cast<::std::size_t>(off_bytes / elem_size)};
+
+            if(r.module_id >= g_defined_func_cache.size()) [[unlikely]] { return nullptr; }
+            auto const& mod_cache{g_defined_func_cache.index_unchecked(r.module_id)};
+            if(local_idx >= mod_cache.size()) [[unlikely]] { return nullptr; }
+
+            auto const* const info{::std::addressof(mod_cache.index_unchecked(local_idx))};
+            if(info->runtime_func != f) [[unlikely]] { return nullptr; }
+            return info;
+        }
 
         struct call_stack_guard
         {
@@ -337,14 +381,14 @@ namespace uwvm2::runtime::uwvm_int
             auto const& am{it->second};
             if(am.type != module_type_t::exec_wasm && am.type != module_type_t::preloaded_wasm) [[unlikely]] { fallback_and_terminate(); }
 
-            auto const* const wf{am.module_storage_ptr.wf};
+            auto  const wf{am.module_storage_ptr.wf};
             if(wf == nullptr || wf->binfmt_ver != 1u) [[unlikely]] { fallback_and_terminate(); }
 
             auto const file_name{wf->file_name};
             auto const& module_storage{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
 
-            auto const* const module_begin{module_storage.module_span.module_begin};
-            auto const* const module_end{module_storage.module_span.module_end};
+            auto  const module_begin{module_storage.module_span.module_begin};
+            auto const module_end{module_storage.module_span.module_end};
             if(module_begin == nullptr || module_end == nullptr) [[unlikely]] { fallback_and_terminate(); }
 
             ::uwvm2::uwvm::utils::memory::print_memory const memory_printer{module_begin, v_err.err_curr, module_end};

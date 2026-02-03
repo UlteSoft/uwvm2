@@ -329,8 +329,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             auto const& curr_func_type{*curr_local_func.function_type_ptr};
             auto const& curr_code{*curr_local_func.wasm_code_ptr};
 
-            auto const* const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
-            auto const* const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
+            auto  const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
+            auto  const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
             // check
             if(function_index < import_func_count) [[unlikely]]
@@ -752,7 +752,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                      {
                                          if(n == 0uz) { return; }
                                          ensure_vec_capacity(dst, n);
-                                         auto* const out{dst.imp.curr_ptr};
+                                         auto out{dst.imp.curr_ptr};
                                          dst.imp.curr_ptr += n;
                                          ::std::memcpy(out, src, n);
                                      }};
@@ -761,7 +761,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                    {
                                        static_assert(::std::is_trivially_copyable_v<T>);
                                        ensure_vec_capacity(dst, sizeof(T));
-                                       auto* const out{dst.imp.curr_ptr};
+                                       auto out{dst.imp.curr_ptr};
                                        dst.imp.curr_ptr += sizeof(T);
                                        ::std::memcpy(out, ::std::addressof(v), sizeof(T));
                                    }};
@@ -2171,7 +2171,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
 
                         auto const& imported_mem0{curr_module.imported_memory_vec_storage.index_unchecked(0uz)};
-                        auto const* import_type_ptr{imported_mem0.import_type_ptr};
+                        auto const import_type_ptr{imported_mem0.import_type_ptr};
                         if(import_type_ptr == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2203,7 +2203,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
                                 case memory_link_kind::defined:
                                 {
-                                    auto* def{curr->target.defined_ptr};
+                                    auto def{curr->target.defined_ptr};
                                     if(def == nullptr) [[unlikely]]
                                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2232,7 +2232,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // Wasm1 MVP: at most one memory. This backend compiles memory index 0.
                         auto& local_mem0{curr_module.local_defined_memory_vec_storage.index_unchecked(0uz)};
                         resolved_memory0.memory_p = const_cast<native_memory_t*>(::std::addressof(local_mem0.memory));
-                        auto const* mem_type_ptr{local_mem0.memory_type_ptr};
+                        auto const mem_type_ptr{local_mem0.memory_type_ptr};
                         if(mem_type_ptr == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -2275,7 +2275,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
                                 case global_link_kind::defined:
                                 {
-                                    auto* def{curr->target.defined_ptr};
+                                    auto def{curr->target.defined_ptr};
                                     if(def == nullptr) [[unlikely]]
                                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)

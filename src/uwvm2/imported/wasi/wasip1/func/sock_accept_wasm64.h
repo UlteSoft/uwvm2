@@ -462,7 +462,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t]{};
 
-                    auto* const raw_ptr{raw};
+                    auto const raw_ptr{raw};
 
                     if(addrlen > 0u)
                     {
@@ -730,7 +730,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 raw[::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t]{};
 
-                    auto* const raw_ptr{raw};
+                    auto const raw_ptr{raw};
 
                     if(addrlen > 0)
                     {

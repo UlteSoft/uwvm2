@@ -215,7 +215,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 if(auto const renumber_map_iter{wasm_fd_storage.renumber_map.find(fd_to)}; renumber_map_iter != wasm_fd_storage.renumber_map.end())
                 {
                     // fd_to already exists in renumber_map - need to replace it safely
-                    auto* old_to{renumber_map_iter->second.release()};
+                    auto old_to{renumber_map_iter->second.release()};
 
                     // Wait for any ongoing operations on old_to to complete
                     ::uwvm2::utils::mutex::mutex_guard_t{old_to->fd_mutex};

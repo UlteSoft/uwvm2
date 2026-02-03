@@ -3173,7 +3173,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     }
                     else
                     {
-                        auto* const li{target_local_imported_memory};
+                        auto li{target_local_imported_memory};
                         if(li == nullptr) [[unlikely]]
                         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
