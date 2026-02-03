@@ -54,6 +54,9 @@
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
+# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+#  include <uwvm2/uwvm/imported/wasi/wasip1/storage/env.h>
+# endif
 #endif
 
 namespace uwvm2::runtime::uwvm_int
@@ -720,6 +723,57 @@ namespace uwvm2::runtime::uwvm_int
                 if(ptr) { byte_allocator::deallocate(ptr); }
             }
         };
+
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+        inline ::uwvm2::object::memory::linear::native_memory_t* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
+        {
+            using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
+            using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
+
+            auto const import_n{rt.imported_memory_vec_storage.size()};
+            if(import_n == 0uz)
+            {
+                if(rt.local_defined_memory_vec_storage.empty()) { return nullptr; }
+                return ::std::addressof(rt.local_defined_memory_vec_storage.index_unchecked(0uz).memory);
+            }
+
+            constexpr ::std::size_t kMaxChain{4096uz};
+            auto const* curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(0uz))};
+            for(::std::size_t steps{}; steps != kMaxChain; ++steps)
+            {
+                if(curr == nullptr) { return nullptr; }
+
+                switch(curr->link_kind)
+                {
+                    case memory_link_kind::imported:
+                    {
+                        curr = curr->target.imported_ptr;
+                        break;
+                    }
+                    case memory_link_kind::defined:
+                    {
+                        auto const* const def{curr->target.defined_ptr};
+                        if(def == nullptr) { return nullptr; }
+                        return ::std::addressof(def->memory);
+                    }
+                    case memory_link_kind::local_imported:
+                    case memory_link_kind::unresolved: [[fallthrough]];
+                    default:
+                    {
+                        return nullptr;
+                    }
+                }
+            }
+            return nullptr;
+        }
+
+        inline void bind_default_wasip1_memory(runtime_module_storage_t const& rt) noexcept
+        {
+            // Best-effort binding: WASI functions will trap/return errors if a caller without memory[0] invokes them.
+            // Always overwrite the pointer to avoid using a stale memory from a previous run.
+            ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.wasip1_memory = resolve_memory0_ptr(rt);
+        }
+#endif
 
         // IMPORTANT:
         // Do NOT wrap `alloca` in a helper function that returns the pointer: `alloca` is stack-frame bound,
@@ -1513,6 +1567,11 @@ namespace uwvm2::runtime::uwvm_int
 
         auto const main_module{g_modules.index_unchecked(main_id).runtime_module};
         if(main_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+        // Bind WASI Preview1 env to the main module's memory[0] before any guest-to-host call is made.
+        bind_default_wasip1_memory(*main_module);
+#endif
 
         auto const import_n{main_module->imported_function_vec_storage.size()};
         auto const total_n{import_n + main_module->local_defined_function_vec_storage.size()};
