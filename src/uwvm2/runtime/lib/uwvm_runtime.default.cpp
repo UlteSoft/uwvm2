@@ -30,6 +30,7 @@
 // macro
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 
 // platform
 #if !UWVM_HAS_BUILTIN(__builtin_alloca) && (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__))
@@ -725,7 +726,7 @@ namespace uwvm2::runtime::uwvm_int
         };
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
-        inline ::uwvm2::object::memory::linear::native_memory_t* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
+        inline ::uwvm2::object::memory::linear::native_memory_t const* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
         {
             using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
             using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
@@ -756,7 +757,7 @@ namespace uwvm2::runtime::uwvm_int
                         if(def == nullptr) { return nullptr; }
                         return ::std::addressof(def->memory);
                     }
-                    case memory_link_kind::local_imported:
+                    case memory_link_kind::local_imported: [[fallthrough]];
                     case memory_link_kind::unresolved: [[fallthrough]];
                     default:
                     {
@@ -771,7 +772,9 @@ namespace uwvm2::runtime::uwvm_int
         {
             // Best-effort binding: WASI functions will trap/return errors if a caller without memory[0] invokes them.
             // Always overwrite the pointer to avoid using a stale memory from a previous run.
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.wasip1_memory = resolve_memory0_ptr(rt);
+            auto const* const mem0{resolve_memory0_ptr(rt)};
+            ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.wasip1_memory =
+                const_cast<::uwvm2::object::memory::linear::native_memory_t*>(mem0);
         }
 #endif
 
@@ -1684,6 +1687,7 @@ namespace uwvm2::runtime::uwvm_int
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
