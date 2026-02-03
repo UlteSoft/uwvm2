@@ -400,7 +400,7 @@ namespace uwvm2::runtime::uwvm_int
         struct valtype_vec_view
         {
             valtype_kind kind{};
-            ::std::byte const* data{};
+            void const* data{};
             ::std::size_t size{};
 
             inline constexpr ::std::uint_least8_t at(::std::size_t i) const noexcept
@@ -409,12 +409,16 @@ namespace uwvm2::runtime::uwvm_int
 
                 if(kind == valtype_kind::raw_u8)
                 {
-                    // `data` is a byte view over raw type-code bytes; read via `std::byte` to avoid strict-aliasing UB.
-                    return ::std::to_integer<::std::uint_least8_t>(data[i]);
+                    auto const p{static_cast<::std::uint_least8_t const*>(data)};
+                    if(p == nullptr) [[unlikely]] { return 0u; }
+                    return p[i];
                 }
                 else
                 {
-                    auto const p{reinterpret_cast<wasm_value_type const*>(data)};
+                    using wasm_value_type_const_ptr_t_may_alias UWVM_GNU_MAY_ALIAS = wasm_value_type const*;
+
+                    auto const p{static_cast<wasm_value_type_const_ptr_t_may_alias>(data)};
+                    if(p == nullptr) [[unlikely]] { return 0u; }
                     return static_cast<::std::uint_least8_t>(p[i]);
                 }
             }
@@ -518,12 +522,8 @@ namespace uwvm2::runtime::uwvm_int
         {
             auto const ft{f->function_type_ptr};
             return {
-                {valtype_kind::wasm_enum,
-                 reinterpret_cast<::std::byte const*>(ft->parameter.begin),
-                 static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
-                {valtype_kind::wasm_enum,
-                 reinterpret_cast<::std::byte const*>(ft->result.begin),
-                 static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
+                {valtype_kind::wasm_enum, ft->parameter.begin, static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
+                {valtype_kind::wasm_enum, ft->result.begin,    static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
             };
         }
 
@@ -534,18 +534,16 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const& ft{info.function_type};
             return {
-                {valtype_kind::wasm_enum,
-                 reinterpret_cast<::std::byte const*>(ft.parameter.begin),
-                 static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)                                                                          },
-                {valtype_kind::wasm_enum, reinterpret_cast<::std::byte const*>(ft.result.begin), static_cast<::std::size_t>(ft.result.end - ft.result.begin)}
+                {valtype_kind::wasm_enum, ft.parameter.begin, static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)},
+                {valtype_kind::wasm_enum, ft.result.begin,    static_cast<::std::size_t>(ft.result.end - ft.result.begin)      }
             };
         }
 
         [[nodiscard]] inline constexpr func_sig_view func_sig_from_capi(capi_function_t const* f) noexcept
         {
             return {
-                {valtype_kind::raw_u8, reinterpret_cast<::std::byte const*>(f->para_type_vec_begin), f->para_type_vec_size},
-                {valtype_kind::raw_u8, reinterpret_cast<::std::byte const*>(f->res_type_vec_begin),  f->res_type_vec_size }
+                {valtype_kind::raw_u8, f->para_type_vec_begin, f->para_type_vec_size},
+                {valtype_kind::raw_u8, f->res_type_vec_begin,  f->res_type_vec_size }
             };
         }
 
@@ -886,12 +884,8 @@ namespace uwvm2::runtime::uwvm_int
             auto const ft{begin + type_index};
             ok = true;
             return {
-                {valtype_kind::wasm_enum,
-                 reinterpret_cast<::std::byte const*>(ft->parameter.begin),
-                 static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
-                {valtype_kind::wasm_enum,
-                 reinterpret_cast<::std::byte const*>(ft->result.begin),
-                 static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
+                {valtype_kind::wasm_enum, ft->parameter.begin, static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
+                {valtype_kind::wasm_enum, ft->result.begin,    static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
             };
         }
 
@@ -912,7 +906,10 @@ namespace uwvm2::runtime::uwvm_int
 
         inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
+#if 0
+            // Since it's a full compile, it is assumed that everything has already been compiled.
             compile_all_modules_if_needed();
+#endif
 
             if(wasm_module_id >= g_modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_modules.index_unchecked(wasm_module_id)};
@@ -971,7 +968,10 @@ namespace uwvm2::runtime::uwvm_int
         inline void
             call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
+#if 0
+            // Since it's a full compile, it is assumed that everything has already been compiled.
             compile_all_modules_if_needed();
+#endif
 
             if(wasm_module_id >= g_modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_modules.index_unchecked(wasm_module_id)};
