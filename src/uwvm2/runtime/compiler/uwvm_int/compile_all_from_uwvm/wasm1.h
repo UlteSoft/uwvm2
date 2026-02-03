@@ -329,8 +329,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             auto const& curr_func_type{*curr_local_func.function_type_ptr};
             auto const& curr_code{*curr_local_func.wasm_code_ptr};
 
-            auto  const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
-            auto  const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
+            auto const code_begin{reinterpret_cast<::std::byte const*>(curr_code.body.expr_begin)};
+            auto const code_end{reinterpret_cast<::std::byte const*>(curr_code.body.code_end)};
 
             // check
             if(function_index < import_func_count) [[unlikely]]
@@ -4220,7 +4220,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
                             storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
                             storage.operand_stack_byte_max = ::std::max(storage.operand_stack_byte_max, runtime_operand_stack_byte_max);
-                            storage.local_funcs.push_back(local_func_symbol);
+                            // IMPORTANT: bytecode contains self-referential absolute pointers (patched from rel offsets).
+                            // Copying would produce a new buffer with pointers still targeting the old buffer (UAF).
+                            storage.local_funcs.push_back(::std::move(local_func_symbol));
 
                             finished_current_func = true;
                             break;
