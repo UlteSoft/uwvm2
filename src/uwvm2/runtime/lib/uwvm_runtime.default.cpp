@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <utility>
 // macro
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/utils/macro/push_macros.h>
@@ -750,6 +751,34 @@ namespace uwvm2::runtime::uwvm_int
         }                                                                                                                                                      \
     }
 
+        template <::std::size_t I, ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
+        using uwvmint_interp_arg_t = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::interpreter_tuple_arg_t<I, CompileOption>;
+
+        template <::std::size_t I, ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
+        UWVM_ALWAYS_INLINE inline constexpr uwvmint_interp_arg_t<I, CompileOption>
+            uwvmint_init_interp_arg(::std::byte const* ip, ::std::byte* stack_top, ::std::byte* local_base) noexcept
+        {
+            if constexpr(I == 0uz) { return ip; }
+            else if constexpr(I == 1uz) { return stack_top; }
+            else if constexpr(I == 2uz) { return local_base; }
+            else
+            {
+                return uwvmint_interp_arg_t<I, CompileOption>{};
+            }
+        }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption, ::std::size_t... Is>
+        UWVM_ALWAYS_INLINE inline void execute_compiled_defined_tailcall_impl(::std::index_sequence<Is...>,
+                                                                              ::std::byte const* ip,
+                                                                              ::std::byte* stack_top,
+                                                                              ::std::byte* local_base) noexcept
+        {
+            using opfunc_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<uwvmint_interp_arg_t<Is, CompileOption>...>;
+            opfunc_t fn;  // no init
+            ::std::memcpy(::std::addressof(fn), ip, sizeof(fn));
+            fn(uwvmint_init_interp_arg<Is, CompileOption>(ip, stack_top, local_base)...);
+        }
+
         inline consteval ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t get_curr_target_tranopt() noexcept
         {
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
@@ -785,21 +814,26 @@ namespace uwvm2::runtime::uwvm_int
             ::std::byte* local_base{};
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(local_base, compiled_func->local_bytes_max, locals_guard);
 
+            if(param_bytes > compiled_func->local_bytes_max) [[unlikely]]
+            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(param_bytes != compiled_func->local_bytes_max) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #else
-            if(param_bytes > compiled_func->local_bytes_max) [[unlikely]] { ::fast_io::fast_terminate(); }
+                ::fast_io::fast_terminate();
 #endif
+            }
 
             if(param_bytes != 0uz) { ::std::memcpy(local_base, caller_args_begin, param_bytes); }
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
             heap_buf_guard operand_guard{};
-            auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
+            auto const stack_cap_raw{compiled_func->operand_stack_byte_max != 0uz ? compiled_func->operand_stack_byte_max
+                                                                                  : operand_stack_capacity_bytes(compiled_func->operand_stack_max)};
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 #endif
+            if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(operand_base, stack_cap_raw, operand_guard);
@@ -811,9 +845,9 @@ namespace uwvm2::runtime::uwvm_int
 
             if constexpr(curr_target_tranopt.is_tail_call)
             {
-                opfunc_byref_t fn;  // no init
-                ::std::memcpy(::std::addressof(fn), ip, sizeof(fn));
-                fn(ip, stack_top, local_base);
+                constexpr ::std::size_t tuple_size{
+                    ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::interpreter_tuple_size<curr_target_tranopt>()};
+                execute_compiled_defined_tailcall_impl<curr_target_tranopt>(::std::make_index_sequence<tuple_size>{}, ip, stack_top, local_base);
             }
             else
             {
@@ -823,10 +857,10 @@ namespace uwvm2::runtime::uwvm_int
                     ::std::memcpy(::std::addressof(fn), ip, sizeof(fn));
                     fn(ip, stack_top, local_base);
                 }
-            }
 
-            auto const actual_result_bytes{static_cast<::std::size_t>(stack_top - operand_base)};
-            if(actual_result_bytes != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const actual_result_bytes{static_cast<::std::size_t>(stack_top - operand_base)};
+                if(actual_result_bytes != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+            }
 
             // Append results back to caller stack.
             ::std::memcpy(*caller_stack_top_ptr, operand_base, result_bytes);
