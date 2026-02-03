@@ -84,45 +84,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                            return nullptr;
                                        }};
 
-        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
-                                                   {
-                                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-                                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
-                                                       {
-                                                           return false;
-                                                       }
+        auto const is_void_to_void_wasm_func_index{
+            [&](::std::size_t func_index) noexcept -> bool
+            {
+                auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+                if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return false; }
 
-                                                       auto const& rt{rt_it->second};
-                                                       auto const import_n{rt.imported_function_vec_storage.size()};
-                                                       auto const local_n{rt.local_defined_function_vec_storage.size()};
-                                                       if(func_index >= import_n + local_n) [[unlikely]] { return false; }
+                auto const& rt{rt_it->second};
+                auto const import_n{rt.imported_function_vec_storage.size()};
+                auto const local_n{rt.local_defined_function_vec_storage.size()};
+                if(func_index >= import_n + local_n) [[unlikely]] { return false; }
 
-                                                       auto const is_void_to_void_ft{[](auto const& ft) constexpr noexcept -> bool
-                                                                                     { return ft.parameter.begin == ft.parameter.end && ft.result.begin == ft.result.end; }};
+                auto const is_void_to_void_ft{[](auto const& ft) constexpr noexcept -> bool
+                                              { return ft.parameter.begin == ft.parameter.end && ft.result.begin == ft.result.end; }};
 
-                                                       if(func_index < import_n)
-                                                       {
-                                                           auto const* const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
-                                                           auto const* const leaf{resolve_import_leaf(imp)};
-                                                           if(leaf == nullptr) [[unlikely]] { return false; }
+                if(func_index < import_n)
+                {
+                    auto const* const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
+                    auto const* const leaf{resolve_import_leaf(imp)};
+                    if(leaf == nullptr) [[unlikely]] { return false; }
 
-                                                           // Allow imported entry only when it ultimately resolves to a wasm-defined function.
-                                                           if(leaf->link_kind != func_link_kind::defined) { return false; }
-                                                           auto const* const f{leaf->target.defined_ptr};
-                                                           if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
-                                                           return is_void_to_void_ft(*f->function_type_ptr);
-                                                       }
+                    // Allow imported entry only when it ultimately resolves to a wasm-defined function.
+                    if(leaf->link_kind != func_link_kind::defined) { return false; }
+                    auto const* const f{leaf->target.defined_ptr};
+                    if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                    return is_void_to_void_ft(*f->function_type_ptr);
+                }
 
-                                                       auto const local_idx{func_index - import_n};
-                                                       auto const* const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
-                                                       if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
-                                                       return is_void_to_void_ft(*f->function_type_ptr);
-                                                   }};
+                auto const local_idx{func_index - import_n};
+                auto const* const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
+                if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                return is_void_to_void_ft(*f->function_type_ptr);
+            }};
 
         // Prefer start section when present.
-        if(auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)}; it != ::uwvm2::uwvm::wasm::storage::all_module.end())
+        auto const all_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)};
+        if(all_module_it != ::uwvm2::uwvm::wasm::storage::all_module.end())
         {
-            auto const& am{it->second};
+            auto const& am{all_module_it->second};
             if(am.type == module_type_t::exec_wasm || am.type == module_type_t::preloaded_wasm)
             {
                 auto const wf{am.module_storage_ptr.wf};
@@ -180,6 +179,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             if(try_export(::uwvm2::utils::container::u8string_view{u8"_start"})) { return idx; }
             if(try_export(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
+        }
+
+        // Fallback: if `all_module_export` is missing/stale, resolve from the parsed export section directly.
+        // This avoids relying on a separately-constructed export map for entrypoint resolution.
+        if(all_module_it != ::uwvm2::uwvm::wasm::storage::all_module.end())
+        {
+            auto const& am{all_module_it->second};
+            if(am.type == module_type_t::exec_wasm || am.type == module_type_t::preloaded_wasm)
+            {
+                auto const wf{am.module_storage_ptr.wf};
+                if(wf != nullptr && wf->binfmt_ver == 1u)
+                {
+                    auto const& mod{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
+
+                    auto get_exportsec_from_feature_tuple{
+                        [&mod]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
+                            ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                        {
+                            return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                                ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(mod.sections);
+                        }};
+
+                    auto const& exportsec{get_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
+                    if(exportsec.sec_span.sec_begin != nullptr)
+                    {
+                        auto const try_export_from_section{[&](::uwvm2::utils::container::u8string_view export_name) noexcept -> bool
+                                                           {
+                                                               for(auto const& e: exportsec.exports)
+                                                               {
+                                                                   if(e.export_name != export_name) { continue; }
+                                                                   if(e.exports.type != external_types::func) { return false; }
+
+                                                                   auto const resolved{static_cast<::std::size_t>(e.exports.storage.func_idx)};
+                                                                   if(!is_void_to_void_wasm_func_index(resolved)) { return false; }
+                                                                   idx = resolved;
+                                                                   return true;
+                                                               }
+                                                               return false;
+                                                           }};
+
+                        if(try_export_from_section(::uwvm2::utils::container::u8string_view{u8"_start"})) { return idx; }
+                        if(try_export_from_section(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
+                    }
+                }
+
+                static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
+            }
         }
 
         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
