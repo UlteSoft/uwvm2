@@ -26,6 +26,7 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <memory>
 # include <type_traits>
 # include <utility>
 // macro
@@ -66,6 +67,57 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
         using start_section_t = ::uwvm2::parser::wasm::standard::wasm1::features::start_section_storage_t;
         using external_types = ::uwvm2::parser::wasm::standard::wasm1::type::external_types;
+        using imported_function_storage_t = ::uwvm2::uwvm::runtime::storage::imported_function_storage_t;
+        using func_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
+
+        // We currently do not provide host arguments to the entry function; therefore, the entry must be `() -> ()`.
+        // NOTE: start section in wasm1.0 requires `() -> ()` by the spec; exported fallbacks are kept consistent.
+        auto const resolve_import_leaf{[](imported_function_storage_t const* imp) noexcept -> imported_function_storage_t const*
+                                       {
+                                           constexpr ::std::size_t kMaxChain{4096uz};
+                                           for(::std::size_t steps{}; steps != kMaxChain; ++steps)
+                                           {
+                                               if(imp == nullptr) [[unlikely]] { return nullptr; }
+                                               if(imp->link_kind != func_link_kind::imported) { return imp; }
+                                               imp = imp->target.imported_ptr;
+                                           }
+                                           return nullptr;
+                                       }};
+
+        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
+                                                   {
+                                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+                                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
+                                                       {
+                                                           return false;
+                                                       }
+
+                                                       auto const& rt{rt_it->second};
+                                                       auto const import_n{rt.imported_function_vec_storage.size()};
+                                                       auto const local_n{rt.local_defined_function_vec_storage.size()};
+                                                       if(func_index >= import_n + local_n) [[unlikely]] { return false; }
+
+                                                       auto const is_void_to_void_ft{[](auto const& ft) constexpr noexcept -> bool
+                                                                                     { return ft.parameter.begin == ft.parameter.end && ft.result.begin == ft.result.end; }};
+
+                                                       if(func_index < import_n)
+                                                       {
+                                                           auto const* const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
+                                                           auto const* const leaf{resolve_import_leaf(imp)};
+                                                           if(leaf == nullptr) [[unlikely]] { return false; }
+
+                                                           // Allow imported entry only when it ultimately resolves to a wasm-defined function.
+                                                           if(leaf->link_kind != func_link_kind::defined) { return false; }
+                                                           auto const* const f{leaf->target.defined_ptr};
+                                                           if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                                                           return is_void_to_void_ft(*f->function_type_ptr);
+                                                       }
+
+                                                       auto const local_idx{func_index - import_n};
+                                                       auto const* const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
+                                                       if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                                                       return is_void_to_void_ft(*f->function_type_ptr);
+                                                   }};
 
         // Prefer start section when present.
         if(auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)}; it != ::uwvm2::uwvm::wasm::storage::all_module.end())
@@ -83,13 +135,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     // subtraction would be UB. `sec_begin != nullptr` is the parser's "section present" flag.
                     if(startsec.sec_span.sec_begin != nullptr)
                     {
-                        // Runtime currently requires the entry to be a local-defined function (not an imported one).
                         if(auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
                            rt_it != ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end())
                         {
                             auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                             auto const idx{static_cast<::std::size_t>(startsec.start_idx)};
-                            if(idx >= import_n) { return idx; }
+                            auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
+                            if(idx < total_n && is_void_to_void_wasm_func_index(idx)) { return idx; }
                         }
                     }
                 }
@@ -115,13 +167,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                       if(exp == nullptr || exp->type != external_types::func) { return false; }
 
                                       auto const resolved{static_cast<::std::size_t>(exp->storage.func_idx)};
-
-                                      // Runtime currently requires the entry to be a local-defined function (not an imported one).
                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return false; }
                                       auto const import_n{rt_it->second.imported_function_vec_storage.size()};
                                       auto const total_n{import_n + rt_it->second.local_defined_function_vec_storage.size()};
-                                      if(resolved < import_n || resolved >= total_n) { return false; }
+                                      if(resolved >= total_n) { return false; }
+                                      if(!is_void_to_void_wasm_func_index(resolved)) { return false; }
 
                                       idx = resolved;
                                       return true;
@@ -131,9 +182,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             if(try_export(::uwvm2::utils::container::u8string_view{u8"main"})) { return idx; }
         }
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"Cannot resolve entry function for module=\"",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            main_module_name,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"\": expected start section or exported function \"_start\"/\"main\" with signature () -> ().\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
     }
 
