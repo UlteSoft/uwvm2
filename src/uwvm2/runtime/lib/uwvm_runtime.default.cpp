@@ -827,8 +827,7 @@ namespace uwvm2::runtime::uwvm_int
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
             heap_buf_guard operand_guard{};
-            auto const stack_cap_raw{compiled_func->operand_stack_byte_max != 0uz ? compiled_func->operand_stack_byte_max
-                                                                                  : operand_stack_capacity_bytes(compiled_func->operand_stack_max)};
+            auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
