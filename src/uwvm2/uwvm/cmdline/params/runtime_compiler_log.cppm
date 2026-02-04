@@ -5,9 +5,9 @@
  *************************************************************/
 
 /**
- * @author      24bit-xjkp
+ * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-21
+ * @date        2025-04-16
  * @copyright   APL-2.0 License
  */
 
@@ -22,13 +22,17 @@
 
 module;
 
-export module uwvm2.uwvm_predefine.io;
-export import :io_device;
-export import :output;
-export import :runtime_log;
-export import :warn_control;
-export import :verbose_control;
-export import :time;
+#include <memory>
+
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.params:runtime_compiler_log;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.cmdline;
+import uwvm2.uwvm.io;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -37,4 +41,4 @@ export import :time;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "runtime_compiler_log.h"

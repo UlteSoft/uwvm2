@@ -89,6 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
 #endif
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
 
         // wasi
 #if defined(UWVM_IMPORT_WASI)

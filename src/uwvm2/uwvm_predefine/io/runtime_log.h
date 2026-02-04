@@ -1,13 +1,13 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
 
 /**
- * @author      24bit-xjkp
+ * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-21
+ * @date        2025-04-16
  * @copyright   APL-2.0 License
  */
 
@@ -20,21 +20,25 @@
  *                                      *
  ****************************************/
 
-module;
-
-export module uwvm2.uwvm_predefine.io;
-export import :io_device;
-export import :output;
-export import :runtime_log;
-export import :warn_control;
-export import :verbose_control;
-export import :time;
+#pragma once
 
 #ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
+// import
+# include <fast_io.h>
+# include <fast_io_device.h>
 #endif
 
-#include "impl.h"
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+#ifdef UWVM
+UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
+{
+    /// @brief Record the runtime compiler's log
+    inline bool enable_runtime_log{};  // [galobal]
+    inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8native_file>
+        u8runtime_log_output{};  // [global] No global variable dependencies from other translation units
+
+}  // namespace uwvm2::utils
+#endif

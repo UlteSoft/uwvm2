@@ -1,13 +1,13 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
 
 /**
- * @author      24bit-xjkp
+ * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-21
+ * @date        2025-04-16
  * @copyright   APL-2.0 License
  */
 
@@ -22,13 +22,9 @@
 
 module;
 
-export module uwvm2.uwvm_predefine.io;
-export import :io_device;
-export import :output;
-export import :runtime_log;
-export import :warn_control;
-export import :verbose_control;
-export import :time;
+export module uwvm2.uwvm_predefine.io:runtime_log;
+
+import fast_io;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -37,4 +33,4 @@ export import :time;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "runtime_log.h"

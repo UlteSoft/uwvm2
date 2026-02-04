@@ -50,6 +50,7 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_tiered;
 export import :runtime_aot;
+export import :runtime_compiler_log;
 
 // wasi
 export import :wasi_disable_utf8_check;
