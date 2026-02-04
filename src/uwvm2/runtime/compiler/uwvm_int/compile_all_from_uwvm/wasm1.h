@@ -270,6 +270,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             bool polymorphic_base{};
             bool then_polymorphic_end{};  // only meaningful for if/else frames
 
+            // Stack-top cache snapshot at "end label" entry (used when fallthrough is unreachable at `end`,
+            // but the construct is reachable via an earlier branch to its end label).
+            // Only meaningful when scalar stack-top caching is enabled.
+            bool stacktop_has_end_state{};
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t stacktop_currpos_at_end{};
+            ::std::size_t stacktop_memory_count_at_end{};
+            ::std::size_t stacktop_cache_count_at_end{};
+            ::std::size_t stacktop_cache_i32_count_at_end{};
+            ::std::size_t stacktop_cache_i64_count_at_end{};
+            ::std::size_t stacktop_cache_f32_count_at_end{};
+            ::std::size_t stacktop_cache_f64_count_at_end{};
+
             // Stack-top cache snapshot at `if` entry (used to restore correct else-body codegen state).
             // Only meaningful for `if` frames when scalar stack-top caching is enabled.
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t stacktop_currpos_at_else_entry{};
@@ -4672,6 +4684,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_then_end;
                                     codegen_operand_stack = operand_stack;
                                 }
+                                else if(frame.stacktop_has_end_state)
+                                {
+                                    // Generic `block`/`loop`/`function` merge: fallthrough is unreachable at `end`,
+                                    // but the construct is reachable via a branch to its end label.
+                                    curr_stacktop = frame.stacktop_currpos_at_end;
+                                    stacktop_memory_count = frame.stacktop_memory_count_at_end;
+                                    stacktop_cache_count = frame.stacktop_cache_count_at_end;
+                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_end;
+                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_end;
+                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_end;
+                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_end;
+                                    codegen_operand_stack = operand_stack;
+                                }
                             }
                         }
 
@@ -4803,7 +4828,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
-                        auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
+                        auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
+                        auto& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
                         auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
                         if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
@@ -4935,7 +4961,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                         }
 
-                        auto const& target_frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - label_index_uz)};
+                        auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
+                        auto const& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
+                        auto& target_frame_mut{control_flow_stack.index_unchecked(target_frame_index)};
                         auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
                         if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
@@ -5343,6 +5371,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                                             emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
                                             emit_br_to(thunks, target_label_id, true);
+                                        }
+
+                                        if(target_label_id == target_frame.end_label_id)
+                                        {
+                                            target_frame_mut.stacktop_has_end_state = true;
+                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
                                         }
 
                                         curr_stacktop = saved_curr_stacktop;
