@@ -41,6 +41,7 @@ import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.validation.error;
 import uwvm2.object;
+import uwvm2.uwvm.io;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.runtime.storage;
