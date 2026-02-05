@@ -2087,7 +2087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 }};
 
             auto const stacktop_spill_one_deepest_to{
-                [&](bytecode_vec_t& dst) constexpr UWVM_THROWS
+                [&](bytecode_vec_t& dst, ::std::size_t max_spill_n = SIZE_MAX) constexpr UWVM_THROWS
                 {
                     if constexpr(!stacktop_enabled) { return; }
                     if(stacktop_cache_count == 0uz) { return; }
@@ -2110,6 +2110,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             ++spill_n;
                         }
                     }
+                    if(max_spill_n == 0uz) { return; }
+                    if(spill_n > max_spill_n) { spill_n = max_spill_n; }
 
                     // Batch only for disjoint ranges; for merged ranges, fall back to single spills.
                     // (Typed spill opfunc enforces Count==1.)
@@ -2252,7 +2254,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                         ::std::size_t spill_cnt{};
                                                         while(stacktop_cache_count_for_range(begin_pos, end_pos) >= ring_size)
                                                         {
-                                                            stacktop_spill_one_deepest_to(dst);
+                                                            // Only spill what is needed to free one slot for this push.
+                                                            // Over-spilling can strand subsequent opcodes (e.g. `select`) with operands in memory while
+                                                            // the corresponding opfunc expects them to still reside in the stack-top cache.
+                                                            stacktop_spill_one_deepest_to(dst, 1uz);
                                                             ++spill_cnt;
                                                         }
 
