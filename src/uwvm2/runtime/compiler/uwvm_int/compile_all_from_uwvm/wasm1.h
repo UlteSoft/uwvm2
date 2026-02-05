@@ -737,6 +737,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             ::std::size_t stacktop_cache_f32_count{};
             ::std::size_t stacktop_cache_f64_count{};
 
+            // Experimental: strict control-flow entry (call-like).
+            // Goal: ensure re-entry points (block/loop end, loop start, else entry) see an empty stack-top cache and
+            // all values materialized in operand-stack memory, to avoid expensive state-merge/repair across edges.
+            constexpr bool strict_cf_entry_like_call{true};
+
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             // Tracking for `stacktop_assert_invariants()` diagnostics.
             ::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code stacktop_dbg_last_op{
@@ -1710,8 +1715,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                          ? 1uz
                                                                          : 0uz)) == 1uz};
 
-	            // Emit a multi-value spill (cache -> memory) for a **single scalar type**.
-	            // This reduces bytecode size and dispatch overhead by combining consecutive spills into one threaded-interpreter opfunc.
+            // Emit a multi-value spill (cache -> memory) for a **single scalar type**.
+            // This reduces bytecode size and dispatch overhead by combining consecutive spills into one threaded-interpreter opfunc.
             [[maybe_unused]] auto const emit_stacktop_spilln_same_vt_to{
                 [&]([[maybe_unused]] bytecode_vec_t& dst,
                     [[maybe_unused]] ::std::size_t start_pos,
@@ -1726,16 +1731,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     auto tmp_currpos{curr_stacktop};
                     remain_t remain{};
 
-	                    switch(vt)
-	                    {
-	                        case curr_operand_stack_value_type::i32:
-	                        {
-	                            if constexpr(stacktop_i32_enabled)
-	                            {
-	                                tmp_currpos.i32_stack_top_curr_pos = start_pos;
-	                                remain.i32_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                    switch(vt)
+                    {
+                        case curr_operand_stack_value_type::i32:
+                        {
+                            if constexpr(stacktop_i32_enabled)
+                            {
+                                tmp_currpos.i32_stack_top_curr_pos = start_pos;
+                                remain.i32_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1751,21 +1756,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     dst,
                                     translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<CompileOption,
                                                                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(
-	                                        tmp_currpos,
-	                                        remain,
-	                                        interpreter_tuple));
-	                                return;
-	                            }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::i64:
-	                        {
-	                            if constexpr(stacktop_i64_enabled)
-	                            {
-	                                tmp_currpos.i64_stack_top_curr_pos = start_pos;
-	                                remain.i64_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                                        tmp_currpos,
+                                        remain,
+                                        interpreter_tuple));
+                                return;
+                            }
+                            break;
+                        }
+                        case curr_operand_stack_value_type::i64:
+                        {
+                            if constexpr(stacktop_i64_enabled)
+                            {
+                                tmp_currpos.i64_stack_top_curr_pos = start_pos;
+                                remain.i64_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1781,21 +1786,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     dst,
                                     translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<CompileOption,
                                                                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64>(
-	                                        tmp_currpos,
-	                                        remain,
-	                                        interpreter_tuple));
-	                                return;
-	                            }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::f32:
-	                        {
-	                            if constexpr(stacktop_f32_enabled)
-	                            {
-	                                tmp_currpos.f32_stack_top_curr_pos = start_pos;
-	                                remain.f32_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                                        tmp_currpos,
+                                        remain,
+                                        interpreter_tuple));
+                                return;
+                            }
+                            break;
+                        }
+                        case curr_operand_stack_value_type::f32:
+                        {
+                            if constexpr(stacktop_f32_enabled)
+                            {
+                                tmp_currpos.f32_stack_top_curr_pos = start_pos;
+                                remain.f32_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1811,21 +1816,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     dst,
                                     translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<CompileOption,
                                                                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(
-	                                        tmp_currpos,
-	                                        remain,
-	                                        interpreter_tuple));
-	                                return;
-	                            }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::f64:
-	                        {
-	                            if constexpr(stacktop_f64_enabled)
-	                            {
-	                                tmp_currpos.f64_stack_top_curr_pos = start_pos;
-	                                remain.f64_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                                        tmp_currpos,
+                                        remain,
+                                        interpreter_tuple));
+                                return;
+                            }
+                            break;
+                        }
+                        case curr_operand_stack_value_type::f64:
+                        {
+                            if constexpr(stacktop_f64_enabled)
+                            {
+                                tmp_currpos.f64_stack_top_curr_pos = start_pos;
+                                remain.f64_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1846,18 +1851,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         interpreter_tuple));
                                 return;
                             }
-	                            break;
-	                        }
-	                        [[unlikely]] default:
-	                        {
-	                            break;
-	                        }
-	                    }
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            break;
+                        }
+                    }
 
-	                    // Fallback: emit single-value spills.
-	                    {
-	                        ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
-	                        ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
+                    // Fallback: emit single-value spills.
+                    {
+                        ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
+                        ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
 
                         // Spill in deepest->top order so operand-stack memory preserves deep->top layout.
                         ::std::size_t pos{start_pos};
@@ -1867,8 +1872,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_stacktop_spill1_typed_to(dst, pos, vt);
                             pos = stacktop_ring_prev(pos, begin_pos, end_pos);
                         }
-	                    }
-	                }};
+                    }
+                }};
 
             auto const emit_stacktop_fill1_typed_to{
                 [&]([[maybe_unused]] bytecode_vec_t& dst,
@@ -1923,11 +1928,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                 }};
 
-	            // Emit a multi-value fill (memory -> cache) for a **single scalar type**.
-	            [[maybe_unused]] auto const emit_stacktop_filln_same_vt_to{
-	                [&]([[maybe_unused]] bytecode_vec_t& dst,
-	                    [[maybe_unused]] ::std::size_t start_pos,
-	                    [[maybe_unused]] ::std::size_t count,
+            // Emit a multi-value fill (memory -> cache) for a **single scalar type**.
+            [[maybe_unused]] auto const emit_stacktop_filln_same_vt_to{
+                [&]([[maybe_unused]] bytecode_vec_t& dst,
+                    [[maybe_unused]] ::std::size_t start_pos,
+                    [[maybe_unused]] ::std::size_t count,
                     [[maybe_unused]] curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                 {
                     if constexpr(!stacktop_enabled) { return; }
@@ -1938,16 +1943,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     auto tmp_currpos{curr_stacktop};
                     remain_t remain{};
 
-	                    switch(vt)
-	                    {
-	                        case curr_operand_stack_value_type::i32:
-	                        {
-	                            if constexpr(stacktop_i32_enabled)
-	                            {
-	                                tmp_currpos.i32_stack_top_curr_pos = start_pos;
-	                                remain.i32_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                    switch(vt)
+                    {
+                        case curr_operand_stack_value_type::i32:
+                        {
+                            if constexpr(stacktop_i32_enabled)
+                            {
+                                tmp_currpos.i32_stack_top_curr_pos = start_pos;
+                                remain.i32_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1963,21 +1968,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     dst,
                                     translate::get_uwvmint_operand_stack_to_stacktop_fptr_from_tuple<CompileOption,
                                                                                                      ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(
-	                                        tmp_currpos,
-	                                        remain,
-	                                        interpreter_tuple));
-	                                return;
-	                            }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::i64:
-	                        {
-	                            if constexpr(stacktop_i64_enabled)
-	                            {
-	                                tmp_currpos.i64_stack_top_curr_pos = start_pos;
-	                                remain.i64_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                                        tmp_currpos,
+                                        remain,
+                                        interpreter_tuple));
+                                return;
+                            }
+                            break;
+                        }
+                        case curr_operand_stack_value_type::i64:
+                        {
+                            if constexpr(stacktop_i64_enabled)
+                            {
+                                tmp_currpos.i64_stack_top_curr_pos = start_pos;
+                                remain.i64_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -1998,16 +2003,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         interpreter_tuple));
                                 return;
                             }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::f32:
-	                        {
-	                            if constexpr(stacktop_f32_enabled)
-	                            {
-	                                tmp_currpos.f32_stack_top_curr_pos = start_pos;
-	                                remain.f32_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                            break;
+                        }
+                        case curr_operand_stack_value_type::f32:
+                        {
+                            if constexpr(stacktop_f32_enabled)
+                            {
+                                tmp_currpos.f32_stack_top_curr_pos = start_pos;
+                                remain.f32_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -2028,16 +2033,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         interpreter_tuple));
                                 return;
                             }
-	                            break;
-	                        }
-	                        case curr_operand_stack_value_type::f64:
-	                        {
-	                            if constexpr(stacktop_f64_enabled)
-	                            {
-	                                tmp_currpos.f64_stack_top_curr_pos = start_pos;
-	                                remain.f64_stack_top_remain_size = count;
-	                                if(runtime_log_on) [[unlikely]]
-	                                {
+                            break;
+                        }
+                        case curr_operand_stack_value_type::f64:
+                        {
+                            if constexpr(stacktop_f64_enabled)
+                            {
+                                tmp_currpos.f64_stack_top_curr_pos = start_pos;
+                                remain.f64_stack_top_remain_size = count;
+                                if(runtime_log_on) [[unlikely]]
+                                {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                          u8"[uwvm-int-compile] fn=",
                                                          function_index,
@@ -2058,18 +2063,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         interpreter_tuple));
                                 return;
                             }
-	                            break;
-	                        }
-	                        [[unlikely]] default:
-	                        {
-	                            break;
-	                        }
-	                    }
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            break;
+                        }
+                    }
 
-	                    // Fallback: emit single-value fills.
-	                    {
-	                        ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
-	                        ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
+                    // Fallback: emit single-value fills.
+                    {
+                        ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
+                        ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
 
                         // Fill in top->deep order: each fill consumes the current operand-stack top and writes the next ring slot.
                         ::std::size_t pos{start_pos};
@@ -2448,6 +2453,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                    stacktop_assert_invariants();
                                                                }
                                                            }};
+
+            [[maybe_unused]] auto const stacktop_reset_currpos_to_begin{
+                [&]() constexpr noexcept
+                {
+                    if constexpr(!stacktop_enabled) { return; }
+                    curr_stacktop.i32_stack_top_curr_pos = stacktop_i32_enabled ? CompileOption.i32_stack_top_begin_pos : SIZE_MAX;
+                    curr_stacktop.i64_stack_top_curr_pos = stacktop_i64_enabled ? CompileOption.i64_stack_top_begin_pos : SIZE_MAX;
+                    curr_stacktop.f32_stack_top_curr_pos = stacktop_f32_enabled ? CompileOption.f32_stack_top_begin_pos : SIZE_MAX;
+                    curr_stacktop.f64_stack_top_curr_pos = stacktop_f64_enabled ? CompileOption.f64_stack_top_begin_pos : SIZE_MAX;
+                    curr_stacktop.v128_stack_top_curr_pos = stacktop_v128_enabled ? CompileOption.v128_stack_top_begin_pos : SIZE_MAX;
+                }};
+
+            [[maybe_unused]] auto const stacktop_canonicalize_edge_to_memory{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
+                                                                             {
+                                                                                 if constexpr(!stacktop_enabled) { return; }
+                                                                                 // Move all cached values to operand-stack memory (call-like barrier).
+                                                                                 stacktop_flush_all_to_operand_stack(dst);
+                                                                                 // Make the empty-cache state deterministic for subsequent codegen.
+                                                                                 stacktop_reset_currpos_to_begin();
+                                                                                 stacktop_cache_count = 0uz;
+                                                                                 stacktop_cache_i32_count = 0uz;
+                                                                                 stacktop_cache_i64_count = 0uz;
+                                                                                 stacktop_cache_f32_count = 0uz;
+                                                                                 stacktop_cache_f64_count = 0uz;
+                                                                                 stacktop_memory_count = codegen_operand_stack.size();
+                                                                             }};
 
             auto const stacktop_prepare_push1_if_reachable{[&](bytecode_vec_t& dst, curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                                            {
@@ -5061,6 +5092,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                           [&]() constexpr UWVM_THROWS
                                                       {
                                                           auto const loop_start{new_label(false)};
+                                                          if constexpr(stacktop_enabled)
+                                                          {
+                                                              if constexpr(strict_cf_entry_like_call)
+                                                              {
+                                                                  if(!is_polymorphic)
+                                                                  {
+                                                                      // Fallthrough into loop start: canonicalize before the re-entry label so
+                                                                      // back-edges can jump directly to the label and see the canonical state.
+                                                                      stacktop_canonicalize_edge_to_memory(bytecode);
+                                                                  }
+                                                                  else
+                                                                  {
+                                                                      // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
+                                                                      stacktop_reset_currpos_to_begin();
+                                                                      stacktop_memory_count = codegen_operand_stack.size();
+                                                                      stacktop_cache_count = 0uz;
+                                                                      stacktop_cache_i32_count = 0uz;
+                                                                      stacktop_cache_i64_count = 0uz;
+                                                                      stacktop_cache_f32_count = 0uz;
+                                                                      stacktop_cache_f64_count = 0uz;
+                                                                  }
+                                                              }
+                                                          }
                                                           set_label_offset(loop_start, bytecode.size());
                                                           return loop_start;
                                                       }(),
@@ -5238,7 +5292,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     codegen_operand_stack = post_pop_codegen_operand_stack;
 
                                     set_label_offset(else_thunk_label_id, thunks.size());
-                                    stacktop_fill_to_canonical(thunks);
+                                    if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(thunks); }
+                                    else
+                                    {
+                                        stacktop_fill_to_canonical(thunks);
+                                    }
                                     emit_br_to(thunks, else_dest_label_id, true);
 
                                     curr_stacktop = saved_curr_stacktop;
@@ -5264,19 +5322,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 
+                        auto else_entry_curr_stacktop{curr_stacktop};
+                        auto else_entry_memory_count{stacktop_memory_count};
+                        auto else_entry_cache_count{stacktop_cache_count};
+                        auto else_entry_cache_i32_count{stacktop_cache_i32_count};
+                        auto else_entry_cache_i64_count{stacktop_cache_i64_count};
+                        auto else_entry_cache_f32_count{stacktop_cache_f32_count};
+                        auto else_entry_cache_f64_count{stacktop_cache_f64_count};
+                        auto else_entry_codegen_operand_stack{codegen_operand_stack};
+                        if constexpr(stacktop_enabled)
+                        {
+                            if constexpr(strict_cf_entry_like_call)
+                            {
+                                else_entry_curr_stacktop.i32_stack_top_curr_pos = stacktop_i32_enabled ? CompileOption.i32_stack_top_begin_pos : SIZE_MAX;
+                                else_entry_curr_stacktop.i64_stack_top_curr_pos = stacktop_i64_enabled ? CompileOption.i64_stack_top_begin_pos : SIZE_MAX;
+                                else_entry_curr_stacktop.f32_stack_top_curr_pos = stacktop_f32_enabled ? CompileOption.f32_stack_top_begin_pos : SIZE_MAX;
+                                else_entry_curr_stacktop.f64_stack_top_curr_pos = stacktop_f64_enabled ? CompileOption.f64_stack_top_begin_pos : SIZE_MAX;
+                                else_entry_curr_stacktop.v128_stack_top_curr_pos = stacktop_v128_enabled ? CompileOption.v128_stack_top_begin_pos : SIZE_MAX;
+                                else_entry_memory_count = else_entry_codegen_operand_stack.size();
+                                else_entry_cache_count = 0uz;
+                                else_entry_cache_i32_count = 0uz;
+                                else_entry_cache_i64_count = 0uz;
+                                else_entry_cache_f32_count = 0uz;
+                                else_entry_cache_f64_count = 0uz;
+                            }
+                        }
+
                         control_flow_stack.push_back({.result = block_result,
                                                       .operand_stack_base = operand_stack.size(),
                                                       .type = block_type::if_,
                                                       .polymorphic_base = is_polymorphic,
                                                       .then_polymorphic_end = false,
-                                                      .stacktop_currpos_at_else_entry = curr_stacktop,
-                                                      .stacktop_memory_count_at_else_entry = stacktop_memory_count,
-                                                      .stacktop_cache_count_at_else_entry = stacktop_cache_count,
-                                                      .stacktop_cache_i32_count_at_else_entry = stacktop_cache_i32_count,
-                                                      .stacktop_cache_i64_count_at_else_entry = stacktop_cache_i64_count,
-                                                      .stacktop_cache_f32_count_at_else_entry = stacktop_cache_f32_count,
-                                                      .stacktop_cache_f64_count_at_else_entry = stacktop_cache_f64_count,
-                                                      .codegen_operand_stack_at_else_entry = codegen_operand_stack,
+                                                      .stacktop_currpos_at_else_entry = else_entry_curr_stacktop,
+                                                      .stacktop_memory_count_at_else_entry = else_entry_memory_count,
+                                                      .stacktop_cache_count_at_else_entry = else_entry_cache_count,
+                                                      .stacktop_cache_i32_count_at_else_entry = else_entry_cache_i32_count,
+                                                      .stacktop_cache_i64_count_at_else_entry = else_entry_cache_i64_count,
+                                                      .stacktop_cache_f32_count_at_else_entry = else_entry_cache_f32_count,
+                                                      .stacktop_cache_f64_count_at_else_entry = else_entry_cache_f64_count,
+                                                      .codegen_operand_stack_at_else_entry = else_entry_codegen_operand_stack,
                                                       .start_label_id = SIZE_MAX,
                                                       .end_label_id = end_label_id,
                                                       .else_label_id = else_dest_label_id});
@@ -5365,6 +5449,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // Lower `else` marker:
                         // - then-path must skip else body, so we emit an unconditional `br` to the end label here.
                         // - else-label is the start of else body, which is *after* this `br`.
+                        if constexpr(stacktop_enabled)
+                        {
+                            if constexpr(strict_cf_entry_like_call)
+                            {
+                                if(!is_polymorphic) { stacktop_canonicalize_edge_to_memory(bytecode); }
+                            }
+                        }
                         emit_br_to(bytecode, if_frame.end_label_id, false);
                         set_label_offset(if_frame.else_label_id, bytecode.size());
 
@@ -5523,6 +5614,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // bytecode[0 ... end_label) | (next opfunc / return)
                         // [           safe         ] | unsafe (could be realloc during later append)
                         //                              ^^ bytecode.size()
+                        if constexpr(stacktop_enabled)
+                        {
+                            if constexpr(strict_cf_entry_like_call)
+                            {
+                                // Fallthrough into `end`: canonicalize *before* the re-entry label so branches can jump
+                                // directly to the label (skipping this sequence) after doing their own canonicalization.
+                                if(!is_polymorphic) { stacktop_canonicalize_edge_to_memory(bytecode); }
+                                else
+                                {
+                                    // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
+                                    stacktop_reset_currpos_to_begin();
+                                    stacktop_memory_count = codegen_operand_stack.size();
+                                    stacktop_cache_count = 0uz;
+                                    stacktop_cache_i32_count = 0uz;
+                                    stacktop_cache_i64_count = 0uz;
+                                    stacktop_cache_f32_count = 0uz;
+                                    stacktop_cache_f64_count = 0uz;
+                                }
+                            }
+                        }
                         if(frame.end_label_id != SIZE_MAX) { set_label_offset(frame.end_label_id, bytecode.size()); }
                         if(frame.type == block_type::if_)
                         {
@@ -5541,47 +5652,63 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         if constexpr(stacktop_enabled)
                         {
-                            // If the current fallthrough path is unreachable at `end`, but the construct is reachable due to
-                            // an earlier branch to this `end` label, restore the stack-top model to the reachable path state.
-                            if(!new_polymorphic_after_end && polymorphic_end_before_merge)
+                            if constexpr(strict_cf_entry_like_call)
                             {
-                                if(frame.type == block_type::if_ && !frame.polymorphic_base)
+                                // In strict CF-entry mode, all re-entry labels are compiled to expect an empty stack-top cache.
+                                // This makes the post-`end` state deterministic regardless of how control reaches it.
+                                codegen_operand_stack = operand_stack;
+                                stacktop_reset_currpos_to_begin();
+                                stacktop_memory_count = codegen_operand_stack.size();
+                                stacktop_cache_count = 0uz;
+                                stacktop_cache_i32_count = 0uz;
+                                stacktop_cache_i64_count = 0uz;
+                                stacktop_cache_f32_count = 0uz;
+                                stacktop_cache_f64_count = 0uz;
+                            }
+                            else
+                            {
+                                // If the current fallthrough path is unreachable at `end`, but the construct is reachable due to
+                                // an earlier branch to this `end` label, restore the stack-top model to the reachable path state.
+                                if(!new_polymorphic_after_end && polymorphic_end_before_merge)
                                 {
-                                    // `if` without `else` can be reachable after `end` via the condition-false path,
-                                    // even if the then-path became unreachable before `end`.
-                                    curr_stacktop = frame.stacktop_currpos_at_else_entry;
-                                    stacktop_memory_count = frame.stacktop_memory_count_at_else_entry;
-                                    stacktop_cache_count = frame.stacktop_cache_count_at_else_entry;
-                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_else_entry;
-                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_else_entry;
-                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_else_entry;
-                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_else_entry;
-                                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_else_entry);
-                                }
-                                else if(frame.type == block_type::else_ && !frame.then_polymorphic_end && frame.stacktop_has_then_end_state)
-                                {
-                                    // `if-else`: else-path is unreachable at `end`, but then-path reaches `end`.
-                                    curr_stacktop = frame.stacktop_currpos_at_then_end;
-                                    stacktop_memory_count = frame.stacktop_memory_count_at_then_end;
-                                    stacktop_cache_count = frame.stacktop_cache_count_at_then_end;
-                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_then_end;
-                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_then_end;
-                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_then_end;
-                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_then_end;
-                                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_then_end);
-                                }
-                                else if(frame.stacktop_has_end_state)
-                                {
-                                    // Generic `block`/`loop`/`function` merge: fallthrough is unreachable at `end`,
-                                    // but the construct is reachable via a branch to its end label.
-                                    curr_stacktop = frame.stacktop_currpos_at_end;
-                                    stacktop_memory_count = frame.stacktop_memory_count_at_end;
-                                    stacktop_cache_count = frame.stacktop_cache_count_at_end;
-                                    stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_end;
-                                    stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_end;
-                                    stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_end;
-                                    stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_end;
-                                    sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_end);
+                                    if(frame.type == block_type::if_ && !frame.polymorphic_base)
+                                    {
+                                        // `if` without `else` can be reachable after `end` via the condition-false path,
+                                        // even if the then-path became unreachable before `end`.
+                                        curr_stacktop = frame.stacktop_currpos_at_else_entry;
+                                        stacktop_memory_count = frame.stacktop_memory_count_at_else_entry;
+                                        stacktop_cache_count = frame.stacktop_cache_count_at_else_entry;
+                                        stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_else_entry;
+                                        stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_else_entry;
+                                        stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_else_entry;
+                                        stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_else_entry;
+                                        sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_else_entry);
+                                    }
+                                    else if(frame.type == block_type::else_ && !frame.then_polymorphic_end && frame.stacktop_has_then_end_state)
+                                    {
+                                        // `if-else`: else-path is unreachable at `end`, but then-path reaches `end`.
+                                        curr_stacktop = frame.stacktop_currpos_at_then_end;
+                                        stacktop_memory_count = frame.stacktop_memory_count_at_then_end;
+                                        stacktop_cache_count = frame.stacktop_cache_count_at_then_end;
+                                        stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_then_end;
+                                        stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_then_end;
+                                        stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_then_end;
+                                        stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_then_end;
+                                        sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_then_end);
+                                    }
+                                    else if(frame.stacktop_has_end_state)
+                                    {
+                                        // Generic `block`/`loop`/`function` merge: fallthrough is unreachable at `end`,
+                                        // but the construct is reachable via a branch to its end label.
+                                        curr_stacktop = frame.stacktop_currpos_at_end;
+                                        stacktop_memory_count = frame.stacktop_memory_count_at_end;
+                                        stacktop_cache_count = frame.stacktop_cache_count_at_end;
+                                        stacktop_cache_i32_count = frame.stacktop_cache_i32_count_at_end;
+                                        stacktop_cache_i64_count = frame.stacktop_cache_i64_count_at_end;
+                                        stacktop_cache_f32_count = frame.stacktop_cache_f32_count_at_end;
+                                        stacktop_cache_f64_count = frame.stacktop_cache_f64_count_at_end;
+                                        sync_type_stacks_from_codegen_snapshot(frame.codegen_operand_stack_at_end);
+                                    }
                                 }
                             }
                         }
@@ -5760,6 +5887,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     emit_drop_typed_to(bytecode, operand_stack.index_unchecked(i - 1uz).type);
                                 }
 
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(bytecode); }
+                                }
                                 emit_br_to(bytecode, target_label_id, false);
                             }
                             else
@@ -5781,6 +5912,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     emit_local_get_typed_to(bytecode, result_type, internal_temp_local_off);
                                 }
 
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(bytecode); }
+                                }
                                 emit_br_to(bytecode, target_label_id, false);
                             }
                         }
@@ -5791,20 +5926,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         if constexpr(stacktop_enabled)
                         {
-                            // If this unconditional branch targets the end label of its frame, record the current
-                            // stack-top state so the `end` handler can restore it when the fallthrough path becomes
-                            // unreachable (polymorphic) before reaching `end`.
-                            if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                            if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
+                            else
                             {
-                                target_frame.stacktop_has_end_state = true;
-                                target_frame.stacktop_currpos_at_end = curr_stacktop;
-                                target_frame.stacktop_memory_count_at_end = stacktop_memory_count;
-                                target_frame.stacktop_cache_count_at_end = stacktop_cache_count;
-                                target_frame.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                target_frame.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                target_frame.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                target_frame.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                target_frame.codegen_operand_stack_at_end = codegen_operand_stack;
+                                // If this unconditional branch targets the end label of its frame, record the current
+                                // stack-top state so the `end` handler can restore it when the fallthrough path becomes
+                                // unreachable (polymorphic) before reaching `end`.
+                                if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                {
+                                    target_frame.stacktop_has_end_state = true;
+                                    target_frame.stacktop_currpos_at_end = curr_stacktop;
+                                    target_frame.stacktop_memory_count_at_end = stacktop_memory_count;
+                                    target_frame.stacktop_cache_count_at_end = stacktop_cache_count;
+                                    target_frame.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                    target_frame.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                    target_frame.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                    target_frame.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                    target_frame.codegen_operand_stack_at_end = codegen_operand_stack;
+                                }
                             }
                         }
 
@@ -6229,28 +6368,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                           return stacktop_cache_count_for_range(begin_pos, end_pos) != ring_size;
                                                                       }()};
 
-                                    if(!need_fill_to_canonical && !need_repair)
+                                    if constexpr(strict_cf_entry_like_call)
                                     {
-                                        // Jump directly (no thunk needed). Emit using the pre-pop stacktop cursor.
-                                        auto const saved_post_pop_stacktop{curr_stacktop};
-                                        curr_stacktop = brif_stacktop_currpos_at_site;
-                                        emit_br_if_jump_any(target_label_id);
-                                        curr_stacktop = saved_post_pop_stacktop;
-
-                                        if(target_label_id == target_frame.end_label_id)
+                                        // In strict mode, the taken path must enter re-entry labels with an empty cache.
+                                        // If the post-pop cache is already empty and no repair is needed, jump directly.
+                                        if(!need_repair && stacktop_cache_count == 0uz)
                                         {
-                                            target_frame_mut.stacktop_has_end_state = true;
-                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            auto const saved_post_pop_stacktop{curr_stacktop};
+                                            curr_stacktop = brif_stacktop_currpos_at_site;
+                                            emit_br_if_jump_any(target_label_id);
+                                            curr_stacktop = saved_post_pop_stacktop;
+                                            // Fallthrough: refill to canonical after the condition pop.
+                                            stacktop_fill_to_canonical(bytecode);
+                                            break;
                                         }
+                                    }
+                                    else
+                                    {
+                                        if(!need_fill_to_canonical && !need_repair)
+                                        {
+                                            // Jump directly (no thunk needed). Emit using the pre-pop stacktop cursor.
+                                            auto const saved_post_pop_stacktop{curr_stacktop};
+                                            curr_stacktop = brif_stacktop_currpos_at_site;
+                                            emit_br_if_jump_any(target_label_id);
+                                            curr_stacktop = saved_post_pop_stacktop;
 
-                                        break;
+                                            if(target_label_id == target_frame.end_label_id)
+                                            {
+                                                target_frame_mut.stacktop_has_end_state = true;
+                                                target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                                target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                                target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                                target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                                target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                                target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                                target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                                target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            }
+
+                                            break;
+                                        }
                                     }
 
                                     auto const taken_thunk_label_id{new_label(true)};
@@ -6296,43 +6453,73 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         stacktop_cache_f64_count = post_pop_cache_f64_count;
                                         codegen_operand_stack = post_pop_codegen_operand_stack;
 
-                                        stacktop_fill_to_canonical(thunks);
-
-                                        if(!need_repair) { emit_br_to(thunks, target_label_id, true); }
-                                        else if(target_arity == 0uz)
+                                        if constexpr(strict_cf_entry_like_call)
                                         {
-                                            // Safety: `target_base` must be <= `curr_size` in the non-polymorphic path.
-                                            for(::std::size_t i{curr_size}; i > target_base; --i)
+                                            // Taken path: repair (if needed), then canonicalize (empty cache) before jumping.
+                                            if(need_repair)
                                             {
-                                                emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                                if(target_arity == 0uz)
+                                                {
+                                                    for(::std::size_t i{curr_size}; i > target_base; --i)
+                                                    {
+                                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    auto const result_type{target_frame.result.begin[0]};
+                                                    emit_local_set_typed_to(thunks, result_type, internal_temp_local_off);
+                                                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                                    {
+                                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                                    }
+                                                    emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
+                                                }
                                             }
+
+                                            stacktop_canonicalize_edge_to_memory(thunks);
                                             emit_br_to(thunks, target_label_id, true);
                                         }
                                         else
                                         {
-                                            auto const result_type{target_frame.result.begin[0]};
-                                            emit_local_set_typed_to(thunks, result_type, internal_temp_local_off);
+                                            stacktop_fill_to_canonical(thunks);
 
-                                            for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                            if(!need_repair) { emit_br_to(thunks, target_label_id, true); }
+                                            else if(target_arity == 0uz)
                                             {
-                                                emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                                // Safety: `target_base` must be <= `curr_size` in the non-polymorphic path.
+                                                for(::std::size_t i{curr_size}; i > target_base; --i)
+                                                {
+                                                    emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                                }
+                                                emit_br_to(thunks, target_label_id, true);
+                                            }
+                                            else
+                                            {
+                                                auto const result_type{target_frame.result.begin[0]};
+                                                emit_local_set_typed_to(thunks, result_type, internal_temp_local_off);
+
+                                                for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                                {
+                                                    emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                                }
+
+                                                emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
+                                                emit_br_to(thunks, target_label_id, true);
                                             }
 
-                                            emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
-                                            emit_br_to(thunks, target_label_id, true);
-                                        }
-
-                                        if(target_label_id == target_frame.end_label_id)
-                                        {
-                                            target_frame_mut.stacktop_has_end_state = true;
-                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            if(target_label_id == target_frame.end_label_id)
+                                            {
+                                                target_frame_mut.stacktop_has_end_state = true;
+                                                target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                                target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                                target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                                target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                                target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                                target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                                target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                                target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            }
                                         }
 
                                         curr_stacktop = saved_curr_stacktop;
@@ -6352,30 +6539,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
                             }
 
-                            if(!need_repair)
+                            bool const strict_need_taken_thunk{[&]() constexpr noexcept -> bool
+                                                               {
+                                                                   if constexpr(stacktop_enabled && strict_cf_entry_like_call)
+                                                                   {
+                                                                       return need_repair || (stacktop_cache_count != 0uz);
+                                                                   }
+                                                                   else
+                                                                   {
+                                                                       return need_repair;
+                                                                   }
+                                                               }()};
+
+                            if(!strict_need_taken_thunk)
                             {
                                 emit_br_if_jump_any(target_label_id);
 
                                 if constexpr(stacktop_enabled)
                                 {
-                                    // If this branch targets the end label of its frame, record the current stack-top state
-                                    // so `end` can restore it when the fallthrough path becomes unreachable later.
-                                    //
-                                    // Note: This must also happen for fused `br_if` forms that do not consume a condition from
-                                    // the operand stack (e.g. `local.get; i32.eqz; br_if` fused to a local-based `br_if`),
-                                    // because in that case the taken path still reaches the end label even though no stack pop
-                                    // triggers the thunk-based snapshot logic above.
-                                    if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                    if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
+                                    else
                                     {
-                                        target_frame_mut.stacktop_has_end_state = true;
-                                        target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                        target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                        target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                        target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                        target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                        target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                        target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                        target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        // If this branch targets the end label of its frame, record the current stack-top state
+                                        // so `end` can restore it when the fallthrough path becomes unreachable later.
+                                        //
+                                        // Note: This must also happen for fused `br_if` forms that do not consume a condition from
+                                        // the operand stack (e.g. `local.get; i32.eqz; br_if` fused to a local-based `br_if`),
+                                        // because in that case the taken path still reaches the end label even though no stack pop
+                                        // triggers the thunk-based snapshot logic above.
+                                        if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                        {
+                                            target_frame_mut.stacktop_has_end_state = true;
+                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        }
                                     }
                                 }
                             }
@@ -6396,45 +6599,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 auto const saved_cache_f64_count{stacktop_cache_f64_count};
                                 auto const saved_codegen_operand_stack{codegen_operand_stack};
 
-                                if(target_arity == 0uz)
+                                if(need_repair)
                                 {
-                                    // Safety: `target_base` must be <= `curr_size` in the non-polymorphic path.
-                                    for(::std::size_t i{curr_size}; i > target_base; --i)
+                                    if(target_arity == 0uz)
                                     {
-                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                        for(::std::size_t i{curr_size}; i > target_base; --i)
+                                        {
+                                            emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                        }
                                     }
-                                    emit_br_to(thunks, target_label_id, true);
-                                }
-                                else
-                                {
-                                    auto const result_type{target_frame.result.begin[0]};
-                                    emit_local_set_typed_to(thunks, result_type, internal_temp_local_off);
-
-                                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                    else
                                     {
-                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                        auto const result_type{target_frame.result.begin[0]};
+                                        emit_local_set_typed_to(thunks, result_type, internal_temp_local_off);
+                                        for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                        {
+                                            emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                        }
+                                        emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
                                     }
-
-                                    emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
-                                    emit_br_to(thunks, target_label_id, true);
                                 }
 
                                 if constexpr(stacktop_enabled)
                                 {
-                                    // Same rationale as the `!need_repair` path: ensure `end` has a reachable snapshot even
-                                    // when the taken path is lowered via a repair thunk and the condition is not popped from
-                                    // the operand stack.
-                                    if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                    if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(thunks); }
+                                }
+                                emit_br_to(thunks, target_label_id, true);
+
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
+                                    else
                                     {
-                                        target_frame_mut.stacktop_has_end_state = true;
-                                        target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                        target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                        target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                        target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                        target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                        target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                        target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                        target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        // Same rationale as the `!need_repair` path: ensure `end` has a reachable snapshot even
+                                        // when the taken path is lowered via a repair thunk and the condition is not popped from
+                                        // the operand stack.
+                                        if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                        {
+                                            target_frame_mut.stacktop_has_end_state = true;
+                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        }
                                     }
                                 }
 
@@ -6704,23 +6915,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                                 auto const target_base{target_frame.operand_stack_base};
                                 bool const need_repair{curr_size > target_base + expected_arity};
-                                if(!need_repair)
+                                bool const strict_need_thunk{[&]() constexpr noexcept -> bool
+                                                             {
+                                                                 if constexpr(stacktop_enabled && strict_cf_entry_like_call)
+                                                                 {
+                                                                     return need_repair || (stacktop_cache_count != 0uz);
+                                                                 }
+                                                                 else
+                                                                 {
+                                                                     return need_repair;
+                                                                 }
+                                                             }()};
+                                if(!strict_need_thunk)
                                 {
                                     if constexpr(stacktop_enabled)
                                     {
-                                        // Record reachable end-label state for constructs that are reached via this `br_table`
-                                        // when their fallthrough becomes unreachable before `end`.
-                                        if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                        if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
+                                        else
                                         {
-                                            target_frame_mut.stacktop_has_end_state = true;
-                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            // Record reachable end-label state for constructs that are reached via this `br_table`
+                                            // when their fallthrough becomes unreachable before `end`.
+                                            if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                            {
+                                                target_frame_mut.stacktop_has_end_state = true;
+                                                target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                                target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                                target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                                target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                                target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                                target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                                target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                                target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                            }
                                         }
                                     }
                                     emit_ptr_label_placeholder(target_label_id, false);
@@ -6740,39 +6966,49 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 auto const saved_cache_f64_count{stacktop_cache_f64_count};
                                 auto const saved_codegen_operand_stack{codegen_operand_stack};
 
-                                if(expected_arity == 0uz)
+                                if(need_repair)
                                 {
-                                    // Safety: `target_base` must be <= `curr_size` in the non-polymorphic path.
-                                    for(::std::size_t i{curr_size}; i > target_base; --i)
+                                    if(expected_arity == 0uz)
                                     {
-                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                        for(::std::size_t i{curr_size}; i > target_base; --i)
+                                        {
+                                            emit_drop_typed_to(thunks, operand_stack.index_unchecked(i - 1uz).type);
+                                        }
                                     }
-                                    emit_br_to(thunks, target_label_id, true);
-                                }
-                                else
-                                {
-                                    emit_local_set_typed_to(thunks, expected_type, internal_temp_local_off);
-                                    for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                    else
                                     {
-                                        emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                        emit_local_set_typed_to(thunks, expected_type, internal_temp_local_off);
+                                        for(::std::size_t i{curr_size - 1uz}; i-- > target_base;)
+                                        {
+                                            emit_drop_typed_to(thunks, operand_stack.index_unchecked(i).type);
+                                        }
+                                        emit_local_get_typed_to(thunks, expected_type, internal_temp_local_off);
                                     }
-                                    emit_local_get_typed_to(thunks, expected_type, internal_temp_local_off);
-                                    emit_br_to(thunks, target_label_id, true);
                                 }
 
                                 if constexpr(stacktop_enabled)
                                 {
-                                    if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                    if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(thunks); }
+                                }
+                                emit_br_to(thunks, target_label_id, true);
+
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if constexpr(strict_cf_entry_like_call) { /* snapshots not needed */ }
+                                    else
                                     {
-                                        target_frame_mut.stacktop_has_end_state = true;
-                                        target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
-                                        target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
-                                        target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
-                                        target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
-                                        target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
-                                        target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
-                                        target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
-                                        target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        if(!is_polymorphic && target_label_id == target_frame.end_label_id)
+                                        {
+                                            target_frame_mut.stacktop_has_end_state = true;
+                                            target_frame_mut.stacktop_currpos_at_end = curr_stacktop;
+                                            target_frame_mut.stacktop_memory_count_at_end = stacktop_memory_count;
+                                            target_frame_mut.stacktop_cache_count_at_end = stacktop_cache_count;
+                                            target_frame_mut.stacktop_cache_i32_count_at_end = stacktop_cache_i32_count;
+                                            target_frame_mut.stacktop_cache_i64_count_at_end = stacktop_cache_i64_count;
+                                            target_frame_mut.stacktop_cache_f32_count_at_end = stacktop_cache_f32_count;
+                                            target_frame_mut.stacktop_cache_f64_count_at_end = stacktop_cache_f64_count;
+                                            target_frame_mut.codegen_operand_stack_at_end = codegen_operand_stack;
+                                        }
                                     }
                                 }
 
