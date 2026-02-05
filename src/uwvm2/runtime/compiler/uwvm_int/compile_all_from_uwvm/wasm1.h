@@ -35,6 +35,7 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/utils/intrinsics/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
@@ -1078,6 +1079,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const emit_opfunc_to{[&](bytecode_vec_t& dst, auto fptr) constexpr UWVM_THROWS
                                       {
+                                          // Best-effort: prefetch the opfunc's instruction stream into cache.
+                                          // This attempts to reduce cold I$ misses when the threaded interpreter dispatches to the opfunc.
+                                          if UWVM_IF_NOT_CONSTEVAL
+                                          {
+                                              using fptr_t = decltype(fptr);
+                                              if constexpr(::std::is_pointer_v<fptr_t>)
+                                              {
+                                                  auto const addr{reinterpret_cast<void const*>(fptr)};
+                                                  ::uwvm2::utils::intrinsics::universal::prefetch<::uwvm2::utils::intrinsics::universal::pfc_mode::instruction,
+                                                                                                  ::uwvm2::utils::intrinsics::universal::pfc_level::L2>(addr);
+                                              }
+                                          }
+
                                           // Note: We intentionally store the raw function pointer bytes into the bytecode stream.
                                           emit_imm_to(dst, fptr);
                                       }};
@@ -1407,7 +1421,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             auto const op_u{static_cast<::std::uint_least32_t>(static_cast<op_underlying_t>(stacktop_dbg_last_op))};
 
                             ::fast_io::io::perr(::fast_io::u8err(),
-                                                u8"[uwvm-int-compile] stacktop invariant failure: fn=",
+                                                u8"[uwvm-int-translator] stacktop invariant failure: fn=",
                                                 function_index,
                                                 u8" ip=",
                                                 stacktop_dbg_last_ip,
@@ -1531,7 +1545,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(runtime_log_on) [[unlikely]]
                         {
                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                 u8"[uwvm-int-compile] fn=",
+                                                 u8"[uwvm-int-translator] fn=",
                                                  function_index,
                                                  u8" event=stacktop.spill1 | vt=",
                                                  runtime_log_vt_name(vt),
@@ -1742,7 +1756,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.spillN | vt=i32 start=",
                                                          start_pos,
@@ -1772,7 +1786,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.spillN | vt=i64 start=",
                                                          start_pos,
@@ -1802,7 +1816,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.spillN | vt=f32 start=",
                                                          start_pos,
@@ -1832,7 +1846,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.spillN | vt=f64 start=",
                                                          start_pos,
@@ -1954,7 +1968,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.fillN | vt=i32 start=",
                                                          start_pos,
@@ -1984,7 +1998,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.fillN | vt=i64 start=",
                                                          start_pos,
@@ -2014,7 +2028,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.fillN | vt=f32 start=",
                                                          start_pos,
@@ -2044,7 +2058,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 if(runtime_log_on) [[unlikely]]
                                 {
                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                         u8"[uwvm-int-compile] fn=",
+                                                         u8"[uwvm-int-translator] fn=",
                                                          function_index,
                                                          u8" event=stacktop.fillN | vt=f64 start=",
                                                          start_pos,
@@ -2122,7 +2136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(runtime_log_on) [[unlikely]]
                         {
                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                 u8"[uwvm-int-compile] fn=",
+                                                 u8"[uwvm-int-translator] fn=",
                                                  function_index,
                                                  u8" event=stacktop.spill_one_deepest(batch) | vt=",
                                                  runtime_log_vt_name(vt),
@@ -2148,7 +2162,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(runtime_log_on) [[unlikely]]
                         {
                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                 u8"[uwvm-int-compile] fn=",
+                                                 u8"[uwvm-int-translator] fn=",
                                                  function_index,
                                                  u8" event=stacktop.spill_one_deepest(single) | vt=",
                                                  runtime_log_vt_name(vt),
@@ -2233,7 +2247,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                         if(runtime_log_on) [[unlikely]]
                                                         {
                                                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                                 u8"[uwvm-int-compile] fn=",
+                                                                                 u8"[uwvm-int-translator] fn=",
                                                                                  function_index,
                                                                                  u8" event=stacktop.prepare_push1(begin) | vt=",
                                                                                  runtime_log_vt_name(vt),
@@ -2265,7 +2279,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                         if(runtime_log_on) [[unlikely]]
                                                         {
                                                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                                 u8"[uwvm-int-compile] fn=",
+                                                                                 u8"[uwvm-int-translator] fn=",
                                                                                  function_index,
                                                                                  u8" event=stacktop.prepare_push1(end) | vt=",
                                                                                  runtime_log_vt_name(vt),
@@ -2305,7 +2319,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                        if(runtime_log_on) [[unlikely]]
                                                        {
                                                            ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                                u8"[uwvm-int-compile] fn=",
+                                                                                u8"[uwvm-int-translator] fn=",
                                                                                 function_index,
                                                                                 u8" event=stacktop.commit_push1 | vt=",
                                                                                 runtime_log_vt_name(vt),
@@ -2371,7 +2385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                      if(runtime_log_on) [[unlikely]]
                                                      {
                                                          ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                              u8"[uwvm-int-compile] fn=",
+                                                                              u8"[uwvm-int-translator] fn=",
                                                                               function_index,
                                                                               u8" event=stacktop.commit_pop_n | n=",
                                                                               n,
@@ -3674,7 +3688,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                             u8"[uwvm-int-compile] fn=",
+                                             u8"[uwvm-int-translator] fn=",
                                              function_index,
                                              u8" ip=",
                                              static_cast<::std::size_t>(code_curr - code_begin),
@@ -4298,7 +4312,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                             u8"[uwvm-int-compile] fn=",
+                                             u8"[uwvm-int-translator] fn=",
                                              function_index,
                                              u8" ip=",
                                              static_cast<::std::size_t>(code_curr - code_begin),
@@ -4692,7 +4706,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                      if(conbine_pending.kind == conbine_pending_kind::none)
                                                      {
                                                          ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                              u8"[uwvm-int-compile] fn=",
+                                                                              u8"[uwvm-int-translator] fn=",
                                                                               function_index,
                                                                               u8" ip=",
                                                                               static_cast<::std::size_t>(wasm_ip - code_begin),
@@ -4745,7 +4759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                      else
                                                      {
                                                          ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
-                                                                              u8"[uwvm-int-compile] fn=",
+                                                                              u8"[uwvm-int-translator] fn=",
                                                                               function_index,
                                                                               u8" ip=",
                                                                               static_cast<::std::size_t>(wasm_ip - code_begin),

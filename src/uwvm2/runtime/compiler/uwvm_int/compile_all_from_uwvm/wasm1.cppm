@@ -36,6 +36,7 @@ module;
 export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:wasm1;
 
 import fast_io;
+import uwvm2.utils.intrinsics;
 import uwvm2.utils.container;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
