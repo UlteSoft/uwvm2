@@ -847,10 +847,17 @@ namespace uwvm2::runtime::uwvm_int
 #endif
 
 #if defined(__ARM_PCS_AAPCS64)
+            // aarch64: aapcs64
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+#elif (defined(__x86_64__) || defined(_M_AMD64)) && !defined(_WIN32)
+            // x86_64: sysv abi
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 6uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 14uz;
 #else
 #endif
 
