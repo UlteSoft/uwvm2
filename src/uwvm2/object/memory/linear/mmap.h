@@ -45,6 +45,7 @@
 # include <uwvm2/utils/mutex/impl.h>
 # include <uwvm2/object/memory/wasm_page/impl.h>
 # include <uwvm2/object/memory/platform_page/impl.h>
+# include <uwvm2/object/memory/signal/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -79,12 +80,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     {
         inline void asan_unpoison_mmap_region([[maybe_unused]] void const* p, [[maybe_unused]] ::std::size_t sz) noexcept
         {
-            if(p != nullptr && sz != 0uz && __asan_unpoison_memory_region != nullptr) { __asan_unpoison_memory_region(p, sz); }
+            if(p != nullptr && sz != 0uz) { __asan_unpoison_memory_region(p, sz); }
         }
 
         inline void asan_poison_mmap_region([[maybe_unused]] void const* p, [[maybe_unused]] ::std::size_t sz) noexcept
         {
-            if(p != nullptr && sz != 0uz && __asan_poison_memory_region != nullptr) { __asan_poison_memory_region(p, sz); }
+            if(p != nullptr && sz != 0uz) { __asan_poison_memory_region(p, sz); }
         }
     }  // namespace details
 # endif
@@ -486,6 +487,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     details::asan_unpoison_mmap_region(this->reserved_begin, max_space);
                 }
 # endif
+
+                // Register the reserved range so SIGSEGV/SIGBUS (or VEH) can be translated to a wasm memory fault report.
+                // init/clear/destroy are only called outside guest execution, so structural updates are safe here.
+                if UWVM_IF_NOT_CONSTEVAL
+                {
+                    auto const reserved_space_for_signal{get_acquire_reserved_space_ceil()};
+                    ::uwvm2::object::memory::signal::register_protected_segment(this->reserved_begin,
+                                                                                this->reserved_begin + reserved_space_for_signal,
+                                                                                this->memory_length_p,
+                                                                                0uz);
+                }
 
                 // Place the usable base address inside the reserved VMA (full protection wasm32 on 64-bit hosts),
                 // otherwise the usable base equals the reserved base.
@@ -1058,6 +1070,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             return max_space;
         }
 
+        inline constexpr ::std::size_t get_acquire_reserved_space_ceil() const noexcept
+        {
+            ::std::size_t reserved_space{get_acquire_reserved_space()};
+            if UWVM_IF_NOT_CONSTEVAL
+            {
+                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
+                if(success && page_size != 0uz)
+                {
+                    auto const page_size_minus_1{page_size - 1uz};
+                    if(reserved_space <= ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[likely]]
+                    {
+                        reserved_space = (reserved_space + page_size_minus_1) & ~page_size_minus_1;
+                    }
+                }
+            }
+            return reserved_space;
+        }
+
         /// @brief      Clear the memory.
         /// @note       Simply clearing the memory without altering the page size.
         /// @note       This function is designed to be lock-free and cannot be executed during WASM execution (multi-threaded). It can only be done after the
@@ -1076,20 +1106,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 return;
             }
 
+            auto const acquire_reserved_space_ceil{get_acquire_reserved_space_ceil()};
+            ::uwvm2::object::memory::signal::unregister_protected_segment(this->reserved_begin, this->reserved_begin + acquire_reserved_space_ceil);
+
 # if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
-            [[maybe_unused]] ::std::size_t acquire_reserved_space_for_asan{get_acquire_reserved_space()};
-            if UWVM_IF_NOT_CONSTEVAL
-            {
-                auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
-                if(success && page_size != 0uz)
-                {
-                    auto const page_size_minus_1{page_size - 1uz};
-                    if(acquire_reserved_space_for_asan <= ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[likely]]
-                    {
-                        acquire_reserved_space_for_asan = (acquire_reserved_space_for_asan + page_size_minus_1) & ~page_size_minus_1;
-                    }
-                }
-            }
+            [[maybe_unused]] auto const acquire_reserved_space_for_asan{acquire_reserved_space_ceil};
 # endif
 
 # if defined(_WIN32) || defined(__CYGWIN__)                                                          // windows
@@ -1129,8 +1150,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
                 if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-                auto const acquire_reserved_space_ceil{(get_acquire_reserved_space() + page_size - 1uz) & ~(page_size - 1uz)};
-
 #  if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
                 details::asan_poison_mmap_region(this->reserved_begin, acquire_reserved_space_ceil);
 #  endif
@@ -1166,20 +1185,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             if(this->reserved_begin != nullptr) [[likely]]
             {
+                auto const acquire_reserved_space_ceil{get_acquire_reserved_space_ceil()};
+                ::uwvm2::object::memory::signal::unregister_protected_segment(this->reserved_begin, this->reserved_begin + acquire_reserved_space_ceil);
+
 # if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
-                [[maybe_unused]] ::std::size_t acquire_reserved_space_for_asan{get_acquire_reserved_space()};
-                if UWVM_IF_NOT_CONSTEVAL
-                {
-                    auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
-                    if(success && page_size != 0uz)
-                    {
-                        auto const page_size_minus_1{page_size - 1uz};
-                        if(acquire_reserved_space_for_asan <= ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[likely]]
-                        {
-                            acquire_reserved_space_for_asan = (acquire_reserved_space_for_asan + page_size_minus_1) & ~page_size_minus_1;
-                        }
-                    }
-                }
+                [[maybe_unused]] auto const acquire_reserved_space_for_asan{acquire_reserved_space_ceil};
 # endif
 
 # if defined(_WIN32) || defined(__CYGWIN__)                                                          // windows
@@ -1218,8 +1228,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
                     auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
                     if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                    auto const acquire_reserved_space_ceil{(get_acquire_reserved_space() + page_size - 1uz) & ~(page_size - 1uz)};
 
 #  if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
                     details::asan_poison_mmap_region(this->reserved_begin, acquire_reserved_space_ceil);
@@ -1263,20 +1271,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             if(this->reserved_begin != nullptr) [[likely]]
             {
+                auto const acquire_reserved_space_ceil{get_acquire_reserved_space_ceil()};
+                ::uwvm2::object::memory::signal::unregister_protected_segment(this->reserved_begin, this->reserved_begin + acquire_reserved_space_ceil);
+
 # if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
-                [[maybe_unused]] ::std::size_t acquire_reserved_space_for_asan{get_acquire_reserved_space()};
-                if UWVM_IF_NOT_CONSTEVAL
-                {
-                    auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
-                    if(success && page_size != 0uz)
-                    {
-                        auto const page_size_minus_1{page_size - 1uz};
-                        if(acquire_reserved_space_for_asan <= ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[likely]]
-                        {
-                            acquire_reserved_space_for_asan = (acquire_reserved_space_for_asan + page_size_minus_1) & ~page_size_minus_1;
-                        }
-                    }
-                }
+                [[maybe_unused]] auto const acquire_reserved_space_for_asan{acquire_reserved_space_ceil};
 # endif
 
 # if defined(_WIN32) || defined(__CYGWIN__)                                                          // windows
@@ -1316,9 +1315,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
                     if(!success) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(page_size == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                    // Overflow "all_memory_length + (page_size - 1uz)" will never occur here because such a situation cannot be allocated.
-                    auto const acquire_reserved_space_ceil{(get_acquire_reserved_space() + (page_size - 1uz)) & ~(page_size - 1uz)};
 
 #  if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
                     details::asan_poison_mmap_region(this->reserved_begin, acquire_reserved_space_ceil);
