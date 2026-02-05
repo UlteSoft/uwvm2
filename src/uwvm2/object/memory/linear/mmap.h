@@ -1076,7 +1076,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if UWVM_IF_NOT_CONSTEVAL
             {
                 auto const [page_size, success]{::uwvm2::object::memory::platform_page::get_platform_page_size()};
-                if(success && page_size != 0uz)
+                if(!success || page_size == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                else
                 {
                     auto const page_size_minus_1{page_size - 1uz};
                     if(reserved_space <= ::std::numeric_limits<::std::size_t>::max() - page_size_minus_1) [[likely]]
