@@ -571,6 +571,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                    return local_offsets.index_unchecked(idx);
                                                }};
 
+            auto const local_type_from_index{[&](wasm_u32 local_index) constexpr noexcept -> curr_operand_stack_value_type
+                                             {
+                                                 if(local_index < func_parameter_count_u32) { return func_parameter_begin[local_index]; }
+                                                 auto tem_local_index{local_index - func_parameter_count_u32};
+
+                                                 for(auto const& local_part: curr_code_locals)
+                                                 {
+                                                     if(tem_local_index < local_part.count) { return local_part.type; }
+                                                     tem_local_index -= local_part.count;
+                                                 }
+
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                                 ::fast_io::fast_terminate();
+                                             }};
+
             // Internal temp local is the first slot after all Wasm-visible locals.
             local_offset_t const internal_temp_local_off{local_offset_from_index(all_local_count)};
 
@@ -3490,6 +3507,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 local_get2_const_i32,
                 local_get2_const_i32_mul,
                 local_get2_const_i32_shl,
+                i32_add_2localget_local_set,
+                i32_add_2localget_local_tee,
                 i32_add_imm_local_settee_same,
                 local_get_eqz_i32,
                 local_get_const_i32,
@@ -3601,6 +3620,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              case conbine_pending_kind::local_get2_const_i32: return u8"local_get2_const_i32";
                                                              case conbine_pending_kind::local_get2_const_i32_mul: return u8"local_get2_const_i32_mul";
                                                              case conbine_pending_kind::local_get2_const_i32_shl: return u8"local_get2_const_i32_shl";
+                                                             case conbine_pending_kind::i32_add_2localget_local_set: return u8"i32_add_2localget_local_set";
+                                                             case conbine_pending_kind::i32_add_2localget_local_tee: return u8"i32_add_2localget_local_tee";
                                                              case conbine_pending_kind::i32_add_imm_local_settee_same: return u8"i32_add_imm_local_settee_same";
                                                              case conbine_pending_kind::local_get_eqz_i32: return u8"local_get_eqz_i32";
                                                              case conbine_pending_kind::local_get_const_i32: return u8"local_get_const_i32";
@@ -3749,6 +3770,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             emit_local_get_typed_to(bytecode, conbine_pending.vt, conbine_pending.off1);
                             emit_local_get_typed_to(bytecode, conbine_pending.vt, conbine_pending.off2);
+                            break;
+                        }
+                        case conbine_pending_kind::i32_add_2localget_local_set: [[fallthrough]];
+                        case conbine_pending_kind::i32_add_2localget_local_tee:
+                        {
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i32_add_2localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.off2);
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
                             break;
                         }
                         case conbine_pending_kind::local_get2_const_i32:
@@ -4472,6 +4503,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         case conbine_pending_kind::local_get2_const_i32_shl:
                         {
                             return op == wasm1_code::i32_add;
+                        }
+                        case conbine_pending_kind::i32_add_2localget_local_set:
+                        {
+                            return op == wasm1_code::local_set;
+                        }
+                        case conbine_pending_kind::i32_add_2localget_local_tee:
+                        {
+                            return op == wasm1_code::local_tee;
                         }
                         case conbine_pending_kind::i32_add_imm_local_settee_same:
                         {
@@ -8366,6 +8405,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 #endif
 
+                        // Conbine: `local.get a; local.get b; i32.add; local.set dst`
+                        if(curr_local_type == curr_operand_stack_value_type::i32 && conbine_pending.kind == conbine_pending_kind::i32_add_2localget_local_set &&
+                           local_off == conbine_pending.off3)
+                        {
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_i32_add_2localget_local_set_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.off2);
+                            emit_imm_to(bytecode, conbine_pending.off3);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            break;
+                        }
+
                         // Conbine: `local.get + const + add + local.set` (same local).
                         if(curr_local_type == curr_operand_stack_value_type::i32 &&
                            conbine_pending.kind == conbine_pending_kind::i32_add_imm_local_settee_same && local_off == conbine_pending.off1)
@@ -8574,6 +8629,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 #endif
+
+                        // Conbine: `local.get a; local.get b; i32.add; local.tee dst`
+                        if(curr_local_type == curr_operand_stack_value_type::i32 && conbine_pending.kind == conbine_pending_kind::i32_add_2localget_local_tee &&
+                           local_off == conbine_pending.off3)
+                        {
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_i32_add_2localget_local_tee_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.off2);
+                            emit_imm_to(bytecode, conbine_pending.off3);
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            break;
+                        }
 
                         // Conbine: `local.get + const + add + local.tee` (same local).
                         if(curr_local_type == curr_operand_stack_value_type::i32 &&
@@ -11185,6 +11257,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
                         if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
+                            // Conbine: `local.get a; local.get b; i32.add; local.set/local.tee dst`
+                            // If the result is immediately stored, fold the whole sequence into one combined opcode to
+                            // avoid materializing the add-result on the operand stack.
+                            if(code_curr != code_end)
+                            {
+                                wasm1_code next_op;  // no init
+                                ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op));
+
+                                if(next_op == wasm1_code::local_set || next_op == wasm1_code::local_tee)
+                                {
+                                    wasm_u32 next_local_index{};
+                                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                    auto const* const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
+                                    auto const* const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
+                                    auto const [next_local_index_next, next_local_index_err]{
+                                        ::fast_io::parse_by_scan(next_local_imm_begin, next_local_imm_end, ::fast_io::mnp::leb128_get(next_local_index))};
+                                    (void)next_local_index_next;
+
+                                    if(next_local_index_err == ::fast_io::parse_code::ok && next_local_index < all_local_count &&
+                                       local_type_from_index(next_local_index) == curr_operand_stack_value_type::i32)
+                                    {
+                                        conbine_pending.off3 = local_offset_from_index(next_local_index);
+                                        conbine_pending.kind = (next_op == wasm1_code::local_set) ? conbine_pending_kind::i32_add_2localget_local_set
+                                                                                                  : conbine_pending_kind::i32_add_2localget_local_tee;
+                                        break;
+                                    }
+                                }
+                            }
+
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                             emit_opfunc_to(bytecode, translate::get_uwvmint_i32_add_2localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                             emit_imm_to(bytecode, conbine_pending.off1);
