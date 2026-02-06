@@ -98,16 +98,19 @@ option("stdlib", function()
     set_values("default", "libstdc++", "libc++")
 end)
 
-option("debug-strip", function()
+option("strip", function()
     set_description
     (
-        "Whether to strip the symbols while building with debug information.",
-        [[    none: Don't strip the symbols if possible.]],
-        [[    debug: Strip the debug symbols to a independent symbol file while keeping other symbols in the target file.]],
-        [[    all: Strip the debug symbols to a independent symbol file then strip all symbols from the target file.]]
+        "Strip level.",
+        [[    default: Use per-mode defaults.]],
+        [[             debug/release/releasedbg: none]],
+        [[             minsizerel: ident]],
+        [[    none: Don't strip symbols.]],
+        [[    symbol: Strip symbols.]],
+        [[    ident: Strip symbols + strip ident strings (e.g. -fno-ident).]]
     )
-    set_default("none")
-    set_values("none", "debug", "all")
+    set_default("default")
+    set_values("default", "none", "symbol", "ident")
 end)
 
 option("enable-lto", function()

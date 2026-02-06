@@ -20,7 +20,7 @@ includes("xmake/platform/impl.lua")
 -- Currently, there are no plugins.
 -- add_plugindirs("xmake/plugins")
 
-set_defaultmode("releasedbg")
+set_defaultmode("release")
 set_allowedmodes(support_rules_table)
 
 function def_build()
