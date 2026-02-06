@@ -758,7 +758,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             // Experimental: strict control-flow entry (call-like).
             // Goal: ensure re-entry points (block/loop end, loop start, else entry) see an empty stack-top cache and
             // all values materialized in operand-stack memory, to avoid expensive state-merge/repair across edges.
-            constexpr bool strict_cf_entry_like_call{true};
+            // NOTE: Keeping stack-top cache across control-flow re-entry is critical for tight loops.
+            // The strict mode forces call-like barriers (flush-to-memory + reset currpos) at loop/block/else entries,
+            // which can introduce large per-iteration overhead when branches are hot.
+            constexpr bool strict_cf_entry_like_call{false};
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             // Tracking for `stacktop_assert_invariants()` diagnostics.
@@ -6162,6 +6165,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         local_offset_t conbine_brif_local_off{};
                         wasm_i32 conbine_brif_imm{};
                         conbine_brif_cmp_kind conbine_brif_cmp{conbine_brif_cmp_kind::none};
+#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                        bool conbine_brif_for_i32_inc_lt_u{};
+                        bool conbine_brif_for_ptr_inc_ne{};
+                        local_offset_t conbine_brif_local_off2{};
+                        wasm_i32 conbine_brif_step{};
+                        wasm_i32 conbine_brif_end{};
+#endif
                         if(conbine_pending.kind == conbine_pending_kind::local_get_eqz_i32)
                         {
                             conbine_brif_local_eqz = true;
@@ -6178,6 +6188,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             conbine_pending.kind = conbine_pending_kind::none;
                             conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
                         }
+#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                        else if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_after_cmp)
+                        {
+                            conbine_brif_for_i32_inc_lt_u = true;
+                            conbine_brif_local_off = conbine_pending.off1;
+                            conbine_brif_step = conbine_pending.imm_i32;
+                            conbine_brif_end = conbine_pending.imm_i32_2;
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                        }
+                        else if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_ptr_inc_after_cmp)
+                        {
+                            conbine_brif_for_ptr_inc_ne = true;
+                            conbine_brif_local_off = conbine_pending.off1;
+                            conbine_brif_local_off2 = conbine_pending.off2;
+                            conbine_brif_step = conbine_pending.imm_i32;
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                        }
+#endif
 
                         auto const fuse_kind{br_if_fuse.kind};
                         auto const fuse_site{br_if_fuse.site};
@@ -6391,6 +6421,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const emit_br_if_jump_conbine{
                             [&](::std::size_t label_id) constexpr UWVM_THROWS
                             {
+#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                if(conbine_brif_for_i32_inc_lt_u)
+                                {
+                                    emit_opfunc_to(
+                                        bytecode,
+                                        translate::get_uwvmint_for_i32_inc_lt_u_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    emit_imm_to(bytecode, conbine_brif_local_off);
+                                    emit_imm_to(bytecode, conbine_brif_step);
+                                    emit_imm_to(bytecode, conbine_brif_end);
+                                    emit_ptr_label_placeholder(label_id, false);
+                                    return;
+                                }
+
+                                if(conbine_brif_for_ptr_inc_ne)
+                                {
+                                    emit_opfunc_to(
+                                        bytecode,
+                                        translate::get_uwvmint_for_ptr_inc_ne_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    emit_imm_to(bytecode, conbine_brif_local_off);
+                                    emit_imm_to(bytecode, conbine_brif_local_off2);
+                                    emit_imm_to(bytecode, conbine_brif_step);
+                                    emit_ptr_label_placeholder(label_id, false);
+                                    return;
+                                }
+#endif
                                 if(conbine_brif_local_eqz)
                                 {
                                     emit_opfunc_to(bytecode,
@@ -6462,7 +6517,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const emit_br_if_jump_any{[&](::std::size_t label_id) constexpr UWVM_THROWS { emit_br_if_jump_conbine(label_id); }};
 
                         auto const target_label_id{get_branch_target_label_id(target_frame)};
-                        bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i32_cmp_imm)};
+                        bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i32_cmp_imm
+#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                                              || conbine_brif_for_i32_inc_lt_u || conbine_brif_for_ptr_inc_ne
+#endif
+                                                              )};
 
                         if(is_polymorphic) { emit_br_if_jump_any(target_label_id); }
                         else
@@ -8733,6 +8792,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(curr_local_type == curr_operand_stack_value_type::i32 &&
                            conbine_pending.kind == conbine_pending_kind::i32_add_imm_local_settee_same && local_off == conbine_pending.off1)
                         {
+#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                            // Heavy loop fusions: delay emission so we can potentially fold the following tight-loop skeleton
+                            // into a single `for_*_br_if` combined opcode:
+                            //
+                            //  i32 loop:
+                            //    local.get i; i32.const step; i32.add; local.tee i; i32.const end; i32.lt_u; br_if <loop>
+                            //
+                            //  ptr loop:
+                            //    local.get p; i32.const step; i32.add; local.tee p; local.get pend; i32.ne; br_if <loop>
+                            //
+                            // If the pattern does not match, the pending state flushes back to the normal `i32_add_imm_local_tee_same` emission.
+                            if(!is_polymorphic && code_curr != code_end)
+                            {
+                                wasm1_code next_op{};  // init
+                                ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op));
+                                if(next_op == wasm1_code::i32_const)
+                                {
+                                    conbine_pending.kind = conbine_pending_kind::for_i32_inc_after_tee;
+                                    conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                                    break;
+                                }
+                                if(next_op == wasm1_code::local_get)
+                                {
+                                    conbine_pending.kind = conbine_pending_kind::for_ptr_inc_after_tee;
+                                    conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                                    break;
+                                }
+                            }
+#endif
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                             if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
                             emit_opfunc_to(bytecode,
