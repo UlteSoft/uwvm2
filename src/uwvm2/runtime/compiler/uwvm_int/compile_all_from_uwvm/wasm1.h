@@ -763,6 +763,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             // which can introduce large per-iteration overhead when branches are hot.
             constexpr bool strict_cf_entry_like_call{false};
 
+            // Experimental: register-only control-flow canonicalization.
+            // Goal: keep operand values resident in the stack-top cache across loop re-entry, while still making the
+            // label entry currpos deterministic (range-begin) so back-edges can jump directly without spilling/filling.
+            constexpr bool stacktop_regtransform_cf_entry{true};
+
+            // Current stack-top transform opfunc supports at most:
+            // - one fully-merged integer ring (i32/i64), and
+            // - one fully-merged fp/simd ring (f32/f64/v128).
+            constexpr bool stacktop_regtransform_supported{
+                // i32/i64 must be same-range if both enabled
+                (!(stacktop_i32_enabled && stacktop_i64_enabled) || (CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                                     CompileOption.i32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos)) &&
+                // f32/f64 must be same-range if both enabled
+                (!(stacktop_f32_enabled && stacktop_f64_enabled) || (CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                                                     CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos)) &&
+                // v128 must coincide with the active f32/f64 merged range
+                (!stacktop_v128_enabled || ((stacktop_f32_enabled && CompileOption.v128_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                                             CompileOption.v128_stack_top_end_pos == CompileOption.f32_stack_top_end_pos) ||
+                                            (stacktop_f64_enabled && CompileOption.v128_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                             CompileOption.v128_stack_top_end_pos == CompileOption.f64_stack_top_end_pos)))};
+
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             // Tracking for `stacktop_assert_invariants()` diagnostics.
             ::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code stacktop_dbg_last_op{
@@ -2512,6 +2533,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     curr_stacktop.v128_stack_top_curr_pos = stacktop_v128_enabled ? CompileOption.v128_stack_top_begin_pos : SIZE_MAX;
                 }};
 
+            [[maybe_unused]] auto const stacktop_transform_currpos_to_begin{
+                [&](bytecode_vec_t& dst) constexpr UWVM_THROWS
+                {
+                    if constexpr(!stacktop_enabled) { return; }
+                    if constexpr(!CompileOption.is_tail_call) { return; }
+                    if constexpr(!stacktop_regtransform_cf_entry || !stacktop_regtransform_supported) { return; }
+
+                    if(is_polymorphic)
+                    {
+                        // Unreachable region: keep compiler-side state deterministic without emitting runtime code.
+                        stacktop_reset_currpos_to_begin();
+                        return;
+                    }
+
+                    // If cache is empty there is no live register state to preserve; reset cursors without emitting a transform opfunc.
+                    if(stacktop_cache_count == 0uz)
+                    {
+                        stacktop_reset_currpos_to_begin();
+                        return;
+                    }
+
+                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                    emit_opfunc_to(dst, translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                    stacktop_reset_currpos_to_begin();
+                }};
+
             [[maybe_unused]] auto const stacktop_canonicalize_edge_to_memory{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                                                                              {
                                                                                  if constexpr(!stacktop_enabled) { return; }
@@ -2997,6 +3044,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                       emit_opfunc_to(dst, translate::get_uwvmint_br_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                       emit_ptr_label_placeholder(label_id, dst_is_thunk);
                                   }};
+
+            [[maybe_unused]] auto const emit_br_to_with_stacktop_transform{
+                [&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_is_thunk) constexpr UWVM_THROWS
+                {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+                    if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported)
+                    {
+                        if(!is_polymorphic && stacktop_cache_count != 0uz)
+                        {
+                            emit_opfunc_to(
+                                dst,
+                                translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_ptr_label_placeholder(label_id, dst_is_thunk);
+                            return;
+                        }
+                    }
+#endif
+
+                    // Fallback: plain `br`.
+                    emit_br_to(dst, label_id, dst_is_thunk);
+                }};
 
             auto const emit_return_to{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                                       {
@@ -5591,6 +5661,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                   }
                                                               }
                                                           }
+                                                          if constexpr(stacktop_enabled)
+                                                          {
+                                                              if constexpr(!strict_cf_entry_like_call)
+                                                              {
+                                                                  // Fallthrough into loop start: canonicalize currpos to a deterministic begin slot
+                                                                  // using a pure-register transform (no operand-stack spill/fill).
+                                                                  stacktop_transform_currpos_to_begin(bytecode);
+                                                              }
+                                                          }
                                                           set_label_offset(loop_start, bytecode.size());
                                                           return loop_start;
                                                       }(),
@@ -6393,7 +6472,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 {
                                     if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(bytecode); }
                                 }
-                                emit_br_to(bytecode, target_label_id, false);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                    {
+                                        emit_br_to_with_stacktop_transform(bytecode, target_label_id, false);
+                                    }
+                                    else
+                                    {
+                                        emit_br_to(bytecode, target_label_id, false);
+                                    }
+                                }
+                                else
+                                {
+                                    emit_br_to(bytecode, target_label_id, false);
+                                }
                             }
                             else
                             {
@@ -6422,7 +6515,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 {
                                     if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(bytecode); }
                                 }
-                                emit_br_to(bytecode, target_label_id, false);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                    {
+                                        emit_br_to_with_stacktop_transform(bytecode, target_label_id, false);
+                                    }
+                                    else
+                                    {
+                                        emit_br_to(bytecode, target_label_id, false);
+                                    }
+                                }
+                                else
+                                {
+                                    emit_br_to(bytecode, target_label_id, false);
+                                }
                             }
                         }
                         else
@@ -7102,9 +7209,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         if(!need_fill_to_canonical && !need_repair)
                                         {
                                             // Jump directly (no thunk needed). Emit using the pre-pop stacktop cursor.
+                                            //
+                                            // If the target is a loop start and we still have cached values after popping
+                                            // the condition, we must transform the cache layout to the loop's begin-currpos
+                                            // contract on the taken path (register-only; no spill/fill).
+                                            ::std::size_t brif_target_label_id{target_label_id};
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                                            if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry &&
+                                                         stacktop_regtransform_supported)
+                                            {
+                                                if(target_frame.type == block_type::loop && stacktop_cache_count != 0uz)
+                                                {
+                                                    auto const transform_thunk_label_id{new_label(true)};
+                                                    set_label_offset(transform_thunk_label_id, thunks.size());
+                                                    emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                                    brif_target_label_id = transform_thunk_label_id;
+                                                }
+                                            }
+#endif
+
+                                            // Emit using the pre-pop stacktop cursor (the br_if op reads the condition before the pop).
                                             auto const saved_post_pop_stacktop{curr_stacktop};
                                             curr_stacktop = brif_stacktop_currpos_at_site;
-                                            emit_br_if_jump_any(target_label_id);
+                                            emit_br_if_jump_any(brif_target_label_id);
                                             curr_stacktop = saved_post_pop_stacktop;
 
                                             if(target_label_id == target_frame.end_label_id)
@@ -7192,13 +7319,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             }
 
                                             stacktop_canonicalize_edge_to_memory(thunks);
-                                            emit_br_to(thunks, target_label_id, true);
+                                            if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                            {
+                                                emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                            }
+                                            else
+                                            {
+                                                emit_br_to(thunks, target_label_id, true);
+                                            }
                                         }
                                         else
                                         {
                                             stacktop_fill_to_canonical(thunks);
 
-                                            if(!need_repair) { emit_br_to(thunks, target_label_id, true); }
+                                            if(!need_repair)
+                                            {
+                                                if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                                {
+                                                    emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                                }
+                                                else
+                                                {
+                                                    emit_br_to(thunks, target_label_id, true);
+                                                }
+                                            }
                                             else if(target_arity == 0uz)
                                             {
                                                 // Safety: `target_base` must be <= `curr_size` in the non-polymorphic path.
@@ -7207,7 +7351,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                     emit_drop_typed_to_no_fill(thunks, operand_stack.index_unchecked(i - 1uz).type);
                                                 }
                                                 stacktop_fill_to_canonical(thunks);
-                                                emit_br_to(thunks, target_label_id, true);
+                                                if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                                {
+                                                    emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                                }
+                                                else
+                                                {
+                                                    emit_br_to(thunks, target_label_id, true);
+                                                }
                                             }
                                             else
                                             {
@@ -7221,7 +7372,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                                                 stacktop_fill_to_canonical(thunks);
                                                 emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
-                                                emit_br_to(thunks, target_label_id, true);
+                                                if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                                {
+                                                    emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                                }
+                                                else
+                                                {
+                                                    emit_br_to(thunks, target_label_id, true);
+                                                }
                                             }
 
                                             if(target_label_id == target_frame.end_label_id)
@@ -7269,7 +7427,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                             if(!strict_need_taken_thunk)
                             {
-                                emit_br_if_jump_any(target_label_id);
+                                ::std::size_t brif_target_label_id{target_label_id};
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                                if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry &&
+                                             stacktop_regtransform_supported)
+                                {
+                                    if(!is_polymorphic && target_frame.type == block_type::loop && stacktop_cache_count != 0uz)
+                                    {
+                                        auto const transform_thunk_label_id{new_label(true)};
+                                        set_label_offset(transform_thunk_label_id, thunks.size());
+                                        emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                        brif_target_label_id = transform_thunk_label_id;
+                                    }
+                                }
+#endif
+                                emit_br_if_jump_any(brif_target_label_id);
 
                                 if constexpr(stacktop_enabled)
                                 {
@@ -7348,7 +7520,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 {
                                     if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(thunks); }
                                 }
-                                emit_br_to(thunks, target_label_id, true);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                    {
+                                        emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                    }
+                                    else
+                                    {
+                                        emit_br_to(thunks, target_label_id, true);
+                                    }
+                                }
+                                else
+                                {
+                                    emit_br_to(thunks, target_label_id, true);
+                                }
 
                                 if constexpr(stacktop_enabled)
                                 {
@@ -7683,7 +7869,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             }
                                         }
                                     }
-                                    emit_ptr_label_placeholder(target_label_id, false);
+                                    ::std::size_t br_table_target_label_id{target_label_id};
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                                    if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry &&
+                                                 stacktop_regtransform_supported)
+                                    {
+                                        if(!is_polymorphic && target_frame.type == block_type::loop && stacktop_cache_count != 0uz)
+                                        {
+                                            auto const transform_thunk_label_id{new_label(true)};
+                                            set_label_offset(transform_thunk_label_id, thunks.size());
+                                            emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                            br_table_target_label_id = transform_thunk_label_id;
+                                        }
+                                    }
+#endif
+                                    emit_ptr_label_placeholder(br_table_target_label_id, false);
                                     continue;
                                 }
 
@@ -7732,7 +7932,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 {
                                     if constexpr(strict_cf_entry_like_call) { stacktop_canonicalize_edge_to_memory(thunks); }
                                 }
-                                emit_br_to(thunks, target_label_id, true);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
+                                    {
+                                        emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
+                                    }
+                                    else
+                                    {
+                                        emit_br_to(thunks, target_label_id, true);
+                                    }
+                                }
+                                else
+                                {
+                                    emit_br_to(thunks, target_label_id, true);
+                                }
 
                                 if constexpr(stacktop_enabled)
                                 {

@@ -1625,6 +1625,126 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // branch_fuse: compare/branch fusions
     // ========================
 
+    /**
+     * @brief Fused stack-top register transform + `br` (tail-call).
+     *
+     * @details
+     * Rotates the active stack-top cache ring(s) so each currpos becomes its range-begin slot, then performs an
+     * unconditional branch to `jmp_ip`.
+     *
+     * This is intended to make loop/label re-entry deterministic **without spilling to operand-stack memory**.
+     *
+     * Bytecode layout: `[opfunc_ptr][jmp_ip: byte const*]`.
+     */
+
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t CurrIntPos, ::std::size_t CurrFpPos, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_stacktop_transform_to_begin(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 1uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        constexpr bool i32_enabled{details::range_enabled(CompileOption.i32_stack_top_begin_pos, CompileOption.i32_stack_top_end_pos)};
+        constexpr bool i64_enabled{details::range_enabled(CompileOption.i64_stack_top_begin_pos, CompileOption.i64_stack_top_end_pos)};
+        constexpr bool f32_enabled{details::range_enabled(CompileOption.f32_stack_top_begin_pos, CompileOption.f32_stack_top_end_pos)};
+        constexpr bool f64_enabled{details::range_enabled(CompileOption.f64_stack_top_begin_pos, CompileOption.f64_stack_top_end_pos)};
+        constexpr bool v128_enabled{details::range_enabled(CompileOption.v128_stack_top_begin_pos, CompileOption.v128_stack_top_end_pos)};
+
+        constexpr bool int_enabled{i32_enabled || i64_enabled};
+        constexpr bool fp_enabled{f32_enabled || f64_enabled || v128_enabled};
+
+        if constexpr(i32_enabled && i64_enabled)
+        {
+            static_assert(CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                              CompileOption.i32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos,
+                          "stacktop transform requires i32/i64 to be fully merged (same begin/end) when both are enabled.");
+        }
+
+        if constexpr(f32_enabled && f64_enabled)
+        {
+            static_assert(CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                              CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos,
+                          "stacktop transform requires f32/f64 to be fully merged (same begin/end) when both are enabled.");
+        }
+        if constexpr(v128_enabled && f32_enabled)
+        {
+            static_assert(CompileOption.v128_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                              CompileOption.v128_stack_top_end_pos == CompileOption.f32_stack_top_end_pos,
+                          "stacktop transform requires v128 to be fully merged with f32/f64 (same begin/end).");
+        }
+        if constexpr(v128_enabled && f64_enabled)
+        {
+            static_assert(CompileOption.v128_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                              CompileOption.v128_stack_top_end_pos == CompileOption.f64_stack_top_end_pos,
+                          "stacktop transform requires v128 to be fully merged with f32/f64 (same begin/end).");
+        }
+
+        // Advance to the `jmp_ip` immediate.
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+
+        if constexpr(int_enabled && fp_enabled)
+        {
+            constexpr ::std::size_t int_begin{i32_enabled ? CompileOption.i32_stack_top_begin_pos : CompileOption.i64_stack_top_begin_pos};
+            constexpr ::std::size_t int_end{i32_enabled ? CompileOption.i32_stack_top_end_pos : CompileOption.i64_stack_top_end_pos};
+            constexpr ::std::size_t fp_begin{f32_enabled ? CompileOption.f32_stack_top_begin_pos
+                                                         : (f64_enabled ? CompileOption.f64_stack_top_begin_pos : CompileOption.v128_stack_top_begin_pos)};
+            constexpr ::std::size_t fp_end{f32_enabled ? CompileOption.f32_stack_top_end_pos
+                                                       : (f64_enabled ? CompileOption.f64_stack_top_end_pos : CompileOption.v128_stack_top_end_pos)};
+
+            constexpr bool same_range{int_begin == fp_begin && int_end == fp_end};
+
+            if constexpr(same_range)
+            {
+                static_assert(CurrIntPos == CurrFpPos, "Merged int/fp stacktop range requires CurrIntPos == CurrFpPos.");
+                static_assert(int_begin <= CurrIntPos && CurrIntPos < int_end);
+
+                constexpr ::std::size_t step{details::ring_step_count<int_begin, int_end>(CurrIntPos, int_begin)};
+                details::rotate_stacktop_range_next<int_begin, int_end, step>(type...);
+            }
+            else
+            {
+                static_assert(details::uwvm_interpreter_stacktop_range_is_disjoint(int_begin, int_end, fp_begin, fp_end),
+                              "stacktop transform requires int/fp ranges to be disjoint when not merged.");
+
+                static_assert(int_begin <= CurrIntPos && CurrIntPos < int_end);
+                static_assert(fp_begin <= CurrFpPos && CurrFpPos < fp_end);
+
+                constexpr ::std::size_t int_step{details::ring_step_count<int_begin, int_end>(CurrIntPos, int_begin)};
+                constexpr ::std::size_t fp_step{details::ring_step_count<fp_begin, fp_end>(CurrFpPos, fp_begin)};
+
+                details::rotate_stacktop_range_next<int_begin, int_end, int_step>(type...);
+                details::rotate_stacktop_range_next<fp_begin, fp_end, fp_step>(type...);
+            }
+        }
+        else if constexpr(int_enabled)
+        {
+            constexpr ::std::size_t int_begin{i32_enabled ? CompileOption.i32_stack_top_begin_pos : CompileOption.i64_stack_top_begin_pos};
+            constexpr ::std::size_t int_end{i32_enabled ? CompileOption.i32_stack_top_end_pos : CompileOption.i64_stack_top_end_pos};
+            static_assert(int_begin <= CurrIntPos && CurrIntPos < int_end);
+            constexpr ::std::size_t int_step{details::ring_step_count<int_begin, int_end>(CurrIntPos, int_begin)};
+            details::rotate_stacktop_range_next<int_begin, int_end, int_step>(type...);
+        }
+        else if constexpr(fp_enabled)
+        {
+            constexpr ::std::size_t fp_begin{f32_enabled ? CompileOption.f32_stack_top_begin_pos
+                                                         : (f64_enabled ? CompileOption.f64_stack_top_begin_pos : CompileOption.v128_stack_top_begin_pos)};
+            constexpr ::std::size_t fp_end{f32_enabled ? CompileOption.f32_stack_top_end_pos
+                                                       : (f64_enabled ? CompileOption.f64_stack_top_end_pos : CompileOption.v128_stack_top_end_pos)};
+            static_assert(fp_begin <= CurrFpPos && CurrFpPos < fp_end);
+            constexpr ::std::size_t fp_step{details::ring_step_count<fp_begin, fp_end>(CurrFpPos, fp_begin)};
+            details::rotate_stacktop_range_next<fp_begin, fp_end, fp_step>(type...);
+        }
+
+        type...[0] = jmp_ip;
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
     /// @brief Fused `br_if` using `eqz` test (tail-call).
     /// @details
     /// - Stack-top optimization: see @ref uwvmint_conbine_stacktop_opt.
@@ -2389,6 +2509,138 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else
                 {
                     return OpWrapper::template fptr<CompileOption, 0uz, Type...>();
+                }
+            }
+
+            // ========================
+            // stacktop_transform + br selectors
+            // ========================
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, ::std::size_t End, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_uwvmint_br_stacktop_transform_to_begin_merged_impl(::std::size_t pos) noexcept
+            {
+                static_assert(Curr < End);
+                if(pos == Curr) { return uwvmint_br_stacktop_transform_to_begin<CompileOption, Curr, Curr, Type...>; }
+                else
+                {
+                    if constexpr(Curr + 1uz < End)
+                    {
+                        return select_uwvmint_br_stacktop_transform_to_begin_merged_impl<CompileOption, Curr + 1uz, End, Type...>(pos);
+                    }
+                    else
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t Curr,
+                      ::std::size_t End,
+                      ::std::size_t FixedFpPos,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_uwvmint_br_stacktop_transform_to_begin_int_only_impl(::std::size_t pos) noexcept
+            {
+                static_assert(Curr < End);
+                if(pos == Curr) { return uwvmint_br_stacktop_transform_to_begin<CompileOption, Curr, FixedFpPos, Type...>; }
+                else
+                {
+                    if constexpr(Curr + 1uz < End)
+                    {
+                        return select_uwvmint_br_stacktop_transform_to_begin_int_only_impl<CompileOption, Curr + 1uz, End, FixedFpPos, Type...>(pos);
+                    }
+                    else
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, ::std::size_t End, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_uwvmint_br_stacktop_transform_to_begin_fp_only_impl(::std::size_t pos) noexcept
+            {
+                static_assert(Curr < End);
+                if(pos == Curr) { return uwvmint_br_stacktop_transform_to_begin<CompileOption, 0uz, Curr, Type...>; }
+                else
+                {
+                    if constexpr(Curr + 1uz < End)
+                    {
+                        return select_uwvmint_br_stacktop_transform_to_begin_fp_only_impl<CompileOption, Curr + 1uz, End, Type...>(pos);
+                    }
+                    else
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t IntPos,
+                      ::std::size_t FpCurr,
+                      ::std::size_t FpEnd,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_uwvmint_br_stacktop_transform_to_begin_fp_impl(::std::size_t fp_pos) noexcept
+            {
+                static_assert(FpCurr < FpEnd);
+                if(fp_pos == FpCurr) { return uwvmint_br_stacktop_transform_to_begin<CompileOption, IntPos, FpCurr, Type...>; }
+                else
+                {
+                    if constexpr(FpCurr + 1uz < FpEnd)
+                    {
+                        return select_uwvmint_br_stacktop_transform_to_begin_fp_impl<CompileOption, IntPos, FpCurr + 1uz, FpEnd, Type...>(fp_pos);
+                    }
+                    else
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+
+            template <uwvm_interpreter_translate_option_t CompileOption,
+                      ::std::size_t IntCurr,
+                      ::std::size_t IntEnd,
+                      ::std::size_t FpBegin,
+                      ::std::size_t FpEnd,
+                      uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            inline constexpr uwvm_interpreter_opfunc_t<Type...> select_uwvmint_br_stacktop_transform_to_begin_int_impl(::std::size_t int_pos,
+                                                                                                                       ::std::size_t fp_pos) noexcept
+            {
+                static_assert(IntCurr < IntEnd);
+                if(int_pos == IntCurr)
+                {
+                    return select_uwvmint_br_stacktop_transform_to_begin_fp_impl<CompileOption, IntCurr, FpBegin, FpEnd, Type...>(fp_pos);
+                }
+                else
+                {
+                    if constexpr(IntCurr + 1uz < IntEnd)
+                    {
+                        return select_uwvmint_br_stacktop_transform_to_begin_int_impl<CompileOption, IntCurr + 1uz, IntEnd, FpBegin, FpEnd, Type...>(int_pos,
+                                                                                                                                                     fp_pos);
+                    }
+                    else
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
                 }
             }
 
@@ -3993,6 +4245,66 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_i32_eqz_localget_fptr<CompileOption, TypeInTuple...>(curr); }
 
         // Branch fused fptrs
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_br_stacktop_transform_to_begin_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            constexpr bool i32_enabled{CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos};
+            constexpr bool i64_enabled{CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos};
+            constexpr bool f32_enabled{CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos};
+            constexpr bool f64_enabled{CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos};
+            constexpr bool v128_enabled{CompileOption.v128_stack_top_begin_pos != CompileOption.v128_stack_top_end_pos};
+
+            constexpr bool int_enabled{i32_enabled || i64_enabled};
+            constexpr bool fp_enabled{f32_enabled || f64_enabled || v128_enabled};
+
+            if constexpr(!int_enabled && !fp_enabled) { return uwvmint_br_stacktop_transform_to_begin<CompileOption, 0uz, 0uz, Type...>; }
+
+            constexpr ::std::size_t int_begin{i32_enabled ? CompileOption.i32_stack_top_begin_pos : CompileOption.i64_stack_top_begin_pos};
+            constexpr ::std::size_t int_end{i32_enabled ? CompileOption.i32_stack_top_end_pos : CompileOption.i64_stack_top_end_pos};
+            constexpr ::std::size_t fp_begin{f32_enabled ? CompileOption.f32_stack_top_begin_pos
+                                                         : (f64_enabled ? CompileOption.f64_stack_top_begin_pos : CompileOption.v128_stack_top_begin_pos)};
+            constexpr ::std::size_t fp_end{f32_enabled ? CompileOption.f32_stack_top_end_pos
+                                                       : (f64_enabled ? CompileOption.f64_stack_top_end_pos : CompileOption.v128_stack_top_end_pos)};
+
+            if constexpr(int_enabled && fp_enabled)
+            {
+                constexpr bool same_range{int_begin == fp_begin && int_end == fp_end};
+                if constexpr(same_range)
+                {
+                    ::std::size_t const pos{i32_enabled ? curr.i32_stack_top_curr_pos : curr.i64_stack_top_curr_pos};
+                    return details::select_uwvmint_br_stacktop_transform_to_begin_merged_impl<CompileOption, int_begin, int_end, Type...>(pos);
+                }
+                else
+                {
+                    ::std::size_t const int_pos{i32_enabled ? curr.i32_stack_top_curr_pos : curr.i64_stack_top_curr_pos};
+                    ::std::size_t const fp_pos{f32_enabled ? curr.f32_stack_top_curr_pos
+                                                           : (f64_enabled ? curr.f64_stack_top_curr_pos : curr.v128_stack_top_curr_pos)};
+                    return details::select_uwvmint_br_stacktop_transform_to_begin_int_impl<CompileOption, int_begin, int_end, fp_begin, fp_end, Type...>(
+                        int_pos,
+                        fp_pos);
+                }
+            }
+            else if constexpr(int_enabled)
+            {
+                ::std::size_t const int_pos{i32_enabled ? curr.i32_stack_top_curr_pos : curr.i64_stack_top_curr_pos};
+                return details::select_uwvmint_br_stacktop_transform_to_begin_int_only_impl<CompileOption, int_begin, int_end, 0uz, Type...>(int_pos);
+            }
+            else
+            {
+                ::std::size_t const fp_pos{f32_enabled ? curr.f32_stack_top_curr_pos
+                                                       : (f64_enabled ? curr.f64_stack_top_curr_pos : curr.v128_stack_top_curr_pos)};
+                return details::select_uwvmint_br_stacktop_transform_to_begin_fp_only_impl<CompileOption, fp_begin, fp_end, Type...>(fp_pos);
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_br_stacktop_transform_to_begin_fptr<CompileOption, TypeInTuple...>(curr); }
+
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_br_if_i32_eqz_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
