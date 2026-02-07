@@ -3682,7 +3682,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 mac_after_mul,
                 mac_after_add,
 
-                // heavy: loop fuse
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+                // extra-heavy: loop fuse
                 for_i32_inc_after_tee,
                 for_i32_inc_after_end_const,
                 for_i32_inc_after_cmp,
@@ -3690,11 +3691,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 for_ptr_inc_after_pend_get,
                 for_ptr_inc_after_cmp,
 
-                // heavy: br_if fuse (local-based)
+                // extra-heavy: br_if fuse (local-based)
                 i32_rem_u_2localget_wait_eqz,
                 i32_rem_u_eqz_2localget_wait_brif,
 
-                // heavy: f64 loop condition (test8 hot loop)
+                // extra-heavy: f64 loop condition (test8 hot loop)
                 for_i32_inc_f64_lt_u_eqz_after_gets,
                 for_i32_inc_f64_lt_u_eqz_after_step_const,
                 for_i32_inc_f64_lt_u_eqz_after_add,
@@ -3702,6 +3703,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 for_i32_inc_f64_lt_u_eqz_after_convert,
                 for_i32_inc_f64_lt_u_eqz_after_cmp,
                 for_i32_inc_f64_lt_u_eqz_after_eqz,
+#  endif
 
                 // heavy: bit-mix
                 xorshift_pre_shr,                 // off1=x, imm_i32=a
@@ -3802,6 +3804,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              case conbine_pending_kind::mac_localget3: return u8"mac_localget3";
                                                              case conbine_pending_kind::mac_after_mul: return u8"mac_after_mul";
                                                              case conbine_pending_kind::mac_after_add: return u8"mac_after_add";
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                                                              case conbine_pending_kind::for_i32_inc_after_tee: return u8"for_i32_inc_after_tee";
                                                              case conbine_pending_kind::for_i32_inc_after_end_const: return u8"for_i32_inc_after_end_const";
                                                              case conbine_pending_kind::for_i32_inc_after_cmp: return u8"for_i32_inc_after_cmp";
@@ -3825,6 +3828,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                  return u8"for_i32_inc_f64_lt_u_eqz_after_cmp";
                                                              case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_eqz:
                                                                  return u8"for_i32_inc_f64_lt_u_eqz_after_eqz";
+#  endif
                                                              case conbine_pending_kind::xorshift_pre_shr: return u8"xorshift_pre_shr";
                                                              case conbine_pending_kind::xorshift_after_shr: return u8"xorshift_after_shr";
                                                              case conbine_pending_kind::xorshift_after_xor1: return u8"xorshift_after_xor1";
@@ -4348,6 +4352,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 
+#   ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                         case conbine_pending_kind::for_i32_inc_after_tee:
                         {
                             if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
@@ -4530,6 +4535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_opfunc_to(bytecode, translate::get_uwvmint_i32_eqz_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                             break;
                         }
+#   endif
                         case conbine_pending_kind::xorshift_pre_shr: [[fallthrough]];
                         case conbine_pending_kind::xorshift_after_shr: [[fallthrough]];
                         case conbine_pending_kind::xorshift_after_xor1: [[fallthrough]];
@@ -4966,6 +4972,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             // - {i32,i64,f64} support local.set only.
                             return op == wasm1_code::local_set || (op == wasm1_code::local_tee && conbine_pending.vt == curr_operand_stack_value_type::f32);
                         }
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                         case conbine_pending_kind::for_i32_inc_after_tee:
                         {
                             return op == wasm1_code::i32_const;
@@ -5026,6 +5033,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             return op == wasm1_code::br_if;
                         }
+#  endif
                         case conbine_pending_kind::xorshift_pre_shr:
                         {
                             return op == wasm1_code::i32_shr_u;
@@ -6560,7 +6568,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         wasm_i32 conbine_brif_imm{};
                         conbine_brif_cmp_kind conbine_brif_cmp{conbine_brif_cmp_kind::none};
 
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         bool conbine_brif_for_i32_inc_lt_u{};
                         bool conbine_brif_for_ptr_inc_ne{};
                         bool conbine_brif_i32_rem_u_eqz_2localget{};
@@ -6586,7 +6594,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             conbine_pending.kind = conbine_pending_kind::none;
                             conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
                         }
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         else if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_after_cmp)
                         {
                             conbine_brif_for_i32_inc_lt_u = true;
@@ -6837,7 +6845,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const emit_br_if_jump_conbine{
                             [&](::std::size_t label_id) constexpr UWVM_THROWS
                             {
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                                 if(conbine_brif_i32_rem_u_eqz_2localget)
                                 {
                                     emit_opfunc_to(
@@ -7023,7 +7031,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const target_label_id{get_branch_target_label_id(target_frame)};
 
                         bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i32_cmp_imm
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                                                               || conbine_brif_for_i32_inc_lt_u || conbine_brif_for_ptr_inc_ne ||
                                                               conbine_brif_i32_rem_u_eqz_2localget || conbine_brif_for_i32_inc_f64_lt_u_eqz
 # endif
@@ -8694,8 +8702,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
                                 else
                                 {
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                                    // Heavy (test8 hot loop): start `local.get(f64); local.get(i32); i32.const ...` fusion chain.
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+                                    // Extra-heavy (test8 hot loop): start `local.get(f64); local.get(i32); i32.const ...` fusion chain.
                                     if(!is_polymorphic && conbine_pending.vt == curr_operand_stack_value_type::f64 &&
                                        curr_local_type == curr_operand_stack_value_type::i32)
                                     {
@@ -8853,6 +8861,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 break;
                             }
 
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                             case conbine_pending_kind::for_ptr_inc_after_tee:
                             {
                                 if(curr_local_type == curr_operand_stack_value_type::i32)
@@ -8868,6 +8877,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 conbine_pending.off1 = local_off;
                                 break;
                             }
+#  endif
 
                             case conbine_pending_kind::xorshift_after_xor1:
                             {
@@ -9265,7 +9275,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                        // Heavy (test8 hot loop): `local.get(f64); local.get(i32); i32.const; i32.add; local.tee` chain.
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+                        // Extra-heavy (test8 hot loop): `local.get(f64); local.get(i32); i32.const; i32.add; local.tee` chain.
                         if(conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_add)
                         {
                             if(!is_polymorphic && curr_local_type == curr_operand_stack_value_type::i32 && local_off == conbine_pending.off2)
@@ -9277,6 +9288,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             // Pattern mismatch: flush the deferred ops so the `local.tee` below sees the correct stack shape.
                             flush_conbine_pending();
                         }
+#  endif
 
                         // Conbine (heavy): `f32.const imm; local.get src; f32.div; local.tee dst`
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::f32_div_from_imm_localtee_wait &&
@@ -9368,7 +9380,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(curr_local_type == curr_operand_stack_value_type::i32 &&
                            conbine_pending.kind == conbine_pending_kind::i32_add_imm_local_settee_same && local_off == conbine_pending.off1)
                         {
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                             // Heavy loop fusions: delay emission so we can potentially fold the following tight-loop skeleton
                             // into a single `for_*_br_if` combined opcode:
                             //
@@ -10975,6 +10987,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // Conbine: `local.get(i32) + i32.const` (delay emission for imm/localget fusions).
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_gets)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_step_const;
@@ -10985,7 +10998,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_after_end_const;
                             conbine_pending.imm_i32_2 = imm;
                         }
-                        else if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_after_xor)
+                        else
+#  endif
+                            if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_after_xor)
                         {
                             conbine_pending.kind = conbine_pending_kind::rot_xor_add_after_xor_constc;
                             conbine_pending.imm_i32_2 = imm;
@@ -11261,7 +11276,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_unary(u8"i32.eqz", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::i32_rem_u_2localget_wait_eqz)
                         {
                             conbine_pending.kind = conbine_pending_kind::i32_rem_u_eqz_2localget_wait_brif;
@@ -11351,7 +11366,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_binary(u8"i32.ne", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::for_ptr_inc_after_pend_get)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_ptr_inc_after_cmp;
@@ -11451,7 +11466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_binary(u8"i32.lt_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::for_i32_inc_after_end_const)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_after_cmp;
@@ -12190,7 +12205,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"f64.lt", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
 
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_cmp;
@@ -12366,12 +12381,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_step_const)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_add;
                             break;
                         }
+# endif
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::mac_after_mul && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
                             conbine_pending.kind = conbine_pending_kind::mac_after_add;
@@ -12650,7 +12667,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
-# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                             // Heavy: `local.get a; local.get b; i32.rem_u; i32.eqz; br_if <L>` -> local-based `br_if_i32_rem_u_eqz_2localget`.
                             if(!is_polymorphic)
                             {
@@ -14441,7 +14458,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_unary(u8"f64.convert_i32_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::f64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_tee)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert;
