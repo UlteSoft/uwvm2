@@ -96,19 +96,27 @@ function def_build()
 		add_defines("UWVM_ENABLE_DEBUG_INT")
 	end
 
-	local heavy_combine_ops_mode = get_config("enable-uwvm-int-heavy-combine-ops")
+	local heavy_combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
 	if heavy_combine_ops_mode == nil then
-		heavy_combine_ops_mode = "default"
+		heavy_combine_ops_mode = "heavy"
 	elseif heavy_combine_ops_mode == true then
-		heavy_combine_ops_mode = "default"
+		heavy_combine_ops_mode = "heavy"
 	elseif heavy_combine_ops_mode == false then
 		heavy_combine_ops_mode = "none"
+	elseif heavy_combine_ops_mode == "default" then
+		-- Backward-compatible alias: "default" == "heavy"
+		heavy_combine_ops_mode = "heavy"
 	end
 
 	if heavy_combine_ops_mode ~= "none" then
-		add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
-		if heavy_combine_ops_mode == "extra" then
-			add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+		-- Soft/light combine is enabled by default unless explicitly set to "none".
+		add_defines("UWVM_ENABLE_UWVM_INT_COMBINE_OPS")
+
+		if heavy_combine_ops_mode == "heavy" or heavy_combine_ops_mode == "extra" then
+			add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
+			if heavy_combine_ops_mode == "extra" then
+				add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+			end
 		end
 	end
 

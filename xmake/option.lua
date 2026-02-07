@@ -184,16 +184,17 @@ option("enable-debug-int", function()
     set_default(true)
 end)
 
-option("enable-uwvm-int-heavy-combine-ops", function()
+option("enable-uwvm-int-combine-ops", function()
     set_description
     (
-        "Enable heavy combined opcodes for uwvm-int.",
-        [[    none: disable all heavy/extra-heavy combine ops.]],
-        [[    default: enable heavy combine ops (default).]],
-        [[    extra: enable heavy + extra-heavy combine ops (ultra-specific mega fusions).]]
+        "Enable combined opcodes for uwvm-int.",
+        [[    none: disable all combine ops.]],
+        [[    soft: enable only soft/light combine ops.]],
+        [[    heavy: enable soft + heavy combine ops (default).]],
+        [[    extra: enable soft + heavy + extra-heavy combine ops (ultra-specific mega fusions).]]
     )
-    set_default("default")
-    set_values("none", "default", "extra")
+    set_default("heavy")
+    set_values("none", "soft", "heavy", "extra")
 end)
 
 option("detailed-debug-check", function()
