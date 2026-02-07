@@ -97,16 +97,6 @@ function def_build()
 	end
 
 	local heavy_combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
-	if heavy_combine_ops_mode == nil then
-		heavy_combine_ops_mode = "heavy"
-	elseif heavy_combine_ops_mode == true then
-		heavy_combine_ops_mode = "heavy"
-	elseif heavy_combine_ops_mode == false then
-		heavy_combine_ops_mode = "none"
-	elseif heavy_combine_ops_mode == "default" then
-		-- Backward-compatible alias: "default" == "heavy"
-		heavy_combine_ops_mode = "heavy"
-	end
 
 	if heavy_combine_ops_mode ~= "none" then
 		-- Soft/light combine is enabled by default unless explicitly set to "none".
