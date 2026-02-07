@@ -187,10 +187,13 @@ end)
 option("enable-uwvm-int-heavy-combine-ops", function()
     set_description
     (
-        "Enable heavy combined opcodes for uwvm-int (dense_compute / rare fusion patterns).",
-        "default = true"
+        "Enable heavy combined opcodes for uwvm-int.",
+        [[    none: disable all heavy/extra-heavy combine ops.]],
+        [[    default: enable heavy combine ops (default).]],
+        [[    extra: enable heavy + extra-heavy combine ops (ultra-specific mega fusions).]]
     )
-    set_default(true)
+    set_default("default")
+    set_values("none", "default", "extra")
 end)
 
 option("detailed-debug-check", function()

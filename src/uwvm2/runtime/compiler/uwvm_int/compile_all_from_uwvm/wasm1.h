@@ -3680,8 +3680,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              case conbine_pending_kind::for_ptr_inc_after_tee: return u8"for_ptr_inc_after_tee";
                                                              case conbine_pending_kind::for_ptr_inc_after_pend_get: return u8"for_ptr_inc_after_pend_get";
                                                              case conbine_pending_kind::for_ptr_inc_after_cmp: return u8"for_ptr_inc_after_cmp";
-                                                             case conbine_pending_kind::i32_rem_u_2localget_wait_eqz:
-                                                                 return u8"i32_rem_u_2localget_wait_eqz";
+                                                             case conbine_pending_kind::i32_rem_u_2localget_wait_eqz: return u8"i32_rem_u_2localget_wait_eqz";
                                                              case conbine_pending_kind::i32_rem_u_eqz_2localget_wait_brif:
                                                                  return u8"i32_rem_u_eqz_2localget_wait_brif";
                                                              case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_gets:
@@ -4315,18 +4314,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_opfunc_to(bytecode, translate::get_uwvmint_i32_eqz_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                             break;
                         }
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_gets:
-                            [[fallthrough]];
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_step_const:
-                            [[fallthrough]];
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_add:
-                            [[fallthrough]];
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_tee:
-                            [[fallthrough]];
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert:
-                            [[fallthrough]];
-                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_cmp:
-                            [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_gets: [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_step_const: [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_add: [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_tee: [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert: [[fallthrough]];
+                        case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_cmp: [[fallthrough]];
                         case conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_eqz:
                         {
                             // Sequence:
@@ -4354,8 +4347,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             {
                                 stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
                             }
-                            emit_opfunc_to(bytecode,
-                                           translate::get_uwvmint_f64_convert_i32_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_convert_i32_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::f64))
                             {
                                 if constexpr(stacktop_enabled)
@@ -6636,6 +6628,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                                 if(conbine_brif_for_i32_inc_f64_lt_u_eqz)
                                 {
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                                     // Mega-fuse `test8` hot prime divisor loop:
                                     //   br_if (n % i == 0) -> break
                                     //   i += step; br_if (sqrt < i) == 0 -> loop
@@ -6644,8 +6637,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     // targets the loop start label, we can emit a single opfunc that runs the whole loop
                                     // internally and keeps `n/sqrt/i` in registers.
                                     {
-                                        using prev_fptr_t = decltype(
-                                            translate::get_uwvmint_br_if_i32_rem_u_eqz_2localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                        using prev_fptr_t =
+                                            decltype(translate::get_uwvmint_br_if_i32_rem_u_eqz_2localget_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                                         interpreter_tuple));
 
                                         constexpr ::std::size_t prev_inst_size{sizeof(prev_fptr_t) + sizeof(local_offset_t) * 2uz + sizeof(rel_offset_t)};
                                         if(bytecode.size() >= prev_inst_size && label_id < labels.size())
@@ -6680,10 +6674,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                             bytecode.resize(prev_start);
                                                             ptr_fixups.pop_back_unchecked();
 
-                                                            emit_opfunc_to(
-                                                                bytecode,
-                                                                translate::get_uwvmint_prime_divisor_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                            interpreter_tuple));
+                                                            emit_opfunc_to(bytecode,
+                                                                           translate::get_uwvmint_prime_divisor_loop_run_fptr_from_tuple<CompileOption>(
+                                                                               curr_stacktop,
+                                                                               interpreter_tuple));
                                                             emit_imm_to(bytecode, n_off);
                                                             emit_imm_to(bytecode, i_off);
                                                             emit_imm_to(bytecode, conbine_brif_local_off);  // sqrt_off
@@ -6696,6 +6690,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             }
                                         }
                                     }
+# endif
 
                                     emit_opfunc_to(
                                         bytecode,
@@ -12221,8 +12216,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             {
                                 wasm1_code next_op{};  // init
                                 if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
-                                if(next_op == wasm1_code::i32_eqz &&
-                                   static_cast<::std::size_t>(code_end - code_curr) >= sizeof(wasm1_code) * 2uz)
+                                if(next_op == wasm1_code::i32_eqz && static_cast<::std::size_t>(code_end - code_curr) >= sizeof(wasm1_code) * 2uz)
                                 {
                                     wasm1_code next2_op{};  // init
                                     ::std::memcpy(::std::addressof(next2_op), code_curr + sizeof(wasm1_code), sizeof(next2_op));

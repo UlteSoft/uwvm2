@@ -40,6 +40,7 @@ export import :stack;
 export import :variable;
 export import :conbine;
 export import :conbine_heavy;
+export import :combine_extra_heavy;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

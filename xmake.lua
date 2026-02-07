@@ -96,9 +96,20 @@ function def_build()
 		add_defines("UWVM_ENABLE_DEBUG_INT")
 	end
 
-	local enable_heavy_combine_ops = get_config("enable-uwvm-int-heavy-combine-ops")
-	if enable_heavy_combine_ops == nil or enable_heavy_combine_ops then
+	local heavy_combine_ops_mode = get_config("enable-uwvm-int-heavy-combine-ops")
+	if heavy_combine_ops_mode == nil then
+		heavy_combine_ops_mode = "default"
+	elseif heavy_combine_ops_mode == true then
+		heavy_combine_ops_mode = "default"
+	elseif heavy_combine_ops_mode == false then
+		heavy_combine_ops_mode = "none"
+	end
+
+	if heavy_combine_ops_mode ~= "none" then
 		add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
+		if heavy_combine_ops_mode == "extra" then
+			add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+		end
 	end
 
 	local detailed_debug_check = get_config("detailed-debug-check")
