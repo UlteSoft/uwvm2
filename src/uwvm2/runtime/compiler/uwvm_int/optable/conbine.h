@@ -53,6 +53,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     /**
      * @brief Fused opcode implementations for the UWVM int interpreter.
      *
@@ -2365,9 +2366,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -8281,6 +8282,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                    ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i32_store_local_plus_imm_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
+#endif
 }  // namespace uwvm2::runtime::compiler::uwvm_int::optable
 
 #ifndef UWVM_MODULE
