@@ -9064,8 +9064,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         // Optional: stack-top fast-path `call` for hot same-type signatures.
                         bool use_stacktop_call_fast{};
-                        curr_operand_stack_value_type stacktop_call_fast_vt{curr_operand_stack_value_type::i32};
+                        
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        curr_operand_stack_value_type stacktop_call_fast_vt{curr_operand_stack_value_type::i32};
+
                         if constexpr(stacktop_enabled && CompileOption.is_tail_call)
                         {
                             if(!is_polymorphic)
