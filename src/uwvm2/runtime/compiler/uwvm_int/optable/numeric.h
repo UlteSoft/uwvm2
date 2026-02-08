@@ -160,12 +160,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         //   The wrapper may build a frame and call the user-provided trap hook; that cost is paid only on the exceptional path.
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_divide_by_zero_tail(Type... /*type*/) UWVM_THROWS
+        UWVM_INTERPRETER_OPFUNC_MACRO UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_divide_by_zero_tail(Type... /*type*/) UWVM_THROWS
         { trap_integer_divide_by_zero(); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_overflow_tail(Type... /*type*/) UWVM_THROWS
+        UWVM_INTERPRETER_OPFUNC_MACRO UWVM_NOINLINE UWVM_GNU_COLD inline constexpr void trap_integer_overflow_tail(Type... /*type*/) UWVM_THROWS
         { trap_integer_overflow(); }
 
         enum class int_unop
