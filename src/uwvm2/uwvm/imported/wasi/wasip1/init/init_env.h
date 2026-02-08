@@ -167,8 +167,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             }};
 
         auto const init_stdio{[
-#  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
-      !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+#  if defined(UWVM_CPP_EXCEPTIONS) &&                                                                                                                          \
+      (!defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&            \
+       !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__))
                                   &print_init_error_with_fast_io_error
 #  endif
         ](::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_t& new_fd_fd, ::fast_io::native_io_observer obs) constexpr noexcept -> bool
