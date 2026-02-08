@@ -799,6 +799,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             bytecode_vec_t& bytecode{local_func_symbol.op.operands};
 
             bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
+            // Verbose emit logging for offline analysis (enabled only when `-Rclog` is used).
+            constexpr bool runtime_log_emit_opfuncs{true};
+            constexpr bool runtime_log_emit_cf{true};
+
+            struct runtime_log_stats_t
+            {
+                ::std::uint_least64_t wasm_op_count{};
+                ::std::uint_least64_t opfunc_main_count{};
+                ::std::uint_least64_t opfunc_thunk_count{};
+                ::std::uint_least64_t label_placeholder_main_count{};
+                ::std::uint_least64_t label_placeholder_thunk_count{};
+                ::std::uint_least64_t cf_br_count{};
+                ::std::uint_least64_t cf_br_transform_count{};
+                ::std::uint_least64_t cf_br_if_count{};
+                ::std::uint_least64_t cf_loop_entry_transform_count{};
+                ::std::uint_least64_t cf_loop_entry_canonicalize_to_mem_count{};
+                ::std::uint_least64_t stacktop_spill1_count{};
+                ::std::uint_least64_t stacktop_spillN_count{};
+                ::std::uint_least64_t stacktop_fill1_count{};
+                ::std::uint_least64_t stacktop_fillN_count{};
+            };
+
+            runtime_log_stats_t runtime_log_stats{};
+
+            // Best-effort: current Wasm IP for emit logs.
+            ::std::size_t runtime_log_curr_ip{};
+
+            auto const runtime_log_bc_name{[](bool in_thunk) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
+                                           {
+                                               if(in_thunk) { return ::uwvm2::utils::container::u8string_view{u8"thunk"}; }
+                                               return ::uwvm2::utils::container::u8string_view{u8"main"};
+                                           }};
 
             auto const runtime_log_op_name{
                 [](::uwvm2::runtime::compiler::uwvm_int::optable::wasm1_code op) constexpr noexcept -> ::uwvm2::utils::container::u8string_view
@@ -1099,6 +1131,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                   {
                                                       rel_offset_t const placeholder{};
                                                       ::std::size_t const site{in_thunk ? thunks.size() : bytecode.size()};
+                                                      if(runtime_log_on) [[unlikely]]
+                                                      {
+                                                          if(in_thunk) { ++runtime_log_stats.label_placeholder_thunk_count; }
+                                                          else
+                                                          {
+                                                              ++runtime_log_stats.label_placeholder_main_count;
+                                                          }
+                                                          if(runtime_log_emit_cf)
+                                                          {
+                                                              ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                                   u8"[uwvm-int-translator] fn=",
+                                                                                   function_index,
+                                                                                   u8" ip=",
+                                                                                   runtime_log_curr_ip,
+                                                                                   u8" event=bytecode.emit.imm | kind=label_placeholder bc=",
+                                                                                   runtime_log_bc_name(in_thunk),
+                                                                                   u8" off=",
+                                                                                   site,
+                                                                                   u8" label_id=",
+                                                                                   label_id,
+                                                                                   u8"\n");
+                                                          }
+                                                      }
                                                       if(in_thunk) { emit_imm_to(thunks, placeholder); }
                                                       else
                                                       {
@@ -1123,6 +1178,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const emit_opfunc_to{[&](bytecode_vec_t& dst, auto fptr) constexpr UWVM_THROWS
                                       {
+                                          if(runtime_log_on) [[unlikely]]
+                                          {
+                                              bool const dst_is_thunk{::std::addressof(dst) == ::std::addressof(thunks)};
+                                              ::std::size_t const off{dst.size()};
+                                              if(dst_is_thunk) { ++runtime_log_stats.opfunc_thunk_count; }
+                                              else
+                                              {
+                                                  ++runtime_log_stats.opfunc_main_count;
+                                              }
+                                              if(runtime_log_emit_opfuncs)
+                                              {
+                                                  // Print the raw opfunc pointer bits stored into the bytecode stream.
+                                                  ::std::uintptr_t bits{};
+                                                  constexpr ::std::size_t copy_n{sizeof(bits) < sizeof(fptr) ? sizeof(bits) : sizeof(fptr)};
+                                                  ::std::memcpy(::std::addressof(bits), ::std::addressof(fptr), copy_n);
+                                                  ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                       u8"[uwvm-int-translator] fn=",
+                                                                       function_index,
+                                                                       u8" ip=",
+                                                                       runtime_log_curr_ip,
+                                                                       u8" event=bytecode.emit.opfunc | bc=",
+                                                                       runtime_log_bc_name(dst_is_thunk),
+                                                                       u8" off=",
+                                                                       off,
+                                                                       u8" sz=",
+                                                                       sizeof(fptr),
+                                                                       u8" fptr_bits=",
+                                                                       ::fast_io::mnp::hex0x(bits),
+                                                                       u8"\n");
+                                              }
+                                          }
+
                                           // Best-effort: prefetch the opfunc's instruction stream into cache.
                                           // This attempts to reduce cold I$ misses when the threaded interpreter dispatches to the opfunc.
                                           if UWVM_IF_NOT_CONSTEVAL
@@ -1588,6 +1675,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         if(runtime_log_on) [[unlikely]]
                         {
+                            ++runtime_log_stats.stacktop_spill1_count;
                             ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                  u8"[uwvm-int-translator] fn=",
                                                  function_index,
@@ -1783,6 +1871,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 {
                     if constexpr(!stacktop_enabled) { return; }
                     if(count == 0uz) { return; }
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.stacktop_spillN_count; }
 
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using remain_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_remain_size_t;
@@ -1940,6 +2029,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 {
                     if constexpr(stacktop_enabled)
                     {
+                        if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.stacktop_fill1_count; }
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         switch(vt)
                         {
@@ -1995,6 +2085,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 {
                     if constexpr(!stacktop_enabled) { return; }
                     if(count == 0uz) { return; }
+                    if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.stacktop_fillN_count; }
 
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using remain_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_remain_size_t;
@@ -3044,6 +3135,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_is_thunk) constexpr UWVM_THROWS
                                   {
                                       namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                      if(runtime_log_on) [[unlikely]]
+                                      {
+                                          ++runtime_log_stats.cf_br_count;
+                                          if(runtime_log_emit_cf)
+                                          {
+                                              ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                   u8"[uwvm-int-translator] fn=",
+                                                                   function_index,
+                                                                   u8" ip=",
+                                                                   runtime_log_curr_ip,
+                                                                   u8" event=bytecode.emit.cf | op=br bc=",
+                                                                   runtime_log_bc_name(dst_is_thunk),
+                                                                   u8" off=",
+                                                                   dst.size(),
+                                                                   u8" label_id=",
+                                                                   label_id,
+                                                                   u8"\n");
+                                          }
+                                      }
                                       emit_opfunc_to(dst, translate::get_uwvmint_br_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                       emit_ptr_label_placeholder(label_id, dst_is_thunk);
                                   }};
@@ -3058,6 +3168,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         if(!is_polymorphic && stacktop_cache_count != 0uz)
                         {
+                            if(runtime_log_on) [[unlikely]]
+                            {
+                                ++runtime_log_stats.cf_br_transform_count;
+                                if(runtime_log_emit_cf)
+                                {
+                                    ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                         u8"[uwvm-int-translator] fn=",
+                                                         function_index,
+                                                         u8" ip=",
+                                                         runtime_log_curr_ip,
+                                                         u8" event=bytecode.emit.cf | op=br_stacktop_transform_to_begin bc=",
+                                                         runtime_log_bc_name(dst_is_thunk),
+                                                         u8" off=",
+                                                         dst.size(),
+                                                         u8" label_id=",
+                                                         label_id,
+                                                         u8" cache=",
+                                                         stacktop_cache_count,
+                                                         u8"\n");
+                                }
+                            }
                             emit_opfunc_to(
                                 dst,
                                 translate::get_uwvmint_br_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
@@ -5170,12 +5301,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                      [[maybe_unused]] wasm1_code op,
                                                      [[maybe_unused]] ::std::byte const* wasm_ip,
                                                      [[maybe_unused]] ::std::size_t bytecode_before,
-                                                     [[maybe_unused]] ::std::size_t thunks_before) constexpr noexcept
+                                                     [[maybe_unused]] ::std::size_t thunks_before,
+                                                     [[maybe_unused]] ::std::uint_least64_t opfunc_main_before,
+                                                     [[maybe_unused]] ::std::uint_least64_t opfunc_thunk_before) constexpr noexcept
                                                  {
                                                      if(!runtime_log_on) [[likely]] { return; }
 
                                                      auto const bc_delta{bytecode.size() - bytecode_before};
                                                      auto const thunk_delta{thunks.size() - thunks_before};
+                                                     auto const opfunc_main_delta{runtime_log_stats.opfunc_main_count - opfunc_main_before};
+                                                     auto const opfunc_thunk_delta{runtime_log_stats.opfunc_thunk_count - opfunc_thunk_before};
                                                      using op_underlying_t = ::std::underlying_type_t<wasm1_code>;
                                                      auto const op_u{static_cast<::std::uint_least32_t>(static_cast<op_underlying_t>(op))};
 
@@ -5201,7 +5336,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                               thunks.size(),
                                                                               u8"(+",
                                                                               thunk_delta,
-                                                                              u8")}",
+                                                                              u8")} opfunc{main=+",
+                                                                              opfunc_main_delta,
+                                                                              u8",thunk=+",
+                                                                              opfunc_thunk_delta,
+                                                                              u8"}",
                                                                               u8" operand{sz=",
                                                                               operand_stack.size(),
                                                                               u8",bytes=",
@@ -5254,7 +5393,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                               thunks.size(),
                                                                               u8"(+",
                                                                               thunk_delta,
-                                                                              u8")}",
+                                                                              u8")} opfunc{main=+",
+                                                                              opfunc_main_delta,
+                                                                              u8",thunk=+",
+                                                                              opfunc_thunk_delta,
+                                                                              u8"}",
                                                                               u8" operand{sz=",
                                                                               operand_stack.size(),
                                                                               u8",bytes=",
@@ -5337,7 +5480,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                           thunks.size(),
                                                                           u8"(+",
                                                                           thunk_delta,
-                                                                          u8")}",
+                                                                          u8")} opfunc{main=+",
+                                                                          opfunc_main_delta,
+                                                                          u8",thunk=+",
+                                                                          opfunc_thunk_delta,
+                                                                          u8"}",
                                                                           u8" operand{sz=",
                                                                           operand_stack.size(),
                                                                           u8",bytes=",
@@ -5398,6 +5545,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                 wasm1_code curr_opbase;  // no initialize necessary
                 ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
+                if(runtime_log_on) [[unlikely]]
+                {
+                    runtime_log_curr_ip = static_cast<::std::size_t>(op_begin - code_begin);
+                    ++runtime_log_stats.wasm_op_count;
+                }
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 stacktop_dbg_last_op = curr_opbase;
@@ -5420,7 +5572,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                 auto const bytecode_before{bytecode.size()};
                 auto const thunks_before{thunks.size()};
-                runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before);
+                auto const opfunc_main_before{runtime_log_stats.opfunc_main_count};
+                auto const opfunc_thunk_before{runtime_log_stats.opfunc_thunk_count};
+                runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
 
                 switch(curr_opbase)
                 {
@@ -5634,53 +5788,80 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 
-                        control_flow_stack.push_back({.result = block_result,
-                                                      .operand_stack_base = operand_stack.size(),
-                                                      .type = block_type::loop,
-                                                      .polymorphic_base = is_polymorphic,
-                                                      .then_polymorphic_end = false,
-                                                      .start_label_id =
-                                                          [&]() constexpr UWVM_THROWS
-                                                      {
-                                                          auto const loop_start{new_label(false)};
-                                                          if constexpr(stacktop_enabled)
-                                                          {
-                                                              if constexpr(strict_cf_entry_like_call)
-                                                              {
-                                                                  if(!is_polymorphic)
-                                                                  {
-                                                                      // Fallthrough into loop start: canonicalize before the re-entry label so
-                                                                      // back-edges can jump directly to the label and see the canonical state.
-                                                                      stacktop_canonicalize_edge_to_memory(bytecode);
-                                                                  }
-                                                                  else
-                                                                  {
-                                                                      // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
-                                                                      stacktop_reset_currpos_to_begin();
-                                                                      stacktop_memory_count = codegen_operand_stack.size();
-                                                                      stacktop_cache_count = 0uz;
-                                                                      stacktop_cache_i32_count = 0uz;
-                                                                      stacktop_cache_i64_count = 0uz;
-                                                                      stacktop_cache_f32_count = 0uz;
-                                                                      stacktop_cache_f64_count = 0uz;
-                                                                  }
-                                                              }
-                                                          }
-                                                          if constexpr(stacktop_enabled)
-                                                          {
-                                                              if constexpr(!strict_cf_entry_like_call)
-                                                              {
-                                                                  // Fallthrough into loop start: canonicalize currpos to a deterministic begin slot
-                                                                  // using a pure-register transform (no operand-stack spill/fill).
-                                                                  stacktop_transform_currpos_to_begin(bytecode);
-                                                              }
-                                                          }
-                                                          set_label_offset(loop_start, bytecode.size());
-                                                          return loop_start;
-                                                      }(),
-                                                      .end_label_id = new_label(false),
-                                                      .else_label_id = SIZE_MAX,
-                                                      .wasm_code_curr_at_start_label = code_curr});
+                        control_flow_stack.push_back(
+                            {.result = block_result,
+                             .operand_stack_base = operand_stack.size(),
+                             .type = block_type::loop,
+                             .polymorphic_base = is_polymorphic,
+                             .then_polymorphic_end = false,
+                             .start_label_id =
+                                 [&]() constexpr UWVM_THROWS
+                             {
+                                 auto const loop_start{new_label(false)};
+                                 if constexpr(stacktop_enabled)
+                                 {
+                                     if constexpr(strict_cf_entry_like_call)
+                                     {
+                                         if(!is_polymorphic)
+                                         {
+                                             // Fallthrough into loop start: canonicalize before the re-entry label so
+                                             // back-edges can jump directly to the label and see the canonical state.
+                                             if(runtime_log_on) [[unlikely]]
+                                             {
+                                                 ++runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count;
+                                                 if(runtime_log_emit_cf)
+                                                 {
+                                                     ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                          u8"[uwvm-int-translator] fn=",
+                                                                          function_index,
+                                                                          u8" ip=",
+                                                                          runtime_log_curr_ip,
+                                                                          u8" event=cf.loop_entry | action=canonicalize_edge_to_memory\n");
+                                                 }
+                                             }
+                                             stacktop_canonicalize_edge_to_memory(bytecode);
+                                         }
+                                         else
+                                         {
+                                             // Unreachable fallthrough: no runtime code needed, but keep model deterministic.
+                                             stacktop_reset_currpos_to_begin();
+                                             stacktop_memory_count = codegen_operand_stack.size();
+                                             stacktop_cache_count = 0uz;
+                                             stacktop_cache_i32_count = 0uz;
+                                             stacktop_cache_i64_count = 0uz;
+                                             stacktop_cache_f32_count = 0uz;
+                                             stacktop_cache_f64_count = 0uz;
+                                         }
+                                     }
+                                 }
+                                 if constexpr(stacktop_enabled)
+                                 {
+                                     if constexpr(!strict_cf_entry_like_call)
+                                     {
+                                         // Fallthrough into loop start: canonicalize currpos to a deterministic begin slot
+                                         // using a pure-register transform (no operand-stack spill/fill).
+                                         if(runtime_log_on) [[unlikely]]
+                                         {
+                                             ++runtime_log_stats.cf_loop_entry_transform_count;
+                                             if(runtime_log_emit_cf)
+                                             {
+                                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                      u8"[uwvm-int-translator] fn=",
+                                                                      function_index,
+                                                                      u8" ip=",
+                                                                      runtime_log_curr_ip,
+                                                                      u8" event=cf.loop_entry | action=stacktop_transform_currpos_to_begin\n");
+                                             }
+                                         }
+                                         stacktop_transform_currpos_to_begin(bytecode);
+                                     }
+                                 }
+                                 set_label_offset(loop_start, bytecode.size());
+                                 return loop_start;
+                             }(),
+                             .end_label_id = new_label(false),
+                             .else_label_id = SIZE_MAX,
+                             .wasm_code_curr_at_start_label = code_curr});
 
                         break;
                     }
@@ -6351,6 +6532,46 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 ::std::byte const* const target_ptr{bytecode_begin_ptr + static_cast<::std::size_t>(off)};
                                 rel_offset_t const ptr_bits{::std::bit_cast<rel_offset_t>(target_ptr)};
                                 ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(ptr_bits), sizeof(ptr_bits));
+                            }
+
+                            if(runtime_log_on) [[unlikely]]
+                            {
+                                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                     u8"[uwvm-int-translator] fn=",
+                                                     function_index,
+                                                     u8" event=stats.func | wasm_ops=",
+                                                     runtime_log_stats.wasm_op_count,
+                                                     u8" bytecode{main=",
+                                                     main_size,
+                                                     u8",thunk=",
+                                                     thunks.size(),
+                                                     u8"} opfunc{main=",
+                                                     runtime_log_stats.opfunc_main_count,
+                                                     u8",thunk=",
+                                                     runtime_log_stats.opfunc_thunk_count,
+                                                     u8"} label_imm{main=",
+                                                     runtime_log_stats.label_placeholder_main_count,
+                                                     u8",thunk=",
+                                                     runtime_log_stats.label_placeholder_thunk_count,
+                                                     u8"} cf{br=",
+                                                     runtime_log_stats.cf_br_count,
+                                                     u8",br_tr=",
+                                                     runtime_log_stats.cf_br_transform_count,
+                                                     u8",br_if=",
+                                                     runtime_log_stats.cf_br_if_count,
+                                                     u8",loop_tr=",
+                                                     runtime_log_stats.cf_loop_entry_transform_count,
+                                                     u8",loop_mem=",
+                                                     runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count,
+                                                     u8"} stacktop{spill1=",
+                                                     runtime_log_stats.stacktop_spill1_count,
+                                                     u8",spillN=",
+                                                     runtime_log_stats.stacktop_spillN_count,
+                                                     u8",fill1=",
+                                                     runtime_log_stats.stacktop_fill1_count,
+                                                     u8",fillN=",
+                                                     runtime_log_stats.stacktop_fillN_count,
+                                                     u8"}\n");
                             }
 
                             local_func_symbol.operand_stack_max = runtime_operand_stack_max;
@@ -7435,7 +7656,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 emit_br_if_jump(label_id);
                             }};
 
-                        auto const emit_br_if_jump_any{[&](::std::size_t label_id) constexpr UWVM_THROWS { emit_br_if_jump_conbine(label_id); }};
+                        auto const emit_br_if_jump_any{[&](::std::size_t label_id) constexpr UWVM_THROWS
+                                                       {
+                                                           if(runtime_log_on) [[unlikely]]
+                                                           {
+                                                               ++runtime_log_stats.cf_br_if_count;
+                                                               if(runtime_log_emit_cf)
+                                                               {
+                                                                   ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                                                        u8"[uwvm-int-translator] fn=",
+                                                                                        function_index,
+                                                                                        u8" ip=",
+                                                                                        runtime_log_curr_ip,
+                                                                                        u8" event=bytecode.emit.cf | op=br_if bc=main off=",
+                                                                                        bytecode.size(),
+                                                                                        u8" label_id=",
+                                                                                        label_id,
+                                                                                        u8"\n");
+                                                               }
+                                                           }
+                                                           emit_br_if_jump_conbine(label_id);
+                                                       }};
 
                         auto const target_label_id{get_branch_target_label_id(target_frame)};
 
@@ -7452,6 +7693,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const emit_br_if_jump_any{
                             [&](::std::size_t label_id) constexpr UWVM_THROWS
                             {
+                                if(runtime_log_on) [[unlikely]]
+                                {
+                                    ++runtime_log_stats.cf_br_if_count;
+                                    if(runtime_log_emit_cf)
+                                    {
+                                        ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                                             u8"[uwvm-int-translator] fn=",
+                                                             function_index,
+                                                             u8" ip=",
+                                                             runtime_log_curr_ip,
+                                                             u8" event=bytecode.emit.cf | op=br_if bc=main off=",
+                                                             bytecode.size(),
+                                                             u8" label_id=",
+                                                             label_id,
+                                                             u8"\n");
+                                    }
+                                }
                                 emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                 emit_ptr_label_placeholder(label_id, false);
                             }};
@@ -16032,7 +16290,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                 }
 
-                runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before);
+                runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
 
                 if(finished_current_func) { break; }
                 if(!is_polymorphic)
