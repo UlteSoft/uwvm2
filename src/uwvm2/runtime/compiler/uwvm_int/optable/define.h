@@ -380,12 +380,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if constexpr(is_i32_f32_i64_f64_merge)
                 {
                     static_assert(::std::same_as<Type, wasm_stack_top_i32_i64_f32_f64_u>);
-                    return typeref...[curr_stack_top].i32;
+                    // i32 values in i32/i64-merged slots are stored via the 64-bit lane to avoid partial updates.
+                    return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(typeref...[curr_stack_top].i64);
                 }
                 else if constexpr(is_i32_i64_merge)
                 {
                     static_assert(::std::same_as<Type, wasm_stack_top_i32_with_i64_u>);
-                    return typeref...[curr_stack_top].i32;
+                    return static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32>(typeref...[curr_stack_top].i64);
                 }
                 else if constexpr(is_i32_f32_merge)
                 {

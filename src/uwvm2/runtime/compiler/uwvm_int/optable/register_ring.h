@@ -403,6 +403,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return out;
         }
 
+        UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64
+            zero_extend_i32_to_i64(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 v) noexcept
+        {
+            using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+            using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+            static_assert(sizeof(wasm_i32) == 4uz);
+            static_assert(sizeof(wasm_i64) == 8uz);
+            return static_cast<wasm_i64>(static_cast<::std::uint_least32_t>(v));
+        }
+
         /**
          * @brief Store a value into the stack-top cache slot at `WritePos`.
          *
@@ -440,12 +450,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if constexpr(is_i32_f32_i64_f64_merge)
                 {
                     static_assert(::std::same_as<slot_t, wasm_stack_top_i32_i64_f32_f64_u>);
-                    typeref...[WritePos].i32 = v;
+                    // Store i32 values via the 64-bit lane to avoid partial updates (and false dependencies)
+                    // on AArch64/x86_64 when this slot is merged with i64.
+                    typeref...[WritePos].i64 = zero_extend_i32_to_i64(v);
                 }
                 else if constexpr(is_i32_i64_merge)
                 {
                     static_assert(::std::same_as<slot_t, wasm_stack_top_i32_with_i64_u>);
-                    typeref...[WritePos].i32 = v;
+                    // Same rationale as above: treat the merged i32/i64 slot as always-written-as-i64.
+                    typeref...[WritePos].i64 = zero_extend_i32_to_i64(v);
                 }
                 else if constexpr(is_i32_f32_merge)
                 {

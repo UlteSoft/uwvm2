@@ -1104,6 +1104,282 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // call_fuse: call_drop / call_local_set / call_local_tee
     // ========================
 
+    /**
+     * @brief Fast-path `call` when all parameters are cached i32 values (tail-call).
+     *
+     * @details
+     * This avoids the translator's "spill-all-to-memory + call + fill-to-cache" sequence for hot call sites where:
+     * - The operand stack is *entirely* in the i32 stack-top cache (no memory segment).
+     * - The callee signature is `(i32 x ParamCount) -> RetT` (RetT = `void` or `wasm_i32`).
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t ParamCount,
+              typename RetT,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_call_stacktop_i32(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        static_assert(ParamCount != 0uz, "stacktop call fast-path expects ParamCount >= 1.");
+        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_i32>,
+                      "stacktop i32 call fast-path currently supports RetT = void or wasm_i32.");
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end, "stacktop i32 call fast-path requires i32 stack-top cache enabled.");
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        // Advance to immediates.
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t call_function;  // no init
+        ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
+        type...[0] += sizeof(call_function);
+
+        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        constexpr ::std::size_t result_bytes{[]() consteval noexcept -> ::std::size_t
+                                             {
+                                                 if constexpr(::std::is_void_v<RetT>) { return 0uz; }
+                                                 else
+                                                 {
+                                                     return sizeof(RetT);
+                                                 }
+                                             }()};
+        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
+
+        ::std::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+        ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+        // Write params in canonical memory order (param0 .. paramN-1).
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            (([&]() constexpr UWVM_THROWS
+              {
+                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                  wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+              }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+
+        if constexpr(!::std::is_void_v<RetT>)
+        {
+            RetT out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+            // Pop ParamCount + push 1 => currpos advances ParamCount times then retreats once:
+            // ring_prev(ring_next^ParamCount(curr)) == ring_next^(ParamCount-1)(curr).
+            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount - 1uz, begin, end>()};
+            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+        }
+
+        // Next opfunc.
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path `call` when all parameters are cached f32 values (tail-call).
+     *
+     * @details
+     * Same as `uwvmint_call_stacktop_i32`, but for the f32 stack-top cache ring.
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f32_stack_top,
+              ::std::size_t ParamCount,
+              typename RetT,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_call_stacktop_f32(Type... type) UWVM_THROWS
+    {
+        using wasm_f32 = conbine_details::wasm_f32;
+        using wasm_f64 = conbine_details::wasm_f64;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        static_assert(ParamCount != 0uz, "stacktop call fast-path expects ParamCount >= 1.");
+        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_f32> || ::std::same_as<RetT, wasm_f64>,
+                      "stacktop f32 call fast-path currently supports RetT = void, wasm_f32 or wasm_f64.");
+
+        if constexpr(::std::same_as<RetT, wasm_f64>)
+        {
+            static_assert(CompileOption.f64_stack_top_begin_pos == CompileOption.f32_stack_top_begin_pos &&
+                              CompileOption.f64_stack_top_end_pos == CompileOption.f32_stack_top_end_pos,
+                          "stacktop f32->f64 call fast-path requires f32/f64 ranges to be fully merged (same begin/end).");
+        }
+
+        constexpr ::std::size_t begin{CompileOption.f32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.f32_stack_top_end_pos};
+        static_assert(begin != end, "stacktop f32 call fast-path requires f32 stack-top cache enabled.");
+        static_assert(begin <= curr_f32_stack_top && curr_f32_stack_top < end);
+
+        // Advance to immediates.
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t call_function;  // no init
+        ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
+        type...[0] += sizeof(call_function);
+
+        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f32)};
+        constexpr ::std::size_t result_bytes{[]() consteval noexcept -> ::std::size_t
+                                             {
+                                                 if constexpr(::std::is_void_v<RetT>) { return 0uz; }
+                                                 else
+                                                 {
+                                                     return sizeof(RetT);
+                                                 }
+                                             }()};
+        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
+
+        ::std::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+        ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+        // Write params in canonical memory order (param0 .. paramN-1).
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            (([&]() constexpr UWVM_THROWS
+              {
+                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f32_stack_top, steps, begin, end>()};
+                  wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, pos>(type...)};
+                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f32)), ::std::addressof(v), sizeof(v));
+              }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+
+        if constexpr(!::std::is_void_v<RetT>)
+        {
+            RetT out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f32_stack_top, ParamCount - 1uz, begin, end>()};
+            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+        }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path `call` when all parameters are cached f64 values (tail-call).
+     *
+     * @details
+     * Same as `uwvmint_call_stacktop_i32`, but for the f64 stack-top cache ring.
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_f64_stack_top,
+              ::std::size_t ParamCount,
+              typename RetT,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_call_stacktop_f64(Type... type) UWVM_THROWS
+    {
+        using wasm_f64 = conbine_details::wasm_f64;
+        using wasm_f32 = conbine_details::wasm_f32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        static_assert(ParamCount != 0uz, "stacktop call fast-path expects ParamCount >= 1.");
+        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_f64> || ::std::same_as<RetT, wasm_f32>,
+                      "stacktop f64 call fast-path currently supports RetT = void, wasm_f64 or wasm_f32.");
+
+        if constexpr(::std::same_as<RetT, wasm_f32>)
+        {
+            static_assert(CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                              CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos,
+                          "stacktop f64->f32 call fast-path requires f32/f64 ranges to be fully merged (same begin/end).");
+        }
+
+        constexpr ::std::size_t begin{CompileOption.f64_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.f64_stack_top_end_pos};
+        static_assert(begin != end, "stacktop f64 call fast-path requires f64 stack-top cache enabled.");
+        static_assert(begin <= curr_f64_stack_top && curr_f64_stack_top < end);
+
+        // Advance to immediates.
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t call_function;  // no init
+        ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
+        type...[0] += sizeof(call_function);
+
+        // Scratch operand stack for the call bridge. The bridge overwrites args with results at the base.
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_f64)};
+        constexpr ::std::size_t result_bytes{[]() consteval noexcept -> ::std::size_t
+                                             {
+                                                 if constexpr(::std::is_void_v<RetT>) { return 0uz; }
+                                                 else
+                                                 {
+                                                     return sizeof(RetT);
+                                                 }
+                                             }()};
+        constexpr ::std::size_t scratch_bytes{param_bytes >= result_bytes ? param_bytes : result_bytes};
+
+        ::std::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+        ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+        // Write params in canonical memory order (param0 .. paramN-1).
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            (([&]() constexpr UWVM_THROWS
+              {
+                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f64_stack_top, steps, begin, end>()};
+                  wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, pos>(type...)};
+                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f64)), ::std::addressof(v), sizeof(v));
+              }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+
+        if constexpr(!::std::is_void_v<RetT>)
+        {
+            RetT out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_f64_stack_top, ParamCount - 1uz, begin, end>()};
+            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+        }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
     /// @brief Fused `call` + `drop` (tail-call).
     /// @details
     /// - Stack-top optimization: requires a full operand-stack spill (same constraint as `uwvmint_call`).
@@ -3928,6 +4204,102 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_i32_add_imm_global_set_same_fptr<CompileOption, TypeInTuple...>(curr); }
 
         // call_fuse fusions
+        template <::std::size_t ParamCount, typename RetT>
+        struct call_stacktop_i32_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            {
+                return uwvmint_call_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>;
+            }
+        };
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.i32_stack_top_begin_pos,
+                                                                    CompileOption.i32_stack_top_end_pos,
+                                                                    call_stacktop_i32_op<ParamCount, RetT>,
+                                                                    Type...>(curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_call_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        {
+            return get_uwvmint_call_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
+        }
+
+        template <::std::size_t ParamCount, typename RetT>
+        struct call_stacktop_f32_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            {
+                return uwvmint_call_stacktop_f32<CompileOption, Curr, ParamCount, RetT, Type...>;
+            }
+        };
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_stacktop_f32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.f32_stack_top_begin_pos,
+                                                                    CompileOption.f32_stack_top_end_pos,
+                                                                    call_stacktop_f32_op<ParamCount, RetT>,
+                                                                    Type...>(curr.f32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_call_stacktop_f32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        {
+            return get_uwvmint_call_stacktop_f32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
+        }
+
+        template <::std::size_t ParamCount, typename RetT>
+        struct call_stacktop_f64_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            {
+                return uwvmint_call_stacktop_f64<CompileOption, Curr, ParamCount, RetT, Type...>;
+            }
+        };
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_stacktop_f64_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.f64_stack_top_begin_pos,
+                                                                    CompileOption.f64_stack_top_end_pos,
+                                                                    call_stacktop_f64_op<ParamCount, RetT>,
+                                                                    Type...>(curr.f64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_call_stacktop_f64_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        {
+            return get_uwvmint_call_stacktop_f64_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
+        }
+
         template <uwvm_interpreter_translate_option_t CompileOption, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_drop_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
@@ -5043,6 +5415,76 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             details::exit_memory_operation_memory_lock(memory);
 
             push_value<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        /// @brief Internal fused `local.get a; local.get b; i32.load` (tail-call).
+        /// @details
+        /// Leaves the deeper `local.get a` value on the operand stack, and loads from `local.get b` as the effective address.
+        ///
+        /// Layout: `[op][off_a][off_b][memory*][offset:u32][next]`.
+        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void i32_load_localget2_off(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(sizeof...(Type) >= 3uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+            auto const op_begin{type...[0]};
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            local_offset_t const off_a{details::read_imm<local_offset_t>(type...[0])};
+            local_offset_t const off_b{details::read_imm<local_offset_t>(type...[0])};
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+
+            wasm_i32 const keep_addr{load_local<wasm_i32>(type...[2u], off_a)};
+            wasm_i32 const addr{load_local<wasm_i32>(type...[2u], off_b)};
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            details::enter_memory_operation_memory_lock(memory);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
+
+            ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
+            auto const out{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            details::exit_memory_operation_memory_lock(memory);
+
+            // Push keep_addr first, then push out, so the top is the loaded value and the deeper slot is the kept address.
+            push_value<CompileOption, wasm_i32, curr_i32_stack_top>(keep_addr, type...);
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            {
+                constexpr ::std::size_t begin{range_begin<CompileOption, wasm_i32>()};
+                constexpr ::std::size_t end{range_end<CompileOption, wasm_i32>()};
+                static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+                constexpr ::std::size_t after_keep_pos{details::ring_prev_pos(curr_i32_stack_top, begin, end)};
+                push_value<CompileOption, wasm_i32, after_keep_pos>(out, type...);
+            }
+            else
+            {
+                push_value<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+            }
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -6403,6 +6845,80 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
+        /// @brief Internal fused `local.get a; local.get b; i32.load; i32.const imm; i32.add` (tail-call).
+        /// @details
+        /// Leaves the deeper `local.get a` value on the operand stack, and performs `load(b)+imm` as the top value.
+        ///
+        /// Layout: `[op][off_a][off_b][memory*][offset:u32][imm:i32][next]`.
+        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void i32_load_add_imm_localget2_off(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(sizeof...(Type) >= 3uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+            auto const op_begin{type...[0]};
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            local_offset_t const off_a{details::read_imm<local_offset_t>(type...[0])};
+            local_offset_t const off_b{details::read_imm<local_offset_t>(type...[0])};
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
+
+            wasm_i32 const keep_addr{load_local<wasm_i32>(type...[2u], off_a)};
+            wasm_i32 const addr{load_local<wasm_i32>(type...[2u], off_b)};
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            details::enter_memory_operation_memory_lock(memory);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
+
+            ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
+            wasm_i32 const loaded{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            details::exit_memory_operation_memory_lock(memory);
+
+            ::std::uint_least32_t const lu{::std::bit_cast<::std::uint_least32_t>(loaded)};
+            ::std::uint_least32_t const iu{::std::bit_cast<::std::uint_least32_t>(imm)};
+            wasm_i32 const out{::std::bit_cast<wasm_i32>(static_cast<::std::uint_least32_t>(lu + iu))};
+
+            push_value<CompileOption, wasm_i32, curr_i32_stack_top>(keep_addr, type...);
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            {
+                constexpr ::std::size_t begin{range_begin<CompileOption, wasm_i32>()};
+                constexpr ::std::size_t end{range_end<CompileOption, wasm_i32>()};
+                static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+                constexpr ::std::size_t after_keep_pos{details::ring_prev_pos(curr_i32_stack_top, begin, end)};
+                push_value<CompileOption, wasm_i32, after_keep_pos>(out, type...);
+            }
+            else
+            {
+                push_value<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+            }
+
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
         /// @brief Internal fused load + and immediate (`i32`) (tail-call).
         /// @details
         /// - Stack-top optimization: see @ref uwvmint_conbine_stacktop_opt.
@@ -6453,6 +6969,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const out{static_cast<wasm_i32>(static_cast<::std::uint_least32_t>(loaded) & static_cast<::std::uint_least32_t>(imm))};
             push_value<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        /// @brief Internal fused `local.get a; local.get b; i32.load; i32.const imm; i32.and` (tail-call).
+        /// @details
+        /// Leaves the deeper `local.get a` value on the operand stack, and performs `load(b)&imm` as the top value.
+        ///
+        /// Layout: `[op][off_a][off_b][memory*][offset:u32][imm:i32][next]`.
+        template <auto BoundsCheckFn, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void i32_load_and_imm_localget2_off(Type... type) UWVM_THROWS
+        {
+            using wasm_i32 = details::wasm_i32;
+            using wasm_u32 = details::wasm_u32;
+            using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+            static_assert(sizeof...(Type) >= 3uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+            auto const op_begin{type...[0]};
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            local_offset_t const off_a{details::read_imm<local_offset_t>(type...[0])};
+            local_offset_t const off_b{details::read_imm<local_offset_t>(type...[0])};
+            native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
+            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
+
+            wasm_i32 const keep_addr{load_local<wasm_i32>(type...[2u], off_a)};
+            wasm_i32 const addr{load_local<wasm_i32>(type...[2u], off_b)};
+            auto const eff65{details::wasm32_effective_offset(addr, offset)};
+
+            auto const& memory{*memory_p};
+            details::enter_memory_operation_memory_lock(memory);
+            if constexpr(BoundsCheckFn == details::bounds_check_generic)
+            {
+                if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
+                {
+                    type...[0] = op_begin;
+                    auto const memory_length{details::load_memory_length_for_oob_unlocked(memory)};
+                    details::memory_oob_terminate(0uz, static_cast<::std::uint_least64_t>(offset), eff65, memory_length, 4uz);
+                }
+            }
+            else
+            {
+                BoundsCheckFn(memory, 0uz, static_cast<::std::uint_least64_t>(offset), eff65, 4uz);
+            }
+
+            ::std::size_t const eff{static_cast<::std::size_t>(eff65.offset)};
+            wasm_i32 const loaded{details::load_i32_le(details::ptr_add_u64(memory.memory_begin, eff))};
+            details::exit_memory_operation_memory_lock(memory);
+
+            wasm_i32 const out{static_cast<wasm_i32>(static_cast<::std::uint_least32_t>(loaded) & static_cast<::std::uint_least32_t>(imm))};
+
+            push_value<CompileOption, wasm_i32, curr_i32_stack_top>(keep_addr, type...);
+            if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
+            {
+                constexpr ::std::size_t begin{range_begin<CompileOption, wasm_i32>()};
+                constexpr ::std::size_t end{range_end<CompileOption, wasm_i32>()};
+                static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+                constexpr ::std::size_t after_keep_pos{details::ring_prev_pos(curr_i32_stack_top, begin, end)};
+                push_value<CompileOption, wasm_i32, after_keep_pos>(out, type...);
+            }
+            else
+            {
+                push_value<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+            }
 
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -7868,6 +8456,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return op_details::memop::i32_load_localget_off<BoundsCheckFn, CompileOption, Pos, Type...>; }
             };
 
+            struct i32_load_localget2_off_op
+            {
+                template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_localget2_off<op_details::bounds_check_generic, CompileOption, Pos, Type...>; }
+            };
+
+            struct i32_load_localget2_off_op_with
+            {
+                template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_localget2_off<BoundsCheckFn, CompileOption, Pos, Type...>; }
+            };
+
             struct i32_load_local_plus_imm_op
             {
                 template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -8159,6 +8761,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return op_details::memop::i32_load_add_imm<BoundsCheckFn, CompileOption, Pos, Type...>; }
             };
 
+            struct i32_load_add_imm_localget2_off_op
+            {
+                template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_add_imm_localget2_off<op_details::bounds_check_generic, CompileOption, Pos, Type...>; }
+            };
+
+            struct i32_load_add_imm_localget2_off_op_with
+            {
+                template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_add_imm_localget2_off<BoundsCheckFn, CompileOption, Pos, Type...>; }
+            };
+
             struct i32_load_and_imm_op
             {
                 template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -8171,6 +8787,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
                 { return op_details::memop::i32_load_and_imm<BoundsCheckFn, CompileOption, Pos, Type...>; }
+            };
+
+            struct i32_load_and_imm_localget2_off_op
+            {
+                template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_and_imm_localget2_off<op_details::bounds_check_generic, CompileOption, Pos, Type...>; }
+            };
+
+            struct i32_load_and_imm_localget2_off_op_with
+            {
+                template <auto BoundsCheckFn, auto Extra, uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return op_details::memop::i32_load_and_imm_localget2_off<BoundsCheckFn, CompileOption, Pos, Type...>; }
             };
         }  // namespace details
 
