@@ -34,10 +34,19 @@
 # define UWVM_INTERPRETER_OPFUNC_TYPE_MACRO
 #endif
 
-#pragma push_macro("UWVM_INTERPRETER_OPFUNC_MACRO")
-#undef UWVM_INTERPRETER_OPFUNC_MACRO
+#pragma push_macro("UWVM_INTERPRETER_OPFUNC_COLD_MACRO")
+#undef UWVM_INTERPRETER_OPFUNC_COLD_MACRO
 #if defined(_WIN32) && (defined(__x86_64__) || defined(_M_AMD64)) && (defined(__GNUC__) || defined(__clang__))
-# define UWVM_INTERPRETER_OPFUNC_MACRO [[__gnu__::__sysv_abi__]] UWVM_GNU_HOT
+# define UWVM_INTERPRETER_OPFUNC_COLD_MACRO [[__gnu__::__sysv_abi__]] UWVM_GNU_COLD
 #else
-# define UWVM_INTERPRETER_OPFUNC_MACRO UWVM_GNU_HOT
+# define UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_GNU_COLD
+#endif
+
+
+#pragma push_macro("UWVM_INTERPRETER_OPFUNC_HOT_MACRO")
+#undef UWVM_INTERPRETER_OPFUNC_HOT_MACRO
+#if defined(_WIN32) && (defined(__x86_64__) || defined(_M_AMD64)) && (defined(__GNUC__) || defined(__clang__))
+# define UWVM_INTERPRETER_OPFUNC_HOT_MACRO [[__gnu__::__sysv_abi__]] UWVM_GNU_HOT
+#else
+# define UWVM_INTERPRETER_OPFUNC_HOT_MACRO UWVM_GNU_HOT
 #endif

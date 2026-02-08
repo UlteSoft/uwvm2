@@ -186,7 +186,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note When stack-top caching is disabled, operands are popped from the operand stack and the result is pushed back via `type...[1u]`.
     template <uwvm_interpreter_translate_option_t CompileOption, details::int_cmp Cmp, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_cmp(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_cmp(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
@@ -240,7 +240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_ptr][next_opfunc_ptr]` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_eqz(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_eqz(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
@@ -286,7 +286,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_cmp(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_cmp(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -382,7 +382,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_eqz(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_eqz(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -461,7 +461,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_cmp(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_cmp(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -555,7 +555,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_cmp(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_cmp(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -645,7 +645,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note Operands are popped from the operand stack and the result is appended back to the operand stack.
     template <uwvm_interpreter_translate_option_t CompileOption, details::int_cmp Cmp, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_cmp(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_cmp(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
@@ -672,70 +672,70 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_eq(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_eq(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::eq>(typeref...); }
 
     /// @brief `i32.ne` (non-tail-call/byref): i32 inequality compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_ne(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_ne(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::ne>(typeref...); }
 
     /// @brief `i32.lt_s` (non-tail-call/byref): signed less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_lt_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_lt_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::lt_s>(typeref...); }
 
     /// @brief `i32.lt_u` (non-tail-call/byref): unsigned less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_lt_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_lt_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::lt_u>(typeref...); }
 
     /// @brief `i32.gt_s` (non-tail-call/byref): signed greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_gt_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_gt_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::gt_s>(typeref...); }
 
     /// @brief `i32.gt_u` (non-tail-call/byref): unsigned greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_gt_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_gt_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::gt_u>(typeref...); }
 
     /// @brief `i32.le_s` (non-tail-call/byref): signed less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_le_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_le_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::le_s>(typeref...); }
 
     /// @brief `i32.le_u` (non-tail-call/byref): unsigned less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_le_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_le_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::le_u>(typeref...); }
 
     /// @brief `i32.ge_s` (non-tail-call/byref): signed greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_ge_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_ge_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::ge_s>(typeref...); }
 
     /// @brief `i32.ge_u` (non-tail-call/byref): unsigned greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_ge_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_ge_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_cmp<CompileOption, details::int_cmp::ge_u>(typeref...); }
 
     /// @brief `i32.eqz` (non-tail-call/byref): tests whether the current i32 operand equals zero.
@@ -744,7 +744,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][next_opfunc_byref_ptr]...` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_eqz(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_eqz(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
@@ -771,7 +771,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][next_opfunc_byref_ptr]...` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, details::int_cmp Cmp, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_cmp(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_cmp(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -799,70 +799,70 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_eq(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_eq(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::eq>(typeref...); }
 
     /// @brief `i64.ne` (non-tail-call/byref): i64 inequality compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_ne(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_ne(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::ne>(typeref...); }
 
     /// @brief `i64.lt_s` (non-tail-call/byref): signed less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_lt_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_lt_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::lt_s>(typeref...); }
 
     /// @brief `i64.lt_u` (non-tail-call/byref): unsigned less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_lt_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_lt_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::lt_u>(typeref...); }
 
     /// @brief `i64.gt_s` (non-tail-call/byref): signed greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_gt_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_gt_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::gt_s>(typeref...); }
 
     /// @brief `i64.gt_u` (non-tail-call/byref): unsigned greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_gt_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_gt_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::gt_u>(typeref...); }
 
     /// @brief `i64.le_s` (non-tail-call/byref): signed less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_le_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_le_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::le_s>(typeref...); }
 
     /// @brief `i64.le_u` (non-tail-call/byref): unsigned less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_le_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_le_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::le_u>(typeref...); }
 
     /// @brief `i64.ge_s` (non-tail-call/byref): signed greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_ge_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_ge_s(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::ge_s>(typeref...); }
 
     /// @brief `i64.ge_u` (non-tail-call/byref): unsigned greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_i64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_ge_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_ge_u(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i64_cmp<CompileOption, details::int_cmp::ge_u>(typeref...); }
 
     /// @brief `i64.eqz` (non-tail-call/byref): tests whether the current i64 operand equals zero and produces an i32 boolean.
@@ -871,7 +871,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][next_opfunc_byref_ptr]...` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_eqz(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_eqz(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -899,7 +899,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][next_opfunc_byref_ptr]...` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, details::float_cmp Cmp, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_cmp(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_cmp(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -926,42 +926,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_eq(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_eq(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::eq>(typeref...); }
 
     /// @brief `f32.ne` (non-tail-call/byref): f32 inequality compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_ne(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_ne(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::ne>(typeref...); }
 
     /// @brief `f32.lt` (non-tail-call/byref): f32 less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_lt(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_lt(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::lt>(typeref...); }
 
     /// @brief `f32.gt` (non-tail-call/byref): f32 greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_gt(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_gt(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::gt>(typeref...); }
 
     /// @brief `f32.le` (non-tail-call/byref): f32 less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_le(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_le(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::le>(typeref...); }
 
     /// @brief `f32.ge` (non-tail-call/byref): f32 greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f32_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_ge(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_ge(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f32_cmp<CompileOption, details::float_cmp::ge>(typeref...); }
 
     /// @brief f64 binary compare core (non-tail-call/byref): evaluates an f64 comparison and pushes a Wasm i32 boolean.
@@ -970,7 +970,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][next_opfunc_byref_ptr]...` (no immediates).
     template <uwvm_interpreter_translate_option_t CompileOption, details::float_cmp Cmp, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_cmp(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_cmp(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -997,42 +997,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_eq(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_eq(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::eq>(typeref...); }
 
     /// @brief `f64.ne` (non-tail-call/byref): f64 inequality compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_ne(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_ne(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::ne>(typeref...); }
 
     /// @brief `f64.lt` (non-tail-call/byref): f64 less-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_lt(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_lt(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::lt>(typeref...); }
 
     /// @brief `f64.gt` (non-tail-call/byref): f64 greater-than compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_gt(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_gt(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::gt>(typeref...); }
 
     /// @brief `f64.le` (non-tail-call/byref): f64 less-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_le(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_le(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::le>(typeref...); }
 
     /// @brief `f64.ge` (non-tail-call/byref): f64 greater-or-equal compare.
     /// @details Stack-top optimization and `type[0]` layout are the same as `uwvmint_f64_cmp` (byref).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_ge(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_ge(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_cmp<CompileOption, details::float_cmp::ge>(typeref...); }
 
     namespace translate

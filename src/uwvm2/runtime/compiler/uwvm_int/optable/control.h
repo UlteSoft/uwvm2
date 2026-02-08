@@ -86,7 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(Type...) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_unreachable(Type...) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -108,7 +108,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_unreachable(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_unreachable(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 1uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -191,7 +191,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -229,7 +229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 1uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -321,7 +321,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br_if(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -375,7 +375,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_if(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br_if(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 1uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -524,7 +524,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br_table(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -578,7 +578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_br_table(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br_table(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 1uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
@@ -725,7 +725,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_return([[maybe_unused]] Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_return([[maybe_unused]] Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -752,7 +752,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_return(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_return(TypeRef & ... typeref) UWVM_THROWS
     {
         static_assert(sizeof...(TypeRef) >= 1uz);
         static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);

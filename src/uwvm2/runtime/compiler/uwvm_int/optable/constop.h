@@ -59,7 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note All loads from the bytecode stream use `memcpy` to avoid alignment assumptions.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_const(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_const(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
@@ -104,7 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note The stack-top write uses `ring_prev_pos(curr_i64_stack_top, begin, end)` to model a push into the ring cache.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_const(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_const(Type... type) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
 
@@ -148,7 +148,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note When stack-top caching is disabled, the immediate is appended to the operand stack (`type...[1u]`).
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_const(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_const(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 
@@ -192,7 +192,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note Keep the operand-stack path (`memcpy` + bump `type...[1u]`) in sync with the stack-top path to preserve semantics.
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_f64_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_const(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_const(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 
@@ -237,7 +237,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @note The upper-level dispatcher is responsible for loading and invoking the next opfunc.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_const(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_const(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
@@ -266,7 +266,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][imm:i64][next_opfunc_byref_ptr]...`.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_const(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_const(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
 
@@ -295,7 +295,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][imm:f32][next_opfunc_byref_ptr]...`.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_const(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_const(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 
@@ -324,7 +324,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: `[opfunc_byref_ptr][imm:f64][next_opfunc_byref_ptr]...`.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_const(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_const(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
 

@@ -270,7 +270,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_wrap_i64(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_wrap_i64(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -347,7 +347,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_extend_i32_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_extend_i32_s(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -424,7 +424,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_extend_i32_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_extend_i32_u(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -501,7 +501,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_reinterpret_f32(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_reinterpret_f32(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -578,7 +578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_reinterpret_i32(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_reinterpret_i32(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -657,7 +657,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_demote_f64(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_demote_f64(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -731,7 +731,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_promote_f32(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_promote_f32(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -808,7 +808,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f32_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f32_s(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -886,7 +886,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f32_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f32_u(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -964,7 +964,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f64_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f64_s(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -1042,7 +1042,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i32_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f64_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f64_u(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -1122,7 +1122,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f32_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f32_s(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -1200,7 +1200,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_f32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f32_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f32_u(Type... type) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -1278,7 +1278,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f64_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f64_s(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -1356,7 +1356,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f64_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f64_u(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -1435,7 +1435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i32_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i32_s(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -1509,7 +1509,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i32_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i32_u(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -1585,7 +1585,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i32_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i32_s(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -1659,7 +1659,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_i32_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i32_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i32_u(Type... type) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -1735,7 +1735,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i64_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i64_s(Type... type) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -1809,7 +1809,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f32_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i64_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i64_u(Type... type) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -1885,7 +1885,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i64_s(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i64_s(Type... type) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -1959,7 +1959,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i64_u(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i64_u(Type... type) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2035,7 +2035,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_i64_stack_top = curr_f64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_reinterpret_f64(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_reinterpret_f64(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2112,7 +2112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t curr_f64_stack_top = curr_i64_stack_top,
               uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_reinterpret_i64(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_reinterpret_i64(Type... type) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2193,7 +2193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.wrap_i64` (non-tail-call/byref): truncates i64 to i32 (low 32 bits).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_wrap_i64(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_wrap_i64(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2219,7 +2219,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.trunc_f32_s` (non-tail-call/byref): truncates f32 to signed i32, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f32_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f32_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2245,7 +2245,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.trunc_f32_u` (non-tail-call/byref): truncates f32 to unsigned i32, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f32_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f32_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2270,7 +2270,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f64_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f64_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2296,7 +2296,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.trunc_f64_u` (non-tail-call/byref): truncates f64 to unsigned i32, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_trunc_f64_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_trunc_f64_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2322,7 +2322,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.extend_i32_s` (non-tail-call/byref): sign-extends i32 to i64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_extend_i32_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_extend_i32_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2348,7 +2348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.extend_i32_u` (non-tail-call/byref): zero-extends i32 to i64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_extend_i32_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_extend_i32_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2374,7 +2374,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.trunc_f32_s` (non-tail-call/byref): truncates f32 to signed i64, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f32_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f32_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2400,7 +2400,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.trunc_f32_u` (non-tail-call/byref): truncates f32 to unsigned i64, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f32_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f32_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2426,7 +2426,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.trunc_f64_s` (non-tail-call/byref): truncates f64 to signed i64, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f64_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f64_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2452,7 +2452,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.trunc_f64_u` (non-tail-call/byref): truncates f64 to unsigned i64, trapping on invalid conversion.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_trunc_f64_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_trunc_f64_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2478,7 +2478,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.convert_i32_s` (non-tail-call/byref): converts signed i32 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i32_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i32_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -2503,7 +2503,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.convert_i32_u` (non-tail-call/byref): converts unsigned i32 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i32_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i32_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -2529,7 +2529,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.convert_i64_s` (non-tail-call/byref): converts signed i64 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i64_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i64_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -2554,7 +2554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.convert_i64_u` (non-tail-call/byref): converts unsigned i64 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_convert_i64_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_convert_i64_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -2580,7 +2580,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.demote_f64` (non-tail-call/byref): converts f64 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_demote_f64(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_demote_f64(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -2605,7 +2605,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.convert_i32_s` (non-tail-call/byref): converts signed i32 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i32_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i32_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2630,7 +2630,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.convert_i32_u` (non-tail-call/byref): converts unsigned i32 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i32_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i32_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2656,7 +2656,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.convert_i64_s` (non-tail-call/byref): converts signed i64 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i64_s(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i64_s(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2681,7 +2681,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.convert_i64_u` (non-tail-call/byref): converts unsigned i64 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_convert_i64_u(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_convert_i64_u(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2707,7 +2707,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.promote_f32` (non-tail-call/byref): converts f32 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_promote_f32(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_promote_f32(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
@@ -2732,7 +2732,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i32.reinterpret_f32` (non-tail-call/byref): bitcasts f32 to i32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_reinterpret_f32(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_reinterpret_f32(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2758,7 +2758,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f32.reinterpret_i32` (non-tail-call/byref): bitcasts i32 to f32.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_reinterpret_i32(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_reinterpret_i32(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
         using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -2784,7 +2784,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `i64.reinterpret_f64` (non-tail-call/byref): bitcasts f64 to i64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i64_reinterpret_f64(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_reinterpret_f64(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
@@ -2810,7 +2810,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief `f64.reinterpret_i64` (non-tail-call/byref): bitcasts i64 to f64.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f64_reinterpret_i64(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_reinterpret_i64(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
         using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;

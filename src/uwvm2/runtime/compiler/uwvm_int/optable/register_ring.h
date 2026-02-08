@@ -1149,7 +1149,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t Count,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_stacktop_to_operand_stack(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_to_operand_stack(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -1189,7 +1189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               typename ValType,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_stacktop_to_operand_stack(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_to_operand_stack(Type... type) UWVM_THROWS
     {
         static_assert(Count != 0uz, "Typed spill opfunc requires Count >= 1.");
         static_assert(sizeof...(Type) >= 1uz);
@@ -1228,7 +1228,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t Count,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_operand_stack_to_stacktop(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_operand_stack_to_stacktop(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -1268,7 +1268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               typename ValType,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_operand_stack_to_stacktop(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_operand_stack_to_stacktop(Type... type) UWVM_THROWS
     {
         static_assert(Count != 0uz, "Typed fill opfunc requires Count >= 1.");
         static_assert(sizeof...(Type) >= 1uz);
@@ -1313,7 +1313,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               ::std::size_t CurrFpPos,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_stacktop_transform_to_begin(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_transform_to_begin(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);

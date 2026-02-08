@@ -101,7 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (n i32), `local_offset_t` (i i32), `local_offset_t` (sqrt f64), `wasm_i32` (step), `::std::byte const*` (break ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_prime_divisor_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_prime_divisor_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_f64 = conbine_details::wasm_f64;
@@ -156,7 +156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (n i32), `local_offset_t` (i i32), `local_offset_t` (sqrt f64), `wasm_i32` (step), `::std::byte const*` (break ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_prime_divisor_loop_run(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_prime_divisor_loop_run(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_f64 = conbine_details::wasm_f64;
@@ -242,7 +242,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     ///   `wasm_i32` (step).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_sum_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_sum_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -299,7 +299,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: see @ref uwvmint_i32_sum_loop_run.
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_i32_sum_loop_run(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_sum_loop_run(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -361,7 +361,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (sum f32), `local_offset_t` (i i32), `wasm_i32` (end).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_inv_square_sum_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_inv_square_sum_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -410,7 +410,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (sum f32), `local_offset_t` (i i32), `wasm_i32` (end).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_inv_cube_sum_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_inv_cube_sum_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -466,7 +466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (sum f32), `local_offset_t` (i i32), `local_offset_t` (prod f32), `local_offset_t` (ip4 i32), `wasm_i32` (end).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_mul_chain_sum_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_mul_chain_sum_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -533,7 +533,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     ///              `local_offset_t` (i1 i32), `wasm_i32` (end).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_f32_affine_inv_square_sum_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_affine_inv_square_sum_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -607,7 +607,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (ptr i32), `local_offset_t` (i i32), `native_memory_t*` (memory0), `wasm_i32` (end).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_test6_sin_table_fill_loop_run(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_test6_sin_table_fill_loop_run(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
         using wasm_u32 = conbine_details::wasm_u32;
@@ -682,7 +682,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (i i32), `wasm_i32` (step), `wasm_i32` (end), `::std::byte const*` (label ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_for_i32_inc_lt_u_br_if(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_for_i32_inc_lt_u_br_if(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
 
@@ -717,7 +717,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (i i32), `wasm_i32` (step), `wasm_i32` (end), `::std::byte const*` (label ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_for_i32_inc_lt_u_br_if(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_for_i32_inc_lt_u_br_if(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
 
@@ -753,7 +753,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (p i32), `local_offset_t` (pend i32), `wasm_i32` (step), `::std::byte const*` (label ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_for_ptr_inc_ne_br_if(Type... type) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_for_ptr_inc_ne_br_if(Type... type) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
 
@@ -789,7 +789,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - Immediates: `local_offset_t` (p i32), `local_offset_t` (pend i32), `wasm_i32` (step), `::std::byte const*` (label ip).
     template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
         requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_MACRO inline constexpr void uwvmint_for_ptr_inc_ne_br_if(TypeRef & ... typeref) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_for_ptr_inc_ne_br_if(TypeRef & ... typeref) UWVM_THROWS
     {
         using wasm_i32 = conbine_details::wasm_i32;
 
