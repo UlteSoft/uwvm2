@@ -347,10 +347,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     };
 
     template <uwvm_int_stack_top_type... Type>
-    using uwvm_interpreter_opfunc_t = UWVM_INTERPRETER_OPFUNC_TYPE_MACRO void (*)(Type... type) UWVM_THROWS;
+    using uwvm_interpreter_opfunc_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(Type... type) UWVM_THROWS;
 
     template <uwvm_int_stack_top_type... Type>
-    using uwvm_interpreter_opfunc_byref_t = UWVM_INTERPRETER_OPFUNC_TYPE_MACRO void (*)(Type&... type) UWVM_THROWS;
+    using uwvm_interpreter_opfunc_byref_t = void(UWVM_INTERPRETER_OPFUNC_TYPE_MACRO*)(Type & ... type) UWVM_THROWS;
 
     template <uwvm_interpreter_translate_option_t CompileOption,
               uwvm_int_stack_top_type GetType,
@@ -1316,20 +1316,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
               typename ValTuple,
               uwvm_int_stack_top_type... TypeRef>
         requires (::fast_io::is_tuple<ValTuple>)
-    UWVM_ALWAYS_INLINE inline constexpr ValTuple get_vals_from_operand_stack(TypeRef&... typeref) noexcept
-    {
-        return manipulate::get_vals_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...);
-    }
+    UWVM_ALWAYS_INLINE inline constexpr ValTuple get_vals_from_operand_stack(TypeRef & ... typeref) noexcept
+    { return manipulate::get_vals_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...); }
 
     template <uwvm_interpreter_translate_option_t CompileOption,
               uwvm_interpreter_stacktop_currpos_t CurrStackTop,
               typename ValTuple,
               uwvm_int_stack_top_type... TypeRef>
         requires (::fast_io::is_tuple<ValTuple>)
-    inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef&... typeref) noexcept
-    {
-        return manipulate::get_remain_size_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...);
-    }
+    inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef & ... typeref) noexcept
+    { return manipulate::get_remain_size_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...); }
 }
 
 #ifndef UWVM_MODULE
