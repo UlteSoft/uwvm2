@@ -2339,7 +2339,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const b{conbine_details::load_local<wasm_i32>(type...[2u], b_off)};
         wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(a, b)};
 
-# if defined(__aarch64__) || defined(__ARM_PCS_AAPCS64)
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
         // AArch64: prefer an explicit conditional branch so the indirect `br` sites become single-target on each path.
         // This tends to reduce indirect-branch predictor pressure for hot br_if-heavy loops.
         if(rem != wasm_i32{}) [[likely]]
@@ -2430,7 +2430,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
-# if defined(__aarch64__) || defined(__ARM_PCS_AAPCS64)
+        
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
         // AArch64: keep the loop hot path (lt == true) as a single-target indirect branch site.
         if(lt) [[likely]]
         {
