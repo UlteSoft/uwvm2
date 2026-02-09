@@ -52,9 +52,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
 #if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)  // GNUC, clang
     using wasm_v128 [[__gnu__::__vector_size__(16)]] = char;
 #elif (defined(_MSC_VER) && !defined(__clang__))  // MSVC
-# if defined(__ARM_NEON)
+# if defined(__ARM_NEON) || defined(_M_ARM64) || defined(_M_ARM64EC)
     using wasm_v128 = __n128;
-# elif defined(__x86_64__) || defined(_M_AMD64)
+# elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
     using wasm_v128 = __m128;
 # else  // armv7a, i686
     union alignas(16uz) wasm_v128

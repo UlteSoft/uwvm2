@@ -76,7 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::utils
 #if defined(_MSC_VER) && !defined(__clang__)
         if UWVM_IF_NOT_CONSTEVAL
         {
-# if defined(_M_X64)
+# if defined(_M_X64) && !(defined(_M_ARM64EC) || defined(__arm64ec__))
             if constexpr(::std::same_as<I, ::std::uint64_t>)
             {
                 ::std::uint64_t res;

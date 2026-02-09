@@ -319,7 +319,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # if defined(__ARMEB__) || defined(__ARM_BIG_ENDIAN)
                                 u8"EB"
 # endif
-#elif defined(__x86_64__) || defined(_M_AMD64)
+#elif (defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
                                 u8"x86_64"
 #elif defined(__i386__) || defined(_M_IX86)
 # if defined(_MSC_VER)
@@ -466,7 +466,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"CRC32 "
 #  endif
                                 u8"NEON "
-# elif defined(_M_AMD64)
+# elif defined(_M_AMD64) && !defined(_M_ARM64EC)
                                 u8"\nISA support: CRC32 MMX SSE SSE2 "
 # elif defined(_M_IX86_FP)
 #  if _M_IX86_FP == 2
@@ -508,7 +508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # if defined(__ARM_FEATURE_SME2)
                                 u8"SME2 "
 # endif
-#elif (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86)) &&                                                                   \
+#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && \
     (defined(__MMX__) || defined(__FMA__) || defined(__BMI__) || defined(__PRFCHW__) || defined(__CRC32__))
                                 u8"\nISA support: "
 # if defined(__CRC32__)

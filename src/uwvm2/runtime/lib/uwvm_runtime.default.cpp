@@ -846,14 +846,14 @@ namespace uwvm2::runtime::uwvm_int
             res.is_tail_call = true;
 #endif
 
-#if defined(__ARM_PCS_AAPCS64)
+#if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             // aarch64: aapcs64
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
-#elif (defined(__x86_64__) || defined(_M_AMD64)) &&                                                                                                            \
-    ((!defined(_WIN32)) || (defined(_WIN32) && (defined(__x86_64__) || defined(_M_AMD64)) && (defined(__GNUC__) || defined(__clang__))))
+#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                    \
+    (!defined(_WIN32) || (defined(__GNUC__) || defined(__clang__)))
             // x86_64: sysv abi
             // x86_64: sysv abi in ms abi
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
