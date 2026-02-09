@@ -275,16 +275,16 @@ FAST_IO_DLLIMPORT void *FAST_IO_WINSTDCALL RtlReAllocateHeap(void *, ::std::uint
 FAST_IO_DLLIMPORT ::std::size_t FAST_IO_WINSTDCALL RtlSizeHeap(void *, ::std::uint_least32_t, void *) noexcept FAST_IO_WINSTDCALL_RENAME(RtlSizeHeap, 12);
 
 #if (defined(__GNUC__) || defined(__clang__)) && \
-	(defined(__aarch64__) || defined(__arm64ec__))
+		(defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC))
 register ::fast_io::win32::nt::teb *fast_io_nt_current_teb __asm__("x18");
 #endif
 
 FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline peb *nt_get_current_peb() noexcept
 {
 #if (defined(__GNUC__) || defined(__clang__))
-#if defined(__aarch64__) || defined(__arm64ec__)
+#if defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC)
 	return ::fast_io::win32::nt::fast_io_nt_current_teb->ProcessEnvironmentBlock;
-#elif defined(__i386__) || defined(__x86_64__)
+#elif (defined(__i386__) || defined(__x86_64__)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
 	if constexpr (sizeof(::std::size_t) == sizeof(::std::uint_least64_t))
 	{
 		peb *ppeb;
@@ -316,7 +316,7 @@ FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline peb *nt_get_current_peb() noex
 #elif defined(_MSC_VER)
 #if defined(_M_ARM64) || defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::arm::__getReg(18))->ProcessEnvironmentBlock;
-#elif defined(_M_AMD64)
+#elif defined(_M_AMD64) && !defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::peb *>(::fast_io::intrinsics::msvc::x86::__readgsqword(0x60));
 #elif defined(_M_IX86)
 	return reinterpret_cast<::fast_io::win32::nt::peb *>(::fast_io::intrinsics::msvc::x86::__readfsdword(0x30));
@@ -331,9 +331,9 @@ FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline peb *nt_get_current_peb() noex
 FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline teb *nt_current_teb() noexcept
 {
 #if (defined(__GNUC__) || defined(__clang__))
-#if defined(__aarch64__) || defined(__arm64ec__)
+#if defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC)
 	return ::fast_io::win32::nt::fast_io_nt_current_teb;
-#elif defined(__i386__) || defined(__x86_64__)
+#elif (defined(__i386__) || defined(__x86_64__)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
 	if constexpr (sizeof(::std::size_t) == sizeof(::std::uint_least64_t))
 	{
 		teb *pteb;
@@ -365,7 +365,7 @@ FAST_IO_GNU_ALWAYS_INLINE_ARTIFICIAL_CONST inline teb *nt_current_teb() noexcept
 #elif defined(_MSC_VER)
 #if defined(_M_ARM64) || defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::arm::__getReg(18));
-#elif defined(_M_AMD64)
+#elif defined(_M_AMD64) && !defined(_M_ARM64EC)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::x86::__readgsqword(0x30));
 #elif defined(_M_IX86)
 	return reinterpret_cast<::fast_io::win32::nt::teb *>(::fast_io::intrinsics::msvc::x86::__readfsdword(0x18));

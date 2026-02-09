@@ -114,7 +114,8 @@
 #if defined(__ARM_ARCH) || defined(__TARGET_ARCH_ARM) ||                   \
     defined(__TARGET_ARCH_THUMB) || defined(_M_ARM) ||                     \
     defined(__arm__) || defined(__arm64) || defined(__thumb__) ||          \
-    defined(_M_ARM64) || defined(__aarch64__) || defined(__AARCH64EL__) || \
+    defined(_M_ARM64) || defined(_M_ARM64EC) || defined(__arm64ec__) ||    \
+    defined(__aarch64__) || defined(__AARCH64EL__) ||                      \
     defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__) ||                 \
     defined(__ARM_ARCH_7R__) || defined(__ARM_ARCH_7M__) ||                \
     defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) ||                \

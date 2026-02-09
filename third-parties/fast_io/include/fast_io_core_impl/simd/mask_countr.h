@@ -105,7 +105,7 @@ inline
 	if constexpr (sizeof(::fast_io::intrinsics::simd_vector<T, n>) == 16)
 	{
 #if defined(__has_builtin) && __has_cpp_attribute(__gnu__::__vector_size__)
-#if defined(__SSE2__) && defined(__x86_64__) && __has_builtin(__builtin_ia32_pmovmskb128)
+#if defined(__SSE2__) && defined(__x86_64__) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && __has_builtin(__builtin_ia32_pmovmskb128)
 		using x86_64_v16qi [[__gnu__::__vector_size__(16)]] = char;
 		::std::uint_least16_t const value{
 			static_cast<::std::uint_least16_t>(__builtin_ia32_pmovmskb128((x86_64_v16qi)vec.value))};
@@ -130,7 +130,7 @@ inline
 			d = static_cast<unsigned>(::std::countr_one(value));
 		}
 #endif
-#elif (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		if constexpr (::fast_io::details::cpu_flags::sse2_supported)
 		{
 			__m128i a = __builtin_bit_cast(__m128i, vec);
@@ -149,7 +149,7 @@ inline
 	else if constexpr (sizeof(::fast_io::intrinsics::simd_vector<T, n>) == 32)
 	{
 #if defined(__has_builtin) && __has_cpp_attribute(__gnu__::__vector_size__)
-#if defined(__AVX__) && defined(__x86_64__) && __has_builtin(__builtin_ia32_pmovmskb256)
+#if defined(__AVX__) && defined(__x86_64__) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && __has_builtin(__builtin_ia32_pmovmskb256)
 		using x86_64_v32qi [[__gnu__::__vector_size__(32)]] = char;
 		::std::uint_least32_t const value{
 			static_cast<::std::uint_least32_t>(__builtin_ia32_pmovmskb256((x86_64_v32qi)vec.value))};
@@ -162,7 +162,7 @@ inline
 			d = static_cast<unsigned>(::std::countr_one(value));
 		}
 #endif
-#elif (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		if constexpr (::fast_io::details::cpu_flags::avx2_supported)
 		{
 			__m256i a = __builtin_bit_cast(__m256i, vec);

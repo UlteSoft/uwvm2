@@ -181,7 +181,8 @@ inline
 }
 
 #if defined(FAST_IO_ARM_SHA) && \
-	(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM))
+	(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(__arm64ec__) || \
+	 defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC))
 inline void sha1_arm_function(::std::uint_least32_t *__restrict state, ::std::byte const *__restrict blocks_start,
 							  ::std::size_t blocks_bytes) noexcept
 {
@@ -535,7 +536,8 @@ inline void sha1_do_function(::std::uint_least32_t *__restrict state, ::std::byt
 	simd_vector<int, 4>{abcd[3], abcd[2], abcd[1], abcd[0]}.store(state);
 	state[4] = static_cast<::std::uint_least32_t>(e0.back());
 #elif defined(FAST_IO_ARM_SHA) && \
-	(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM))
+		(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(__arm64ec__) || \
+		 defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC))
 	sha1_arm_function(state, blocks_start, blocks_bytes);
 #else
 	sha1_do_constexpr_function(state, blocks_start, blocks_bytes);
@@ -722,7 +724,8 @@ inline void sha1_do_function(::std::uint_least32_t *__restrict state, ::std::byt
 	_mm_storeu_si128((__m128i *)state, ABCD);
 	state[4] = _mm_extract_epi32(E0, 3);
 #elif defined(FAST_IO_ARM_SHA) && \
-	(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM))
+		(defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(__arm64ec__) || \
+		 defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC))
 	sha1_arm_function(state, blocks_start, blocks_bytes);
 #else
 	sha1_do_constexpr_function(state, blocks_start, blocks_bytes);

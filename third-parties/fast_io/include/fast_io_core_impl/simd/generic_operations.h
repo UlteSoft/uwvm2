@@ -1,9 +1,9 @@
 ﻿#pragma once
 
 #if !defined(_MSC_VER) || defined(__clang__)
-#if defined(__x86_64__) || defined(__i386__)
+#if ((defined(__x86_64__) || defined(__i386__)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 #include <immintrin.h>
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 #include <arm_neon.h>
 #endif
 #endif
@@ -119,7 +119,7 @@ wrap_add_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -265,7 +265,7 @@ wrap_add_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -336,7 +336,7 @@ wrap_add_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 						float32x2_t bmm = __builtin_bit_cast(float32x2_t, b);
 						return __builtin_bit_cast(vec_type, vadd_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x1_t amm = __builtin_bit_cast(float64x1_t, a);
@@ -353,7 +353,7 @@ wrap_add_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 						float32x4_t bmm = __builtin_bit_cast(float32x4_t, b);
 						return __builtin_bit_cast(vec_type, vaddq_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x2_t amm = __builtin_bit_cast(float64x2_t, a);
@@ -392,7 +392,7 @@ wrap_sub_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
@@ -539,7 +539,7 @@ wrap_sub_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -610,7 +610,7 @@ wrap_sub_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 						float32x2_t bmm = __builtin_bit_cast(float32x2_t, b);
 						return __builtin_bit_cast(vec_type, vsub_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x1_t amm = __builtin_bit_cast(float64x1_t, a);
@@ -627,7 +627,7 @@ wrap_sub_common(::fast_io::intrinsics::simd_vector<T, N> const &a,
 						float32x4_t bmm = __builtin_bit_cast(float32x4_t, b);
 						return __builtin_bit_cast(vec_type, vsubq_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x2_t amm = __builtin_bit_cast(float64x2_t, a);
@@ -718,7 +718,7 @@ inline constexpr simd_vector<T, N> operator*(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -858,7 +858,7 @@ inline constexpr simd_vector<T, N> operator*(simd_vector<T, N> const &a, simd_ve
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -962,7 +962,7 @@ inline constexpr simd_vector<T, N> operator*(simd_vector<T, N> const &a, simd_ve
 						float32x2_t bmm = __builtin_bit_cast(float32x2_t, b);
 						return __builtin_bit_cast(vec_type, vmul_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x1_t amm = __builtin_bit_cast(float64x1_t, a);
@@ -979,7 +979,7 @@ inline constexpr simd_vector<T, N> operator*(simd_vector<T, N> const &a, simd_ve
 						float32x4_t bmm = __builtin_bit_cast(float32x4_t, b);
 						return __builtin_bit_cast(vec_type, vmulq_f32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == sizeof(double))
 					{
 						float64x2_t amm = __builtin_bit_cast(float64x2_t, a);
@@ -1004,7 +1004,7 @@ inline constexpr simd_vector<T, N> operator/(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -1171,11 +1171,11 @@ inline constexpr simd_vector<T, N> operator/(simd_vector<T, N> const &a, simd_ve
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 			if constexpr (::std::floating_point<T>)
 			{
 				if constexpr (sizeof(vec_type) == 8)
@@ -1225,7 +1225,7 @@ inline constexpr simd_vector<T, N> operator&(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -1254,7 +1254,7 @@ inline constexpr simd_vector<T, N> operator&(simd_vector<T, N> const &a, simd_ve
 				return __builtin_bit_cast(vec_type, _mm512_and_epi32(amm, bmm));
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -1387,7 +1387,7 @@ inline constexpr simd_vector<T, N> operator|(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -1416,7 +1416,7 @@ inline constexpr simd_vector<T, N> operator|(simd_vector<T, N> const &a, simd_ve
 				return __builtin_bit_cast(vec_type, _mm512_or_epi32(amm, bmm));
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -1549,7 +1549,7 @@ inline constexpr simd_vector<T, N> operator^(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -1578,7 +1578,7 @@ inline constexpr simd_vector<T, N> operator^(simd_vector<T, N> const &a, simd_ve
 				return __builtin_bit_cast(vec_type, _mm512_xor_epi32(amm, bmm));
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -1711,8 +1711,8 @@ inline constexpr simd_vector<T, N> operator<<(simd_vector<T, N> const &a, simd_v
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -1858,7 +1858,7 @@ inline constexpr simd_vector<T, N> operator<<(simd_vector<T, N> const &a, unsign
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (2 <= sizeof(T) && sizeof(T) <= 8)
 		{
@@ -1944,7 +1944,7 @@ inline constexpr simd_vector<T, N> operator<<(simd_vector<T, N> const &a, unsign
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -2061,7 +2061,7 @@ inline constexpr simd_vector<T, N> operator>>(simd_vector<T, N> const &a, unsign
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (2 <= sizeof(T) && sizeof(T) <= 8)
 		{
@@ -2147,7 +2147,7 @@ inline constexpr simd_vector<T, N> operator>>(simd_vector<T, N> const &a, unsign
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -2264,7 +2264,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -2544,7 +2544,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -2570,7 +2570,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vclt_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -2599,7 +2599,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcltq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -2631,7 +2631,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vclt_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -2660,7 +2660,7 @@ inline constexpr simd_vector<T, N> operator<(simd_vector<T, N> const &a, simd_ve
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcltq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -2685,7 +2685,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -2965,7 +2965,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -2991,7 +2991,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcgt_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3020,7 +3020,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcgtq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3052,7 +3052,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcgt_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3081,7 +3081,7 @@ inline constexpr simd_vector<T, N> operator>(simd_vector<T, N> const &a, simd_ve
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcgtq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3106,7 +3106,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -3303,7 +3303,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -3329,7 +3329,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcle_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3358,7 +3358,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcleq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3390,7 +3390,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcle_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3419,7 +3419,7 @@ inline constexpr simd_vector<T, N> operator<=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcleq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3444,7 +3444,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = ::fast_io::intrinsics::simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -3645,7 +3645,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 				}
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -3671,7 +3671,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcge_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3700,7 +3700,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcgeq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3732,7 +3732,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vcge_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3761,7 +3761,7 @@ inline constexpr simd_vector<T, N> operator>=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vcgeq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3786,7 +3786,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 	if (!__builtin_is_constant_evaluated())
 #endif
 	{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 		using vec_type = simd_vector<T, N>;
 		if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 		{
@@ -3851,7 +3851,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 				return __builtin_bit_cast(vec_type, _mm512_movm_epi64(_mm512_cmpeq_epi64_mask(amm, bmm)));
 			}
 		}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 		using vec_type = simd_vector<T, N>;
 		if constexpr (::fast_io::details::cpu_flags::armneon_supported)
 		{
@@ -3877,7 +3877,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vceq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3906,7 +3906,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vceqq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -3938,7 +3938,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vceq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -3967,7 +3967,7 @@ inline constexpr simd_vector<T, N> operator==(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vceqq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -4004,7 +4004,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 		if (!__builtin_is_constant_evaluated())
 #endif
 		{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 			if constexpr (using_avx512)
 			{
 				if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
@@ -4071,7 +4071,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 					}
 				}
 			}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 			using vec_type = simd_vector<T, N>;
 			if constexpr (::std::signed_integral<T>)
 			{
@@ -4095,7 +4095,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vtst_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -4124,7 +4124,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vtstq_s32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);
@@ -4156,7 +4156,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 						uint32x2_t bmm = __builtin_bit_cast(uint32x2_t, b);
 						return __builtin_bit_cast(vec_type, vtst_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x1_t amm = __builtin_bit_cast(uint64x1_t, a);
@@ -4185,7 +4185,7 @@ inline constexpr simd_vector<T, N> operator!=(simd_vector<T, N> const &a, simd_v
 						uint32x4_t bmm = __builtin_bit_cast(uint32x4_t, b);
 						return __builtin_bit_cast(vec_type, vtstq_u32(amm, bmm));
 					}
-#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
 					else if constexpr (sizeof(T) == 8)
 					{
 						uint64x2_t amm = __builtin_bit_cast(uint64x2_t, a);

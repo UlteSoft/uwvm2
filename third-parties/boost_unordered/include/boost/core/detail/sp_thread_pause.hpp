@@ -29,21 +29,21 @@
 
 # define BOOST_CORE_SP_PAUSE() __builtin_ia32_pause()
 
-#elif defined(_MSC_VER) && ( defined(_M_IX86) || defined(_M_X64) )
+#elif defined(_MSC_VER) && (( defined(_M_IX86) || defined(_M_X64) ) && !defined(_M_ARM64EC))
 
 # include <intrin.h>
 # define BOOST_CORE_SP_PAUSE() _mm_pause()
 
-#elif defined(_MSC_VER) && ( defined(_M_ARM) || defined(_M_ARM64) )
+#elif defined(_MSC_VER) && ( defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC) )
 
 # include <intrin.h>
 # define BOOST_CORE_SP_PAUSE() __yield()
 
-#elif defined(__GNUC__) && ( defined(__i386__) || defined(__x86_64__) )
+#elif defined(__GNUC__) && (( defined(__i386__) || defined(__x86_64__) ) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 
 # define BOOST_CORE_SP_PAUSE() __asm__ __volatile__( "rep; nop" : : : "memory" )
 
-#elif defined(__GNUC__) && ( (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__) || defined(__aarch64__) )
+#elif defined(__GNUC__) && ( (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__) || defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64EC) )
 
 # define BOOST_CORE_SP_PAUSE() __asm__ __volatile__( "yield" : : : "memory" )
 

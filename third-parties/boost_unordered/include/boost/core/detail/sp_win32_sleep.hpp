@@ -28,7 +28,7 @@ namespace detail
 
 #if !defined( BOOST_USE_WINDOWS_H )
 
-#if defined(__clang__) && defined(__x86_64__)
+#if defined(__clang__) && defined(_WIN64)
 // clang x64 warns that __stdcall is ignored
 # define BOOST_CORE_SP_STDCALL
 #else

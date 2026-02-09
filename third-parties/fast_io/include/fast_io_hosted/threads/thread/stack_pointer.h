@@ -30,13 +30,13 @@ inline void *get_stack_pointer() noexcept
 #endif
 		;
 
-#if defined(__x86_64__) && !defined(__arm64ec__)
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 	__asm__ volatile("movq %%rsp, %0" : "=r"(result));
-#elif defined(__i386__)
+#elif defined(__i386__) || defined(_M_IX86)
 	__asm__ volatile("movl %%esp, %0" : "=r"(result));
-#elif defined(__aarch64__) || defined(__arm64ec__)
+#elif defined(__aarch64__) || defined(__arm64ec__) || defined(_M_ARM64) || defined(_M_ARM64EC)
 	__asm__ volatile("mov %0, sp" : "=r"(result));
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(_M_ARM)
 	__asm__ volatile("mov %0, sp" : "=r"(result));
 #elif defined(__loongarch__)
 	__asm__ volatile("move %0, $sp" : "=r"(result));
