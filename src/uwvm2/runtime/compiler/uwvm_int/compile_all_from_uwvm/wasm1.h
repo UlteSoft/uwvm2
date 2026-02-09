@@ -461,7 +461,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const operand_stack_push{[&](curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                           {
-                                              operand_stack.push_back({vt});
+                                              // Hot path: avoid the checked `push_back()` in fast_io::vector.
+                                              if(operand_stack.size() == operand_stack.capacity())
+                                              {
+                                                  operand_stack.reserve(operand_stack.capacity() ? operand_stack.capacity() * 2uz : 64uz);
+                                              }
+                                              operand_stack.push_back_unchecked({vt});
                                               auto const add{operand_stack_valtype_size(vt)};
                                               if(add == 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                                               if(add > (::std::numeric_limits<::std::size_t>::max() - operand_stack_bytes)) [[unlikely]]
@@ -5626,7 +5631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                 // Combine state: only fuse if the next opcode is immediately `br_if`.
-                if(curr_opbase != wasm1_code::br_if)
+                if(br_if_fuse.kind != br_if_fuse_kind::none && curr_opbase != wasm1_code::br_if) [[unlikely]]
                 {
                     br_if_fuse.kind = br_if_fuse_kind::none;
                     br_if_fuse.site = SIZE_MAX;
@@ -5635,14 +5640,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 }
 
                 // Conbine state machine: flush pending ops unless the current opcode can continue the fusion.
-                if(!conbine_can_continue(curr_opbase)) { flush_conbine_pending(); }
+                if(conbine_pending.kind != conbine_pending_kind::none && !conbine_can_continue(curr_opbase)) [[unlikely]] { flush_conbine_pending(); }
 #endif
 
-                auto const bytecode_before{bytecode.size()};
-                auto const thunks_before{thunks.size()};
-                auto const opfunc_main_before{runtime_log_stats.opfunc_main_count};
-                auto const opfunc_thunk_before{runtime_log_stats.opfunc_thunk_count};
-                runtime_log_wasm_op_state(u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                ::std::size_t bytecode_before{};
+                ::std::size_t thunks_before{};
+                ::std::uint_least64_t opfunc_main_before{};
+                ::std::uint_least64_t opfunc_thunk_before{};
+                
+                if(runtime_log_on) [[unlikely]]
+                {
+                    bytecode_before = bytecode.size();
+                    thunks_before = thunks.size();
+                    opfunc_main_before = runtime_log_stats.opfunc_main_count;
+                    opfunc_thunk_before = runtime_log_stats.opfunc_thunk_count;
+                    runtime_log_wasm_op_state(
+                        u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                }
 
                 switch(curr_opbase)
                 {
@@ -16637,7 +16651,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                 }
 
-                runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                if(runtime_log_on) [[unlikely]]
+                {
+                    runtime_log_wasm_op_state(
+                        u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                }
 
                 if(finished_current_func) { break; }
                 if(!is_polymorphic)
