@@ -847,12 +847,12 @@ namespace uwvm2::runtime::uwvm_int
 #endif
 
 #if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
-            // aarch64: aapcs64
+            // aarch64: AAPCS64 (x0-x7 integer args, v0-v7 fp/simd args)
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
-#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                    \
+#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                     \
     (!defined(_WIN32) || (defined(__GNUC__) || defined(__clang__)))
             // x86_64: sysv abi
             // x86_64: sysv abi in ms abi
@@ -860,7 +860,67 @@ namespace uwvm2::runtime::uwvm_int
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 6uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 14uz;
-#else
+#elif defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                  \
+    !(defined(__GNUC__) || defined(__clang__))
+            // x86_64: Windows x64 (MS ABI) (rcx/rdx/r8/r9, xmm0-xmm3)
+            // Note: This ABI provides only 4 argument slots. After the 3 fixed interpreter args, it cannot fit the Wasm1 minimum
+            // stack-top rings (i32>=3, i64/f32/f64>=2) without spilling cache values to memory, which tends to negate the benefit.
+            // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
+#elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
+            // powerpc64: SysV ELF (r3-r10 integer args, VSX for fp/simd)
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+# if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
+            // riscv64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring in the integer register file.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+# else
+            // riscv64: psABI (a0-a7 integer args, fa0-fa7 fp args). Keep v128 caching off by default:
+            // `wasm_v128` argument passing is not consistently vector-reg based across toolchains/ABIs.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
+# endif
+#elif defined(__loongarch__) && defined(__loongarch64)
+# if defined(__loongarch_soft_float) || defined(__loongarch_single_float)
+            // loongarch64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+# else
+            // loongarch64: LP64D (a0-a7 integer args, fa0-fa7 fp args). Keep v128 caching off by default:
+            // `wasm_v128` argument passing may be lowered to GPR pairs/stack depending on ABI + vector extension.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
+# endif
+#elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+            // MIPS ABIs are slot-based: fp args are only register-passed while they remain within the ABI's argument slots.
+            // We conservatively target the 8-slot N32/N64 ABIs; O32 has only 4 slots and cannot satisfy Wasm1's minimum ring sizes without heavy spilling.
+# if defined(__mips_n32) || defined(__mips_n64)
+#  if defined(__mips_soft_float)
+            // N32/N64 soft-float: use a scalar4-merged ring in the integer slots (fits in the 8 arg slots).
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+#  else
+            // N32/N64 hard-float: keep total args within 8 slots so fp values still use FPRs.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+#  endif
+# endif
+#elif defined(__s390x__)
+            // s390x: Linux ABI (r2-r6 integer args, f0/f2/... fp args). Keep v128 caching off by default:
+            // 16-byte vectors can be passed indirectly by pointer.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
+            res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
+            res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
 #endif
 
             return res;

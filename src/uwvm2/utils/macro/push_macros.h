@@ -606,3 +606,17 @@
 #else
 # define UWVM_NOINLINE
 #endif
+
+#pragma push_macro("UWVM_FASTCALL")
+#undef UWVM_FASTCALL
+#if defined(__i386__) || defined(_M_IX86)
+# if (defined(_MSC_VER) && !defined(__clang__)) && !UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__) && !defined(__WINE__)
+#  define UWVM_FASTCALL __fastcall
+# elif (defined(__clang__) || defined(__GNUC__)) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__)
+#  define UWVM_FASTCALL __attribute__((__fastcall__))
+# else
+#  define UWVM_FASTCALL
+# endif
+#else
+# define UWVM_FASTCALL
+#endif
