@@ -343,6 +343,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
         storage.local_funcs.reserve(local_func_count);
 
+        // Reuse translation temporaries across functions to avoid repeated heap allocations.
+        using curr_block_type = block_t;
+        ::uwvm2::utils::container::vector<curr_block_type> control_flow_stack{};
+
+        using curr_operand_stack_value_type = wasm_value_type;
+        using curr_operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t>;
+        curr_operand_stack_type operand_stack{};
+        // Codegen operand stack (type-only): tracks the operand-stack types for the **emitted bytecode**.
+        // This is required for stack-top caching spill/fill typing because conbine may validate ahead of codegen.
+        curr_operand_stack_type codegen_operand_stack{};
+
+        ::uwvm2::utils::container::vector<::std::size_t> local_offsets{};
+
         for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; ++local_function_idx)
         {
             ::std::size_t const function_index{import_func_count + local_function_idx};
@@ -399,17 +412,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             }
 #endif
 
-            // control-flow stack
-            using curr_block_type = block_t;
-            ::uwvm2::utils::container::vector<curr_block_type> control_flow_stack{};
-
-            // operand stack
-            using curr_operand_stack_value_type = wasm_value_type;
-            using curr_operand_stack_type = ::uwvm2::utils::container::vector<operand_stack_storage_t>;
-            curr_operand_stack_type operand_stack{};
-            // Codegen operand stack (type-only): tracks the operand-stack types for the **emitted bytecode**.
-            // This is required for stack-top caching spill/fill typing because conbine may validate ahead of codegen.
-            curr_operand_stack_type codegen_operand_stack{};
+            // Reset per-function translation temporaries.
+            control_flow_stack.clear();
+            operand_stack.clear();
+            codegen_operand_stack.clear();
             bool is_polymorphic{};
 
             ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
@@ -459,6 +465,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             // Maintained incrementally to avoid O(n^2) rescans during compilation.
             ::std::size_t operand_stack_bytes{};
 
+            // Runtime operand stack maximum (for allocation sizing).
+            // Track on-demand (push/restore) instead of per-op to reduce translator overhead.
+            ::std::size_t runtime_operand_stack_max{};
+            ::std::size_t runtime_operand_stack_byte_max{};
+
             auto const operand_stack_push{[&](curr_operand_stack_value_type vt) constexpr UWVM_THROWS
                                           {
                                               // Hot path: avoid the checked `push_back()` in fast_io::vector.
@@ -474,6 +485,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                   ::fast_io::fast_terminate();
                                               }
                                               operand_stack_bytes += add;
+
+                                              if(!is_polymorphic) [[likely]]
+                                              {
+                                                  auto const sz{operand_stack.size()};
+                                                  if(sz > runtime_operand_stack_max) { runtime_operand_stack_max = sz; }
+                                                  if(operand_stack_bytes > runtime_operand_stack_byte_max)
+                                                  {
+                                                      runtime_operand_stack_byte_max = operand_stack_bytes;
+                                                  }
+                                              }
                                           }};
 
             auto const operand_stack_pop_unchecked{[&]() constexpr noexcept
@@ -514,11 +535,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                       }
                                                                       operand_stack_bytes += add;
                                                                   }
+
+                                                                  if(!is_polymorphic) [[likely]]
+                                                                  {
+                                                                      auto const sz{operand_stack.size()};
+                                                                      if(sz > runtime_operand_stack_max) { runtime_operand_stack_max = sz; }
+                                                                      if(operand_stack_bytes > runtime_operand_stack_byte_max)
+                                                                      {
+                                                                          runtime_operand_stack_byte_max = operand_stack_bytes;
+                                                                      }
+                                                                  }
                                                               }};
 
             // Local storage is byte-packed too (same scalar sizes). We emit local offsets as immediates, so runtime only
             // needs the total local byte size to allocate and zero-initialize.
-            ::uwvm2::utils::container::vector<local_offset_t> local_offsets{};
             local_offsets.resize(static_cast<::std::size_t>(all_local_count_with_internal));
 
             auto const local_bytes_add{[&](local_offset_t& acc, local_offset_t add) constexpr noexcept
@@ -5591,8 +5621,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #endif
                                                  }};
 
-            ::std::size_t runtime_operand_stack_max{};
-            ::std::size_t runtime_operand_stack_byte_max{};
             bool finished_current_func{};
 
             for(;;)
@@ -5647,15 +5675,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 ::std::size_t thunks_before{};
                 ::std::uint_least64_t opfunc_main_before{};
                 ::std::uint_least64_t opfunc_thunk_before{};
-                
+
                 if(runtime_log_on) [[unlikely]]
                 {
                     bytecode_before = bytecode.size();
                     thunks_before = thunks.size();
                     opfunc_main_before = runtime_log_stats.opfunc_main_count;
                     opfunc_thunk_before = runtime_log_stats.opfunc_thunk_count;
-                    runtime_log_wasm_op_state(
-                        u8"wasm.op.before", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                    runtime_log_wasm_op_state(u8"wasm.op.before",
+                                              curr_opbase,
+                                              op_begin,
+                                              bytecode_before,
+                                              thunks_before,
+                                              opfunc_main_before,
+                                              opfunc_thunk_before);
                 }
 
                 switch(curr_opbase)
@@ -16653,16 +16686,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                 if(runtime_log_on) [[unlikely]]
                 {
-                    runtime_log_wasm_op_state(
-                        u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
+                    runtime_log_wasm_op_state(u8"wasm.op.after",
+                                              curr_opbase,
+                                              op_begin,
+                                              bytecode_before,
+                                              thunks_before,
+                                              opfunc_main_before,
+                                              opfunc_thunk_before);
                 }
 
                 if(finished_current_func) { break; }
-                if(!is_polymorphic)
-                {
-                    runtime_operand_stack_max = ::std::max(runtime_operand_stack_max, operand_stack.size());
-                    runtime_operand_stack_byte_max = ::std::max(runtime_operand_stack_byte_max, operand_stack_bytes);
-                }
             }
         }
 
