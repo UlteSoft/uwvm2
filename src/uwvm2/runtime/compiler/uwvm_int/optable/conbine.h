@@ -1128,8 +1128,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
 
         static_assert(ParamCount != 0uz, "stacktop call fast-path expects ParamCount >= 1.");
-        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_i32>,
-                      "stacktop i32 call fast-path currently supports RetT = void or wasm_i32.");
+        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_i32>, "stacktop i32 call fast-path currently supports RetT = void or wasm_i32.");
 
         constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
         constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
@@ -1165,13 +1164,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Write params in canonical memory order (param0 .. paramN-1).
         [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
         {
-            (([&]() constexpr UWVM_THROWS
-              {
-                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
-                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
-                  wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
-                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
-              }()),
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
              ...);
         }(::std::make_index_sequence<ParamCount>{});
 
@@ -1261,13 +1261,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Write params in canonical memory order (param0 .. paramN-1).
         [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
         {
-            (([&]() constexpr UWVM_THROWS
-              {
-                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
-                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f32_stack_top, steps, begin, end>()};
-                  wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, pos>(type...)};
-                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f32)), ::std::addressof(v), sizeof(v));
-              }()),
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f32_stack_top, steps, begin, end>()};
+                     wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f32)), ::std::addressof(v), sizeof(v));
+                 }()),
              ...);
         }(::std::make_index_sequence<ParamCount>{});
 
@@ -1354,13 +1355,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Write params in canonical memory order (param0 .. paramN-1).
         [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
         {
-            (([&]() constexpr UWVM_THROWS
-              {
-                  constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
-                  constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f64_stack_top, steps, begin, end>()};
-                  wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, pos>(type...)};
-                  ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f64)), ::std::addressof(v), sizeof(v));
-              }()),
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_f64_stack_top, steps, begin, end>()};
+                     wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_f64)), ::std::addressof(v), sizeof(v));
+                 }()),
              ...);
         }(::std::make_index_sequence<ParamCount>{});
 
@@ -2043,11 +2045,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         type...[0] += sizeof(jmp_ip);
 
         wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split fallthrough / jump into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(v != wasm_i32{}) [[likely]]
+        {
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        type...[0] = jmp_ip;
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# else
         if(v == wasm_i32{}) { type...[0] = jmp_ip; }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused `br_if` using `eqz` test (byref).
@@ -2101,6 +2118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i32>()};
@@ -2110,18 +2128,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...)};
-            if(details::eval_int_cmp<Cmp, wasm_i32, conbine_details::wasm_u32>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_int_cmp<Cmp, wasm_i32, conbine_details::wasm_u32>(lhs, rhs);
         }
         else
         {
             wasm_i32 const rhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
             wasm_i32 const lhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
-            if(details::eval_int_cmp<Cmp, wasm_i32, conbine_details::wasm_u32>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_int_cmp<Cmp, wasm_i32, conbine_details::wasm_u32>(lhs, rhs);
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2270,11 +2305,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         type...[0] += sizeof(jmp_ip);
 
         wasm_i64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split fallthrough / jump into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(v != wasm_i64{}) [[likely]]
+        {
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        type...[0] = jmp_ip;
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# else
         if(v == wasm_i64{}) { type...[0] = jmp_ip; }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused `br_if` using `eqz` test (byref).
@@ -2328,6 +2378,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_i64>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i64>()};
@@ -2337,18 +2388,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
             wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...)};
-            if(details::eval_int_cmp<Cmp, wasm_i64, conbine_details::wasm_u64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_int_cmp<Cmp, wasm_i64, conbine_details::wasm_u64>(lhs, rhs);
         }
         else
         {
             wasm_i64 const rhs{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
             wasm_i64 const lhs{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
-            if(details::eval_int_cmp<Cmp, wasm_i64, conbine_details::wasm_u64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_int_cmp<Cmp, wasm_i64, conbine_details::wasm_u64>(lhs, rhs);
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2437,6 +2505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_i32>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i32>()};
@@ -2446,18 +2515,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...)};
-            if((lhs & rhs) != wasm_i32{}) { type...[0] = jmp_ip; }
+            take_branch = ((lhs & rhs) != wasm_i32{});
         }
         else
         {
             wasm_i32 const rhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
             wasm_i32 const lhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
-            if((lhs & rhs) != wasm_i32{}) { type...[0] = jmp_ip; }
+            take_branch = ((lhs & rhs) != wasm_i32{});
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused conditional branch entrypoint `uwvmint_br_if_i32_and_nz` (byref).
@@ -2516,11 +2602,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         type...[0] += sizeof(jmp_ip);
 
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split fallthrough / jump into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(x != wasm_i32{}) [[likely]]
+        {
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        type...[0] = jmp_ip;
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# else
         if(x == wasm_i32{}) { type...[0] = jmp_ip; }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused `br_if` using `eqz` test (byref).
@@ -2583,11 +2684,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         type...[0] += sizeof(jmp_ip);
 
         wasm_i32 const x{conbine_details::load_local<wasm_i32>(type...[2u], local_off)};
-        if(details::eval_int_cmp<Cmp, wasm_i32, wasm_u32>(x, imm)) { type...[0] = jmp_ip; }
+        bool const take_branch{details::eval_int_cmp<Cmp, wasm_i32, wasm_u32>(x, imm)};
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused `local.get` + immediate compare + `br_if` (byref).
@@ -2684,11 +2802,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
         conbine_details::store_local(type...[2u], local_off, v);
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(v != wasm_i32{}) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# else
         if(v != wasm_i32{}) { type...[0] = jmp_ip; }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused `local.tee` + non-zero test + `br_if` (byref).
@@ -4210,15 +4343,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
             static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-            {
-                return uwvmint_call_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>;
-            }
+            { return uwvmint_call_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...>
-            get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             return details::select_stacktop_fptr_or_default_conbine<CompileOption,
                                                                     CompileOption.i32_stack_top_begin_pos,
@@ -4229,12 +4359,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto
-            get_uwvmint_call_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        {
-            return get_uwvmint_call_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
-        }
+        inline constexpr auto get_uwvmint_call_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
 
         template <::std::size_t ParamCount, typename RetT>
         struct call_stacktop_f32_op
@@ -4242,15 +4369,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
             static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-            {
-                return uwvmint_call_stacktop_f32<CompileOption, Curr, ParamCount, RetT, Type...>;
-            }
+            { return uwvmint_call_stacktop_f32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...>
-            get_uwvmint_call_stacktop_f32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_f32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             return details::select_stacktop_fptr_or_default_conbine<CompileOption,
                                                                     CompileOption.f32_stack_top_begin_pos,
@@ -4261,12 +4385,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto
-            get_uwvmint_call_stacktop_f32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        {
-            return get_uwvmint_call_stacktop_f32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
-        }
+        inline constexpr auto get_uwvmint_call_stacktop_f32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_f32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
 
         template <::std::size_t ParamCount, typename RetT>
         struct call_stacktop_f64_op
@@ -4274,15 +4395,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
                 requires (CompileOption.is_tail_call)
             static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
-            {
-                return uwvmint_call_stacktop_f64<CompileOption, Curr, ParamCount, RetT, Type...>;
-            }
+            { return uwvmint_call_stacktop_f64<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...>
-            get_uwvmint_call_stacktop_f64_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_f64_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
             return details::select_stacktop_fptr_or_default_conbine<CompileOption,
                                                                     CompileOption.f64_stack_top_begin_pos,
@@ -4293,12 +4411,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
-        inline constexpr auto
-            get_uwvmint_call_stacktop_f64_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                         ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        {
-            return get_uwvmint_call_stacktop_f64_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr);
-        }
+        inline constexpr auto get_uwvmint_call_stacktop_f64_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_f64_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)

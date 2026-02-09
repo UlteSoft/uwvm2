@@ -130,8 +130,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(n, i)};
             if(rem == wasm_i32{})
             {
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+                // AArch64: return immediately on the taken break so the indirect-branch site is single-target on each path.
+                conbine_details::store_local(type...[2u], i_off, i);
+                type...[0] = break_ip;
+
+                uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+                ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+                UWVM_MUSTTAIL return next_interpreter(type...);
+# else
                 type...[0] = break_ip;
                 break;
+# endif
             }
 
             i = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step);
@@ -703,11 +713,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const i{conbine_details::load_local<wasm_i32>(type...[2u], i_off)};
         wasm_i32 const next_i{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step)};
         conbine_details::store_local(type...[2u], i_off, next_i);
-        if(details::eval_int_cmp<details::int_cmp::lt_u, wasm_i32, conbine_details::wasm_u32>(next_i, end)) { type...[0] = jmp_ip; }
+        bool const take_branch{details::eval_int_cmp<details::int_cmp::lt_u, wasm_i32, conbine_details::wasm_u32>(next_i, end)};
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_for_i32_inc_lt_u_br_if` (byref).
@@ -775,11 +802,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const pend{conbine_details::load_local<wasm_i32>(type...[2u], pend_off)};
         wasm_i32 const next_p{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(p, step)};
         conbine_details::store_local(type...[2u], p_off, next_p);
-        if(details::eval_int_cmp<details::int_cmp::ne, wasm_i32, conbine_details::wasm_u32>(next_p, pend)) { type...[0] = jmp_ip; }
+        bool const take_branch{details::eval_int_cmp<details::int_cmp::ne, wasm_i32, conbine_details::wasm_u32>(next_p, pend)};
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
+        if(take_branch) [[likely]]
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_for_ptr_inc_ne_br_if` (byref).
@@ -879,28 +923,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&)
-            noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return uwvmint_f32_affine_inv_square_sum_loop_run<CompileOption, Type...>; }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&)
-            noexcept
+                                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f32_affine_inv_square_sum_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_test6_sin_table_fill_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&)
-            noexcept
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_test6_sin_table_fill_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return uwvmint_test6_sin_table_fill_loop_run<CompileOption, Type...>; }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_test6_sin_table_fill_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
-                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&)
-            noexcept
+                                                                                        ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_test6_sin_table_fill_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
 
         // loop skeletons
