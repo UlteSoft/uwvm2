@@ -11578,7 +11578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
                         {
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                             if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                             {
                                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
@@ -11623,7 +11623,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
                         {
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                             if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                             {
                                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
@@ -11668,7 +11668,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
                         {
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                             if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                             {
                                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
