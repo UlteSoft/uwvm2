@@ -3859,6 +3859,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 local_get_eqz_i32,
                 local_get_const_i32,
                 local_get_const_i64,
+                const_i32,
+                const_i64,
                 local_get_const_i32_cmp_brif,
                 local_get_const_i32_add,
                 local_get_const_i32_add_localget,
@@ -3989,6 +3991,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              case conbine_pending_kind::local_get_eqz_i32: return u8"local_get_eqz_i32";
                                                              case conbine_pending_kind::local_get_const_i32: return u8"local_get_const_i32";
                                                              case conbine_pending_kind::local_get_const_i64: return u8"local_get_const_i64";
+                                                             case conbine_pending_kind::const_i32: return u8"const_i32";
+                                                             case conbine_pending_kind::const_i64: return u8"const_i64";
                                                              case conbine_pending_kind::local_get_const_i32_cmp_brif: return u8"local_get_const_i32_cmp_brif";
                                                              case conbine_pending_kind::local_get_const_i32_add: return u8"local_get_const_i32_add";
                                                              case conbine_pending_kind::local_get_const_i32_add_localget:
@@ -4157,6 +4161,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 # ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        case conbine_pending_kind::const_i32:
+                        {
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i32_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+                            break;
+                        }
+                        case conbine_pending_kind::const_i64:
+                        {
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64); }
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i64_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
+                            break;
+                        }
                         case conbine_pending_kind::i32_add_2localget_local_set: [[fallthrough]];
                         case conbine_pending_kind::i32_add_2localget_local_tee:
                         {
@@ -4885,6 +4905,54 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         case conbine_pending_kind::none:
                         {
                             return true;
+                        }
+                        case conbine_pending_kind::const_i32:
+                        {
+                            switch(op)
+                            {
+                                case wasm1_code::i32_add: [[fallthrough]];
+                                case wasm1_code::i32_sub: [[fallthrough]];
+                                case wasm1_code::i32_mul: [[fallthrough]];
+                                case wasm1_code::i32_and: [[fallthrough]];
+                                case wasm1_code::i32_or: [[fallthrough]];
+                                case wasm1_code::i32_xor: [[fallthrough]];
+                                case wasm1_code::i32_shl: [[fallthrough]];
+                                case wasm1_code::i32_shr_s: [[fallthrough]];
+                                case wasm1_code::i32_shr_u: [[fallthrough]];
+                                case wasm1_code::i32_rotl: [[fallthrough]];
+                                case wasm1_code::i32_rotr:
+                                {
+                                    return true;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return false;
+                                }
+                            }
+                        }
+                        case conbine_pending_kind::const_i64:
+                        {
+                            switch(op)
+                            {
+                                case wasm1_code::i64_add: [[fallthrough]];
+                                case wasm1_code::i64_sub: [[fallthrough]];
+                                case wasm1_code::i64_mul: [[fallthrough]];
+                                case wasm1_code::i64_and: [[fallthrough]];
+                                case wasm1_code::i64_or: [[fallthrough]];
+                                case wasm1_code::i64_xor: [[fallthrough]];
+                                case wasm1_code::i64_shl: [[fallthrough]];
+                                case wasm1_code::i64_shr_s: [[fallthrough]];
+                                case wasm1_code::i64_shr_u: [[fallthrough]];
+                                case wasm1_code::i64_rotl: [[fallthrough]];
+                                case wasm1_code::i64_rotr:
+                                {
+                                    return true;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    return false;
+                                }
+                            }
                         }
                         case conbine_pending_kind::local_get:
                         {
@@ -9064,7 +9132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         // Optional: stack-top fast-path `call` for hot same-type signatures.
                         bool use_stacktop_call_fast{};
-                        
+
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         curr_operand_stack_value_type stacktop_call_fast_vt{curr_operand_stack_value_type::i32};
 
@@ -12501,11 +12569,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         else
                         {
                             flush_conbine_pending();
-                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
-                            emit_opfunc_to(bytecode, translate::get_uwvmint_i32_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                            emit_imm_to(bytecode, imm);
-                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+                            conbine_pending.kind = conbine_pending_kind::const_i32;
+                            conbine_pending.imm_i32 = imm;
                         }
 #else
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -12569,11 +12634,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         else
                         {
                             flush_conbine_pending();
-                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64); }
-                            emit_opfunc_to(bytecode, translate::get_uwvmint_i64_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                            emit_imm_to(bytecode, imm);
-                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
+                            conbine_pending.kind = conbine_pending_kind::const_i64;
+                            conbine_pending.imm_i64 = imm;
                         }
 #else
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
@@ -13987,6 +14049,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::add>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_step_const)
                         {
@@ -14149,6 +14222,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::sub>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
@@ -14184,6 +14268,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::mul>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::mac_localget3 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
@@ -14313,6 +14408,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            // Prefer keeping the existing `i32.and ; br_if` fusion when the and-result is immediately consumed by a branch.
+                            wasm1_code next_opbase{};  // init
+                            if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+                            if(next_opbase != wasm1_code::br_if)
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                        CompileOption,
+                                        ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::and_>(curr_stacktop, interpreter_tuple));
+                                emit_imm_to(bytecode, conbine_pending.imm_i32);
+                                conbine_pending.kind = conbine_pending_kind::none;
+                                break;
+                            }
+
+                            flush_conbine_pending();
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
@@ -14358,6 +14472,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::or_>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
@@ -14393,6 +14518,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::xor_>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::xorshift_after_shr)
                         {
@@ -14450,6 +14586,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shl>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::xorshift_after_xor1_getx_constb)
                         {
@@ -14501,6 +14648,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shr_s>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
@@ -14525,6 +14683,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shr_u>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::xorshift_pre_shr)
                         {
@@ -14555,6 +14724,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_binary(u8"i32.rotl", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
+
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
                         {
@@ -14572,6 +14755,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i32.rotr", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i32)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotr>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32)
@@ -14622,6 +14819,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::add>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::mac_after_mul && conbine_pending.vt == curr_operand_stack_value_type::i64)
                         {
@@ -14662,6 +14870,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.sub", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::sub>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_sub_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14671,6 +14893,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.mul", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::mul>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::mac_localget3 && conbine_pending.vt == curr_operand_stack_value_type::i64)
@@ -14727,6 +14963,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::and_>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i64)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
@@ -14750,6 +14997,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.or", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::or_>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_or_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14759,6 +15020,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.xor", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::xor_>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_xor_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14768,6 +15043,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.shl", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shl>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_shl_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14777,6 +15066,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.shr_s", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shr_s>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_shr_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14786,6 +15089,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.shr_u", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::shr_u>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_shr_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14795,6 +15112,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.rotl", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_rotl_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -14804,6 +15135,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_binary(u8"i64.rotr", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::const_i64)
+                        {
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_i64_binop_imm_stack_fptr_from_tuple<
+                                    CompileOption,
+                                    ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotr>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_rotr_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 

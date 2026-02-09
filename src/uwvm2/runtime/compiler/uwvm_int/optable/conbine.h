@@ -371,6 +371,169 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_shr_s_imm_localget(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_i32_binop_imm_localget<CompileOption, numeric_details::int_binop::shr_s>(typeref...); }
 
+    // ========================
+    // arith_imm_stack / bit_imm_stack / shift_imm_stack : (stack) + imm + op
+    // ========================
+
+    /**
+     * @brief Integer binary op fusion: `i32.const` + `i32.binop` on an existing stack value.
+     *
+     * @details
+     * This fuses the common pattern:
+     * `...; <push i32 lhs>; i32.const <imm>; i32.binop`
+     * into a single opcode implementation that reads the immediate directly from the bytecode stream and keeps
+     * the operand-stack height unchanged.
+     *
+     * - Stack-top optimization: supported for i32.
+     * - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+     * - Immediates: `wasm_i32`.
+     * - Stack effect (relative to before `i32.const`): `(i32 -- i32)` (replace top with `eval(lhs, imm)`).
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              numeric_details::int_binop Op,
+              ::std::size_t curr_i32_stack_top,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_binop_imm_stack(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        wasm_i32 const rhs{conbine_details::read_imm<wasm_i32>(type...[0])};
+
+        if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_i32>())
+        {
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i32>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_i32>()};
+            static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+            wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+            wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, numeric_details::wasm_u32>(lhs, rhs)};
+            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+        }
+        else
+        {
+            wasm_i32 const lhs{get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
+            wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, numeric_details::wasm_u32>(lhs, rhs)};
+            ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            type...[1u] += sizeof(out);
+        }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief Fused `i32.const` + `i32.binop` on an existing stack value (byref).
+    /// @details
+    /// - Stack-top optimization: N/A in byref mode.
+    /// - `type[0]` layout: see @ref uwvmint_conbine_byref_layout.
+    /// - Immediates: `wasm_i32`.
+    /// - Stack effect (relative to before `i32.const`): `(i32 -- i32)`.
+    template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeRef>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_binop_imm_stack(TypeRef & ... typeref) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+        typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+        wasm_i32 const rhs{conbine_details::read_imm<wasm_i32>(typeref...[0])};
+
+        wasm_i32 const lhs{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
+        wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, numeric_details::wasm_u32>(lhs, rhs)};
+        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        typeref...[1u] += sizeof(out);
+    }
+
+    /**
+     * @brief Integer binary op fusion: `i64.const` + `i64.binop` on an existing stack value.
+     *
+     * @details
+     * - Stack-top optimization: supported for i64.
+     * - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+     * - Immediates: `wasm_i64`.
+     * - Stack effect (relative to before `i64.const`): `(i64 -- i64)`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              numeric_details::int_binop Op,
+              ::std::size_t curr_i64_stack_top,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_binop_imm_stack(Type... type) UWVM_THROWS
+    {
+        using wasm_i64 = conbine_details::wasm_i64;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        wasm_i64 const rhs{conbine_details::read_imm<wasm_i64>(type...[0])};
+
+        if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_i64>())
+        {
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i64>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_i64>()};
+            static_assert(begin <= curr_i64_stack_top && curr_i64_stack_top < end);
+
+            wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
+            wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, numeric_details::wasm_u64>(lhs, rhs)};
+            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
+        }
+        else
+        {
+            wasm_i64 const lhs{get_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
+            wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, numeric_details::wasm_u64>(lhs, rhs)};
+            ::std::memcpy(type...[1u], ::std::addressof(out), sizeof(out));
+            type...[1u] += sizeof(out);
+        }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief Fused `i64.const` + `i64.binop` on an existing stack value (byref).
+    /// @details
+    /// - Stack-top optimization: N/A in byref mode.
+    /// - `type[0]` layout: see @ref uwvmint_conbine_byref_layout.
+    /// - Immediates: `wasm_i64`.
+    /// - Stack effect (relative to before `i64.const`): `(i64 -- i64)`.
+    template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeRef>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_binop_imm_stack(TypeRef & ... typeref) UWVM_THROWS
+    {
+        using wasm_i64 = conbine_details::wasm_i64;
+
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+        typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+        wasm_i64 const rhs{conbine_details::read_imm<wasm_i64>(typeref...[0])};
+
+        wasm_i64 const lhs{get_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
+        wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, numeric_details::wasm_u64>(lhs, rhs)};
+        ::std::memcpy(typeref...[1u], ::std::addressof(out), sizeof(out));
+        typeref...[1u] += sizeof(out);
+    }
+
     // i32 eqz localget
     /// @brief Fused `local.get` + `i32.eqz` (tail-call).
     /// @details
@@ -3153,6 +3316,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_i32_binop_imm_localget<Opt, numeric_details::int_binop::shr_s, Type...>; }
             };
 
+            // wrappers for `i32.const`/`i64.const` + integer binop on an existing stack value
+            template <numeric_details::int_binop Op>
+            struct i32_binop_imm_stack_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i32_binop_imm_stack<Opt, Op, Pos, Type...>; }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                { return uwvmint_i32_binop_imm_stack<Opt, Op, Type...>; }
+            };
+
+            template <numeric_details::int_binop Op>
+            struct i64_binop_imm_stack_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i64_binop_imm_stack<Opt, Op, Pos, Type...>; }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                { return uwvmint_i64_binop_imm_stack<Opt, Op, Type...>; }
+            };
+
             struct i32_eqz_localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -3854,6 +4042,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_i32_shr_s_imm_localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                  ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i32_shr_s_imm_localget_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i32_binop_imm_stack_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.i32_stack_top_begin_pos,
+                                                                    CompileOption.i32_stack_top_end_pos,
+                                                                    details::i32_binop_imm_stack_op<Op>,
+                                                                    Type...>(curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i32_binop_imm_stack_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i32_binop_imm_stack_fptr<CompileOption, Op, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_i32_binop_imm_stack_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return details::i32_binop_imm_stack_op<Op>::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i32_binop_imm_stack_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i32_binop_imm_stack_fptr<CompileOption, Op, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_binop_imm_stack_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.i64_stack_top_begin_pos,
+                                                                    CompileOption.i64_stack_top_end_pos,
+                                                                    details::i64_binop_imm_stack_op<Op>,
+                                                                    Type...>(curr.i64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i64_binop_imm_stack_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i64_binop_imm_stack_fptr<CompileOption, Op, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_i64_binop_imm_stack_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return details::i64_binop_imm_stack_op<Op>::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i64_binop_imm_stack_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i64_binop_imm_stack_fptr<CompileOption, Op, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)

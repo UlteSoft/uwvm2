@@ -2430,7 +2430,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
-        
+
 # if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
         // AArch64: keep the loop hot path (lt == true) as a single-target indirect branch site.
         if(lt) [[likely]]
@@ -2675,6 +2675,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_f32>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f32>()};
@@ -2684,18 +2685,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_f32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
             wasm_f32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, next_pos>(type...)};
-            if(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs);
         }
         else
         {
             wasm_f32 const rhs{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             wasm_f32 const lhs{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
-            if(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs);
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(take_branch)
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2816,6 +2834,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f64>()};
@@ -2825,18 +2844,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_f64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             wasm_f64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...)};
-            if(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
         else
         {
             wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(take_branch)
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2894,6 +2930,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
         type...[0] += sizeof(jmp_ip);
 
+        bool take_branch{};
         if constexpr(conbine_details::stacktop_enabled_for<CompileOption, wasm_f64>())
         {
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f64>()};
@@ -2903,18 +2940,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_f64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             wasm_f64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...)};
-            if(!details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = !details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
         else
         {
             wasm_f64 const rhs{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             wasm_f64 const lhs{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
-            if(!details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)) { type...[0] = jmp_ip; }
+            take_branch = !details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
+        }
+
+# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
+        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+        if(take_branch)
+        {
+            type...[0] = jmp_ip;
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
+# else
+        if(take_branch) { type...[0] = jmp_ip; }
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+# endif
     }
 
     /// @brief Fused operand-stack compare + `i32.eqz` + `br_if` (byref).
