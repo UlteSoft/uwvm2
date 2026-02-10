@@ -4594,11 +4594,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
-            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
-                                                                    CompileOption.i32_stack_top_begin_pos,
-                                                                    CompileOption.i32_stack_top_end_pos,
-                                                                    call_stacktop_i32_op<ParamCount, RetT>,
-                                                                    Type...>(curr.i32_stack_top_curr_pos);
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_stacktop_i32_op<ParamCount, RetT>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                // No scalar stack-top cache: fall back to the normal `call` opfunc which operates on operand-stack memory.
+                // Translator guarantees stack-top spill when caching is enabled; when caching is disabled, the operand stack is already in memory.
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>;
+            }
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
@@ -4620,11 +4629,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_f32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
-            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
-                                                                    CompileOption.f32_stack_top_begin_pos,
-                                                                    CompileOption.f32_stack_top_end_pos,
-                                                                    call_stacktop_f32_op<ParamCount, RetT>,
-                                                                    Type...>(curr.f32_stack_top_curr_pos);
+            if constexpr(CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.f32_stack_top_begin_pos,
+                                                                        CompileOption.f32_stack_top_end_pos,
+                                                                        call_stacktop_f32_op<ParamCount, RetT>,
+                                                                        Type...>(curr.f32_stack_top_curr_pos);
+            }
+            else
+            {
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>;
+            }
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
@@ -4646,11 +4662,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_f64_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
         {
-            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
-                                                                    CompileOption.f64_stack_top_begin_pos,
-                                                                    CompileOption.f64_stack_top_end_pos,
-                                                                    call_stacktop_f64_op<ParamCount, RetT>,
-                                                                    Type...>(curr.f64_stack_top_curr_pos);
+            if constexpr(CompileOption.f64_stack_top_begin_pos != CompileOption.f64_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.f64_stack_top_begin_pos,
+                                                                        CompileOption.f64_stack_top_end_pos,
+                                                                        call_stacktop_f64_op<ParamCount, RetT>,
+                                                                        Type...>(curr.f64_stack_top_curr_pos);
+            }
+            else
+            {
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>;
+            }
         }
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>

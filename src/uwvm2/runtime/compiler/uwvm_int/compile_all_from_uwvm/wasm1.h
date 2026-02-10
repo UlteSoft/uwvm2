@@ -2662,27 +2662,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             [[maybe_unused]] auto const stacktop_transform_currpos_to_begin{
                 [&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                 {
-                    if constexpr(!stacktop_enabled) { return; }
-                    if constexpr(!CompileOption.is_tail_call) { return; }
-                    if constexpr(!stacktop_regtransform_cf_entry || !stacktop_regtransform_supported) { return; }
-
-                    if(is_polymorphic)
+                    if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported)
                     {
-                        // Unreachable region: keep compiler-side state deterministic without emitting runtime code.
-                        stacktop_reset_currpos_to_begin();
-                        return;
-                    }
+                        if(is_polymorphic)
+                        {
+                            // Unreachable region: keep compiler-side state deterministic without emitting runtime code.
+                            stacktop_reset_currpos_to_begin();
+                            return;
+                        }
 
-                    // If cache is empty there is no live register state to preserve; reset cursors without emitting a transform opfunc.
-                    if(stacktop_cache_count == 0uz)
-                    {
-                        stacktop_reset_currpos_to_begin();
-                        return;
-                    }
+                        // If cache is empty there is no live register state to preserve; reset cursors without emitting a transform opfunc.
+                        if(stacktop_cache_count == 0uz)
+                        {
+                            stacktop_reset_currpos_to_begin();
+                            return;
+                        }
 
-                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                    emit_opfunc_to(dst, translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                    stacktop_reset_currpos_to_begin();
+                        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                        emit_opfunc_to(dst,
+                                       translate::get_uwvmint_stacktop_transform_to_begin_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        stacktop_reset_currpos_to_begin();
+                    }
                 }};
 
             [[maybe_unused]] auto const stacktop_canonicalize_edge_to_memory{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
