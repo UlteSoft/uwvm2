@@ -349,6 +349,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::uwvm2::runtime::compiler::uwvm_int::optable::
                 get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
 
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+#endif
         if(cond)
         {
             type...[0] = jmp_ip;
@@ -356,11 +359,68 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // next_op_true (*jmp_ip) ...
             // safe
             // ^^ type...[0]
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+            UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
         // next_opfunc ...
         // safe
         // ^^ type...[0]
+
+        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief `br_if` opcode (tail-call): conditional branch by popping i32 condition from the operand stack memory.
+    /// @details
+    /// This variant is used when stack-top caching is enabled but the i32 condition is not resident in the stack-top cache
+    /// (e.g. tiny/merged ring configurations where some producers materialize results in memory).
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_br_if_pop_from_memory(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+
+        using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        // ^^ type...[0]
+
+        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
+
+        // curr_uwvmint_br_if jmp_ip next_op_false
+        // safe
+        //                    ^^ type...[0]
+
+        ::std::byte const* jmp_ip;  // no init
+        ::std::memcpy(::std::addressof(jmp_ip), type...[0], sizeof(jmp_ip));
+
+        type...[0] += sizeof(jmp_ip);
+
+        // Pop condition from operand stack memory (updates stack pointer `type...[1]`).
+        wasm_i32 const cond{::uwvm2::runtime::compiler::uwvm_int::optable::get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
+
+#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+#endif
+        if(cond)
+        {
+            type...[0] = jmp_ip;
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
 
         ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -481,6 +541,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 return uwvmint_br_if<CompileOption, 0uz, Type...>;
             }
         }
+
+        /// @brief Translator: returns the interpreter function pointer for `br_if` (tail-call, pop-from-memory).
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_br_if_pop_from_memory_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_br_if_pop_from_memory<CompileOption, Type...>; }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_br_if_pop_from_memory_fptr_from_tuple(
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_br_if_pop_from_memory_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
 
         /// @brief Translator: infers types from a tuple and returns the `br_if` function pointer (tail-call).
         /// @details

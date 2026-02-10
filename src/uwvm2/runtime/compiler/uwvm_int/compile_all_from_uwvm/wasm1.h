@@ -7288,6 +7288,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // Translate: `br_if` needs stack repair on the taken path only. If repair is necessary, emit a thunk target.
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
+                        // When stack-top caching is enabled, the i32 condition may still reside in operand stack memory
+                        // (e.g. tiny rings / merged scalar rings). `br_if` must pop from the correct source to keep the
+                        // runtime stack pointer consistent with the compiler-side model.
+                        bool brif_cond_cached_at_site{true};
+
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 
                         // Conbine: `local.get(i32); i32.eqz; br_if` and `local.get(i32); i32.const; cmp; br_if`.
@@ -7381,6 +7386,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             [&]() constexpr UWVM_THROWS
                             {
                                 if(fused_brif || fuse_kind == br_if_fuse_kind::none) { return; }
+                                if constexpr(stacktop_enabled)
+                                {
+                                    // Fused br_if opfuncs read the i32 condition from stack-top cache. With tiny rings,
+                                    // the condition can be materialized in operand-stack memory (cache empty), in which
+                                    // case fusing would desync the runtime stack pointer.
+                                    if(!brif_cond_cached_at_site) { return; }
+                                }
 
                                 using fptr_t = decltype(translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                 if(fuse_site == SIZE_MAX) { return; }
@@ -7577,7 +7589,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 patch_fused_brif();
                                 if(!fused_brif)
                                 {
-                                    emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    if constexpr(stacktop_enabled)
+                                    {
+                                        if(!brif_cond_cached_at_site)
+                                        {
+                                            emit_opfunc_to(bytecode,
+                                                           translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(
+                                                               curr_stacktop,
+                                                               interpreter_tuple));
+                                        }
+                                        else
+                                        {
+                                            emit_opfunc_to(bytecode,
+                                                           translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        emit_opfunc_to(bytecode,
+                                                       translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    }
                                 }
                                 emit_ptr_label_placeholder(label_id, false);
                             }};
@@ -7822,7 +7853,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              u8"\n");
                                     }
                                 }
-                                emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(!brif_cond_cached_at_site)
+                                    {
+                                        emit_opfunc_to(bytecode,
+                                                       translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                                    interpreter_tuple));
+                                    }
+                                    else
+                                    {
+                                        emit_opfunc_to(bytecode,
+                                                       translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    }
+                                }
+                                else
+                                {
+                                    emit_opfunc_to(bytecode,
+                                                   translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                }
                                 emit_ptr_label_placeholder(label_id, false);
                             }};
 
@@ -8158,6 +8207,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     // Fast path: if the condition-pop cannot trigger any canonical fills, we can jump directly
                                     // without introducing a taken-path thunk.
                                     auto const brif_stacktop_currpos_at_site{curr_stacktop};
+                                    brif_cond_cached_at_site = (stacktop_cache_count != 0uz);
 
                                     // Model the i32 condition pop (post-pop, pre-fill).
                                     stacktop_commit_pop_n(1uz);
