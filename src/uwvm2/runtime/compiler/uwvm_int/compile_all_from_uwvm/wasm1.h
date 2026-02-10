@@ -658,13 +658,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 static_assert(CompileOption.f32_stack_top_begin_pos >= 3uz && CompileOption.f32_stack_top_end_pos > CompileOption.f32_stack_top_begin_pos);
                 static_assert(CompileOption.f64_stack_top_begin_pos >= 3uz && CompileOption.f64_stack_top_end_pos > CompileOption.f64_stack_top_begin_pos);
 
-                // Minimum ring sizes for Wasm1 opcode semantics:
-                // - i32 ring: needs >= 3 for `select` (2 values + i32 condition can all be i32).
-                // - i64/f32/f64 rings: need >= 2 for binary ops / select value pairs.
-                static_assert(CompileOption.i32_stack_top_end_pos - CompileOption.i32_stack_top_begin_pos >= 3uz);
-                static_assert(CompileOption.i64_stack_top_end_pos - CompileOption.i64_stack_top_begin_pos >= 2uz);
-                static_assert(CompileOption.f32_stack_top_end_pos - CompileOption.f32_stack_top_begin_pos >= 2uz);
-                static_assert(CompileOption.f64_stack_top_end_pos - CompileOption.f64_stack_top_begin_pos >= 2uz);
+                // Note:
+                // Smaller rings (e.g. 1 or 2 slots) are allowed. When an opcode needs more operands than the ring can hold,
+                // the opfunc falls back to reading the remaining operands from the operand stack memory (stack pointer),
+                // keeping as many values in registers as possible.
 
                 // Overlaps must be *fully merged* (same begin/end). Partial overlaps are invalid for the optable layouts.
                 constexpr auto overlap{[](::std::size_t a_begin, ::std::size_t a_end, ::std::size_t b_begin, ::std::size_t b_end) consteval noexcept

@@ -2339,27 +2339,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const b{conbine_details::load_local<wasm_i32>(type...[2u], b_off)};
         wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(a, b)};
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: prefer an explicit conditional branch so the indirect `br` sites become single-target on each path.
-        // This tends to reduce indirect-branch predictor pressure for hot br_if-heavy loops.
-        if(rem != wasm_i32{}) [[likely]]
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
+        if(rem == wasm_i32{})
         {
+            type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        type...[0] = jmp_ip;
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(rem == wasm_i32{}) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused `local.get a; local.get b; i32.rem_u; i32.eqz; br_if <L>` (byref).
@@ -2431,26 +2425,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: keep the loop hot path (lt == true) as a single-target indirect branch site.
-        if(lt) [[likely]]
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
+        if(!lt)
         {
+            type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
         }
 
-        type...[0] = jmp_ip;
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(!lt) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused `local.get(f64 sqrt); local.get(i32 i); i32.const step; i32.add; local.tee i; f64.convert_i32_u; f64.lt; i32.eqz; br_if <L>` (byref).
@@ -2681,10 +2670,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f32>()};
             constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_f32>()};
             static_assert(begin <= curr_f32_stack_top && curr_f32_stack_top < end);
+            constexpr ::std::size_t ring_sz{end - begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_f32_stack_top, begin, end)};
 
             wasm_f32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            wasm_f32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, next_pos>(type...)};
+            wasm_f32 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from the operand stack memory.
+                lhs = get_curr_val_from_operand_stack_cache<wasm_f32>(type...);
+            }
             take_branch = details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs);
         }
         else
@@ -2694,11 +2691,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs);
         }
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
@@ -2707,13 +2706,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(take_branch) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2840,10 +2832,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f64>()};
             constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_f64>()};
             static_assert(begin <= curr_f64_stack_top && curr_f64_stack_top < end);
+            constexpr ::std::size_t ring_sz{end - begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_f64_stack_top, begin, end)};
 
             wasm_f64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            wasm_f64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...)};
+            wasm_f64 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from the operand stack memory.
+                lhs = get_curr_val_from_operand_stack_cache<wasm_f64>(type...);
+            }
             take_branch = details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
         else
@@ -2853,11 +2853,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
@@ -2866,13 +2868,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(take_branch) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused operand-stack compare + `br_if` (byref).
@@ -2936,10 +2931,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_f64>()};
             constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_f64>()};
             static_assert(begin <= curr_f64_stack_top && curr_f64_stack_top < end);
+            constexpr ::std::size_t ring_sz{end - begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_f64_stack_top, begin, end)};
 
             wasm_f64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            wasm_f64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...)};
+            wasm_f64 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from the operand stack memory.
+                lhs = get_curr_val_from_operand_stack_cache<wasm_f64>(type...);
+            }
             take_branch = !details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
         else
@@ -2949,11 +2952,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = !details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: split taken/not-taken into distinct indirect-branch sites to reduce multi-target predictor pressure.
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
@@ -2962,13 +2967,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(take_branch) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused operand-stack compare + `i32.eqz` + `br_if` (byref).

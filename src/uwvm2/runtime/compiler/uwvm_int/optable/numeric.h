@@ -578,7 +578,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 OperandT const v{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
 
-                OperandT out{};  // init
+                OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_unop<Op, wasm_i32, wasm_u32>(v); }
                 else
                 {
@@ -607,26 +607,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t end{range_end<CompileOption, OperandT>()};
                 static_assert(begin <= curr_stack_top && curr_stack_top < end);
 
+                constexpr ::std::size_t ring_sz{end - begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
 
                 OperandT const rhs{get_curr_val_from_operand_stack_top<CompileOption, OperandT, curr_stack_top>(typeref...)};
-                OperandT const lhs{get_curr_val_from_operand_stack_top<CompileOption, OperandT, next_pos>(typeref...)};
+                OperandT lhs;  // no init
+                if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, OperandT, next_pos>(typeref...); }
+                else
+                {
+                    // Ring too small to hold both operands: keep RHS in cache, load LHS from operand stack memory (no pop).
+                    lhs = peek_curr_val_from_operand_stack_cache<OperandT>(typeref...);
+                }
 
-                OperandT out{};  // init
+                OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs); }
                 else
                 {
                     out = eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
                 }
 
-                details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, next_pos>(out, typeref...);
+                if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, next_pos>(out, typeref...); }
+                else
+                {
+                    // Binary op: result replaces NOS in operand stack memory (stack height -1).
+                    set_curr_val_to_operand_stack_cache_top(out, typeref...);
+                }
             }
             else
             {
                 OperandT const rhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
                 OperandT const lhs{get_curr_val_from_operand_stack_cache<OperandT>(typeref...)};
 
-                OperandT out{};  // init
+                OperandT out;  // no init
                 if constexpr(::std::same_as<OperandT, wasm_i32>) { out = eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs); }
                 else
                 {
@@ -685,12 +698,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t end{range_end<CompileOption, OperandT>()};
                 static_assert(begin <= curr_stack_top && curr_stack_top < end);
 
+                constexpr ::std::size_t ring_sz{end - begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
 
                 OperandT const rhs{get_curr_val_from_operand_stack_top<CompileOption, OperandT, curr_stack_top>(typeref...)};
-                OperandT const lhs{get_curr_val_from_operand_stack_top<CompileOption, OperandT, next_pos>(typeref...)};
+                OperandT lhs;  // no init
+                if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, OperandT, next_pos>(typeref...); }
+                else
+                {
+                    // Ring too small to hold both operands: keep RHS in cache, load LHS from operand stack memory (no pop).
+                    lhs = peek_curr_val_from_operand_stack_cache<OperandT>(typeref...);
+                }
                 OperandT const out{eval_float_binop<Op, OperandT>(lhs, rhs)};
-                details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, next_pos>(out, typeref...);
+                if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, OperandT, next_pos>(out, typeref...); }
+                else
+                {
+                    // Binary op: result replaces NOS in operand stack memory (stack height -1).
+                    set_curr_val_to_operand_stack_cache_top(out, typeref...);
+                }
             }
             else
             {
@@ -823,10 +849,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t end{numeric_details::range_end<CompileOption, wasm_i32>()};
             static_assert(begin <= curr_stack_top && curr_stack_top < end);
 
+            constexpr ::std::size_t ring_sz{end - begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
 
             wasm_i32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_stack_top>(type...)};
-            wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...)};
+            wasm_i32 lhs;  // no init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from operand stack memory (no pop).
+                lhs = peek_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+            }
 
             if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
             if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
@@ -835,7 +869,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             wasm_i32 const out{static_cast<wasm_i32>(lhs / rhs)};
-            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+            if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...); }
+            else
+            {
+                // Binary op: result replaces NOS in operand stack memory (stack height -1).
+                set_curr_val_to_operand_stack_cache_top(out, type...);
+            }
         }
         else
         {
@@ -1037,10 +1076,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t end{numeric_details::range_end<CompileOption, wasm_i64>()};
             static_assert(begin <= curr_stack_top && curr_stack_top < end);
 
+            constexpr ::std::size_t ring_sz{end - begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, begin, end)};
 
             wasm_i64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_stack_top>(type...)};
-            wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...)};
+            wasm_i64 lhs;  // no init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from operand stack memory (no pop).
+                lhs = peek_curr_val_from_operand_stack_cache<wasm_i64>(type...);
+            }
 
             if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
             if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
@@ -1049,7 +1096,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             wasm_i64 const out{static_cast<wasm_i64>(lhs / rhs)};
-            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, next_pos>(out, type...);
+            if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, next_pos>(out, type...); }
+            else
+            {
+                // Binary op: result replaces NOS in operand stack memory (stack height -1).
+                set_curr_val_to_operand_stack_cache_top(out, type...);
+            }
         }
         else
         {

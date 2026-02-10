@@ -200,15 +200,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
             static_assert(range_begin <= curr_stack_top && curr_stack_top < range_end);
 
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_stack_top, range_begin, range_end)};
 
             wasm_i32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_stack_top>(type...)};
-            wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...)};
+            wasm_i32 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, next_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both operands: keep RHS in cache, load LHS from operand stack memory (no pop).
+                lhs = peek_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+            }
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_int_cmp<Cmp, wasm_i32, wasm_u32>(lhs, rhs))};
 
             // Binary op: result replaces NOS (next_pos), stack height -1.
-            details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+            if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...); }
+            else
+            {
+                set_curr_val_to_operand_stack_cache_top(out, type...);
+            }
         }
         else
         {
@@ -301,10 +313,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
             static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
 
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
 
             wasm_i64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
-            wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...)};
+            wasm_i64 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, next_pos>(type...); }
+            else
+            {
+                constexpr bool in_place_i64_to_i32{details::stacktop_enabled_for_compare<CompileOption, wasm_i32>() &&
+                                                   details::i32_range_matches_operand_range<CompileOption, wasm_i64>()};
+
+                if constexpr(in_place_i64_to_i32)
+                {
+                    // Keep RHS in cache; LHS becomes the i32 result in operand stack memory.
+                    lhs = peek_curr_val_from_operand_stack_cache<wasm_i64>(type...);
+                }
+                else
+                {
+                    // Disjoint rings / no i32 cache: consume LHS from operand stack memory.
+                    lhs = get_curr_val_from_operand_stack_cache<wasm_i64>(type...);
+                }
+            }
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_int_cmp<Cmp, wasm_i64, wasm_u64>(lhs, rhs))};
 
@@ -312,8 +343,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_i64>())
                 {
-                    // Binary i64->i32: result replaces NOS (next_pos) in the merged scalar ring.
-                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+                    // Binary i64->i32 (merged scalar ring): result replaces NOS (next_pos), stack height -1.
+                    if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...); }
+                    else
+                    {
+                        // LHS is in memory (8 bytes), but the new top is i32 (4 bytes): shrink stack by 4 bytes.
+                        ::std::memcpy(type...[1u] - sizeof(wasm_i64), ::std::addressof(out), sizeof(out));
+                        type...[1u] -= sizeof(wasm_i64) - sizeof(wasm_i32);
+                    }
                 }
                 else
                 {
@@ -475,10 +512,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
             static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
 
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_f32_stack_top, range_begin, range_end)};
 
             wasm_f32 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
-            wasm_f32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, next_pos>(type...)};
+            wasm_f32 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, next_pos>(type...); }
+            else
+            {
+                constexpr bool in_place_f32_to_i32{details::stacktop_enabled_for_compare<CompileOption, wasm_i32>() &&
+                                                   details::i32_range_matches_operand_range<CompileOption, wasm_f32>()};
+
+                if constexpr(in_place_f32_to_i32)
+                {
+                    // Keep RHS in cache; LHS becomes the i32 result in operand stack memory.
+                    lhs = peek_curr_val_from_operand_stack_cache<wasm_f32>(type...);
+                }
+                else
+                {
+                    // Disjoint rings / no i32 cache: consume LHS from operand stack memory.
+                    lhs = get_curr_val_from_operand_stack_cache<wasm_f32>(type...);
+                }
+            }
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs))};
 
@@ -486,7 +542,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_f32>())
                 {
-                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+                    if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...); }
+                    else
+                    {
+                        set_curr_val_to_operand_stack_cache_top(out, type...);
+                    }
                 }
                 else
                 {
@@ -569,10 +629,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
             static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
 
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
+            static_assert(ring_sz != 0uz);
             constexpr ::std::size_t next_pos{details::ring_next_pos(curr_f64_stack_top, range_begin, range_end)};
 
             wasm_f64 const rhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
-            wasm_f64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...)};
+            wasm_f64 lhs{};  // init
+            if constexpr(ring_sz >= 2uz) { lhs = get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, next_pos>(type...); }
+            else
+            {
+                constexpr bool in_place_f64_to_i32{details::stacktop_enabled_for_compare<CompileOption, wasm_i32>() &&
+                                                   details::i32_range_matches_operand_range<CompileOption, wasm_f64>()};
+
+                if constexpr(in_place_f64_to_i32)
+                {
+                    // Keep RHS in cache; LHS becomes the i32 result in operand stack memory.
+                    lhs = peek_curr_val_from_operand_stack_cache<wasm_f64>(type...);
+                }
+                else
+                {
+                    // Disjoint rings / no i32 cache: consume LHS from operand stack memory.
+                    lhs = get_curr_val_from_operand_stack_cache<wasm_f64>(type...);
+                }
+            }
 
             wasm_i32 const out{static_cast<wasm_i32>(details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs))};
 
@@ -580,8 +659,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 if constexpr(details::i32_range_matches_operand_range<CompileOption, wasm_f64>())
                 {
-                    // Binary f64->i32: result replaces NOS (next_pos) in the merged scalar ring.
-                    details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...);
+                    // Binary f64->i32 (merged scalar ring): result replaces NOS (next_pos), stack height -1.
+                    if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, next_pos>(out, type...); }
+                    else
+                    {
+                        // LHS is in memory (8 bytes), but the new top is i32 (4 bytes): shrink stack by 4 bytes.
+                        ::std::memcpy(type...[1u] - sizeof(wasm_f64), ::std::addressof(out), sizeof(out));
+                        type...[1u] -= sizeof(wasm_f64) - sizeof(wasm_i32);
+                    }
                 }
                 else
                 {

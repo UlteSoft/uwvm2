@@ -848,6 +848,8 @@ namespace uwvm2::runtime::uwvm_int
 
 #if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             // aarch64: AAPCS64 (x0-x7 integer args, v0-v7 fp/simd args)
+            // 3 fixed args: (ip, operand_stack_top, local_base) => occupy x0-x2
+            // Use remaining integer args (x3-x7) for i32/i64 stack-top caching, and fp/simd args (v0-v7) for f32/f64/v128.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;

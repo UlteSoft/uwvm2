@@ -184,25 +184,61 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     static_assert(curr_value_stack_top == curr_i32_stack_top);
 
+                    constexpr ::std::size_t ring_sz{i32_range_end - i32_range_begin};
+                    static_assert(ring_sz != 0uz);
                     constexpr ::std::size_t v2_pos{details::ring_next_pos(curr_i32_stack_top, i32_range_begin, i32_range_end)};
                     constexpr ::std::size_t v1_pos{details::ring_next_pos(v2_pos, i32_range_begin, i32_range_end)};
 
-                    ValueT const v2{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v2_pos>(type...)};
-                    ValueT const v1{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...)};
-                    ValueT const out{cond != wasm_i32{0} ? v1 : v2};
-                    details::set_curr_val_to_stacktop_cache<CompileOption, ValueT, v1_pos>(out, type...);
+                    if constexpr(ring_sz >= 3uz)
+                    {
+                        ValueT const v2{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v2_pos>(type...)};
+                        ValueT const v1{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...)};
+                        ValueT const out{cond != wasm_i32{0} ? v1 : v2};
+                        details::set_curr_val_to_stacktop_cache<CompileOption, ValueT, v1_pos>(out, type...);
+                    }
+                    else if constexpr(ring_sz == 2uz)
+                    {
+                        ValueT const v2{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v2_pos>(type...)};
+                        // `v1` is in operand stack memory and is kept (becomes the result).
+                        ValueT const v1{peek_curr_val_from_operand_stack_cache<ValueT>(type...)};
+                        ValueT const out{cond != wasm_i32{0} ? v1 : v2};
+                        set_curr_val_to_operand_stack_cache_top(out, type...);
+                    }
+                    else
+                    {
+                        static_assert(ring_sz == 1uz);
+                        // `v2` and `v1` are both in operand stack memory; consume `v2`, keep `v1`.
+                        ValueT const v2_mem{peek_nth_val_from_operand_stack_cache<ValueT, 0uz>(type...)};
+                        ValueT const v1_mem{peek_nth_val_from_operand_stack_cache<ValueT, 1uz>(type...)};
+                        ValueT const out{cond != wasm_i32{0} ? v1_mem : v2_mem};
+                        set_nth_val_to_operand_stack_cache<ValueT, 1uz>(out, type...);
+                        type...[1u] -= sizeof(ValueT);
+                    }
                 }
                 else
                 {
                     static_assert(value_range_begin <= curr_value_stack_top && curr_value_stack_top < value_range_end);
 
+                    constexpr ::std::size_t ring_sz{value_range_end - value_range_begin};
+                    static_assert(ring_sz != 0uz);
                     constexpr ::std::size_t v2_pos{curr_value_stack_top};
                     constexpr ::std::size_t v1_pos{details::ring_next_pos(v2_pos, value_range_begin, value_range_end)};
 
                     ValueT const v2{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v2_pos>(type...)};
-                    ValueT const v1{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...)};
+                    ValueT v1{};  // init
+                    if constexpr(ring_sz >= 2uz) { v1 = get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...); }
+                    else
+                    {
+                        static_assert(ring_sz == 1uz);
+                        // `v1` is in operand stack memory and is kept (becomes the result).
+                        v1 = peek_curr_val_from_operand_stack_cache<ValueT>(type...);
+                    }
                     ValueT const out{cond != wasm_i32{0} ? v1 : v2};
-                    details::set_curr_val_to_stacktop_cache<CompileOption, ValueT, v1_pos>(out, type...);
+                    if constexpr(ring_sz >= 2uz) { details::set_curr_val_to_stacktop_cache<CompileOption, ValueT, v1_pos>(out, type...); }
+                    else
+                    {
+                        set_curr_val_to_operand_stack_cache_top(out, type...);
+                    }
                 }
             }
             else
@@ -228,11 +264,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t value_range_end{details::stacktop_range_end_pos<CompileOption, ValueT>()};
                 static_assert(value_range_begin <= curr_value_stack_top && curr_value_stack_top < value_range_end);
 
+                constexpr ::std::size_t ring_sz{value_range_end - value_range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t v2_pos{curr_value_stack_top};
                 constexpr ::std::size_t v1_pos{details::ring_next_pos(v2_pos, value_range_begin, value_range_end)};
 
                 ValueT const v2{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v2_pos>(type...)};
-                ValueT const v1{get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...)};
+                ValueT v1{};  // init
+                if constexpr(ring_sz >= 2uz) { v1 = get_curr_val_from_operand_stack_top<CompileOption, ValueT, v1_pos>(type...); }
+                else
+                {
+                    static_assert(ring_sz == 1uz);
+                    // Ring too small to hold both values: `v1` is the top of the operand stack memory.
+                    v1 = get_curr_val_from_operand_stack_cache<ValueT>(type...);
+                }
                 ValueT const out{cond != wasm_i32{0} ? v1 : v2};
                 details::set_curr_val_to_stacktop_cache<CompileOption, ValueT, v1_pos>(out, type...);
             }

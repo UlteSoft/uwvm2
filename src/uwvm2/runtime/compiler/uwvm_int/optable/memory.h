@@ -750,8 +750,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...);
                 constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i32_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -798,8 +805,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
                 static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -846,8 +860,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
                 static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f32_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -894,8 +915,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
                 static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f64_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -1880,8 +1908,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
             constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i32_stack_top, range_begin, range_end)};
-            wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...)};
+            wasm_i32 addr{};  // init
+            if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+            }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
             auto const& memory{*memory_p};
@@ -1891,7 +1926,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if(details::should_trap_oob_unlocked(memory, eff65, 4uz)) [[unlikely]]
                 {
                     type...[0] = op_begin;
-                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32) * 2uz; }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>())
+                    {
+                        // Operand-stack mode: both `value` and `addr` were popped from memory.
+                        type...[1u] += sizeof(wasm_i32) * 2uz;
+                    }
+                    else if constexpr(ring_sz < 2uz)
+                    {
+                        // Stack-top mode with tiny ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_i32_store<4uz, CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
             }
@@ -1940,8 +1984,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
                 static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -1958,6 +2009,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                                      details::i32_i64_ranges_merged<CompileOption>() &&
+                                      ((CompileOption.i64_stack_top_end_pos - CompileOption.i64_stack_top_begin_pos) < 2uz))
+                    {
+                        // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_i64_store<8uz, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>(type...);
                 }
             }
@@ -2006,8 +2064,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.f32_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f32_stack_top_end_pos};
                 static_assert(range_begin <= curr_f32_stack_top && curr_f32_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f32_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -2024,6 +2089,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f32>()) { type...[1u] += sizeof(wasm_f32); }
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f32>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                                      details::i32_f32_ranges_merged<CompileOption>() &&
+                                      ((CompileOption.f32_stack_top_end_pos - CompileOption.f32_stack_top_begin_pos) < 2uz))
+                    {
+                        // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_f32_store<4uz, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>(type...);
                 }
             }
@@ -2072,8 +2144,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.f64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.f64_stack_top_end_pos};
                 static_assert(range_begin <= curr_f64_stack_top && curr_f64_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_f64_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -2090,6 +2169,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_f64>()) { type...[1u] += sizeof(wasm_f64); }
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_f64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                                      details::scalar_ranges_all_merged<CompileOption>() &&
+                                      ((CompileOption.f64_stack_top_end_pos - CompileOption.f64_stack_top_begin_pos) < 2uz))
+                    {
+                        // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_f64_store<8uz, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>(type...);
                 }
             }
@@ -2131,8 +2217,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
             constexpr ::std::size_t range_end{CompileOption.i32_stack_top_end_pos};
+            constexpr ::std::size_t ring_sz{range_end - range_begin};
             constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i32_stack_top, range_begin, range_end)};
-            wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...)};
+            wasm_i32 addr{};  // init
+            if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+            else
+            {
+                // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+            }
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
             auto const& memory{*memory_p};
@@ -2142,7 +2235,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 if(details::should_trap_oob_unlocked(memory, eff65, static_cast<::std::size_t>(StoreBytes))) [[unlikely]]
                 {
                     type...[0] = op_begin;
-                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32) * 2uz; }
+                    if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>())
+                    {
+                        // Operand-stack mode: both `value` and `addr` were popped from memory.
+                        type...[1u] += sizeof(wasm_i32) * 2uz;
+                    }
+                    else if constexpr(ring_sz < 2uz)
+                    {
+                        // Stack-top mode with tiny ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_i32_store<static_cast<::std::size_t>(StoreBytes), CompileOption, curr_i32_stack_top, Type...>(type...);
                 }
             }
@@ -2203,8 +2305,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 constexpr ::std::size_t range_begin{CompileOption.i64_stack_top_begin_pos};
                 constexpr ::std::size_t range_end{CompileOption.i64_stack_top_end_pos};
                 static_assert(range_begin <= curr_i64_stack_top && curr_i64_stack_top < range_end);
+                constexpr ::std::size_t ring_sz{range_end - range_begin};
+                static_assert(ring_sz != 0uz);
                 constexpr ::std::size_t addr_pos{details::ring_next_pos(curr_i64_stack_top, range_begin, range_end)};
-                addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...);
+                if constexpr(ring_sz >= 2uz) { addr = get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, addr_pos>(type...); }
+                else
+                {
+                    // Ring too small to hold both store operands: address is the top of the operand stack memory.
+                    addr = get_curr_val_from_operand_stack_cache<wasm_i32>(type...);
+                }
             }
             else
             {
@@ -2221,6 +2330,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     type...[0] = op_begin;
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i64>()) { type...[1u] += sizeof(wasm_i64); }
                     if constexpr(!details::stacktop_enabled_for<CompileOption, wasm_i32>()) { type...[1u] += sizeof(wasm_i32); }
+                    else if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i64>() && details::stacktop_enabled_for<CompileOption, wasm_i32>() &&
+                                      details::i32_i64_ranges_merged<CompileOption>() &&
+                                      ((CompileOption.i64_stack_top_end_pos - CompileOption.i64_stack_top_begin_pos) < 2uz))
+                    {
+                        // Stack-top mode with tiny merged scalar ring: `addr` was popped from operand stack memory.
+                        type...[1u] += sizeof(wasm_i32);
+                    }
                     UWVM_MUSTTAIL return trap_oob_i64_store<static_cast<::std::size_t>(StoreBytes),
                                                             CompileOption,
                                                             curr_i64_stack_top,

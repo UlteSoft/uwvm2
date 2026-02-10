@@ -674,6 +674,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         return ret;
     }
 
+    template <uwvm_int_stack_top_type GetType, uwvm_int_stack_top_type... TypeRef>
+    UWVM_ALWAYS_INLINE inline constexpr GetType peek_curr_val_from_operand_stack_cache(TypeRef & ... typeref) noexcept
+    {
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+        static_assert(::std::same_as<Type, ::std::byte*>);
+        static_assert(::std::is_trivially_copyable_v<GetType>);
+
+        GetType ret;  // no init
+        ::std::memcpy(::std::addressof(ret), typeref...[1u] - sizeof(GetType), sizeof(GetType));
+        return ret;
+    }
+
+    template <uwvm_int_stack_top_type GetType, ::std::size_t N, uwvm_int_stack_top_type... TypeRef>
+    UWVM_ALWAYS_INLINE inline constexpr GetType peek_nth_val_from_operand_stack_cache(TypeRef & ... typeref) noexcept
+    {
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+        static_assert(::std::same_as<Type, ::std::byte*>);
+        static_assert(::std::is_trivially_copyable_v<GetType>);
+
+        constexpr ::std::size_t bytes_from_top{sizeof(GetType) * (N + 1uz)};
+        GetType ret;  // no init
+        ::std::memcpy(::std::addressof(ret), typeref...[1u] - bytes_from_top, sizeof(GetType));
+        return ret;
+    }
+
+    template <uwvm_int_stack_top_type PutType, uwvm_int_stack_top_type... TypeRef>
+    UWVM_ALWAYS_INLINE inline constexpr void set_curr_val_to_operand_stack_cache_top(PutType const& v, TypeRef&... typeref) noexcept
+    {
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+        static_assert(::std::same_as<Type, ::std::byte*>);
+        static_assert(::std::is_trivially_copyable_v<PutType>);
+
+        ::std::memcpy(typeref...[1u] - sizeof(PutType), ::std::addressof(v), sizeof(PutType));
+    }
+
+    template <uwvm_int_stack_top_type PutType, ::std::size_t N, uwvm_int_stack_top_type... TypeRef>
+    UWVM_ALWAYS_INLINE inline constexpr void set_nth_val_to_operand_stack_cache(PutType const& v, TypeRef&... typeref) noexcept
+    {
+        static_assert(sizeof...(TypeRef) >= 2uz);
+        using Type = ::std::remove_cvref_t<TypeRef...[1u]>;
+        static_assert(::std::same_as<Type, ::std::byte*>);
+        static_assert(::std::is_trivially_copyable_v<PutType>);
+
+        constexpr ::std::size_t bytes_from_top{sizeof(PutType) * (N + 1uz)};
+        ::std::memcpy(typeref...[1u] - bytes_from_top, ::std::addressof(v), sizeof(PutType));
+    }
+
     namespace details
     {
         inline consteval bool uwvm_interpreter_stacktop_range_enabled(::std::size_t begin_pos, ::std::size_t end_pos) noexcept { return begin_pos != end_pos; }

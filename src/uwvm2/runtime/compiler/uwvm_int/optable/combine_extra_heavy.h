@@ -128,20 +128,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         for(;;)
         {
             wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(n, i)};
+
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+            [[clang::nomerge]]
+# endif
             if(rem == wasm_i32{})
             {
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-                // AArch64: return immediately on the taken break so the indirect-branch site is single-target on each path.
-                conbine_details::store_local(type...[2u], i_off, i);
                 type...[0] = break_ip;
+                
+                // break;
+                conbine_details::store_local(type...[2u], i_off, i);
 
                 uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
                 ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
                 UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-                type...[0] = break_ip;
-                break;
-# endif
             }
 
             i = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(i, step);
@@ -715,11 +715,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::store_local(type...[2u], i_off, next_i);
         bool const take_branch{details::eval_int_cmp<details::int_cmp::lt_u, wasm_i32, conbine_details::wasm_u32>(next_i, end)};
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
-        if(take_branch) [[likely]]
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
+        if(take_branch)
         {
             type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
@@ -728,13 +730,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(take_branch) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_for_i32_inc_lt_u_br_if` (byref).
@@ -804,11 +799,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::store_local(type...[2u], p_off, next_p);
         bool const take_branch{details::eval_int_cmp<details::int_cmp::ne, wasm_i32, conbine_details::wasm_u32>(next_p, pend)};
 
-# if (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
-        // AArch64: separate the taken/not-taken tailcalls so each indirect-branch site sees only one target set.
-        if(take_branch) [[likely]]
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+        [[clang::nomerge]]
+# endif
+        if(take_branch)
         {
             type...[0] = jmp_ip;
+
             uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
             ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
             UWVM_MUSTTAIL return next_interpreter(type...);
@@ -817,13 +814,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
-# else
-        if(take_branch) { type...[0] = jmp_ip; }
-
-        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-        UWVM_MUSTTAIL return next_interpreter(type...);
-# endif
     }
 
     /// @brief Fused combined opcode entrypoint `uwvmint_for_ptr_inc_ne_br_if` (byref).
