@@ -871,10 +871,15 @@ namespace uwvm2::runtime::uwvm_int
     !(defined(__GNUC__) || defined(__clang__))
             // x86_64: Windows x64 (MS ABI) (rcx/rdx/r8/r9, xmm0-xmm3)
             // This ABI provides only 4 register argument slots total. After the 3 fixed interpreter args, only 1 slot remains (r9/xmm3).
-            // With the updated stack-top model, we can still enable a tiny cache: a 1-slot scalar4-merged ring (i32/i64/f32/f64)
-            // in the last register slot. Keep v128 caching off by default.
+            // Empirically, enabling a 1-slot scalar4-merged stack-top cache tends to regress overall performance
+            // (register pressure + spills), so keep stack-top caching disabled by default here.
+#if 0
+            /// @deprecated MS ABI "1-slot" stack-top cache experiment.
+            ///             Often regresses performance due to spills/register shuffling. Kept for reference.
+            ///             Keep v128 caching off by default.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 4uz;
+#endif
 #elif defined(__i386__) || defined(_M_IX86)
             // i386: (usually) only 2 register argument slots under fastcall (ecx/edx), and we already need 3 fixed args.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
