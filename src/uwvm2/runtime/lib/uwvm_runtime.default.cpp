@@ -854,6 +854,11 @@ namespace uwvm2::runtime::uwvm_int
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+#elif defined(__arm__) || defined(_M_ARM)
+            // ARM32: AAPCS/EABI (r0-r3 integer args; hard-float variants may also use VFP regs).
+            // After the 3 fixed interpreter args, there is at most 1 remaining core argument register (r3).
+            // A full scalar+fp stack-top cache would largely spill to memory on most ABIs, negating the benefit.
+            // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
 #elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                     \
     (!defined(_WIN32) || (defined(__GNUC__) || defined(__clang__)))
             // x86_64: sysv abi
@@ -865,8 +870,13 @@ namespace uwvm2::runtime::uwvm_int
 #elif defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                  \
     !(defined(__GNUC__) || defined(__clang__))
             // x86_64: Windows x64 (MS ABI) (rcx/rdx/r8/r9, xmm0-xmm3)
-            // Note: This ABI provides only 4 argument slots. After the 3 fixed interpreter args, it cannot fit the Wasm1 minimum
-            // stack-top rings (i32>=3, i64/f32/f64>=2) without spilling cache values to memory, which tends to negate the benefit.
+            // This ABI provides only 4 register argument slots total. After the 3 fixed interpreter args, only 1 slot remains (r9/xmm3).
+            // With the updated stack-top model, we can still enable a tiny cache: a 1-slot scalar4-merged ring (i32/i64/f32/f64)
+            // in the last register slot. Keep v128 caching off by default.
+            res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
+            res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 4uz;
+#elif defined(__i386__) || defined(_M_IX86)
+            // i386: (usually) only 2 register argument slots under fastcall (ecx/edx), and we already need 3 fixed args.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
 #elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
             // powerpc64: SysV ELF (r3-r10 integer args, VSX for fp/simd)
@@ -874,6 +884,9 @@ namespace uwvm2::runtime::uwvm_int
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
+#elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)
+            // powerpc32: AIX/SysV/EABI variants differ in i64/f64 passing (often reg-pairs) and hard-float rules.
+            // Keep stack-top caching disabled by default for correctness across ABIs.
 #elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
 # if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
             // riscv64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring in the integer register file.
@@ -887,6 +900,9 @@ namespace uwvm2::runtime::uwvm_int
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
 # endif
+#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 32)
+            // riscv32: i64/f64 are passed in register pairs and the effective register slots are tight.
+            // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
 #elif defined(__loongarch__) && defined(__loongarch64)
 # if defined(__loongarch_soft_float) || defined(__loongarch_single_float)
             // loongarch64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring.
@@ -900,6 +916,8 @@ namespace uwvm2::runtime::uwvm_int
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
 # endif
+#elif defined(__loongarch__)
+            // loongarch32: i64/f64 passing uses pairs / stack depending on ABI; keep caching disabled by default.
 #elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
             // MIPS ABIs are slot-based: fp args are only register-passed while they remain within the ABI's argument slots.
             // We conservatively target the 8-slot N32/N64 ABIs; O32 has only 4 slots and cannot satisfy Wasm1's minimum ring sizes without heavy spilling.
@@ -923,6 +941,41 @@ namespace uwvm2::runtime::uwvm_int
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+#elif defined(__s390__) || defined(__SYSC_ZARCH__)
+            // s390 (31-bit) / z/Architecture (non-s390x toolchains): i64/f64 passing is ABI-sensitive (often reg pairs).
+            // Leave stack-top caching disabled by default.
+#elif defined(__sparc__)
+            // SPARC: multiple ABIs (v8/v9, 32/64) with different fp arg rules. Leave caching disabled by default.
+#elif defined(__IA64__) || defined(_M_IA64) || defined(__ia64__) || defined(__itanium__)
+            // IA-64: Itanium ABI is rare today; keep caching disabled by default to avoid ABI mismatches.
+#elif defined(__alpha__)
+            // Alpha: uncommon; leave caching disabled by default.
+#elif defined(__m68k__) || defined(__mc68000__)
+            // m68k: uncommon; leave caching disabled by default.
+#elif defined(__HPPA__)
+            // HPPA: uncommon; leave caching disabled by default.
+#elif defined(__e2k__)
+            // E2K: uncommon; leave caching disabled by default.
+#elif defined(__XTENSA__)
+            // Xtensa: embedded; leave caching disabled by default.
+#elif defined(__BFIN__)
+            // Blackfin: embedded; leave caching disabled by default.
+#elif defined(__convex__)
+            // Convex: historical; leave caching disabled by default.
+#elif defined(__370__) || defined(__THW_370__)
+            // System/370: historical; leave caching disabled by default.
+#elif defined(__pdp10) || defined(__pdp7) || defined(__pdp11)
+            // PDP family: historical; leave caching disabled by default.
+#elif defined(__THW_RS6000) || defined(_IBMR2) || defined(_POWER) || defined(_ARCH_PWR) || defined(_ARCH_PWR2)
+            // RS/6000: historical; leave caching disabled by default.
+#elif defined(__CUDA_ARCH__)
+            // PTX (CUDA device code): stack-top caching is not applicable here.
+#elif defined(__sh__)
+            // SuperH: embedded; leave caching disabled by default.
+#elif defined(__AVR__)
+            // AVR: embedded; leave caching disabled by default.
+#elif defined(__wasm__)
+            // UWVM itself may be built as wasm32-wasi; stack-top caching via native ABI registers is not applicable here.
 #endif
 
             return res;
