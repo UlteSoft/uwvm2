@@ -7593,10 +7593,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     {
                                         if(!brif_cond_cached_at_site)
                                         {
-                                            emit_opfunc_to(bytecode,
-                                                           translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(
-                                                               curr_stacktop,
-                                                               interpreter_tuple));
+                                            emit_opfunc_to(
+                                                bytecode,
+                                                translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                         }
                                         else
                                         {
@@ -7606,8 +7605,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     }
                                     else
                                     {
-                                        emit_opfunc_to(bytecode,
-                                                       translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                     }
                                 }
                                 emit_ptr_label_placeholder(label_id, false);
@@ -7857,20 +7855,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 {
                                     if(!brif_cond_cached_at_site)
                                     {
-                                        emit_opfunc_to(bytecode,
-                                                       translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                    interpreter_tuple));
+                                        emit_opfunc_to(
+                                            bytecode,
+                                            translate::get_uwvmint_br_if_pop_from_memory_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                     }
                                     else
                                     {
-                                        emit_opfunc_to(bytecode,
-                                                       translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                     }
                                 }
                                 else
                                 {
-                                    emit_opfunc_to(bytecode,
-                                                   translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                 }
                                 emit_ptr_label_placeholder(label_id, false);
                             }};
