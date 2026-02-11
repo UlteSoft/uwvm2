@@ -193,13 +193,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
                     auto const& mod{wf->wasm_module_storage.wasm_binfmt_ver1_storage};
 
-                    auto get_exportsec_from_feature_tuple{
-                        [&mod]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                            ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
-                        {
-                            return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
-                                ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(mod.sections);
-                        }};
+                    auto get_exportsec_from_feature_tuple{[&mod]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
+                                                              ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
+                                                          {
+                                                              return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                                                                  ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(
+                                                                  mod.sections);
+                                                          }};
 
                     auto const& exportsec{get_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
                     if(exportsec.sec_span.sec_begin != nullptr)
@@ -386,6 +386,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         /// @todo run interpreter
 
                         // not supported yet
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"Lazy compilation is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8"(runtime)\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
 
                         break;
@@ -395,6 +405,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         /// @todo run interpreter
 
                         // not supported yet
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"lazy+verification is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                            u8"(runtime)\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
 
                         break;
@@ -418,6 +438,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter:
                             {
                                 // not supported yet
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    u8"[fatal] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"Debug Interpreter is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    u8"(runtime)\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
@@ -427,6 +457,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
                             {
                                 // not supported yet
+                                ::fast_io::io::perr(
+                                    ::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"UWVM INTERPRETER LLVM JIT Tiered is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
@@ -436,6 +477,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
                             {
                                 // not supported yet
+                                ::fast_io::io::perr(
+                                    ::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"LLVM JIT is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
