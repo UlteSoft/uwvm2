@@ -1176,7 +1176,7 @@ class deque
         return deque_detail::to_address(block_ctrl_begin_fancy_);
     }
 
-    constexpr void dealloc_block_range(Block *begin, Block *end) noexcept
+    constexpr void dealloc_block_range_(Block *begin, Block *end) noexcept
     {
         for (; begin != end; ++begin)
         {
@@ -1238,7 +1238,7 @@ class deque
     {
         destroy_elems_();
         // 清理块数组
-        dealloc_block_range(block_alloc_begin_, block_alloc_end_);
+        dealloc_block_range_(block_alloc_begin_, block_alloc_end_);
         dealloc_ctrl_();
     }
 
@@ -2508,9 +2508,9 @@ class deque
     {
         if (block_alloc_size_() != ::std::size_t(0)) // 保证fill_block_alloc_end
         {
-            dealloc_block_range(block_alloc_begin_, block_elem_begin_);
+            dealloc_block_range_(block_alloc_begin_, block_elem_begin_);
             block_alloc_begin_ = block_elem_begin_;
-            dealloc_block_range(block_elem_end_, block_alloc_end_);
+            dealloc_block_range_(block_elem_end_, block_alloc_end_);
             block_alloc_end_ = block_elem_end_;
         }
     }
