@@ -23,7 +23,7 @@ struct kdevice_queue
 	list_entry DeviceListHead;
 	::std::size_t Lock;
 
-#if defined(__x86_64__) || defined(_M_AMD64)
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 
 	union
 	{

@@ -6,8 +6,9 @@ namespace fast_io::details::cpu_flags
 inline constexpr bool sse2_supported{
 #if defined(__SSE2__) ||                         \
 	(defined(_MSC_VER) && !defined(__clang__) && \
-	 (((defined(__x86_64__) || defined(_M_AMD64)) && !defined(_KERNEL_MODE)) || defined(__AVX__)))
-	true
+		 (((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !defined(_KERNEL_MODE) &&                                                 \
+           !(defined(__arm64ec__) || defined(_M_ARM64EC))) || defined(__AVX__)))
+		true
 #elif defined(_M_IX86_FP) && defined(_MSC_VER) && !defined(__clang__) && !defined(_KERNEL_MODE)
 #if _M_IX86_FP == 2
 	true
@@ -76,7 +77,7 @@ inline constexpr bool wasmsimd128_supported{
 };
 
 inline constexpr bool armneon_supported{
-#if defined(__ARM_NEON) || ((defined(_MSC_VER) && !defined(__clang__)) && defined(_M_ARM64) && !defined(_KERNEL_MODE))
+#if defined(__ARM_NEON) || ((defined(_MSC_VER) && !defined(__clang__)) && (defined(_M_ARM64) || defined(_M_ARM64EC)) && !defined(_KERNEL_MODE))
 	true
 #endif
 };

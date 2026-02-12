@@ -51,7 +51,6 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.depend;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.utils.memory;
-import uwvm2.uwvm.cmdline;
 import uwvm2.uwvm.wasm.base;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.wasm.storage;

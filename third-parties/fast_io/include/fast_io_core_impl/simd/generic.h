@@ -173,7 +173,7 @@ struct
 			if (!__builtin_is_constant_evaluated())
 #endif
 			{
-#if (defined(__x86_64__) || defined(_M_AMD64) || defined(__i386__) || defined(_M_IX86))
+#if ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 				if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::sse2_supported)
 				{
 					if constexpr (::fast_io::details::cpu_flags::sse3_supported)
@@ -241,7 +241,7 @@ struct
 					*this = __builtin_bit_cast(simd_vector<T, N>, temp_vec);
 					return;
 				}
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM) || defined(__arm64ec__) || defined(_M_ARM64EC)
 				if constexpr (sizeof(vec_type) == 16 && ::fast_io::details::cpu_flags::armneon_supported)
 				{
 					if constexpr (sizeof(T) == 8)

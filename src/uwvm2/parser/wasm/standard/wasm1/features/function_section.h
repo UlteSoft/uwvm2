@@ -40,10 +40,10 @@
 # include <uwvm2/utils/macro/push_macros.h>
 // platform
 # if defined(_MSC_VER) && !defined(__clang__)
-#  if !defined(_KERNEL_MODE) && defined(_M_AMD64)
+#  if !defined(_KERNEL_MODE) && defined(_M_AMD64) && !defined(_M_ARM64EC)
 #   include <emmintrin.h>  // MSVC x86_64-SSE2
 #  endif
-#  if !defined(_KERNEL_MODE) && defined(_M_ARM64)
+#  if !defined(_KERNEL_MODE) && (defined(_M_ARM64) || defined(_M_ARM64EC))
 #   include <arm_neon.h>  // MSVC aarch64-NEON
 #  endif
 # endif
@@ -294,7 +294,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #if defined(_MSC_VER) && !defined(__clang__)
         /// MSVC
 
-# if !defined(_KERNEL_MODE) && (defined(_M_AMD64) || defined(_M_ARM64))
+# if !defined(_KERNEL_MODE) && ((defined(_M_AMD64) && !defined(_M_ARM64EC)) || defined(_M_ARM64) || defined(_M_ARM64EC))
         /// (Little Endian), MSVC, ::fast_io::intrinsics::simd_vector
         /// x86_64-sse2, aarch64-neon
 
@@ -1609,7 +1609,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #if defined(_MSC_VER) && !defined(__clang__)
         /// MSVC
 
-# if !defined(_KERNEL_MODE) && (defined(_M_AMD64) || defined(_M_ARM64))
+# if !defined(_KERNEL_MODE) && ((defined(_M_AMD64) && !defined(_M_ARM64EC)) || defined(_M_ARM64) || defined(_M_ARM64EC))
         /// (Little Endian), MSVC, ::fast_io::intrinsics::simd_vector
         /// x86_64-sse2, aarch64-neon
 
@@ -4658,7 +4658,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
                                              if(remaining < sizeof(unsigned)) [[unlikely]] { return false; }
 
                                              // wasm_byte is uint_least8_t, so it is safe to reinterpret_cast
-                                             auto const* bytes{reinterpret_cast<wasm_byte const*>(p)};
+                                             auto bytes{reinterpret_cast<wasm_byte const*>(p)};
 
                                              unsigned word{};
                                              ::std::memcpy(::std::addressof(word), bytes, sizeof(word));
@@ -4886,7 +4886,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 #if defined(_MSC_VER) && !defined(__clang__)
         /// MSVC
 
-# if !defined(_KERNEL_MODE) && (defined(_M_AMD64) || defined(_M_ARM64))
+# if !defined(_KERNEL_MODE) && ((defined(_M_AMD64) && !defined(_M_ARM64EC)) || defined(_M_ARM64) || defined(_M_ARM64EC))
         /// (Little Endian), MSVC, ::fast_io::intrinsics::simd_vector
         /// x86_64-sse2, aarch64-neon
         if constexpr(::std::endian::native == ::std::endian::little)

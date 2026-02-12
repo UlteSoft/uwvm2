@@ -73,8 +73,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
         for(::std::size_t local_idx{}; local_idx < codesec.codes.size(); ++local_idx)
         {
             auto const& code{codesec.codes.index_unchecked(local_idx)};
-            auto const* const code_begin_ptr{reinterpret_cast<::std::byte const*>(code.body.expr_begin)};
-            auto const* const code_end_ptr{reinterpret_cast<::std::byte const*>(code.body.code_end)};
+            auto const code_begin_ptr{reinterpret_cast<::std::byte const*>(code.body.expr_begin)};
+            auto const code_end_ptr{reinterpret_cast<::std::byte const*>(code.body.code_end)};
 
             ::uwvm2::validation::error::code_validation_error_impl v_err{};
 #ifdef UWVM_CPP_EXCEPTIONS
@@ -183,7 +183,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::validator
                 case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm: [[fallthrough]];
                 case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
                 {
-                    auto const* const wf{mod.module_storage_ptr.wf};
+                    auto const wf{mod.module_storage_ptr.wf};
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(wf == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif

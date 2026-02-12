@@ -498,7 +498,8 @@ inline constexpr char32_t utf16_surrogate_to_utf32(char16_t high, char16_t low) 
 	return static_cast<char32_t>((static_cast<::std::uint_least32_t>(high) << 10u) + low - 0x35fdc00u);
 }
 
-#if (defined(_MSC_VER) && defined(_M_AMD64) && !defined(__clang__)) || (defined(__SSE__) && defined(__SSE2__) && defined(__x86_64__))
+#if (defined(_MSC_VER) && defined(_M_AMD64) && !defined(_M_ARM64EC) && !defined(__clang__)) ||                                             \
+	(defined(__SSE__) && defined(__SSE2__) && defined(__x86_64__) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 template <::std::integral T, ::std::integral U>
 	requires((sizeof(T) == 1) && (sizeof(U) == 1 || sizeof(U) == 2 || sizeof(U) == 4))
 inline code_cvt_result<T, U> convert_ascii_with_sse(T const *__restrict pSrc, U *__restrict pDst) noexcept

@@ -25,6 +25,7 @@ module;
 export module uwvm2.uwvm_predefine.io;
 export import :io_device;
 export import :output;
+export import :runtime_log;
 export import :warn_control;
 export import :verbose_control;
 export import :time;

@@ -15,7 +15,7 @@ namespace boost
 namespace hash_detail
 {
 
-#if defined(_MSC_VER) && defined(_M_X64) && !defined(__clang__)
+#if defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC) && !defined(__clang__)
 
 __forceinline std::uint64_t mulx( std::uint64_t x, std::uint64_t y )
 {
@@ -24,7 +24,7 @@ __forceinline std::uint64_t mulx( std::uint64_t x, std::uint64_t y )
     return r ^ r2;
 }
 
-#elif defined(_MSC_VER) && defined(_M_ARM64) && !defined(__clang__)
+#elif defined(_MSC_VER) && (defined(_M_ARM64) || defined(_M_ARM64EC)) && !defined(__clang__)
 
 __forceinline std::uint64_t mulx( std::uint64_t x, std::uint64_t y )
 {

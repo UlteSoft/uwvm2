@@ -38,6 +38,7 @@
 # include "wasm_register_dl.h"
 # include "wasm_depend_recursion_limit.h"
 # include "wasm_set_parser_limit.h"
+# include "wasm_set_initializer_limit.h"
 # include "wasm_list_weak_symbol_module.h"
 # include "wasm_memory_grow_strict.h"
 
@@ -49,6 +50,7 @@
 # include "runtime_jit.h"
 # include "runtime_tiered.h"
 # include "runtime_aot.h"
+# include "runtime_compiler_log.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"

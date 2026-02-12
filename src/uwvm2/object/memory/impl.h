@@ -24,6 +24,7 @@
 #ifndef UWVM_MODULE
 # include <uwvm2/object/memory/flags/impl.h>
 # include <uwvm2/object/memory/error/impl.h>
+# include <uwvm2/object/memory/signal/impl.h>
 # include <uwvm2/object/memory/wasm_page/impl.h>
 # include <uwvm2/object/memory/platform_page/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>

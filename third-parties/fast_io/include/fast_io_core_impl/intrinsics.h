@@ -179,15 +179,15 @@ inline constexpr bool add_carry(bool carry, T a, T b, T &out) noexcept
 		else
 		{
 #if defined(_MSC_VER) && !defined(__clang__)
-#if (defined(_M_IX86) || defined(_M_AMD64))
-			if constexpr (sizeof(T) == 8)
-			{
-#if defined(_M_AMD64)
-				return _addcarry_u64(carry, a, b, reinterpret_cast<::std::uint_least64_t *>(__builtin_addressof(out)));
+#if (defined(_M_IX86) || ((defined(_M_AMD64) || defined(_M_X64)) && !defined(_M_ARM64EC)))
+				if constexpr (sizeof(T) == 8)
+				{
+#if (defined(_M_AMD64) || defined(_M_X64)) && !defined(_M_ARM64EC)
+					return _addcarry_u64(carry, a, b, reinterpret_cast<::std::uint_least64_t *>(__builtin_addressof(out)));
 #else
-				return _addcarry_u32(_addcarry_u32(carry,
-												   *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(a)),
-												   *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(b)),
+					return _addcarry_u32(_addcarry_u32(carry,
+													   *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(a)),
+													   *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(b)),
 												   reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(out))),
 									 reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(a))[1],
 									 reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(b))[1],
@@ -363,14 +363,14 @@ inline constexpr bool sub_borrow(bool borrow, T a, T b, T &out) noexcept
 		else
 		{
 #if defined(_MSC_VER) && !defined(__clang__)
-#if (defined(_M_IX86) || defined(_M_AMD64))
-			if constexpr (sizeof(T) == 8)
-			{
-#if defined(_M_AMD64)
-				return _subborrow_u64(borrow, a, b,
-									  reinterpret_cast<::std::uint_least64_t *>(__builtin_addressof(out)));
+#if (defined(_M_IX86) || ((defined(_M_AMD64) || defined(_M_X64)) && !defined(_M_ARM64EC)))
+				if constexpr (sizeof(T) == 8)
+				{
+#if (defined(_M_AMD64) || defined(_M_X64)) && !defined(_M_ARM64EC)
+					return _subborrow_u64(borrow, a, b,
+										  reinterpret_cast<::std::uint_least64_t *>(__builtin_addressof(out)));
 #else
-				return _subborrow_u32(
+					return _subborrow_u32(
 					_subborrow_u32(borrow, *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(a)),
 								   *reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(b)),
 								   reinterpret_cast<::std::uint_least32_t *>(__builtin_addressof(out))),
@@ -617,7 +617,7 @@ inline
 			return static_cast<::std::uint_least64_t>(res);
 		}
 	}
-#elif defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)
+#elif defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC) && !defined(__arm64ec__)
 #if __cpp_if_consteval >= 202106L && 0
 	if !consteval
 	{
@@ -680,7 +680,7 @@ inline
 #endif
 	};
 	return static_cast<::std::uint_least64_t>((static_cast<__uint128_t>(a) * b) >> ul64bits);
-#elif defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC)
+#elif defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64EC) && !defined(__arm64ec__)
 	if (__builtin_is_constant_evaluated())
 	{
 		return umul_least64_high_emulated(a, b);
@@ -700,11 +700,11 @@ inline constexpr ::std::size_t add_or_overflow_die(::std::size_t a, ::std::size_
 #if __cpp_lib_is_constant_evaluated >= 201811L
 	if (!__builtin_is_constant_evaluated())
 	{
-#if defined(_M_X64)
-		::std::size_t res;
-		if (_addcarry_u64(false, a, b, __builtin_addressof(res))) [[unlikely]]
-		{
-			__debugbreak();
+#if defined(_M_X64) && !defined(_M_ARM64EC)
+			::std::size_t res;
+			if (_addcarry_u64(false, a, b, __builtin_addressof(res))) [[unlikely]]
+			{
+				__debugbreak();
 		}
 		return res;
 #elif defined(_M_X32)
@@ -892,11 +892,11 @@ inline constexpr U shiftright(U low_part, U high_part, ::std::uint_least8_t shif
 	else
 #endif
 	{
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(__i386__)) && !defined(__clang__)
-		if constexpr (sizeof(U) == 8 && sizeof(::std::size_t) >= 8)
-		{
-			return __shiftright128(low_part, high_part, shift);
-		}
+#if defined(_MSC_VER) && !defined(__clang__) && ((defined(__i386__)) || (defined(_M_X64) && !defined(_M_ARM64EC)))
+			if constexpr (sizeof(U) == 8 && sizeof(::std::size_t) >= 8)
+			{
+				return __shiftright128(low_part, high_part, shift);
+			}
 		else
 #endif
 		{

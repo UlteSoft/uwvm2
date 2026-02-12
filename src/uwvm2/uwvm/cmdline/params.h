@@ -65,6 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_register_dl),
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_initializer_limit),
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_list_weak_symbol_module),
 #endif
@@ -88,6 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
 #endif
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
 
         // wasi
 #if defined(UWVM_IMPORT_WASI)

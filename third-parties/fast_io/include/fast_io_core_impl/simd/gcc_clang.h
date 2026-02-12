@@ -405,8 +405,8 @@ struct simd_vector
 			temp_vec_type temp_vec;
 			__builtin_memcpy(__builtin_addressof(temp_vec), __builtin_addressof(this->value), sizeof(vec_type));
 #endif
-#if FAST_IO_HAS_BUILTIN(__builtin_shufflevector) && ((!defined(__x86_64__) && !defined(__i386__)) || \
-											   (!defined(__GNUC__) || defined(__clang__)) || defined(__SSE4_2__))
+#if FAST_IO_HAS_BUILTIN(__builtin_shufflevector) && (((!defined(__x86_64__) && !defined(__i386__)) || defined(__arm64ec__) || defined(_M_ARM64EC)) || \
+												   (!defined(__GNUC__) || defined(__clang__)) || defined(__SSE4_2__))
 			if constexpr (sizeof(T) == 8)
 			{
 				// clang-format off

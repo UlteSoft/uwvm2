@@ -48,7 +48,6 @@
 # include <uwvm2/uwvm/utils/depend/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/utils/memory/impl.h>
-# include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
@@ -306,6 +305,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 
         // Used to record the contents exported by each module. Persist globally.
+        // Rebuild every run to avoid stale `u8string_view` keys and mismatched module sets.
+        ::uwvm2::uwvm::wasm::storage::all_module_export.clear();
         ::uwvm2::uwvm::wasm::storage::all_module_export.reserve(all_module_size);  // Reserve space for all modules to avoid reallocations
 
         // Build dependency relationships
@@ -326,9 +327,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         case 1u:
                         {
                             auto const& exec_wasm_module_storage{exec_wasm_ptr->wasm_module_storage.wasm_binfmt_ver1_storage};
+                            // Build export map for the current module itself.
+                            // Note: entrypoint resolution in `run.h` depends on this even if the module has no imports.
+                            {
+                                auto get_exec_wasm_module_storage_exportsec_from_feature_tuple{
+                                    [&exec_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
+                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
+                                    {
+                                        return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
+                                            ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(
+                                            exec_wasm_module_storage.sections);
+                                    }};
+                                auto const& exec_wasm_module_storage_exportsec{
+                                    get_exec_wasm_module_storage_exportsec_from_feature_tuple(::uwvm2::uwvm::wasm::feature::all_features)};
+
+                                auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                                if(inserted) [[unlikely]]
+                                {
+                                    curr_exported_module->second.reserve(exec_wasm_module_storage_exportsec.exports.size());  // Reserve space for exports
+                                    for(auto const& exports: exec_wasm_module_storage_exportsec.exports)
+                                    {
+                                        ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                        export_record.type = curr_module.second.type;
+                                        auto& file_export{export_record.storage.wasm_file_export_storage_ptr};
+                                        file_export.binfmt_ver = exec_wasm_binfmt_ver;
+                                        file_export.storage.wasm_binfmt_ver1_export_storage_ptr = ::std::addressof(exports.exports);
+                                        static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                        // No duplication, because a check was performed during loading.
+                                        curr_exported_module->second.emplace(exports.export_name, export_record);
+                                    }
+                                }
+                            }
+
                             auto get_exec_wasm_module_storage_importsec_from_feature_tuple{
                                 [&exec_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                                    ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                                    ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                                 {
                                     return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                         ::uwvm2::parser::wasm::standard::wasm1::features::import_section_storage_t<Fs...>>(exec_wasm_module_storage.sections);
@@ -408,7 +441,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                                 auto const& imported_wasm_module_storage{imported_wasm_ptr->wasm_module_storage.wasm_binfmt_ver1_storage};
                                                 auto get_imported_wasm_module_storage_exportsec_from_feature_tuple{
                                                     [&imported_wasm_module_storage]<::uwvm2::parser::wasm::concepts::wasm_feature... Fs> UWVM_ALWAYS_INLINE(
-                                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept
+                                                        ::uwvm2::utils::container::tuple<Fs...>) constexpr noexcept -> decltype(auto)
                                                     {
                                                         return ::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
                                                             ::uwvm2::parser::wasm::standard::wasm1::features::export_section_storage_t<Fs...>>(
@@ -648,6 +681,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                 case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_dl:
                 {
+                    // Build export map for preloaded dl modules.
+                    {
+                        auto const dl_ptr{curr_module.second.module_storage_ptr.wd};
+                        if(dl_ptr != nullptr)
+                        {
+                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            if(inserted) [[unlikely]]
+                            {
+                                auto const dl_func_vec{dl_ptr->wasm_dl_storage.capi_function_vec};
+                                auto const dl_func_ptr{dl_func_vec.function_begin};
+                                auto const dl_func_sz{dl_func_vec.function_size};
+                                curr_exported_module->second.reserve(dl_func_sz);
+                                for(auto dl_func_curr{dl_func_ptr}; dl_func_curr != dl_func_ptr + dl_func_sz; ++dl_func_curr)
+                                {
+                                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                    auto const dl_func_curr_name{
+                                        ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(dl_func_curr->func_name_ptr),
+                                                                                 dl_func_curr->func_name_length}
+                                    };
+
+                                    ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                    export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_dl;
+                                    export_record.storage.wasm_dl_export_storage_ptr.storage = dl_func_curr;
+                                    static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                    curr_exported_module->second.emplace(dl_func_curr_name, export_record);
+                                }
+                            }
+                        }
+                    }
                     // Since dl only allows importing functions, there is no possibility of cyclic dependencies or similar issues, so no check is needed
                     break;
                 }
@@ -655,6 +717,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
                 case ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol:
                 {
+                    // Build export map for weak symbol modules.
+                    {
+                        auto const weak_symbol_ptr{curr_module.second.module_storage_ptr.wws};
+                        if(weak_symbol_ptr != nullptr)
+                        {
+                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            if(inserted) [[unlikely]]
+                            {
+                                auto const wws_func{weak_symbol_ptr->wasm_wws_storage.capi_function_vec};
+                                auto const wws_func_ptr{wws_func.function_begin};
+                                auto const wws_func_sz{wws_func.function_size};
+                                curr_exported_module->second.reserve(wws_func_sz);
+                                for(auto wws_func_curr{wws_func_ptr}; wws_func_curr != wws_func_ptr + wws_func_sz; ++wws_func_curr)
+                                {
+                                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                    auto const wws_func_curr_name{
+                                        ::uwvm2::utils::container::u8string_view{reinterpret_cast<char8_t_const_may_alias_ptr>(wws_func_curr->func_name_ptr),
+                                                                                 wws_func_curr->func_name_length}
+                                    };
+
+                                    ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                    export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::weak_symbol;
+                                    export_record.storage.wasm_weak_symbol_export_storage_ptr.storage = wws_func_curr;
+                                    static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                    curr_exported_module->second.emplace(wws_func_curr_name, export_record);
+                                }
+                            }
+                        }
+                    }
                     // Since weak_symbol only allows importing functions, there is no possibility of cyclic dependencies or similar issues, so no check is
                     // needed
                     break;
@@ -663,7 +754,58 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                 case ::uwvm2::uwvm::wasm::type::module_type_t::local_import:
                 {
                     // Local imported modules (host-side) currently don't import other modules, so no dependency edges are added.
-                    // Construct export map on demand in import checks.
+                    // Export map is constructed in this pass for consistent lookup behavior.
+                    {
+                        auto const imported_local_ptr{curr_module.second.module_storage_ptr.li};
+                        if(imported_local_ptr != nullptr)
+                        {
+                            auto [curr_exported_module, inserted]{::uwvm2::uwvm::wasm::storage::all_module_export.try_emplace(curr_module_name)};
+                            if(inserted) [[unlikely]]
+                            {
+                                auto const fn_all{imported_local_ptr->get_all_function_information()};
+                                auto const gl_all{imported_local_ptr->get_all_global_information()};
+                                auto const mem_all{imported_local_ptr->get_all_memory_information()};
+
+                                curr_exported_module->second.reserve(imported_local_ptr->get_total_export_count());
+
+                                for(auto it{fn_all.begin}; it != fn_all.end; ++it)
+                                {
+                                    ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                    export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                    auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                    li_export.storage = imported_local_ptr;
+                                    li_export.index = it->index;
+                                    li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::func;
+                                    static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                    curr_exported_module->second.emplace(it->function_name, export_record);
+                                }
+
+                                for(auto it{gl_all.begin}; it != gl_all.end; ++it)
+                                {
+                                    ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                    export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                    auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                    li_export.storage = imported_local_ptr;
+                                    li_export.index = it->index;
+                                    li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::global;
+                                    static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                    curr_exported_module->second.emplace(it->global_name, export_record);
+                                }
+
+                                for(auto it{mem_all.begin}; it != mem_all.end; ++it)
+                                {
+                                    ::uwvm2::uwvm::wasm::type::all_module_export_t export_record{};
+                                    export_record.type = ::uwvm2::uwvm::wasm::type::module_type_t::local_import;
+                                    auto& li_export{export_record.storage.local_imported_export_storage_ptr};
+                                    li_export.storage = imported_local_ptr;
+                                    li_export.index = it->index;
+                                    li_export.type = ::uwvm2::uwvm::wasm::type::local_imported_export_type_t::memory;
+                                    static_assert(::std::is_trivially_copy_constructible_v<decltype(export_record)>);
+                                    curr_exported_module->second.emplace(it->memory_name, export_record);
+                                }
+                            }
+                        }
+                    }
                     break;
                 }
                 [[unlikely]] default:

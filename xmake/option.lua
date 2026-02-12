@@ -98,16 +98,19 @@ option("stdlib", function()
     set_values("default", "libstdc++", "libc++")
 end)
 
-option("debug-strip", function()
+option("strip", function()
     set_description
     (
-        "Whether to strip the symbols while building with debug information.",
-        [[    none: Don't strip the symbols if possible.]],
-        [[    debug: Strip the debug symbols to a independent symbol file while keeping other symbols in the target file.]],
-        [[    all: Strip the debug symbols to a independent symbol file then strip all symbols from the target file.]]
+        "Strip level.",
+        [[    default: Use per-mode defaults.]],
+        [[             debug/release/releasedbg: none]],
+        [[             minsizerel: ident]],
+        [[    none: Don't strip symbols.]],
+        [[    symbol: Strip symbols.]],
+        [[    ident: Strip symbols + strip ident strings (e.g. -fno-ident).]]
     )
-    set_default("none")
-    set_values("none", "debug", "all")
+    set_default("default")
+    set_values("default", "none", "symbol", "ident")
 end)
 
 option("enable-lto", function()
@@ -179,6 +182,19 @@ option("enable-debug-int", function()
         "default = true"
     )
     set_default(true)
+end)
+
+option("enable-uwvm-int-combine-ops", function()
+    set_description
+    (
+        "Enable combined opcodes for uwvm-int.",
+        [[    none: disable all combine ops.]],
+        [[    soft: enable only soft/light combine ops.]],
+        [[    heavy: enable soft + heavy combine ops (default).]],
+        [[    extra: enable soft + heavy + extra-heavy combine ops (ultra-specific mega fusions).]]
+    )
+    set_default("heavy")
+    set_values("none", "soft", "heavy", "extra")
 end)
 
 option("detailed-debug-check", function()

@@ -104,7 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # if defined(_MSC_VER) && !defined(__clang__)
         if UWVM_IF_NOT_CONSTEVAL
         {
-#  if defined(_M_X64)
+#  if defined(_M_X64) && !(defined(_M_ARM64EC) || defined(__arm64ec__))
             if constexpr(::std::same_as<I, ::std::uint64_t>)
             {
                 // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.

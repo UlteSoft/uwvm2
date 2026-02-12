@@ -44,14 +44,14 @@
 #if !defined(BOOST_UNORDERED_DISABLE_SSE2)
 #if defined(BOOST_UNORDERED_ENABLE_SSE2)|| \
     defined(__SSE2__)|| \
-    defined(_M_X64)||(defined(_M_IX86_FP)&&_M_IX86_FP>=2)
+    (((defined(_M_X64) || defined(_M_AMD64)) && !defined(_M_ARM64EC)) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
 #define BOOST_UNORDERED_SSE2
 #endif
 #endif
 
 #if !defined(BOOST_UNORDERED_DISABLE_NEON)
 #if defined(BOOST_UNORDERED_ENABLE_NEON)||\
-    (defined(__ARM_NEON)&&!defined(__ARM_BIG_ENDIAN))
+    ((defined(__ARM_NEON) || defined(_M_ARM64) || defined(_M_ARM64EC)) && !defined(__ARM_BIG_ENDIAN))
 #define BOOST_UNORDERED_LITTLE_ENDIAN_NEON
 #endif
 #endif

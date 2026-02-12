@@ -23,6 +23,7 @@
 module;
 
 export module uwvm2.uwvm.runtime.initializer;
+export import :init_limit;
 export import :init;
 
 #ifndef UWVM_MODULE

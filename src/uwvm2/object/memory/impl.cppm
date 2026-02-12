@@ -25,6 +25,7 @@ module;
 import uwvm2.object.memory.flags;
 export module uwvm2.object.memory;
 export import uwvm2.object.memory.error;
+export import uwvm2.object.memory.signal;
 export import uwvm2.object.memory.wasm_page;
 export import uwvm2.object.memory.platform_page;
 export import uwvm2.object.memory.linear;

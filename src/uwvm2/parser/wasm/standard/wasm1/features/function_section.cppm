@@ -39,10 +39,10 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 // platform
 #if defined(_MSC_VER) && !defined(__clang__)
-# if !defined(_KERNEL_MODE) && defined(_M_AMD64)
+# if !defined(_KERNEL_MODE) && defined(_M_AMD64) && !defined(_M_ARM64EC)
 #  include <emmintrin.h>  // MSVC x86_64-SSE2
 # endif
-# if !defined(_KERNEL_MODE) && defined(_M_ARM64)
+# if !defined(_KERNEL_MODE) && (defined(_M_ARM64) || defined(_M_ARM64EC))
 #  include <arm_neon.h>  // MSVC aarch64-NEON
 # endif
 #endif

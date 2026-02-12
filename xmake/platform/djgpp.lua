@@ -27,8 +27,9 @@ function djgpp_target()
         add_ldflags(target_cvt, {force = true})
     end
 
-    local debug_strip = get_config("debug-strip")
-    if debug_strip == "all" or is_mode("release", "releasedbg", "minsizerel") then
+    local strip_cfg = get_config("strip") or "default"
+    local is_ident_strip = strip_cfg == "ident" or (strip_cfg == "default" and is_mode("minsizerel"))
+    if is_ident_strip then
         add_cxflags("-fno-ident") -- also strip ident data
     end
 

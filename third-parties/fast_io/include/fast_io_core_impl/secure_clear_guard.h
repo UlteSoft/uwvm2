@@ -68,13 +68,13 @@ inline void secure_clear(void *data, ::std::size_t size) noexcept
 	forceinline for this is nonsense
 	*/
 
-#if defined(_M_AMD64)
+#if defined(_M_AMD64) && !defined(_M_ARM64EC)
 	__stosb(__builtin_bit_cast(unsigned char *, data), 0, size);
 #else
 	char volatile *vptr = (char volatile *)data;
 	while (size)
 	{
-#if !defined(_M_CEE) && (defined(_M_ARM) || defined(_M_ARM64))
+#if !defined(_M_CEE) && (defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC))
 		__iso_volatile_store8(vptr, 0);
 #else
 		*vptr = 0;
@@ -120,7 +120,7 @@ inline constexpr ::std::byte *bytes_secure_clear_n(::std::byte *data, ::std::siz
 		char volatile *vptr = (char volatile *)data;
 		while (size)
 		{
-#if !defined(_M_CEE) && (defined(_M_ARM) || defined(_M_ARM64))
+#if !defined(_M_CEE) && (defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC))
 			__iso_volatile_store8(vptr, 0);
 #else
 			*vptr = 0;

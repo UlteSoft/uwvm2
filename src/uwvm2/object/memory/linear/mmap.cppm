@@ -46,6 +46,7 @@ import uwvm2.utils.debug;
 import uwvm2.utils.mutex;
 import uwvm2.object.memory.wasm_page;
 import uwvm2.object.memory.platform_page;
+import uwvm2.object.memory.signal;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -55,4 +56,3 @@ import uwvm2.object.memory.platform_page;
 #endif
 
 #include "mmap.h"
-

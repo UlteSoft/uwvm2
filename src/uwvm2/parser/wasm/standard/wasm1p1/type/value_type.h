@@ -49,8 +49,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1p1::type
     ///             single instruction multiple data).
     ///             This is only used for storage and will be converted to the type used for computation during computation depending on platform support
     /// @see        WebAssembly Release 1.1 (Draft 2021-11-16) § 2.3.2
-#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__)  // GNUC, clang
     using wasm_v128 [[__gnu__::__vector_size__(16)]] = char;
+#elif (defined(_MSC_VER) && !defined(__clang__))  // MSVC
+# if defined(__ARM_NEON) || defined(_M_ARM64) || defined(_M_ARM64EC)
+    using wasm_v128 = __n128;
+# elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
+    using wasm_v128 = __m128;
+# else  // armv7a, i686
+    union alignas(16uz) wasm_v128
+    {
+        wasm_u8 u8x16[16];
+        wasm_i8 i8x16[16];
+
+        wasm_u16 u16x8[8];
+        wasm_i16 i16x8[8];
+
+        wasm_u32 u32x4[4];
+        wasm_i32 i32x4[4];
+        wasm_f32 f32x4[4];
+
+        wasm_u64 u64x2[2];
+        wasm_i64 i64x2[2];
+        wasm_f64 f64x2[2];
+    };
+# endif
 #elif CHAR_BIT > 8
     struct alignas(16uz) wasm_v128
     {

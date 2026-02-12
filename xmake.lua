@@ -20,7 +20,7 @@ includes("xmake/platform/impl.lua")
 -- Currently, there are no plugins.
 -- add_plugindirs("xmake/plugins")
 
-set_defaultmode("releasedbg")
+set_defaultmode("release")
 set_allowedmodes(support_rules_table)
 
 function def_build()
@@ -94,8 +94,20 @@ function def_build()
 	local enable_debug_int = get_config("enable-debug-int")
 	if enable_debug_int then
 		add_defines("UWVM_ENABLE_DEBUG_INT")
-	else
-		add_defines("UWVM_DISABLE_DEBUG_INT")
+	end
+
+	local heavy_combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
+
+	if heavy_combine_ops_mode ~= "none" then
+		-- Soft/light combine is enabled by default unless explicitly set to "none".
+		add_defines("UWVM_ENABLE_UWVM_INT_COMBINE_OPS")
+
+		if heavy_combine_ops_mode == "heavy" or heavy_combine_ops_mode == "extra" then
+			add_defines("UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS")
+			if heavy_combine_ops_mode == "extra" then
+				add_defines("UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS")
+			end
+		end
 	end
 
 	local detailed_debug_check = get_config("detailed-debug-check")
@@ -241,63 +253,124 @@ function def_build()
 end
 
 target("uwvm")
-set_kind("binary")
-def_build()
+	set_kind("binary")
+	def_build()
 
-local is_debug_mode = is_mode("debug")  -- public all modules in debug mode
-local enable_cxx_module = get_config("use-cxx-module")
+	-- uwvm uses precise floating-point model to ensure determinism.
+	set_fpmodels("precise") 
 
--- third-parties/fast_io
-add_includedirs("third-parties/fast_io/include")
+	local is_debug_mode = is_mode("debug")  -- public all modules in debug mode
+	local enable_cxx_module = get_config("use-cxx-module")
 
-if enable_cxx_module then
-	add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-	add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-end
+	-- third-parties/fast_io
+	add_includedirs("third-parties/fast_io/include")
 
--- third-parties/bizwen
-add_includedirs("third-parties/bizwen/include")
+	if enable_cxx_module then
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+	end
 
--- third-parties/boost
-add_includedirs("third-parties/boost_unordered/include")
+	-- third-parties/bizwen
+	add_includedirs("third-parties/bizwen/include")
 
--- uwvm
-add_defines("UWVM=2")
-
--- src
-add_includedirs("src/")
-
-add_headerfiles("src/**.h")
-
-if enable_cxx_module then
-	-- uwvm predefine
-	add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-	-- utils
-	add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-	-- object
-	add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-	-- imported
-	add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-	-- wasm parser
-	add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+	-- third-parties/boost
+	add_includedirs("third-parties/boost_unordered/include")
 
 	-- uwvm
-	add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-end
+	add_defines("UWVM=2")
 
-if enable_cxx_module then
-	-- uwvm main
-	add_files("src/uwvm2/uwvm/main.module.cpp")
-else
-	-- uwvm main
-	add_files("src/uwvm2/uwvm/main.default.cpp")
-end
+	-- src
+	add_includedirs("src/")
+
+	add_headerfiles("src/**.h")
+
+	if enable_cxx_module then
+		-- uwvm predefine
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+		-- utils
+		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+		-- object
+		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+		-- imported
+		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+		-- wasm parser
+		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+		-- uwvm
+		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+	end
+
+	if enable_cxx_module then
+		-- uwvm main
+		add_files("src/uwvm2/uwvm/main.module.cpp")
+	else
+		-- uwvm main
+		add_files("src/uwvm2/uwvm/main.default.cpp")
+	end
+
+	-- uwvm_runtime (uwvm_runtime interpreter runtime unit)
+	if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
+		add_deps("uwvm_runtime")
+	end
 
 target_end()
+
+-- uwvm_runtime: build the interpreter/runtime execution unit separately so it can use its own FP flags.
+if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
+	target("uwvm_runtime")
+		set_kind("object")
+		def_build()
+			
+		-- Interpreter/runtime execution unit: disable observable floating-point side effects
+		-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
+		add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
+
+		-- third-parties/fast_io
+		add_includedirs("third-parties/fast_io/include")
+		-- third-parties/bizwen
+		add_includedirs("third-parties/bizwen/include")
+		-- third-parties/boost
+		add_includedirs("third-parties/boost_unordered/include")
+
+		-- src
+		add_includedirs("src/")
+
+		add_defines("UWVM=2")
+
+		if enable_cxx_module then
+			-- uwvm predefine
+			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+			-- utils
+			add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+			-- object
+			add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+			-- imported
+			add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+			-- wasm parser
+			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+			-- uwvm
+			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+		end
+
+		if enable_cxx_module then
+			-- uwvm int main
+			add_files("src/uwvm2/runtime/lib/uwvm_runtime.module.cpp")
+		else
+			-- uwvm int main
+			add_files("src/uwvm2/runtime/lib/uwvm_runtime.default.cpp")
+		end
+		
+	target_end()
+end
 
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
@@ -305,6 +378,10 @@ for _, file in ipairs(os.files("test/**.cc")) do
 	target(name)
 	set_kind("binary")
 	def_build()
+
+	-- uwvm uses precise floating-point model to ensure determinism.
+	set_fpmodels("precise") 
+
 	set_default(false)
 
 	local enable_cxx_module = get_config("use-cxx-module")

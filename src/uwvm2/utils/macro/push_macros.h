@@ -584,8 +584,9 @@
 /// @note         support: win9x, winnt, posix
 #pragma push_macro("UWVM_SUPPORT_MMAP")
 #undef UWVM_SUPPORT_MMAP
-#if (defined(_WIN32) || defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&                                        \
-                                                 (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) && __has_include(<sys/mman.h>))
+#if !defined(UWVM_FORCE_DISABLE_MMAP) &&                                                                                                                       \
+    (((defined(_WIN32) || defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&                                      \
+                                                   (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) && __has_include(<sys/mman.h>))))
 # define UWVM_SUPPORT_MMAP
 #endif
 
@@ -594,4 +595,28 @@
 // Currently only supports ELF weak symbols.
 #if defined(__ELF__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__weak__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__used__)
 # define UWVM_SUPPORT_WEAK_SYMBOL
+#endif
+
+#pragma push_macro("UWVM_NOINLINE")
+#undef UWVM_NOINLINE
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__noinline__)
+# define UWVM_NOINLINE [[__gnu__::__noinline__]]
+#elif UWVM_HAS_CPP_ATTRIBUTE(msvc::noinline)
+# define UWVM_NOINLINE [[msvc::noinline]]
+#else
+# define UWVM_NOINLINE
+#endif
+
+#pragma push_macro("UWVM_FASTCALL")
+#undef UWVM_FASTCALL
+#if defined(__i386__) || defined(_M_IX86)
+# if (defined(_MSC_VER) && !defined(__clang__)) && !UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__) && !defined(__WINE__)
+#  define UWVM_FASTCALL __fastcall
+# elif (defined(__clang__) || defined(__GNUC__)) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__fastcall__)
+#  define UWVM_FASTCALL __attribute__((__fastcall__))
+# else
+#  define UWVM_FASTCALL
+# endif
+#else
+# define UWVM_FASTCALL
 #endif

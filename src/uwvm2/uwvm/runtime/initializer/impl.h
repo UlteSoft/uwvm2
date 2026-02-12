@@ -23,5 +23,6 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+# include "init_limit.h"
 # include "init.h"
 #endif

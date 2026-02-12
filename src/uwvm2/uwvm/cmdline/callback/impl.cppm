@@ -37,6 +37,7 @@ export import :wasm_preload_library;
 export import :wasm_register_dl;
 export import :wasm_depend_recursion_limit;
 export import :wasm_set_parser_limit;
+export import :wasm_set_initializer_limit;
 export import :wasm_list_weak_symbol_module;
 
 // runtime
@@ -47,6 +48,7 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_tiered;
 export import :runtime_aot;
+export import :runtime_compiler_log;
 
 // wasi
 export import :wasi_disable_utf8_check;

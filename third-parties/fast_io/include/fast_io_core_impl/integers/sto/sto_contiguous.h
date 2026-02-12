@@ -258,7 +258,7 @@ inline constexpr char unsigned simd16_shift_table[32]{0xFF, 0xFF, 0xFF, 0xFF, 0x
 													  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 1, 2, 3, 4, 5,
 													  6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
-#if defined(__SSE4_1__) && (defined(__x86_64__) || defined(_M_AMD64))
+#if defined(__SSE4_1__) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 
 template <bool char_execharset>
 inline ::std::uint_least32_t detect_length(char unsigned const *buffer) noexcept
@@ -1083,7 +1083,7 @@ scan_int_contiguous_none_space_part_define_impl(char_type const *first, char_typ
 	using unsigned_type = my_make_unsigned_t<::std::remove_cvref_t<T>>;
 	unsigned_type res{};
 	char_type const *it;
-#if defined(__SSE4_1__) && (defined(__x86_64__) || defined(_M_AMD64))
+#if defined(__SSE4_1__) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)))
 	if constexpr (base == 10 && sizeof(char_type) == 1 && sizeof(unsigned_type) <= sizeof(::std::uint_least64_t))
 	{
 		if (

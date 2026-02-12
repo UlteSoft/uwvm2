@@ -69,14 +69,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::mutex
 
     UWVM_ALWAYS_INLINE inline constexpr void rwlock_pause() noexcept
     {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if (defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))
         // x86 / x64: use PAUSE if available
 # if UWVM_HAS_BUILTIN(__builtin_ia32_pause)
         __builtin_ia32_pause();
 # else
         ::std::atomic_signal_fence(::std::memory_order_seq_cst);
 # endif
-#elif defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__) || defined(_M_ARM)
+#elif (defined(__aarch64__) || defined(_M_ARM64)) || (defined(__arm__) || defined(_M_ARM)) || (defined(__arm64ec__) || defined(_M_ARM64EC))
         // ARM / AArch64: use YIELD-style builtin if available
 # if UWVM_HAS_BUILTIN(__builtin_aarch64_yield)
         __builtin_aarch64_yield();
