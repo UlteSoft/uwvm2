@@ -73,7 +73,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
+        run: xmake f -m debug --use-llvm=y --toolchain=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
         run: |
           xmake b -rv
@@ -179,7 +179,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
+        run: xmake f -m debug --use-llvm=y --toolchain=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
@@ -209,7 +209,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
+        run: xmake f -m debug --use-llvm=y --toolchain=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
       - name: Build
         run: | 
           xmake b -rv
