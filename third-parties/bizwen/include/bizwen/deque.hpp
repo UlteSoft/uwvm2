@@ -2645,13 +2645,13 @@ class deque
     }
 
     template <bool back>
-    struct partial_guard_
+    class partial_guard_
     {
         deque *d;
-        ::std::size_t const size;
+        size_type const size;
 
       public:
-        constexpr partial_guard_(deque *dp, ::std::size_t const old_size) noexcept : d(dp), size(old_size)
+        constexpr partial_guard_(deque *dp, size_type const old_size) noexcept : d(dp), size(old_size)
         {
         }
 
@@ -2783,9 +2783,6 @@ class deque
         }
     }
 
-// TRANSITION: EDG不能区分该重载和bidirectional_iterator重载的区别
-// https://developercommunity.visualstudio.com/t/IntellisenceEDG-cannot-correctly-determ/10981026
-#if !defined(__EDG__)
     template <typename U>
         requires ::std::random_access_iterator<::std::remove_reference_t<U>>
     constexpr void prepend_range_noguard_(U &&first, U &&last)
@@ -2793,7 +2790,6 @@ class deque
         reserve_front_(static_cast<::std::size_t>(last - first));
         emplace_front_noalloc_range_(first, last);
     }
-#endif
 
     template <typename R>
     constexpr void prepend_range_noguard_(R &&rg)
@@ -2820,7 +2816,10 @@ class deque
             }
             auto const count = static_cast<::std::size_t>(::std::ranges::size(rg));
             reserve_front_(count);
-            emplace_front_noalloc_range_(::std::ranges::begin(rg), ::std::ranges::end(rg));
+            for (auto &&i : rg)
+            {
+                emplace_front_noalloc_(::std::forward<decltype(i)>(i));
+            }
             ::std::ranges::reverse(begin(), begin() + static_cast<::std::ptrdiff_t>(count));
         }
         else
@@ -3134,14 +3133,14 @@ class deque
         auto const old_size = front_diff + back_diff;
         if (back_diff <= front_diff)
         {
-            partial_guard_<true> guard(this, old_size);
+            partial_guard_<true> guard(this, static_cast<size_type>(old_size));
             append_range_noguard_(first, last);
             guard.release();
             ::std::rotate(begin() + front_diff, begin() + old_size, end());
         }
         else
         {
-            partial_guard_<false> guard(this, old_size);
+            partial_guard_<false> guard(this, static_cast<size_type>(old_size));
             prepend_range_noguard_(first, last);
             guard.release();
             ::std::rotate(begin(), begin() + (static_cast<difference_type>(size()) - old_size), end() - back_diff);
