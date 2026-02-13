@@ -71,7 +71,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install clang-22 clang-tools lld xmake
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
@@ -111,7 +111,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install clang-22 clang-tools lld xmake
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Download Intel SDE
         run: |
           mkdir -p /opt/intel-sde
@@ -177,7 +177,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install clang-22 clang-tools lld xmake
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
       - name: Build
@@ -207,7 +207,7 @@ jobs:
           wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
           sudo add-apt-repository ppa:xmake-io/xmake
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
-          sudo apt-get install clang-22 clang-tools lld xmake
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
         run: xmake f -m debug --use-llvm=y --toolchain=clang -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
       - name: Build
