@@ -73,7 +73,7 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --use-llvm=y --toolchain=clang --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --c
+        run: xmake f -m debug --use-llvm=y --toolchain=clang --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
         run: |
           xmake b -rv
