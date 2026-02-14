@@ -6755,7 +6755,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
                         auto& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
-                        auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
+                        // Label arity = label_types count. IMPORTANT: for `loop`, label types are parameters (MVP: none),
+                        // not result types.
+                        auto const target_arity{target_frame.type == block_type::loop ? 0uz
+                                                                                      : static_cast<::std::size_t>(target_frame.result.end -
+                                                                                                                   target_frame.result.begin)};
 
                         if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
                         {
@@ -7244,7 +7248,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const target_frame_index{all_label_count_uz - 1uz - label_index_uz};
                         auto const& target_frame{control_flow_stack.index_unchecked(target_frame_index)};
                         auto& target_frame_mut{control_flow_stack.index_unchecked(target_frame_index)};
-                        auto const target_arity{static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
+                        // Label arity = label_types count. IMPORTANT: for `loop`, label types are parameters (MVP: none),
+                        // not result types.
+                        auto const target_arity{target_frame.type == block_type::loop ? 0uz
+                                                                                      : static_cast<::std::size_t>(target_frame.result.end -
+                                                                                                                   target_frame.result.begin)};
 
                         if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
                         {
@@ -8668,9 +8676,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const get_sig{[&](wasm_u32 li) constexpr noexcept
                                            {
                                                auto const& frame{control_flow_stack.index_unchecked(all_label_count_uz - 1uz - static_cast<::std::size_t>(li))};
-                                               ::std::size_t const arity{static_cast<::std::size_t>(frame.result.end - frame.result.begin)};
+                                               ::std::size_t arity{};
                                                curr_operand_stack_value_type type{};
-                                               if(arity != 0uz) { type = frame.result.begin[0]; }
+                                               if(frame.type != block_type::loop)
+                                               {
+                                                   arity = static_cast<::std::size_t>(frame.result.end - frame.result.begin);
+                                                   if(arity != 0uz) { type = frame.result.begin[0]; }
+                                               }
                                                return get_sig_result_t{arity, type};
                                            }};
 
