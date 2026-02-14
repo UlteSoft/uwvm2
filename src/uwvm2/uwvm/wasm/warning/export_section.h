@@ -95,7 +95,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::warning
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                         u8"[warn]  ",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                        u8"It is not recommended that the length of Export Name is 0.",
+                                        u8"It is not recommended that the length of Export Name is 0. ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(parser)\n",
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
                     if(::uwvm2::uwvm::io::parser_warning_fatal) [[unlikely]]

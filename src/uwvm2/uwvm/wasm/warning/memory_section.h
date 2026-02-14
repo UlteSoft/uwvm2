@@ -75,7 +75,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::warning
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                 u8"[warn]  ",
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                u8"The initial value of memory is greater than 65536 (this is the theoretical maximum size of wasm32, which may cause instantiation to fail).",
+                u8"The initial value of memory is greater than 65536 (this is the theoretical maximum size of wasm32, which may cause instantiation to fail). ",
+                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                u8"(parser)\n",
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
             if(::uwvm2::uwvm::io::parser_warning_fatal) [[unlikely]]
@@ -105,7 +107,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::warning
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                     u8"[warn]  ",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                    u8"The maximum value of memory is greater than 65536 (this is the theoretical maximum size of wasm32, which may cause instantiation to fail).",
+                    u8"The maximum value of memory is greater than 65536 (this is the theoretical maximum size of wasm32, which may cause instantiation to fail). ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                    u8"(parser)\n",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
                 if(::uwvm2::uwvm::io::parser_warning_fatal) [[unlikely]]
