@@ -23,5 +23,7 @@
 // #pragma once
 
 /// @todo add more features here
+#pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET")
 #pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET")
+#pragma pop_macro("UWVM_IMPORT_WASI_WASIP1_WASM64")
 #pragma pop_macro("UWVM_IMPORT_WASI_WASIP1")

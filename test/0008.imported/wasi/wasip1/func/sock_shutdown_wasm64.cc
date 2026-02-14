@@ -66,7 +66,7 @@
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
-# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 int main()
 {
@@ -405,4 +405,3 @@ int main() {}
 int main() {}
 
 #endif
-

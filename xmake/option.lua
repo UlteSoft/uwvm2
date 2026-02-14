@@ -400,3 +400,27 @@ option("disable-local-imported-wasip1", function()
     )
     set_default(false)
 end)
+
+option("enable-local-imported-wasip1-wasm64", function()
+    set_description
+    (
+        "Enable the wasip1 extension for the wasm64 version.",
+        "Prerequisite: disable-local-imported-wasip1 == false",
+        "default = true"
+    )
+    set_default(true)
+end)
+
+option("enable-local-imported-wasip1-socket", function()
+    set_description
+    (
+        "Enable the socket extension in wasip1.",
+        "Prerequisite: disable-local-imported-wasip1 == false",
+        "default = wasip1",
+        [[    none: Disable extensions.]],
+        [[    wasip1: Enable the official wasip1 extension.]],
+        [[    wasix: Enable the wasix extension. The difference from wasip1 is that sock_accept has an additional parameter: `ro_addr`.]]
+    )
+    set_default("wasip1")
+    set_values("none", "wasip1", "wasix")
+end)

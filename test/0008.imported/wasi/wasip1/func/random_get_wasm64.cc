@@ -32,6 +32,10 @@
 #ifdef UWVM_IMPORT_WASI_WASIP1
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
+
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
 int main()
 {
     using ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t;
@@ -97,3 +101,9 @@ int main()
         if(::std::memcmp(memory.memory_begin + buf, zeros, BUF_LEN) == 0) { ::fast_io::fast_terminate(); }
     }
 }
+
+#else
+
+int main() {}
+
+#endif

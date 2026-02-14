@@ -51,7 +51,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#ifdef UWVM_IMPORT_WASI_WASIP1
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
