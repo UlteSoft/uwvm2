@@ -29,6 +29,7 @@
 # include <concepts>
 # include <limits>
 # include <memory>
+# include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
@@ -361,18 +362,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_stack(::std::size_t pos) noexcept
             {
                 static_assert(Curr < End);
-                if constexpr(Curr + 1uz == End)
-                {
-                    return OpWrapper::template fptr<CompileOption, Curr, Type...>();
-                }
+                if constexpr(Curr + 1uz == End) { return OpWrapper::template fptr<CompileOption, Curr, Type...>(); }
                 else
                 {
                     constexpr ::std::size_t count{End - Curr};
                     static constexpr auto table{[]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr noexcept
-                                                 {
-                                                     return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Is)>{
-                                                         OpWrapper::template fptr<CompileOption, Curr + Is, Type...>()...};
-                                                 }(::std::make_index_sequence<count>{})};
+                                                {
+                                                    return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Is)>{
+                                                        OpWrapper::template fptr<CompileOption, Curr + Is, Type...>()...};
+                                                }(::std::make_index_sequence<count>{})};
 
                     if(pos < Curr || pos >= End) [[unlikely]]
                     {
@@ -407,11 +405,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     constexpr ::std::size_t i32_count{I32End - I32Curr};
                     constexpr ::std::size_t val_count{ValEnd - ValCurr};
                     constexpr ::std::size_t total{i32_count * val_count};
-                    static constexpr auto table{[]<::std::size_t... Ks>(::std::index_sequence<Ks...>) constexpr noexcept
-                                                 {
-                                                     return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Ks)>{
-                                                         OpWrapper::template fptr<CompileOption, I32Curr + (Ks / val_count), ValCurr + (Ks % val_count), Type...>()...};
-                                                 }(::std::make_index_sequence<total>{})};
+                    static constexpr auto table{
+                        []<::std::size_t... Ks>(::std::index_sequence<Ks...>) constexpr noexcept
+                        {
+                            return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Ks)>{
+                                OpWrapper::template fptr<CompileOption, I32Curr + (Ks / val_count), ValCurr + (Ks % val_count), Type...>()...};
+                        }(::std::make_index_sequence<total>{})};
 
                     if(i32_pos < I32Curr || i32_pos >= I32End || val_pos < ValCurr || val_pos >= ValEnd) [[unlikely]]
                     {
