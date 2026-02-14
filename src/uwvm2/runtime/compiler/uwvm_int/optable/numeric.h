@@ -1495,20 +1495,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...> select_stacktop_fptr_by_currpos_impl_numeric(::std::size_t pos) noexcept
             {
                 static_assert(Curr < End);
-                if(pos == Curr) { return OpWrapper::template fptr<CompileOption, Curr, Type...>(); }
+                if constexpr(Curr + 1uz == End)
+                {
+                    return OpWrapper::template fptr<CompileOption, Curr, Type...>();
+                }
                 else
                 {
-                    if constexpr(Curr + 1uz < End)
-                    {
-                        return select_stacktop_fptr_by_currpos_impl_numeric<CompileOption, Curr + 1uz, End, OpWrapper, Type...>(pos);
-                    }
-                    else
+                    constexpr ::std::size_t count{End - Curr};
+                    static constexpr auto table{[]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr noexcept
+                                                 {
+                                                     return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Is)>{
+                                                         OpWrapper::template fptr<CompileOption, Curr + Is, Type...>()...};
+                                                 }(::std::make_index_sequence<count>{})};
+
+                    if(pos < Curr || pos >= End) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
                         ::fast_io::fast_terminate();
                     }
+                    return table[pos - Curr];
                 }
             }
 

@@ -356,6 +356,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
         ::uwvm2::utils::container::vector<::std::size_t> local_offsets{};
 
+        // Reuse label/thunk fixup temporaries across functions to avoid repeated heap allocations.
+        using bytecode_vec_t = ::uwvm2::utils::container::vector<::std::byte>;
+
+        using rel_offset_t = ::std::make_unsigned_t<::std::ptrdiff_t>;
+        static_assert(sizeof(rel_offset_t) == sizeof(::std::byte const*));
+        static_assert(::std::is_trivially_copyable_v<rel_offset_t>);
+
+        struct label_info_t
+        {
+            ::std::size_t offset{SIZE_MAX};
+            bool in_thunk{};
+        };
+
+        struct ptr_fixup_t
+        {
+            ::std::size_t site{};      // byte index within the owning buffer
+            ::std::size_t label_id{};  // index into labels
+            bool in_thunk{};           // false: site in `bytecode`, true: site in `thunks`
+        };
+
+        ::uwvm2::utils::container::vector<label_info_t> labels{};
+        ::uwvm2::utils::container::vector<ptr_fixup_t> ptr_fixups{};
+        bytecode_vec_t thunks{};
+        labels.reserve(64uz);
+        ptr_fixups.reserve(256uz);
+        thunks.reserve(256uz);
+
         for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; ++local_function_idx)
         {
             ::std::size_t const function_index{import_func_count + local_function_idx};
@@ -549,7 +576,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             // Local storage is byte-packed too (same scalar sizes). We emit local offsets as immediates, so runtime only
             // needs the total local byte size to allocate and zero-initialize.
-            local_offsets.resize(static_cast<::std::size_t>(all_local_count_with_internal));
+            local_offsets.clear();
+            auto const local_offsets_need{static_cast<::std::size_t>(all_local_count_with_internal)};
+            if(local_offsets.capacity() < local_offsets_need) { local_offsets.reserve(local_offsets_need); }
 
             auto const local_bytes_add{[&](local_offset_t& acc, local_offset_t add) constexpr noexcept
                                        {
@@ -564,24 +593,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                        }};
 
             local_offset_t local_bytes{};
-            ::std::size_t local_fill_idx{};
             for(wasm_u32 i{}; i != func_parameter_count_u32; ++i)
             {
-                local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+                // Safe: reserved `all_local_count_with_internal` above.
+                local_offsets.push_back_unchecked(local_bytes);
                 local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(func_parameter_begin[i])));
-                ++local_fill_idx;
             }
             for(auto const& local_part: curr_code_locals)
             {
                 for(wasm_u32 j{}; j != local_part.count; ++j)
                 {
-                    local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+                    // Safe: reserved `all_local_count_with_internal` above.
+                    local_offsets.push_back_unchecked(local_bytes);
                     local_bytes_add(local_bytes, static_cast<local_offset_t>(operand_stack_valtype_size(local_part.type)));
-                    ++local_fill_idx;
                 }
             }
 
-            if(local_fill_idx != static_cast<::std::size_t>(all_local_count)) [[unlikely]]
+            if(local_offsets.size() != static_cast<::std::size_t>(all_local_count)) [[unlikely]]
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -590,7 +618,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             }
 
             // Internal temp local comes last and must be wide enough for any scalar result (8 bytes).
-            local_offsets.index_unchecked(local_fill_idx) = local_bytes;
+            // Safe: reserved `all_local_count_with_internal` above.
+            local_offsets.push_back_unchecked(local_bytes);
             local_bytes_add(local_bytes, internal_temp_local_size);
 
             local_func_symbol.local_bytes_max = local_bytes;
@@ -827,7 +856,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #endif
 
             // Bytecode emitter (writes into local_func_symbol.op.operands).
-            using bytecode_vec_t = ::uwvm2::utils::container::vector<::std::byte>;
             bytecode_vec_t& bytecode{local_func_symbol.op.operands};
 
             bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
@@ -1123,27 +1151,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const emit_imm{[&]<typename T>(T const& v) constexpr UWVM_THROWS { emit_imm_to(bytecode, v); }};
 
-            using rel_offset_t = ::std::make_unsigned_t<::std::ptrdiff_t>;
-            static_assert(sizeof(rel_offset_t) == sizeof(::std::byte const*));
-            static_assert(::std::is_trivially_copyable_v<rel_offset_t>);
-
-            struct label_info_t
-            {
-                ::std::size_t offset{SIZE_MAX};
-                bool in_thunk{};
-            };
-
-            struct ptr_fixup_t
-            {
-                ::std::size_t site{};      // byte index within the owning buffer
-                ::std::size_t label_id{};  // index into labels
-                bool in_thunk{};           // false: site in `bytecode`, true: site in `thunks`
-            };
-
-            ::uwvm2::utils::container::vector<label_info_t> labels{};
-            ::uwvm2::utils::container::vector<ptr_fixup_t> ptr_fixups{};
-            labels.reserve(64uz);
-            ptr_fixups.reserve(256uz);
+            labels.clear();
+            ptr_fixups.clear();
 
             auto const new_label{[&](bool in_thunk) constexpr UWVM_THROWS -> ::std::size_t
                                  {
@@ -1156,8 +1165,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
             auto const set_label_offset{[&](::std::size_t label_id, ::std::size_t off) constexpr noexcept { labels.index_unchecked(label_id).offset = off; }};
 
             // Thunk bytecode (appended after main `bytecode` so it never shifts main offsets).
-            bytecode_vec_t thunks{};
-            thunks.reserve(256uz);
+            thunks.clear();
 
             auto const emit_ptr_label_placeholder{[&](::std::size_t label_id, bool in_thunk) constexpr UWVM_THROWS
                                                   {
@@ -1298,6 +1306,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                   }
 #endif
                                                                   if(codegen_operand_stack.empty()) { return; }
+                                                                  if constexpr(stacktop_enabled)
+                                                                  {
+                                                                      if(!is_polymorphic && stacktop_cache_count != 0uz)
+                                                                      {
+                                                                          auto const old_vt{codegen_operand_stack.back_unchecked().type};
+                                                                          if(old_vt != vt)
+                                                                          {
+                                                                              auto const cache_count_ref_for_vt{
+                                                                                  [&]([[maybe_unused]] curr_operand_stack_value_type ty) constexpr noexcept -> ::std::size_t&
+                                                                                  {
+                                                                                      switch(ty)
+                                                                                      {
+                                                                                          case curr_operand_stack_value_type::i32:
+                                                                                          {
+                                                                                              return stacktop_cache_i32_count;
+                                                                                          }
+                                                                                          case curr_operand_stack_value_type::i64:
+                                                                                          {
+                                                                                              return stacktop_cache_i64_count;
+                                                                                          }
+                                                                                          case curr_operand_stack_value_type::f32:
+                                                                                          {
+                                                                                              return stacktop_cache_f32_count;
+                                                                                          }
+                                                                                          case curr_operand_stack_value_type::f64:
+                                                                                          {
+                                                                                              return stacktop_cache_f64_count;
+                                                                                          }
+                                                                                          [[unlikely]] default:
+                                                                                          {
+                                                                                              return stacktop_cache_i32_count;
+                                                                                          }
+                                                                                      }
+                                                                                  }};
+
+                                                                              // The top value is always inside the cached segment when `stacktop_cache_count != 0`.
+                                                                              --cache_count_ref_for_vt(old_vt);
+                                                                              ++cache_count_ref_for_vt(vt);
+                                                                          }
+                                                                      }
+                                                                  }
                                                                   codegen_operand_stack.back_unchecked().type = vt;
                                                               }};
 
@@ -2399,11 +2448,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                     {
                                                         if constexpr(!stacktop_enabled) { return; }
 
-                                                        // Ensure per-type cache counters match the codegen type stack before doing any
-                                                        // range-capacity decisions. Some ops only retype the top value and do not update
-                                                        // per-type counts eagerly; this keeps the model consistent.
-                                                        stacktop_rebuild_cache_type_counts_from_codegen();
-
                                                         ::std::size_t const begin_pos{stacktop_range_begin_pos(vt)};
                                                         ::std::size_t const end_pos{stacktop_range_end_pos(vt)};
                                                         ::std::size_t const ring_size{end_pos - begin_pos};
@@ -2504,14 +2548,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
             auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
                                              {
-                                                 if constexpr(!stacktop_enabled) { return; }
-                                                 else
-                                                 {
-                                                     if(n == 0uz) { return; }
-                                                     // Keep per-type cache counters consistent even if some ops only retype the top value (merged ranges)
-                                                     // without eagerly adjusting `stacktop_cache_*_count`. Pop modeling depends on decrementing the correct
-                                                     // per-type counter for each popped value.
-                                                     stacktop_rebuild_cache_type_counts_from_codegen();
+                                                     if constexpr(!stacktop_enabled) { return; }
+                                                     else
+                                                     {
+                                                         if(n == 0uz) { return; }
 
                                                      auto const before_curr_stacktop{curr_stacktop};
                                                      auto const before_stacktop_memory_count{stacktop_memory_count};
@@ -2636,11 +2676,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                else
                                                                {
                                                                    stacktop_assert_invariants();
-                                                                   // Some ops only "retype" the logical top value (e.g., f64.promote_f32) and may not
-                                                                   // update per-type cache counters eagerly. Spills rely on accurate per-type counts
-                                                                   // to select correct slots and adjust counters, so reconcile here before flushing.
-                                                                   stacktop_rebuild_cache_type_counts_from_codegen();
-
                                                                    // Spill from deepest to top so operand stack memory ends up in correct deep->top order.
                                                                    while(stacktop_cache_count != 0uz) { stacktop_spill_one_deepest_to(dst); }
 
@@ -6630,18 +6665,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 ::std::size_t const target_abs{lbl.in_thunk ? (main_size + lbl.offset) : lbl.offset};
                                 ::std::size_t const site_abs{fx.in_thunk ? (main_size + fx.site) : fx.site};
 
-                                rel_offset_t const off{static_cast<rel_offset_t>(target_abs)};
-                                ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(off), sizeof(off));
-                            }
-
-                            for(auto const& fx: ptr_fixups)
-                            {
-                                ::std::size_t const site_abs{fx.in_thunk ? (main_size + fx.site) : fx.site};
-
-                                rel_offset_t off;  // no init
-                                ::std::memcpy(::std::addressof(off), bytecode_begin_ptr + site_abs, sizeof(off));
-
-                                ::std::byte const* const target_ptr{bytecode_begin_ptr + static_cast<::std::size_t>(off)};
+                                // Patch the `[byte const*]` immediate directly with the absolute pointer bits.
+                                ::std::byte const* const target_ptr{bytecode_begin_ptr + target_abs};
                                 rel_offset_t const ptr_bits{::std::bit_cast<rel_offset_t>(target_ptr)};
                                 ::std::memcpy(bytecode_begin_mut_ptr + site_abs, ::std::addressof(ptr_bits), sizeof(ptr_bits));
                             }

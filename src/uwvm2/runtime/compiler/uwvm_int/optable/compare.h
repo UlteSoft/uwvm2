@@ -1136,20 +1136,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 static_assert(Curr < End);
 
-                if(pos == Curr) { return OpWrapper::template fptr<CompileOption, Curr, Type...>(); }
+                if constexpr(Curr + 1uz == End)
+                {
+                    return OpWrapper::template fptr<CompileOption, Curr, Type...>();
+                }
                 else
                 {
-                    if constexpr(Curr + 1uz < End)
-                    {
-                        return select_stacktop_fptr_by_currpos_impl_compare<CompileOption, Curr + 1uz, End, OpWrapper, Type...>(pos);
-                    }
-                    else
+                    constexpr ::std::size_t count{End - Curr};
+                    static constexpr auto table{[]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr noexcept
+                                                 {
+                                                     return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Is)>{
+                                                         OpWrapper::template fptr<CompileOption, Curr + Is, Type...>()...};
+                                                 }(::std::make_index_sequence<count>{})};
+
+                    if(pos < Curr || pos >= End) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
                         ::fast_io::fast_terminate();
                     }
+                    return table[pos - Curr];
                 }
             }
 
@@ -1166,41 +1173,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 static_assert(I32Curr < I32End);
                 static_assert(OpCurr < OpEnd);
-
-                if(i32_pos == I32Curr)
+                if constexpr(I32Curr + 1uz == I32End && OpCurr + 1uz == OpEnd)
                 {
-                    if(op_pos == OpCurr) { return OpWrapper::template fptr<CompileOption, I32Curr, OpCurr, Type...>(); }
-                    else
-                    {
-                        if constexpr(OpCurr + 1uz < OpEnd)
-                        {
-                            return select_stacktop_fptr_by_currpos_impl_compare_2d<CompileOption, I32Curr, I32End, OpCurr + 1uz, OpEnd, OpWrapper, Type...>(
-                                i32_pos,
-                                op_pos);
-                        }
-                        else
-                        {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
-                            ::fast_io::fast_terminate();
-                        }
-                    }
+                    return OpWrapper::template fptr<CompileOption, I32Curr, OpCurr, Type...>();
                 }
                 else
                 {
-                    if constexpr(I32Curr + 1uz < I32End)
-                    {
-                        return select_stacktop_fptr_by_currpos_impl_compare_2d<CompileOption, I32Curr + 1uz, I32End, OpCurr, OpEnd, OpWrapper, Type...>(i32_pos,
-                                                                                                                                                        op_pos);
-                    }
-                    else
+                    constexpr ::std::size_t i32_count{I32End - I32Curr};
+                    constexpr ::std::size_t op_count{OpEnd - OpCurr};
+                    constexpr ::std::size_t total{i32_count * op_count};
+                    static constexpr auto table{[]<::std::size_t... Ks>(::std::index_sequence<Ks...>) constexpr noexcept
+                                                 {
+                                                     return ::uwvm2::utils::container::array<uwvm_interpreter_opfunc_t<Type...>, sizeof...(Ks)>{
+                                                         OpWrapper::template fptr<CompileOption, I32Curr + (Ks / op_count), OpCurr + (Ks % op_count), Type...>()...};
+                                                 }(::std::make_index_sequence<total>{})};
+
+                    if(i32_pos < I32Curr || i32_pos >= I32End || op_pos < OpCurr || op_pos >= OpEnd) [[unlikely]]
                     {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
                         ::fast_io::fast_terminate();
                     }
+                    ::std::size_t const i32_idx{i32_pos - I32Curr};
+                    ::std::size_t const op_idx{op_pos - OpCurr};
+                    return table[i32_idx * op_count + op_idx];
                 }
             }
 
