@@ -1207,7 +1207,7 @@ inline int my_open_posix_fd_temp_file()
 
 } // namespace details
 
-struct posix_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct posix_file_factory 
 {
 	using native_handle_type = int;
 	int fd{-1};

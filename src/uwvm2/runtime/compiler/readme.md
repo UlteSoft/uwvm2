@@ -1,5 +1,13 @@
-# Non-image compilers
-Non-image compilers, compilers that do not need to be compiled into an executable file to run by creating a process. 
-Typically includes an interpreter that generates an operation table and a just-in-time compiler that generates native code in memory.
+# Runtime compilers
 
-* During code compilation, opcode information is retrieved via templates to ensure compliance with features at compile time. However, opcode information is discarded during execution to maintain compatibility.
+This directory contains UWVM2 “runtime compiler” components: implementations that translate validated WebAssembly into an **in-memory executable form** (interpreter bytecode and/or native code), without producing a standalone executable on disk.
+
+## Contents
+
+- `uwvm_int/`: high-performance threaded interpreter pipeline (“u2”), including the register-ring stack-top cache design. See `uwvm_int/readme.md`.
+- `debug_int/`: debug interpreter focused on full semantic coverage and observability. See `debug_int/readme.md`.
+- `llvm_jit/`: JIT-related work (in-memory native code generation; currently sparse / work-in-progress).
+
+## Notes
+
+During compilation/translation, opcode metadata and feature constraints can be resolved via templates to enforce correctness at compile time. The runtime execution path can then remain independent of that metadata to preserve compatibility and keep hot paths minimal.

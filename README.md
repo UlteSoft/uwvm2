@@ -30,6 +30,9 @@ Most wasm standards are supported. See [feature.md](documents/features.md). For 
 ### Supports multiple platforms
 Supports over 100 triplet platforms, including DOS series, POSIX series, Windows 9x series, Windows NT series, and the Host C Library Series. Supports interpretation execution (INT), just-in-time compilation (JIT), and tiered compilation (TC). See [support.md](documents/support.md) for details.
 
+### Runtime execution backends
+UWVM2 includes multiple runtime execution backends (interpreter and in-memory compilation components). See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the u2 interpreter (“register-ring stack-top cache”) architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
+
 ### High-performance, secure, and highly scalable standard parser
 High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
 

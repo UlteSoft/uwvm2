@@ -1298,7 +1298,7 @@ inline constexpr nt_family_file_lock<family> file_lock(basic_nt_family_io_observ
 }
 
 template <nt_family family>
-struct nt_family_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct nt_family_file_factory 
 {
 	using native_handle_type = void *;
 	void *handle{};
@@ -1319,7 +1319,7 @@ using nt_file_factory = nt_family_file_factory<nt_family::nt>;
 using zw_file_factory = nt_family_file_factory<nt_family::zw>;
 
 template <nt_family family, ::std::integral ch_type>
-class basic_nt_family_file FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_nt_family_io_observer<family, ch_type>
+class basic_nt_family_file  : public basic_nt_family_io_observer<family, ch_type>
 {
 public:
 	using typename basic_nt_family_io_observer<family, ch_type>::char_type;

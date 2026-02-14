@@ -830,7 +830,7 @@ inline decltype(auto) zero_copy_out_handle(basic_c_family_io_observer<family,ch_
 #endif
 
 template <c_family family>
-struct c_family_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct c_family_file_factory 
 {
 	using native_handle_type = FILE *;
 	FILE *fp{};
@@ -853,7 +853,7 @@ struct c_family_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
 };
 
 template <c_family family, ::std::integral ch_type>
-class basic_c_family_file FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_c_family_io_observer<family, ch_type>
+class basic_c_family_file  : public basic_c_family_io_observer<family, ch_type>
 {
 public:
 	using char_type = ch_type;

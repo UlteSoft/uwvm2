@@ -51,7 +51,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     /// @brief      The basic allocator memory class for single-thread usage.
     /// @defailt    Supports platforms without mmap or when custom_page is smaller than platform_page.
     template <typename Alloc>
-    struct basic_single_thread_allocator_memory_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct basic_single_thread_allocator_memory_t 
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"single-thread allocator"};
 

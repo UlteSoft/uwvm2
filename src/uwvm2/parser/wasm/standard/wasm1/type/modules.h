@@ -131,7 +131,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::type
     ///             that initialize a subrange of a table, at a given offset, from a static vector of elements.
     /// @details    New feature
     /// @see        WebAssembly Release 1.0 (2019-07-20) § 2.5.7
-    struct elem_segment_type UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct elem_segment_type 
     {
         indices table{};
         initializer_exp offset{};

@@ -48,14 +48,14 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
-    struct wasm_file_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm_file_t 
     {
         // support binfmt ver1 currently
         static_assert(::uwvm2::uwvm::wasm::feature::max_binfmt_version == 1u, "missing implementation of other binfmt version");
 
         inline static constexpr ::std::size_t sizeof_wasm_file_module_storage_u{sizeof(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t)};
 
-        union wasm_file_module_storage_u UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+        union wasm_file_module_storage_u 
         {
             // This type can be initialized with all zeros
             ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t wasm_binfmt_ver1_storage;

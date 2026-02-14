@@ -531,7 +531,7 @@ inline ::std::size_t open_win32_socket_impl(sock_family d, sock_type t, open_mod
 
 } // namespace win32::details
 
-struct win32_socket_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct win32_socket_factory 
 {
 	using native_handle_type = ::std::size_t;
 	::std::size_t hsocket{};
@@ -563,7 +563,7 @@ inline win32_socket_factory tcp_accept(basic_win32_family_socket_io_observer<fam
 }
 
 template <win32_family family, ::std::integral ch_type>
-class basic_win32_family_socket_file FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_win32_family_socket_io_observer<family, ch_type>
+class basic_win32_family_socket_file  : public basic_win32_family_socket_io_observer<family, ch_type>
 {
 public:
 	using typename basic_win32_family_socket_io_observer<family, ch_type>::char_type;

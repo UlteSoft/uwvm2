@@ -930,7 +930,7 @@ inline constexpr void deque_clone_trivial_common(dequecontroltype &controller, d
 } // namespace details
 
 template <typename T, typename allocator>
-class deque FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+class deque 
 {
 public:
 	using value_type = T;
