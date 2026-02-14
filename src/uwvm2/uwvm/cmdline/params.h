@@ -100,6 +100,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # if defined(UWVM_IMPORT_WASI_WASIP1)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_noinherit_system_environment),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_delete_system_environment),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_add_environment),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_disable),
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_socket_tcp_listen),

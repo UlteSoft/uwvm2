@@ -38,6 +38,7 @@
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/utils/container/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>
 #endif
@@ -50,6 +51,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+    struct wasip1_add_environment_t
+    {
+        ::uwvm2::utils::container::u8string_view env{};
+        ::uwvm2::utils::container::u8string_view value{};
+    };
+
+    /// @brief     Do not inherit host environment variables into WASI Preview 1 environment.
+    inline bool wasip1_noinherit_system_environment{};  // [global]
+
+    /// @brief     Delete host environment variables by name (ignored when wasip1_noinherit_system_environment is set).
+    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> wasip1_delete_system_environment{};  // [global]
+
+    /// @brief     Add/replace environment variables (wins over wasip1_delete_system_environment).
+    inline ::uwvm2::utils::container::vector<wasip1_add_environment_t> wasip1_add_environment{};  // [global]
+
+    /// @brief     The storage of final WASI Preview 1 environment variables ("key=value").
+    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_environment_storage{};  // [global]
+
     /// @brief     Default WasiPreview1 environment
     using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
     inline wasip1_env_type default_wasip1_env{};  // [global]

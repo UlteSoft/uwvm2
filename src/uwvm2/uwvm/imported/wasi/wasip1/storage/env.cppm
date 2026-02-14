@@ -39,6 +39,7 @@ export module uwvm2.uwvm.imported.wasi.wasip1.storage:env;
 import fast_io;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
+import uwvm2.utils.container;
 import uwvm2.imported.wasi.wasip1;
 import uwvm2.object.memory.linear;
 

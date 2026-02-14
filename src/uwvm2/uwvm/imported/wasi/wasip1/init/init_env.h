@@ -58,6 +58,7 @@
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -126,6 +127,114 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                     u8")\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
+
+        // ====== Environment variables ======
+        {
+            using u8string = ::uwvm2::utils::container::u8string;
+            using u8string_view = ::uwvm2::utils::container::u8string_view;
+
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Begin initializing the wasip1 environment variables. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    u8"[",
+                                    ::uwvm2::uwvm::io::get_local_realtime(),
+                                    u8"] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+
+            auto const get_env_key{[](u8string_view env_str) constexpr noexcept -> u8string_view
+                                   {
+                                       auto const eq_pos{env_str.find_character(u8'=')};
+                                       if(eq_pos == ::fast_io::containers::npos) { return env_str; }
+                                       return env_str.subview(0uz, eq_pos);
+                                   }};
+
+            ::uwvm2::utils::container::vector<u8string> env_vec{};
+
+            if(!wasip1_noinherit_system_environment)
+            {
+                env_vec = ::uwvm2::imported::wasi::wasip1::platform::get_process_env();
+
+                // Filter invalid host env entries (e.g. "=C:=..."), keep only non-empty keys.
+                {
+                    ::uwvm2::utils::container::vector<u8string> filtered{};
+                    filtered.reserve(env_vec.size());
+                    for(auto& e: env_vec)
+                    {
+                        u8string_view const ev{e.data(), e.size()};
+                        if(get_env_key(ev).empty()) { continue; }
+                        filtered.emplace_back(::std::move(e));
+                    }
+                    env_vec = ::std::move(filtered);
+                }
+
+                // Delete system environment (ignored when -I1nosysenv is present).
+                if(!wasip1_delete_system_environment.empty())
+                {
+                    ::uwvm2::utils::container::vector<u8string> kept{};
+                    kept.reserve(env_vec.size());
+                    for(auto& e: env_vec)
+                    {
+                        u8string_view const ev{e.data(), e.size()};
+                        u8string_view const key{get_env_key(ev)};
+
+                        bool should_delete{};
+                        for(auto const del_key: wasip1_delete_system_environment)
+                        {
+                            if(del_key == key)
+                            {
+                                should_delete = true;
+                                break;
+                            }
+                        }
+
+                        if(!should_delete) { kept.emplace_back(::std::move(e)); }
+                    }
+                    env_vec = ::std::move(kept);
+                }
+            }
+
+            // Add/replace environment variables (wins over delete).
+            if(!wasip1_add_environment.empty())
+            {
+                for(auto const& kv: wasip1_add_environment)
+                {
+                    auto new_entry{::uwvm2::utils::container::u8concat_uwvm(kv.env, u8"=", kv.value)};
+
+                    bool replaced{};
+                    for(auto& e: env_vec)
+                    {
+                        u8string_view const ev{e.data(), e.size()};
+                        if(get_env_key(ev) == kv.env)
+                        {
+                            e = ::std::move(new_entry);
+                            replaced = true;
+                            break;
+                        }
+                    }
+
+                    if(!replaced) { env_vec.emplace_back(::std::move(new_entry)); }
+                }
+            }
+
+            // Own strings in global storage and bind string_views into env.envs.
+            wasip1_environment_storage = ::std::move(env_vec);
+            env.envs.clear();
+            env.envs.reserve(wasip1_environment_storage.size());
+            for(auto const& e: wasip1_environment_storage)
+            {
+                env.envs.emplace_back(u8string_view{e.data(), e.size()});
+            }
+        }
 
         // ====== Stronger failure semantics (internal) ======
         // Do not mutate `env.fd_storage` until we know initialization succeeds.
