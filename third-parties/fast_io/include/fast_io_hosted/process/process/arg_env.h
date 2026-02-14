@@ -188,7 +188,7 @@ inline constexpr void construct_win32_process_envs_decay(
 } // namespace details
 
 template <::fast_io::win32_family family, bool is_first>
-struct basic_win32_process_args FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct basic_win32_process_args 
 {
 	inline static constexpr bool is_nt{family == ::fast_io::win32_family::wide_nt};
 	using char_type = ::std::conditional_t<is_nt, char16_t, char>;
@@ -244,7 +244,7 @@ struct basic_win32_process_args FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
 };
 
 template <::fast_io::win32_family family>
-struct basic_win32_process_envs FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct basic_win32_process_envs 
 {
 	inline static constexpr bool is_nt{family == ::fast_io::win32_family::wide_nt};
 	using char_type = ::std::conditional_t<is_nt, char16_t, char>;
@@ -329,7 +329,7 @@ namespace details
 {
 
 template <::std::integral char_type>
-struct cstr_guard FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct cstr_guard 
 {
 	using Alloc = ::fast_io::native_typed_global_allocator<char_type>;
 
@@ -476,7 +476,7 @@ extern "C" char **environ;
 } // namespace posix
 } // namespace details
 
-struct posix_process_args FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct posix_process_args 
 {
 	using char_type = char;
 	using replace_char_type = char;

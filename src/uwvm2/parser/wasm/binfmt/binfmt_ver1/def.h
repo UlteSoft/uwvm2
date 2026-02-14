@@ -54,7 +54,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::binfmt::ver1
     /// @details    module_span: The entire scope of the module, due to the 0-copy technique used by the interpreter, has to continuously open the file mapping
     ///             sections:    Stores a tuple of all sections, which are merged together and can be extended by templates.
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct wasm_binfmt_ver1_module_extensible_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm_binfmt_ver1_module_extensible_storage_t 
     {
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 binfmt_version{1u};
 

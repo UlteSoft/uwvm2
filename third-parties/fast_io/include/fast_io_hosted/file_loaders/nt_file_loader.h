@@ -102,7 +102,7 @@ inline auto nt_load_file_options_impl(nt_mmap_options const &options, Args &&...
 
 template <::fast_io::nt_family family>
 	requires(family == ::fast_io::nt_family::nt || family == ::fast_io::nt_family::zw)
-class nt_family_file_loader FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+class nt_family_file_loader 
 {
 public:
 	using value_type = char;

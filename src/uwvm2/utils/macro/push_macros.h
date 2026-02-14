@@ -351,22 +351,6 @@
 # define UWVM_REPLACEABLE_IF_ELIGIBLE
 #endif
 
-/// @brief        Specify that a type is trivially relocatable if it meets certain conditions.
-/// @see          trivially_relocatable_if_eligible
-#pragma push_macro("UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE")
-#if defined(__cpp_trivial_relocatability)
-# undef UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
-# if defined(__clang__)
-#  define UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE                                                                                                               \
-      _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wc++26-extensions\"")                                                              \
-          trivially_relocatable_if_eligible _Pragma("clang diagnostic pop")
-# else  // ^^^ defined(__clang__) / vvv !defined(__clang__)
-#  define UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE trivially_relocatable_if_eligible
-# endif  // ^^^ !defined(__clang__)
-#else
-# define UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
-#endif
-
 /// @brief        Indicates that the function will throw a Herbception exception.
 /// @details      C++ exceptions are the worst historical feature of c++, this program uses only one exception
 ///               type which is fast_io::error, and fully replaces herbception after it enters the proposal.

@@ -202,7 +202,7 @@ struct vector_internal
 } // namespace details
 
 template <typename T, typename allocator>
-class vector FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+class vector 
 {
 public:
 	using allocator_type = allocator;

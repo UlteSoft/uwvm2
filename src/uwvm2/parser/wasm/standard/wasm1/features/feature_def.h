@@ -585,7 +585,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 const* end{};
     };
 
-    struct vectypeidx_minimize_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct vectypeidx_minimize_storage_t 
     {
         inline static constexpr ::std::size_t sizeof_vectypeidx_minimize_storage_u{::uwvm2::parser::wasm::concepts::operation::get_union_size<
             typeidx_u8_view_t,
@@ -593,7 +593,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
             ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u16>,
             ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>>()};
 
-        union vectypeidx_minimize_storage_u UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+        union vectypeidx_minimize_storage_u 
         {
             typeidx_u8_view_t typeidx_u8_view;
             static_assert(::std::is_trivially_copyable_v<typeidx_u8_view_t> && ::std::is_trivially_destructible_v<typeidx_u8_view_t>);
@@ -1489,7 +1489,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     struct element_section_storage_t;
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct wasm1_elem_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm1_elem_storage_t 
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 table_idx{};
         ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...> expr{};
@@ -1642,11 +1642,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>  // Fs is used as an extension to an existing type, but does not extend the type
-    struct wasm1_element_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm1_element_t 
     {
         inline static constexpr ::std::size_t sizeof_storage_u{sizeof(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_elem_storage_t<Fs...>)};
 
-        union storage_u UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+        union storage_u 
         {
             // This type can be initialized with all zeros
             ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_elem_storage_t<Fs...> table_idx;
@@ -1804,7 +1804,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct final_wasm_code_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct final_wasm_code_t 
     {
         code_body_t body{};
         ::uwvm2::utils::container::vector<final_local_entry_t<Fs...>> locals{};
@@ -1832,7 +1832,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct wasm1_data_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm1_data_storage_t 
     {
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memory_idx{};
         ::uwvm2::parser::wasm::standard::wasm1::features::final_wasm_const_expr<Fs...> expr{};
@@ -1940,7 +1940,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>  // Fs is used as an extension to an existing type, but does not extend the type
-    struct wasm1_data_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct wasm1_data_t 
     {
         inline static constexpr ::std::size_t sizeof_storage_u{sizeof(::uwvm2::parser::wasm::standard::wasm1::features::wasm1_data_storage_t<Fs...>)};
 

@@ -115,7 +115,7 @@ inline void win32_unload_address(void const *address) noexcept
 } // namespace win32::details
 
 template <win32_family family>
-class win32_family_file_loader FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+class win32_family_file_loader 
 {
 public:
 	using value_type = char;
