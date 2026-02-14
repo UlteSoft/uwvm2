@@ -64,6 +64,7 @@
 
 // log
 # include "log_output.h"
+# include "log_enable_warning.h"
 # include "log_disable_warning.h"
 # include "log_convert_warn_to_fatal.h"
 # include "log_verbose.h"
