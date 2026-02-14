@@ -33,6 +33,10 @@
 #ifdef UWVM_IMPORT_WASI_WASIP1
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
+
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
 // NOLINTBEGIN
 
 using ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t;
@@ -981,3 +985,8 @@ int main()
 
 // NOLINTEND
 
+#else
+
+int main() {}
+
+#endif

@@ -73,6 +73,20 @@ function def_build()
 		add_defines("UWVM_DISABLE_LOCAL_IMPORTED_WASIP1")
 	end
 
+	local enable_local_imported_wasip1_wasm64 = get_config("enable-local-imported-wasip1-wasm64")
+	if enable_local_imported_wasip1_wasm64 then
+		add_defines("UWVM_ENABLE_LOCAL_IMPORTED_WASIP1_WASM64")
+	end
+
+	local enable_local_imported_wasip1_socket = get_config("enable-local-imported-wasip1-socket")
+	if not enable_local_imported_wasip1_socket or enable_local_imported_wasip1_socket == "none" then
+		-- do nothing
+	elseif enable_local_imported_wasip1_socket == "wasip1" then
+		add_defines("UWVM_ENABLE_WASIP1_SOCKET")
+	elseif enable_local_imported_wasip1_socket == "wasix" then
+		add_defines("UWVM_ENABLE_WASIX_VER_WASIP1_SOCKET")
+	end
+
 	local enable_int = get_config("enable-int")
 	if not enable_int or enable_int == "none" then
 		add_defines("UWVM_DISABLE_INT")

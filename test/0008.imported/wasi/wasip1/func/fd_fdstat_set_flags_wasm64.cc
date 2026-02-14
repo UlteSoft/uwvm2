@@ -55,6 +55,9 @@
 #ifdef UWVM_IMPORT_WASI_WASIP1
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
 #if (!defined(__NEWLIB__) || defined(__CYGWIN__)) && !defined(_WIN32) && __has_include(<dirent.h>) && !defined(_PICOLIBC__) && \
     !(defined(__MSDOS__) || defined(__DJGPP__))
 
@@ -869,3 +872,8 @@ int main() {}
 
 #endif
 
+#else
+
+int main() {}
+
+#endif
