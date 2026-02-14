@@ -38,7 +38,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 {
     /// @brief warning control
     inline bool show_vm_warning{true};            // [global]
-    inline bool show_parser_warning{true};        // [global]
+    // Parser warnings can be extremely noisy (e.g. unused-type reports) and are mostly "allowed but not recommended"
+    // checks, so keep them off by default. Use `--log-enable-warning parser` to turn them back on.
+    inline bool show_parser_warning{false};       // [global]
     inline bool show_untrusted_dl_warning{true};  // [global]
 # ifdef UWVM_SUPPORT_PRELOAD_DL
     inline bool show_dl_warning{true};  // [global]

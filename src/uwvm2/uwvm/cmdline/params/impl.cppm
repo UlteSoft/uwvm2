@@ -64,6 +64,7 @@ export import :wasip1_socket_udp_connect;
 
 // log
 export import :log_output;
+export import :log_enable_warning;
 export import :log_disable_warning;
 export import :log_convert_warn_to_fatal;
 export import :log_verbose;

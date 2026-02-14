@@ -112,6 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
             // log
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_output),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::log_enable_warning),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_disable_warning),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_convert_warn_to_fatal),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::log_verbose),

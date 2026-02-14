@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-31
+ * @date        2026-02-14
  * @copyright   APL-2.0 License
  */
 
@@ -44,15 +44,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view log_disable_warning_alias{u8"-log-dw"};
+        inline constexpr ::uwvm2::utils::container::u8string_view log_enable_warning_alias{u8"-log-ew"};
 #if defined(UWVM_MODULE)
         extern "C++"
 #else
         inline constexpr
 #endif
-            ::uwvm2::utils::cmdline::parameter_return_type log_disable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type log_enable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
@@ -60,26 +60,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # pragma clang diagnostic push
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter log_disable_warning{
-        .name{u8"--log-disable-warning"},
-        .describe{u8"Turn off the warning output of the uwvm."},
-        .usage{u8"[all|vm|untrusted-dl"
-#if defined(UWVM_SUPPORT_PRELOAD_DL)
-               u8"|dl"
-#endif
-#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
-               u8"|weak-symbol"
-#endif
-               u8"|depend"
-#if defined(_WIN32) && !defined(_WIN32_WINDOWS)
-               u8"|nt-path"
-#endif
-#if defined(_WIN32) && defined(_WIN32_WINDOWS)
-               u8"|toctou"
-#endif
-               u8"|runtime" u8"]"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::log_disable_warning_alias), 1uz}},
-        .handle{::std::addressof(details::log_disable_warning_callback)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter log_enable_warning{
+        .name{u8"--log-enable-warning"},
+        .describe{u8"Turn on the warning output of the uwvm."},
+        .usage{u8"[all|parser]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::log_enable_warning_alias), 1uz}},
+        .handle{::std::addressof(details::log_enable_warning_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::log}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
