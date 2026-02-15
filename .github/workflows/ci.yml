@@ -73,7 +73,11 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
+        run: |
+          ln -s $(which clang++-23) clang++
+          ln -s $(which clang-23) clang
+          export PATH=$PWD:$PATH
+          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
         run: |
           xmake b -rv
@@ -118,7 +122,11 @@ jobs:
           curl -L "${{ matrix.sde_url }}" -o /tmp/sde.tar.xz
           tar -xf /tmp/sde.tar.xz -C /opt/intel-sde --strip-components=1
       - name: Configure
-        run: xmake f -m debug --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
+        run: |
+          ln -s $(which clang++-23) clang++
+          ln -s $(which clang-23) clang
+          export PATH=$PWD:$PATH
+          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y
       - name: Build
         run: |
           # Build all targets (including tests), but do not run them.
@@ -179,7 +187,11 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
+        run: |
+          ln -s $(which clang++-23) clang++
+          ln -s $(which clang-23) clang
+          export PATH=$PWD:$PATH
+          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
@@ -209,7 +221,11 @@ jobs:
           sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
-        run: xmake f -m debug --cxx=clang++-23 --cc=clang-23 -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
+        run: |
+          ln -s $(which clang++-23) clang++
+          ln -s $(which clang-23) clang
+          export PATH=$PWD:$PATH
+          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y
       - name: Build
         run: | 
           xmake b -rv
