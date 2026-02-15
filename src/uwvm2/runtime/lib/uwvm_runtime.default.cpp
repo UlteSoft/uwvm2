@@ -20,6 +20,7 @@
  ****************************************/
 
 // std
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -123,7 +124,10 @@ namespace uwvm2::runtime::uwvm_int
             ::std::size_t function_index{};
         };
 
-        inline ::uwvm2::utils::container::vector<call_stack_frame> g_call_stack{};
+        inline constexpr ::std::size_t kCallStackMaxDepth{4096uz};
+        inline thread_local ::std::array<call_stack_frame, kCallStackMaxDepth> g_call_stack_buf{};
+        inline thread_local ::std::size_t g_call_stack_size{};
+        inline thread_local bool g_call_stack_overflowed{};
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -162,8 +166,16 @@ namespace uwvm2::runtime::uwvm_int
 
             inline constexpr explicit call_stack_guard(::std::size_t module_id, ::std::size_t function_index) noexcept
             {
-                g_call_stack.push_back(call_stack_frame{module_id, function_index});
-                active = true;
+                if(g_call_stack_size < kCallStackMaxDepth) [[likely]]
+                {
+                    g_call_stack_buf[g_call_stack_size] = call_stack_frame{module_id, function_index};
+                    ++g_call_stack_size;
+                    active = true;
+                }
+                else
+                {
+                    g_call_stack_overflowed = true;
+                }
             }
 
             call_stack_guard(call_stack_guard const&) = delete;
@@ -171,7 +183,10 @@ namespace uwvm2::runtime::uwvm_int
 
             inline constexpr ~call_stack_guard()
             {
-                if(active && !g_call_stack.empty()) { g_call_stack.pop_back(); }
+                if(active) [[likely]]
+                {
+                    if(g_call_stack_size != 0uz) [[likely]] { --g_call_stack_size; }
+                }
             }
         };
 
@@ -293,10 +308,10 @@ namespace uwvm2::runtime::uwvm_int
                                 u8"Call stack:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-            auto const n{g_call_stack.size()};
+            auto const n{g_call_stack_size};
             for(::std::size_t i{}; i != n; ++i)
             {
-                auto const& fr{g_call_stack.index_unchecked(n - 1uz - i)};
+                auto const& fr{g_call_stack_buf[n - 1uz - i]};
                 if(fr.module_id >= g_modules.size()) { continue; }
 
                 auto const& mod_rec{g_modules.index_unchecked(fr.module_id)};
@@ -333,6 +348,18 @@ namespace uwvm2::runtime::uwvm_int
                 }
 
                 ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }
+
+            if(g_call_stack_overflowed) [[unlikely]]
+            {
+                ::fast_io::io::perrln(u8log_output_ul,
+                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                      u8"uwvm: ",
+                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                      u8"[warn]  ",
+                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                      u8"Call stack overflowed; frames truncated.",
+                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
             ::fast_io::io::perrln(u8log_output_ul);
@@ -727,6 +754,64 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
+        struct thread_local_bump_allocator
+        {
+            ::std::byte* base{};
+            ::std::size_t cap{};
+            ::std::size_t sp{};
+
+            thread_local_bump_allocator(thread_local_bump_allocator const&) = delete;
+            thread_local_bump_allocator& operator= (thread_local_bump_allocator const&) = delete;
+
+            inline constexpr thread_local_bump_allocator() noexcept = default;
+
+            inline ~thread_local_bump_allocator()
+            {
+                if(base) { byte_allocator::deallocate(base); }
+            }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t mark() const noexcept { return sp; }
+
+            UWVM_ALWAYS_INLINE inline constexpr void release(::std::size_t m) noexcept { sp = m; }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE static inline constexpr ::std::size_t align_up(::std::size_t v, ::std::size_t a) noexcept
+            { return (v + (a - 1uz)) & ~(a - 1uz); }
+
+            UWVM_ALWAYS_INLINE inline void ensure_capacity(::std::size_t need) noexcept
+            {
+                if(need <= cap) [[likely]] { return; }
+
+                auto new_cap{cap ? cap : 4096uz};
+                while(new_cap < need) { new_cap <<= 1; }
+
+                void* const new_mem{byte_allocator::allocate(new_cap)};
+                if(new_mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                if(base) [[likely]]
+                {
+                    ::std::memcpy(new_mem, base, sp);
+                    byte_allocator::deallocate(base);
+                }
+
+                base = static_cast<::std::byte*>(new_mem);
+                cap = new_cap;
+            }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* allocate_bytes(::std::size_t n, ::std::size_t align = 16uz) noexcept
+            {
+                if(n == 0uz) [[unlikely]] { n = 1uz; }
+                sp = align_up(sp, align);
+                if(sp > (::std::numeric_limits<::std::size_t>::max() - n)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const need{sp + n};
+                ensure_capacity(need);
+                auto* const p{base + sp};
+                sp = need;
+                return p;
+            }
+        };
+
+        inline thread_local thread_local_bump_allocator g_call_scratch{};
+
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         inline ::uwvm2::object::memory::linear::native_memory_t const* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
         {
@@ -810,6 +895,23 @@ namespace uwvm2::runtime::uwvm_int
         }                                                                                                                                                      \
     }
 
+#define UWVM_STACK_OR_HEAP_ALLOC_BYTES_NONNULL(dst_ptr, bytes_expr, guard_obj)                                                                                 \
+    {                                                                                                                                                          \
+        ::std::size_t uwvm_n{bytes_expr};                                                                                                                      \
+        if(uwvm_n == 0uz) [[unlikely]] { uwvm_n = 1uz; }                                                                                                       \
+        if(uwvm_n < 1024uz)                                                                                                                                    \
+        {                                                                                                                                                      \
+            void* const uwvm_p{UWVM_ALLOCA_BYTES(uwvm_n)};                                                                                                     \
+            dst_ptr = static_cast<::std::byte*>(uwvm_p);                                                                                                       \
+        }                                                                                                                                                      \
+        else                                                                                                                                                   \
+        {                                                                                                                                                      \
+            void* const uwvm_p{byte_allocator::allocate(uwvm_n)};                                                                                              \
+            guard_obj.ptr = uwvm_p;                                                                                                                            \
+            dst_ptr = static_cast<::std::byte*>(uwvm_p);                                                                                                       \
+        }                                                                                                                                                      \
+    }
+
         template <::std::size_t I, ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
         using uwvmint_interp_arg_t = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::interpreter_tuple_arg_t<I, CompileOption>;
 
@@ -873,13 +975,13 @@ namespace uwvm2::runtime::uwvm_int
             // This ABI provides only 4 register argument slots total. After the 3 fixed interpreter args, only 1 slot remains (r9/xmm3).
             // Empirically, enabling a 1-slot scalar4-merged stack-top cache tends to regress overall performance
             // (register pressure + spills), so keep stack-top caching disabled by default here.
-#if 0
+# if 0
             /// @deprecated MS ABI "1-slot" stack-top cache experiment.
             ///             Often regresses performance due to spills/register shuffling. Kept for reference.
             ///             Keep v128 caching off by default.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 4uz;
-#endif
+# endif
 #elif defined(__i386__) || defined(_M_IX86)
             // i386: (usually) only 2 register argument slots under fastcall (ecx/edx), and we already need 3 fixed args.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
@@ -992,17 +1094,31 @@ namespace uwvm2::runtime::uwvm_int
                                              ::std::size_t result_bytes,
                                              ::std::byte** caller_stack_top_ptr) noexcept
         {
+            auto const local_bytes_raw{compiled_func->local_bytes_max};
+            auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
+            constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
+            constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
+            bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
+                                   g_call_stack_size > kAllocaMaxCallDepth};
+            ::std::size_t scratch_mark{};
+            if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
+
             auto caller_stack_top{*caller_stack_top_ptr};
             auto const caller_args_begin{caller_stack_top - param_bytes};
             // Pop params from the caller stack first (so nested calls can't see them).
             *caller_stack_top_ptr = caller_args_begin;
 
             // Allocate locals as a packed byte buffer (i32/f32=4, i64/f64=8, plus the internal temp local).
-            heap_buf_guard locals_guard{};
             ::std::byte* local_base{};
-            UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(local_base, compiled_func->local_bytes_max, locals_guard);
+            if(use_scratch) { local_base = g_call_scratch.allocate_bytes(local_bytes_raw); }
+            else
+            {
+                ::std::size_t local_n{local_bytes_raw};
+                if(local_n == 0uz) [[unlikely]] { local_n = 1uz; }
+                local_base = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_n));
+            }
 
-            if(param_bytes > compiled_func->local_bytes_max) [[unlikely]]
+            if(param_bytes > local_bytes_raw) [[unlikely]]
             {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
@@ -1012,18 +1128,29 @@ namespace uwvm2::runtime::uwvm_int
             }
 
             if(param_bytes != 0uz) { ::std::memcpy(local_base, caller_args_begin, param_bytes); }
+            // Wasm locals are zero-initialized; params are already populated above.
+            if(local_bytes_raw > param_bytes) { ::std::memset(local_base + param_bytes, 0, local_bytes_raw - param_bytes); }
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
-            heap_buf_guard operand_guard{};
-            auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
-
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 #endif
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
-            UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(operand_base, stack_cap_raw, operand_guard);
+            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw); }
+            else
+            {
+                ::std::size_t op_n{stack_cap_raw};
+                if(op_n == 0uz) [[unlikely]] { op_n = 1uz; }
+                operand_base = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(op_n));
+            }
+
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            // Operand stack is fully defined by writes along interpreter execution; it does not require zero-initialization.
+            // Keep it zeroed only in detailed debug-check builds to catch any accidental reads of uninitialized operands.
+            ::std::memset(operand_base, 0, (stack_cap_raw == 0uz ? 1uz : stack_cap_raw));
+#endif
 
             ::std::byte const* ip{compiled_func->op.operands.data()};
             ::std::byte* stack_top{operand_base};
@@ -1052,6 +1179,8 @@ namespace uwvm2::runtime::uwvm_int
             // Append results back to caller stack.
             ::std::memcpy(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
+
+            if(use_scratch) { g_call_scratch.release(scratch_mark); }
         }
 
         inline void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,
@@ -1102,7 +1231,7 @@ namespace uwvm2::runtime::uwvm_int
             *caller_stack_top_ptr += res_bytes;
         }
 
-        inline void invoke_resolved(resolved_func const& rf, ::std::byte** caller_stack_top_ptr) noexcept
+        [[maybe_unused]] inline void invoke_resolved(resolved_func const& rf, ::std::byte** caller_stack_top_ptr) noexcept
         {
             switch(rf.k)
             {
@@ -1185,7 +1314,7 @@ namespace uwvm2::runtime::uwvm_int
             return ::std::addressof(module.local_defined_table_vec_storage.index_unchecked(local_index));
         }
 
-        [[nodiscard]] inline constexpr func_sig_view
+        [[maybe_unused]] [[nodiscard]] inline constexpr func_sig_view
             expected_sig_from_type_index(runtime_module_storage_t const& module, ::std::size_t type_index, bool& ok) noexcept
         {
             ok = false;
@@ -1303,178 +1432,112 @@ namespace uwvm2::runtime::uwvm_int
             if(selector_u32 >= table->elems.size()) [[unlikely]] { trap_fatal(trap_kind::call_indirect_table_out_of_bounds); }
 
             auto const& elem{table->elems.index_unchecked(static_cast<::std::size_t>(selector_u32))};
-            resolved_func rf{};
-            func_sig_view actual_sig{};
-            cached_import_target const* cached_tgt{};
+            auto const sig_from_ft{[](::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* ft) constexpr noexcept -> func_sig_view
+                                   {
+                                       return {
+                                           {valtype_kind::wasm_enum, ft->parameter.begin, static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
+                                           {valtype_kind::wasm_enum, ft->result.begin,    static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
+                                       };
+                                   }};
+
+            auto const type_begin{module.type_section_storage.type_section_begin};
+            auto const type_end{module.type_section_storage.type_section_end};
+            if(type_begin == nullptr || type_end == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const type_total{static_cast<::std::size_t>(type_end - type_begin)};
+            if(type_index >= type_total) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const* const expected_ft_ptr{type_begin + type_index};
+            if(expected_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const expected_sig{sig_from_ft(expected_ft_ptr)};
+
+            auto const import_n{module.imported_function_vec_storage.size()};
 
             switch(elem.type)
             {
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_defined:
                 {
-                    if(elem.storage.defined_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
-                    rf.k = resolved_func::kind::defined;
-                    rf.u.defined_ptr = elem.storage.defined_ptr;
-                    actual_sig = func_sig_from_defined(elem.storage.defined_ptr);
-                    break;
+                    auto const def_ptr{elem.storage.defined_ptr};
+                    if(def_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
+
+                    auto const actual_ft_ptr{def_ptr->function_type_ptr};
+                    if(actual_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    if(actual_ft_ptr != expected_ft_ptr)
+                    {
+                        if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                    }
+
+                    auto const base{module.local_defined_function_vec_storage.data()};
+                    auto const local_n{module.local_defined_function_vec_storage.size()};
+                    if(base == nullptr || def_ptr < base || def_ptr >= base + local_n) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const local_idx{static_cast<::std::size_t>(def_ptr - base)};
+                    auto const func_idx{import_n + local_idx};
+
+                    call_stack_guard g{wasm_module_id, func_idx};
+                    if(wasm_module_id >= g_defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& mod_cache{g_defined_func_cache.index_unchecked(wasm_module_id)};
+                    if(local_idx >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& info{mod_cache.index_unchecked(local_idx)};
+                    if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    execute_compiled_defined(info.runtime_func, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
+                    return;
                 }
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported:
                 {
-                    if(elem.storage.imported_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
-
-                    // Fast path: table element points to this module's import slot.
                     auto const imp_ptr{elem.storage.imported_ptr};
+                    if(imp_ptr == nullptr) [[unlikely]] { trap_fatal(trap_kind::call_indirect_null_element); }
+
+                    auto const import_type_ptr{imp_ptr->import_type_ptr};
+                    if(import_type_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const actual_ft_ptr{import_type_ptr->imports.storage.function};
+                    if(actual_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    if(actual_ft_ptr != expected_ft_ptr)
+                    {
+                        if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                    }
+
                     auto const base{module.imported_function_vec_storage.data()};
                     auto const imp_n{module.imported_function_vec_storage.size()};
-                    if(base != nullptr && imp_ptr >= base && imp_ptr < base + imp_n)
+                    if(base == nullptr || imp_ptr < base || imp_ptr >= base + imp_n) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const idx{static_cast<::std::size_t>(imp_ptr - base)};
+
+                    if(wasm_module_id >= g_import_call_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& cache{g_import_call_cache.index_unchecked(wasm_module_id)};
+                    if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& tgt{cache.index_unchecked(idx)};
+
+                    call_stack_guard g{tgt.frame.module_id, tgt.frame.function_index};
+                    switch(tgt.k)
                     {
-                        auto const idx{static_cast<::std::size_t>(imp_ptr - base)};
-                        if(wasm_module_id >= g_import_call_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                        auto const& cache{g_import_call_cache.index_unchecked(wasm_module_id)};
-                        if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                        cached_tgt = ::std::addressof(cache.index_unchecked(idx));
-                        auto const& tgt{*cached_tgt};
-
-                        switch(tgt.k)
+                        case cached_import_target::kind::defined:
                         {
-                            case cached_import_target::kind::defined:
-                            {
-                                rf.k = resolved_func::kind::defined;
-                                rf.u.defined_ptr = tgt.u.defined.runtime_func;
-                                actual_sig = tgt.sig;
-                                break;
-                            }
-                            case cached_import_target::kind::local_imported:
-                            {
-                                rf.k = resolved_func::kind::local_imported;
-                                rf.u.local_imported = tgt.u.local_imported;
-                                actual_sig = tgt.sig;
-                                break;
-                            }
-                            case cached_import_target::kind::dl:
-                            case cached_import_target::kind::weak_symbol:
-                            {
-                                rf.k = (tgt.k == cached_import_target::kind::dl) ? resolved_func::kind::dl : resolved_func::kind::weak_symbol;
-                                rf.u.capi_ptr = tgt.u.capi_ptr;
-                                actual_sig = tgt.sig;
-                                break;
-                            }
-                            [[unlikely]] default:
-                            {
-                                ::fast_io::fast_terminate();
-                            }
+                            execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
                         }
-
-                        break;
-                    }
-
-                    // Fallback: resolve the import-alias chain (already initialized by uwvm runtime initializer).
-                    rf = resolve_func_from_import_assuming_initialized(imp_ptr);
-                    switch(rf.k)
-                    {
-                        case resolved_func::kind::defined: actual_sig = func_sig_from_defined(rf.u.defined_ptr); break;
-                        case resolved_func::kind::local_imported:
+                        case cached_import_target::kind::local_imported:
                         {
-                            local_imported_t const* m{rf.u.local_imported.module_ptr};
-                            actual_sig = func_sig_from_local_imported(m, rf.u.local_imported.index);
-                            break;
+                            invoke_local_imported(tgt.u.local_imported, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
                         }
-                        case resolved_func::kind::dl:
-                        case resolved_func::kind::weak_symbol:
-                            actual_sig = func_sig_from_capi(rf.u.capi_ptr);
-                            break;
+                        case cached_import_target::kind::dl:
+                        case cached_import_target::kind::weak_symbol:
+                        {
+                            invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
+                        }
                         [[unlikely]] default:
+                        {
                             ::fast_io::fast_terminate();
+                        }
                     }
-                    break;
                 }
                 [[unlikely]] default:
                 {
-                    // Note: UWVM currently targets wasm1.0 MVP, where tables are effectively used for funcref-based indirect calls.
-                    // This default branch is intentionally left as a hard failure to reserve room for future table element kinds
-                    // (e.g., reference-types / typed function references and table.set-driven polymorphic entries).
-                    // Until that extension is implemented, we can only validate/guard and must not guess semantics.
                     ::fast_io::fast_terminate();
                 }
             }
-
-            bool expected_ok{};
-            auto const expected_sig{expected_sig_from_type_index(module, type_index, expected_ok)};
-            if(!expected_ok) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-            if(!func_sig_equal(expected_sig, actual_sig)) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
-
-            if(cached_tgt != nullptr)
-            {
-                auto const& tgt{*cached_tgt};
-                call_stack_guard g{tgt.frame.module_id, tgt.frame.function_index};
-                switch(tgt.k)
-                {
-                    case cached_import_target::kind::defined:
-                    {
-                        execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
-                    case cached_import_target::kind::local_imported:
-                    {
-                        invoke_local_imported(tgt.u.local_imported, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
-                    case cached_import_target::kind::dl:
-                    case cached_import_target::kind::weak_symbol:
-                    {
-                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
-                    [[unlikely]] default:
-                    {
-                        ::fast_io::fast_terminate();
-                    }
-                }
-            }
-
-            if(rf.k == resolved_func::kind::defined)
-            {
-                auto const* const info{find_defined_func_info(rf.u.defined_ptr)};
-                if(info != nullptr)
-                {
-                    call_stack_guard g{info->module_id, info->function_index};
-                    execute_compiled_defined(info->runtime_func, info->compiled_func, info->param_bytes, info->result_bytes, stack_top_ptr);
-                    return;
-                }
-            }
-
-            // Best-effort: record the original table element function index when it is an imported slot.
-            if(elem.type == ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported)
-            {
-                auto const imp_ptr{elem.storage.imported_ptr};
-                auto const base{module.imported_function_vec_storage.data()};
-                if(base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                auto const imp_n{module.imported_function_vec_storage.size()};
-                if(imp_ptr < base || imp_ptr >= base + imp_n) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                auto const func_idx{static_cast<::std::size_t>(imp_ptr - base)};
-                call_stack_guard g{wasm_module_id, func_idx};
-                invoke_resolved(rf, stack_top_ptr);
-                return;
-            }
-
-            // Fallback for direct local-defined table element.
-            if(elem.type == ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_defined)
-            {
-                auto const def_ptr{elem.storage.defined_ptr};
-                auto const base{module.local_defined_function_vec_storage.data()};
-                if(base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                auto const local_n{module.local_defined_function_vec_storage.size()};
-                if(def_ptr < base || def_ptr >= base + local_n) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                auto const local_idx{static_cast<::std::size_t>(def_ptr - base)};
-                auto const func_idx{module.imported_function_vec_storage.size() + local_idx};
-                call_stack_guard g{wasm_module_id, func_idx};
-                invoke_resolved(rf, stack_top_ptr);
-                return;
-            }
-
-            ::fast_io::fast_terminate();
         }
 
         inline void ensure_bridges_initialized() noexcept
