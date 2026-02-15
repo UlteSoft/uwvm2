@@ -54,6 +54,8 @@ export import :runtime_compiler_log;
 export import :wasi_disable_utf8_check;
 export import :wasip1_set_fd_limit;
 export import :wasip1_mount_dir;
+export import :wasip1_delete_system_environment;
+export import :wasip1_add_environment;
 export import :wasip1_disable;
 export import :wasip1_socket_tcp_listen;
 export import :wasip1_socket_tcp_connect;
@@ -62,6 +64,7 @@ export import :wasip1_socket_udp_connect;
 
 // log
 export import :log_output;
+export import :log_enable_warning;
 export import :log_disable_warning;
 export import :log_convert_warn_to_fatal;
 

@@ -585,7 +585,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct final_import_type UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct final_import_type 
     {
         static_assert(is_valid_final_extern_type_t<Fs...>);
 
@@ -1087,7 +1087,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 
     /// @brief final local global type
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct final_local_global_type UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct final_local_global_type 
     {
         final_global_type<Fs...> global{};    // Types used to store global
         final_wasm_const_expr<Fs...> expr{};  // Expressions used to initialize global
@@ -1156,7 +1156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
     };
 
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct final_wasm_export_type UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct final_wasm_export_type 
     {
         static_assert(is_valid_final_export_type_t<Fs...>);
 

@@ -991,10 +991,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # ifdef UWVM_IMPORT_WASI_WASIP1
                             // Support WASI WASIP1
-                            u8"  * Support Imported WASI Preview 1 (With WASM64 Extension)\n"
+                            u8"  * Support Imported WASI Preview 1"
+#  ifdef UWVM_IMPORT_WASI_WASIP1_WASM64
+                            u8" (With WASM64 Extension)"
+#  endif
+                            u8"\n"
 #  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET
                             // Support WASI WASIP1 Socket: The wasip1 socket appears as an extension.
-                            u8"      - Support Imported WASI Preview 1 Socket\n"
+                            u8"      - Support Imported WASI Preview 1 Socket"
+#   ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
+                            u8" (WASIX Version)"
+#   endif
+                            u8"\n"
 #  endif
 # endif
 #endif

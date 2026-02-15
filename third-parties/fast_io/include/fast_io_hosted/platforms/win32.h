@@ -918,7 +918,7 @@ inline void io_control(basic_win32_family_io_observer<family, ch_type> h, Args &
 	}
 }
 
-struct win32_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct win32_file_factory 
 {
 	using native_handle_type = void *;
 	void *handle{};
@@ -1262,7 +1262,7 @@ inline win32_9xa_at_entry at_fdcwd() noexcept
 }
 #endif
 
-struct win32_9xa_dir_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct win32_9xa_dir_file_factory 
 {
 	using native_handle_type = win32_9xa_dir_handle;
 	win32_9xa_dir_handle handle{};
@@ -1431,7 +1431,7 @@ inline win32_9xa_at_entry at(win32_9xa_dir_io_observer const &wiob) noexcept
 }
 
 template <win32_family family, ::std::integral ch_type>
-class basic_win32_family_file FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_win32_family_io_observer<family, ch_type>
+class basic_win32_family_file  : public basic_win32_family_io_observer<family, ch_type>
 {
 public:
 	using typename basic_win32_family_io_observer<family, ch_type>::char_type;

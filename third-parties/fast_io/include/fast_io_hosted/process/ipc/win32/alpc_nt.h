@@ -115,7 +115,7 @@ struct nt_alpc_message_attribute_guard
 };
 
 template <nt_family family>
-struct nt_alpc_handle FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct nt_alpc_handle 
 {
 	using alpc_message_alloc = ::fast_io::native_thread_local_allocator;
 
@@ -1054,7 +1054,7 @@ template <nt_family family, ::std::integral ch_type>
 using basic_nt_family_alpc_ipc_server_observer = basic_nt_family_alpc_ipc_universal_observer<family, ch_type>;
 
 template <nt_family family, ::std::integral ch_type>
-class basic_nt_family_alpc_ipc_server FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_nt_family_alpc_ipc_server_observer<family, ch_type>
+class basic_nt_family_alpc_ipc_server  : public basic_nt_family_alpc_ipc_server_observer<family, ch_type>
 {
 public:
 	using typename basic_nt_family_alpc_ipc_server_observer<family, ch_type>::char_type;
@@ -1145,7 +1145,7 @@ template <nt_family family, ::std::integral ch_type>
 using basic_nt_family_alpc_ipc_client_observer = basic_nt_family_alpc_ipc_universal_observer<family, ch_type>;
 
 template <nt_family family, ::std::integral ch_type>
-class basic_nt_family_alpc_ipc_client FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE : public basic_nt_family_alpc_ipc_client_observer<family, ch_type>
+class basic_nt_family_alpc_ipc_client  : public basic_nt_family_alpc_ipc_client_observer<family, ch_type>
 {
 public:
 	using typename basic_nt_family_alpc_ipc_client_observer<family, ch_type>::char_type;

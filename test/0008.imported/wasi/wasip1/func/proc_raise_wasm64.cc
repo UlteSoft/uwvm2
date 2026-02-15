@@ -52,6 +52,10 @@
 #ifdef UWVM_IMPORT_WASI_WASIP1
 # error "UWVM_IMPORT_WASI_WASIP1 existed"
 #endif
+
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
 namespace
 {
     using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
@@ -115,3 +119,9 @@ int main()
         ::fast_io::fast_terminate();
     }
 }
+
+#else
+
+int main() {}
+
+#endif

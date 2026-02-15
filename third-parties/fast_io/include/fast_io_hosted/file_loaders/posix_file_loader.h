@@ -85,7 +85,7 @@ inline auto posix_load_file_options_impl(::fast_io::posix_mmap_options const &op
 
 } // namespace details
 
-class posix_file_loader FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+class posix_file_loader 
 {
 public:
 	using value_type = char;

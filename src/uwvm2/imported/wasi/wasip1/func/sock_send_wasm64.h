@@ -88,7 +88,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+#if defined(UWVM_IMPORT_WASI_WASIP1)&& defined(UWVM_IMPORT_WASI_WASIP1_WASM64) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {

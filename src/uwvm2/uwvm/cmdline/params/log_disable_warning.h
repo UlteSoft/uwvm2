@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter log_disable_warning{
         .name{u8"--log-disable-warning"},
         .describe{u8"Turn off the warning output of the uwvm."},
-        .usage{u8"[all|vm|parser|untrusted-dl"
+        .usage{u8"[all|vm|untrusted-dl"
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                u8"|dl"
 #endif
@@ -91,4 +91,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

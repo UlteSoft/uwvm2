@@ -103,7 +103,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         if(auto currp1_str{currp1->str}; currp1_str == u8"all")
         {
             ::uwvm2::uwvm::io::show_vm_warning = false;
-            ::uwvm2::uwvm::io::show_parser_warning = false;
             ::uwvm2::uwvm::io::show_untrusted_dl_warning = false;
 #ifdef UWVM_SUPPORT_PRELOAD_DL
             ::uwvm2::uwvm::io::show_dl_warning = false;
@@ -121,7 +120,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::io::show_runtime_warning = false;
         }
         else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::show_vm_warning = false; }
-        else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::show_parser_warning = false; }
         else if(currp1_str == u8"untrusted-dl") { ::uwvm2::uwvm::io::show_untrusted_dl_warning = false; }
 #ifdef UWVM_SUPPORT_PRELOAD_DL
         else if(currp1_str == u8"dl") { ::uwvm2::uwvm::io::show_dl_warning = false; }

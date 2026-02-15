@@ -61,7 +61,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::features
 {
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
-    struct type_section_storage_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct type_section_storage_t 
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view section_name{u8"Type"};
         inline static constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte section_id{

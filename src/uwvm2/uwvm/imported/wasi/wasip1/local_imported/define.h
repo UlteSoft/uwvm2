@@ -373,7 +373,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
 #  endif
 
         // wasi uextension: memory64. Non-standard extension, but imported by default for security reasons.
-
+#  if defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
         inline constexpr char8_t name_args_get_wasm64[] = u8"args_get_wasm64";
         using args_get_wasm64 = wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::args_get_wasm64), name_args_get_wasm64>;
 
@@ -538,7 +538,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         using sched_yield_wasm64 =
             wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sched_yield_wasm64), name_sched_yield_wasm64>;
 
-#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+#   if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         inline constexpr char8_t name_sock_accept_wasm64[] = u8"sock_accept_wasm64";
         using sock_accept_wasm64 =
             wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64), name_sock_accept_wasm64>;
@@ -554,6 +554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
         inline constexpr char8_t name_sock_shutdown_wasm64[] = u8"sock_shutdown_wasm64";
         using sock_shutdown_wasm64 =
             wasip1_local_imported_function<::std::addressof(::uwvm2::imported::wasi::wasip1::func::sock_shutdown_wasm64), name_sock_shutdown_wasm64>;
+#   endif
 #  endif
     }  // namespace details
 
@@ -604,15 +605,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             details::proc_exit,
             details::proc_raise,
             details::random_get,
-            details::sched_yield,
+            details::sched_yield
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+            ,
             details::sock_accept,
             details::sock_recv,
             details::sock_send,
-            details::sock_shutdown,
+            details::sock_shutdown
 #  endif
 
             // wasm64
+#  if defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
+            ,
             details::args_get_wasm64,
             details::args_sizes_get_wasm64,
             details::clock_res_get_wasm64,
@@ -655,12 +659,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             details::proc_raise_wasm64,
             details::random_get_wasm64,
             details::sched_yield_wasm64
-#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+#   if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
             ,
             details::sock_accept_wasm64,
             details::sock_recv_wasm64,
             details::sock_send_wasm64,
             details::sock_shutdown_wasm64
+#   endif
 #  endif
             >;
     };

@@ -92,7 +92,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+#if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 {
@@ -100,8 +100,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t> & env,
         ::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t sock_fd,
         ::uwvm2::imported::wasi::wasip1::abi::fdflags_wasm64_t fd_flags,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_fd_ptrsz,
-        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_addr_ptrsz) noexcept
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_fd_ptrsz
+# ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
+        ,
+        ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t ro_addr_ptrsz
+# endif
+        ) noexcept
     {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
         if(env.wasip1_memory == nullptr) [[unlikely]]
@@ -140,10 +144,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 ::fast_io::mnp::addrvw(ro_fd_ptrsz),
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                                 u8", ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
                                 ::fast_io::mnp::addrvw(ro_addr_ptrsz),
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+#  endif
                                 u8") ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                 u8"(wasi-trace)\n",
@@ -156,8 +162,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                 static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
                                 u8", ",
                                 ::fast_io::mnp::addrvw(ro_fd_ptrsz),
+#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                                 u8", ",
                                 ::fast_io::mnp::addrvw(ro_addr_ptrsz),
+#  endif
                                 u8") (wasi-trace)\n");
 # endif
         }
@@ -448,6 +456,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unlocked(memory, ro_fd_ptrsz, new_fd);
 
+#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
                     //
                     //   tag: Addressfamily (1 = Inet4, 2 = Inet6)
@@ -530,6 +539,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ro_addr_ptrsz,
                         reinterpret_cast<::std::byte const*>(raw_ptr),
                         reinterpret_cast<::std::byte const*>(raw_ptr) + ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
+#  endif
                 }
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;
@@ -716,6 +726,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                     ::uwvm2::imported::wasi::wasip1::memory::store_basic_wasm_type_to_memory_wasm64_unlocked(memory, ro_fd_ptrsz, new_fd);
 
+#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
                     // Encode the peer address into the __wasi_addr_port_t layout used by WASIX:
                     //
                     //   tag: Addressfamily (1 = Inet4, 2 = Inet6)
@@ -797,6 +808,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                         ro_addr_ptrsz,
                         reinterpret_cast<::std::byte const*>(raw_ptr),
                         reinterpret_cast<::std::byte const*>(raw_ptr) + ::uwvm2::imported::wasi::wasip1::func::size_of_wasi_addr_port_t);
+#  endif
                 }
 
                 return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::esuccess;

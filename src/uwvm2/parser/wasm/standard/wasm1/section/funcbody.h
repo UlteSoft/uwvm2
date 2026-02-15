@@ -38,7 +38,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::section
 {
     /// @brief function bodys, use to storage
-    struct code_func_body UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct code_func_body 
     {
         ::uwvm2::utils::container::vector<::uwvm2::parser::wasm::standard::wasm1::type::local_entry> locals{};
         ::uwvm2::parser::wasm::standard::wasm1::type::vec_byte body{};

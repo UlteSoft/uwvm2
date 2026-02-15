@@ -3,7 +3,6 @@
 #pragma pop_macro("FAST_IO_CPP_EXCEPTIONS")
 #pragma pop_macro("FAST_IO_CPP_RTTI")
 #pragma pop_macro("FAST_IO_HAS_BUILTIN")
-#pragma pop_macro("FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE")
 #pragma pop_macro("FAST_IO_ASSERT")
 #pragma pop_macro("FAST_IO_GNU_RETURNS_NONNULL")
 #pragma pop_macro("FAST_IO_GNU_MALLOC")

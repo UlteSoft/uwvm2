@@ -59,6 +59,7 @@ import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
 import uwvm2.imported.wasi.wasip1;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

@@ -138,7 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     ///            - WebAssembly linear memory is grow-only: once a given `(offset, size)` range has been validated against some length, that range remains
     ///              valid after subsequent grows, so callers do not need to re-run bounds checks for the same range after a successful grow.
 
-    struct mmap_memory_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct mmap_memory_t 
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"mmap"};
 

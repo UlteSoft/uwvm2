@@ -282,7 +282,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     /// @defailt    The allocator memory supports the following scenarios: First, platforms that do not support mmap. Second, when the size of custom_page is
     ///             smaller than platform_page.
     template <typename Alloc>
-    struct basic_allocator_memory_t UWVM_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+    struct basic_allocator_memory_t 
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"mult-thread allocator"};
 

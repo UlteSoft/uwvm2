@@ -64,7 +64,7 @@
 #endif
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 
-# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+# if defined(UWVM_IMPORT_WASI_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1_WASM64) && defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 int main()
 {
@@ -90,15 +90,20 @@ int main()
     env.fd_storage.opens.resize(4uz);
 
     constexpr wasi_void_ptr_wasm64_t FD_PTR{1024u};
-    constexpr wasi_void_ptr_wasm64_t ADDR_PTR{2048u};
+    [[maybe_unused]] constexpr wasi_void_ptr_wasm64_t ADDR_PTR{2048u};
+
+# if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET)
+#  define UWVM2_TEST_SOCK_ACCEPT_WASM64(ENV, SOCK_FD, FD_FLAGS, RO_FD_PTR, RO_ADDR_PTR) \
+      ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64((ENV), (SOCK_FD), (FD_FLAGS), (RO_FD_PTR), (RO_ADDR_PTR))
+# else
+#  define UWVM2_TEST_SOCK_ACCEPT_WASM64(ENV, SOCK_FD, FD_FLAGS, RO_FD_PTR, RO_ADDR_PTR) \
+      ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64((ENV), (SOCK_FD), (FD_FLAGS), (RO_FD_PTR))
+# endif
 
     // Case 0: negative fd -> ebadf
     {
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(-1),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(-1), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::ebadf)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected ebadf for negative fd");
@@ -111,11 +116,8 @@ int main()
         auto& fde = *env.fd_storage.opens.index_unchecked(1uz).fd_p;
         fde.close_pos = 0u;
 
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(1),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(1), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::ebadf)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected ebadf for closed descriptor");
@@ -131,11 +133,8 @@ int main()
         fde.rights_inherit = static_cast<rights_wasm64_t>(0);
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::file);
 
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(2),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(2), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::enotcapable)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected enotcapable when right_sock_accept missing");
@@ -154,7 +153,7 @@ int main()
         auto const invalid_flags = fdflags_wasm64_t::fdflag_append;
 
         auto const ret =
-            ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env, static_cast<wasi_posix_fd_wasm64_t>(3), invalid_flags, FD_PTR, ADDR_PTR);
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(3), invalid_flags, FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::einval)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected einval for unsupported fdflags");
@@ -170,11 +169,8 @@ int main()
         fde.rights_inherit = ::uwvm2::imported::wasi::wasip1::abi::rights_wasm64_t::right_sock_accept;
         fde.wasi_fd.ptr->wasi_fd_storage.reset_type(::uwvm2::imported::wasi::wasip1::fd_manager::wasi_fd_type_e::dir);
 
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(0),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(0), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::enotsock)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected enotsock for directory descriptor");
@@ -243,11 +239,8 @@ int main()
         }
 
         // Accept via WASI sock_accept_wasm64
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(0),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(0), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::esuccess)
         {
             ::fast_io::io::perrln(::fast_io::u8err(), u8"sock_accept_wasm64: expected esuccess for real TCP accept");
@@ -359,11 +352,8 @@ int main()
         }
 
         // Accept via WASI sock_accept_wasm64
-        auto const ret = ::uwvm2::imported::wasi::wasip1::func::sock_accept_wasm64(env,
-                                                                                   static_cast<wasi_posix_fd_wasm64_t>(0),
-                                                                                   static_cast<fdflags_wasm64_t>(0),
-                                                                                   FD_PTR,
-                                                                                   ADDR_PTR);
+        auto const ret =
+            UWVM2_TEST_SOCK_ACCEPT_WASM64(env, static_cast<wasi_posix_fd_wasm64_t>(0), static_cast<fdflags_wasm64_t>(0), FD_PTR, ADDR_PTR);
         if(ret != errno_wasm64_t::esuccess)
         {
             ::fast_io::io::perrln(::fast_io::u8err(),

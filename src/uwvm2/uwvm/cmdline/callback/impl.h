@@ -54,6 +54,8 @@
 # include "wasi_disable_utf8_check.h"
 # include "wasip1_set_fd_limit.h"
 # include "wasip1_mount_dir.h"
+# include "wasip1_delete_system_environment.h"
+# include "wasip1_add_environment.h"
 # include "wasip1_disable.h"
 # include "wasip1_socket_tcp_listen.h"
 # include "wasip1_socket_tcp_connect.h"
@@ -62,6 +64,7 @@
 
 // log
 # include "log_output.h"
+# include "log_enable_warning.h"
 # include "log_disable_warning.h"
 # include "log_convert_warn_to_fatal.h"
 

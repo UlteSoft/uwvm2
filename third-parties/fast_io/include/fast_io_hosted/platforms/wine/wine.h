@@ -35,7 +35,7 @@ public:
 };
 
 template <wine_family family>
-struct wine_family_file_factory FAST_IO_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+struct wine_family_file_factory 
 {
 	using native_handle_type = ::fast_io::wine_host_fd_t;
 	native_handle_type host_fd{};
