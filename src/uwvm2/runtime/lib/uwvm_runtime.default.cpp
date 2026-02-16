@@ -1088,6 +1088,136 @@ namespace uwvm2::runtime::uwvm_int
             return res;
         }
 
+        UWVM_ALWAYS_INLINE inline void copy_bytes_small(::std::byte* dst, ::std::byte const* src, ::std::size_t n) noexcept
+        {
+            switch(n)
+            {
+                case 0uz: return;
+                case 4uz: ::std::memcpy(dst, src, 4uz); return;
+                case 8uz: ::std::memcpy(dst, src, 8uz); return;
+                case 12uz: ::std::memcpy(dst, src, 12uz); return;
+                case 16uz: ::std::memcpy(dst, src, 16uz); return;
+                case 20uz: ::std::memcpy(dst, src, 20uz); return;
+                case 24uz: ::std::memcpy(dst, src, 24uz); return;
+                case 28uz: ::std::memcpy(dst, src, 28uz); return;
+                case 32uz: ::std::memcpy(dst, src, 32uz); return;
+                default: ::std::memcpy(dst, src, n); return;
+            }
+        }
+
+        UWVM_ALWAYS_INLINE inline void zero_bytes_small(::std::byte* dst, ::std::size_t n) noexcept
+        {
+            switch(n)
+            {
+                case 0uz: return;
+                case 4uz: ::std::memset(dst, 0, 4uz); return;
+                case 8uz: ::std::memset(dst, 0, 8uz); return;
+                case 12uz: ::std::memset(dst, 0, 12uz); return;
+                case 16uz: ::std::memset(dst, 0, 16uz); return;
+                case 20uz: ::std::memset(dst, 0, 20uz); return;
+                case 24uz: ::std::memset(dst, 0, 24uz); return;
+                case 28uz: ::std::memset(dst, 0, 28uz); return;
+                case 32uz: ::std::memset(dst, 0, 32uz); return;
+                case 64uz: ::std::memset(dst, 0, 64uz); return;
+                case 128uz: ::std::memset(dst, 0, 128uz); return;
+                case 256uz: ::std::memset(dst, 0, 256uz); return;
+                case 512uz: ::std::memset(dst, 0, 512uz); return;
+                case 1024uz: ::std::memset(dst, 0, 1024uz); return;
+                default: ::std::memset(dst, 0, n); return;
+            }
+        }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* align_ptr_up(::std::byte* p, ::std::size_t align) noexcept
+        {
+            auto const v{reinterpret_cast<::std::uintptr_t>(p)};
+            auto const a{align};
+            return reinterpret_cast<::std::byte*>((v + (a - 1uz)) & ~(a - 1uz));
+        }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline bool
+            try_execute_trivial_defined_call(::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
+                                             ::std::byte** stack_top_ptr) noexcept
+        {
+            using trivial_kind_t = ::uwvm2::runtime::compiler::uwvm_int::optable::trivial_defined_call_kind;
+
+            if(info.trivial_kind == trivial_kind_t::none) { return false; }
+
+            auto* const stack_top{*stack_top_ptr};
+            auto* const args_begin{stack_top - info.param_bytes};
+            if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const load_u32{[](::std::byte const* p) noexcept -> ::std::uint_least32_t
+                                {
+                                    ::std::uint_least32_t v{};  // no init
+                                    ::std::memcpy(::std::addressof(v), p, sizeof(v));
+                                    return v;
+                                }};
+            auto const store_u32{[](::std::byte* p, ::std::uint_least32_t v) noexcept { ::std::memcpy(p, ::std::addressof(v), sizeof(v)); }};
+
+            ::std::uint_least32_t const imm_u32{::std::bit_cast<::std::uint_least32_t>(info.trivial_imm)};
+
+            switch(info.trivial_kind)
+            {
+                case trivial_kind_t::param0_i32:
+                {
+                    // Keep the first i32 argument and drop the rest.
+                    if(info.param_bytes < 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::add_const_i32:
+                {
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a + imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::xor_i32:
+                {
+                    if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a ^ b));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::xor_add_const_i32:
+                {
+                    if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a + (b ^ imm_u32)));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::sub_or_const_i32:
+                {
+                    if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a - (b | imm_u32)));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::sum8_xor_const_i32:
+                {
+                    if(info.param_bytes != 32uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t acc{};
+                    for(::std::size_t i{}; i != 8uz; ++i) { acc += load_u32(args_begin + i * 4uz); }
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(acc ^ imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                [[unlikely]] default:
+                {
+                    break;
+                }
+            }
+
+            return false;
+        }
+
         inline void execute_compiled_defined([[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
                                              compiled_local_func_t const* compiled_func,
                                              ::std::size_t param_bytes,
@@ -1096,6 +1226,14 @@ namespace uwvm2::runtime::uwvm_int
         {
             auto const local_bytes_raw{compiled_func->local_bytes_max};
             auto const stack_cap_raw{compiled_func->operand_stack_byte_max};
+            constexpr ::std::size_t kInternalTempLocalBytes{8uz};
+            ::std::size_t wasm_locals_bytes{local_bytes_raw};
+            if(local_bytes_raw >= kInternalTempLocalBytes) [[likely]] { wasm_locals_bytes = local_bytes_raw - kInternalTempLocalBytes; }
+            if(param_bytes > wasm_locals_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const zeroinit_end_raw{compiled_func->local_bytes_zeroinit_end};
+            if(zeroinit_end_raw < param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(zeroinit_end_raw > wasm_locals_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const zero_n{zeroinit_end_raw - param_bytes};
             constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
             bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
@@ -1110,12 +1248,30 @@ namespace uwvm2::runtime::uwvm_int
 
             // Allocate locals as a packed byte buffer (i32/f32=4, i64/f64=8, plus the internal temp local).
             ::std::byte* local_base{};
-            if(use_scratch) { local_base = g_call_scratch.allocate_bytes(local_bytes_raw); }
+            constexpr ::std::size_t kFrameAlign{16uz};
+            constexpr ::std::size_t kFrameAlignPad{kFrameAlign - 1uz};
+            bool const align_wasm_locals_start{zero_n >= 64uz};
+            ::std::size_t local_alloc_n{local_bytes_raw};
+            if(local_alloc_n == 0uz) [[unlikely]] { local_alloc_n = 1uz; }
+            if(align_wasm_locals_start)
+            {
+                if(local_alloc_n > (::std::numeric_limits<::std::size_t>::max() - kFrameAlignPad)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                local_alloc_n += kFrameAlignPad;
+            }
+            ::std::byte* local_alloc{};
+            if(use_scratch) { local_alloc = g_call_scratch.allocate_bytes(local_alloc_n, kFrameAlign); }
             else
             {
-                ::std::size_t local_n{local_bytes_raw};
-                if(local_n == 0uz) [[unlikely]] { local_n = 1uz; }
-                local_base = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_n));
+                local_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_alloc_n));
+            }
+            if(align_wasm_locals_start)
+            {
+                // Align the start of the Wasm locals region (after params). This can improve bulk-zero performance on some libc `memset`s.
+                local_base = align_ptr_up(local_alloc + param_bytes, kFrameAlign) - param_bytes;
+            }
+            else
+            {
+                local_base = local_alloc;
             }
 
             if(param_bytes > local_bytes_raw) [[unlikely]]
@@ -1127,9 +1283,11 @@ namespace uwvm2::runtime::uwvm_int
 #endif
             }
 
-            if(param_bytes != 0uz) { ::std::memcpy(local_base, caller_args_begin, param_bytes); }
-            // Wasm locals are zero-initialized; params are already populated above.
-            if(local_bytes_raw > param_bytes) { ::std::memset(local_base + param_bytes, 0, local_bytes_raw - param_bytes); }
+            if(param_bytes != 0uz) { copy_bytes_small(local_base, caller_args_begin, param_bytes); }
+
+            // Wasm-visible locals (excluding params) are zero-initialized. The internal temp local (last 8 bytes) is not Wasm-visible and does not
+            // require initialization; avoiding a tiny `memset` per call saves a lot of overhead on call-heavy benchmarks.
+            if(zero_n != 0uz) { zero_bytes_small(local_base + param_bytes, zero_n); }
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1138,7 +1296,7 @@ namespace uwvm2::runtime::uwvm_int
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
-            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw); }
+            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw, kFrameAlign); }
             else
             {
                 ::std::size_t op_n{stack_cap_raw};
@@ -1177,7 +1335,7 @@ namespace uwvm2::runtime::uwvm_int
             }
 
             // Append results back to caller stack.
-            ::std::memcpy(*caller_stack_top_ptr, operand_base, result_bytes);
+            copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
 
             if(use_scratch) { g_call_scratch.release(scratch_mark); }
@@ -1353,6 +1511,22 @@ namespace uwvm2::runtime::uwvm_int
             if(!g_compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
 
+            if(wasm_module_id == SIZE_MAX) [[likely]]
+            {
+                using call_info_t = ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info;
+                auto const* const info{reinterpret_cast<call_info_t const*>(func_index)};
+                if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info->runtime_func)};
+                auto const* const cf{info->compiled_func};
+                if(rf == nullptr || cf == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                if(try_execute_trivial_defined_call(*info, stack_top_ptr)) { return; }
+
+                call_stack_guard g{info->module_id, info->function_index};
+                execute_compiled_defined(rf, cf, info->param_bytes, info->result_bytes, stack_top_ptr);
+                return;
+            }
+
             if(wasm_module_id >= g_modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
@@ -1450,8 +1624,6 @@ namespace uwvm2::runtime::uwvm_int
             if(expected_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const expected_sig{sig_from_ft(expected_ft_ptr)};
 
-            auto const import_n{module.imported_function_vec_storage.size()};
-
             switch(elem.type)
             {
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_defined:
@@ -1471,16 +1643,16 @@ namespace uwvm2::runtime::uwvm_int
                     auto const local_n{module.local_defined_function_vec_storage.size()};
                     if(base == nullptr || def_ptr < base || def_ptr >= base + local_n) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const local_idx{static_cast<::std::size_t>(def_ptr - base)};
-                    auto const func_idx{import_n + local_idx};
 
-                    call_stack_guard g{wasm_module_id, func_idx};
-                    if(wasm_module_id >= g_defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    auto const& mod_cache{g_defined_func_cache.index_unchecked(wasm_module_id)};
-                    if(local_idx >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    auto const& info{mod_cache.index_unchecked(local_idx)};
+                    if(local_idx >= module_rec.compiled.local_defined_call_info.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& info{module_rec.compiled.local_defined_call_info.index_unchecked(local_idx)};
                     if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
 
-                    execute_compiled_defined(info.runtime_func, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
+                    call_stack_guard g{info.module_id, info.function_index};
+                    auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
+                    if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    execute_compiled_defined(rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                     return;
                 }
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported:

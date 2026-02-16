@@ -59,21 +59,50 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         ::std::size_t local_count{};
         ::std::size_t local_bytes_max{};
+        // End offset (in bytes, from locals base) of the Wasm-visible locals region that must be zero-initialized on entry.
+        // This includes parameters (which are populated by memcpy) and any non-parameter locals that may be read.
+        // It must not include the internal temp local (which is not Wasm-visible and does not require initialization).
+        ::std::size_t local_bytes_zeroinit_end{};
         ::std::size_t operand_stack_max{};
         ::std::size_t operand_stack_byte_max{};
 
         uwvm_interpreter_function_operands_t op{};
     };
 
+    enum class trivial_defined_call_kind : ::std::uint_least8_t
+    {
+        none,
+        param0_i32,
+        add_const_i32,
+        xor_i32,
+        xor_add_const_i32,
+        sub_or_const_i32,
+        sum8_xor_const_i32
+    };
+
+    struct compiled_defined_call_info
+    {
+        ::std::size_t module_id{};
+        ::std::size_t function_index{};  // wasm index space: imports first, then locals
+        void const* runtime_func{};      // runtime local-defined function storage (opaque to optable)
+        local_func_storage_t const* compiled_func{};
+        ::std::size_t param_bytes{};
+        ::std::size_t result_bytes{};
+        trivial_defined_call_kind trivial_kind{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 trivial_imm{};
+    };
+
     struct uwvm_interpreter_full_function_symbol_t
     {
         ::std::size_t local_count{};
         ::std::size_t local_bytes_max{};
+        ::std::size_t local_bytes_zeroinit_end{};
         ::std::size_t operand_stack_max{};
         ::std::size_t operand_stack_byte_max{};
 
         ::uwvm2::utils::container::vector<local_func_storage_t const*> imported_func_operands_ptrs{};
         ::uwvm2::utils::container::vector<local_func_storage_t> local_funcs{};
+        ::uwvm2::utils::container::vector<compiled_defined_call_info> local_defined_call_info{};
     };
 
     union wasm_stack_top_i32_with_f32_u
