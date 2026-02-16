@@ -1155,6 +1155,7 @@ namespace uwvm2::runtime::uwvm_int
             auto const store_u32{[](::std::byte* p, ::std::uint_least32_t v) noexcept { ::std::memcpy(p, ::std::addressof(v), sizeof(v)); }};
 
             ::std::uint_least32_t const imm_u32{::std::bit_cast<::std::uint_least32_t>(info.trivial_imm)};
+            ::std::uint_least32_t const imm2_u32{::std::bit_cast<::std::uint_least32_t>(info.trivial_imm2)};
 
             switch(info.trivial_kind)
             {
@@ -1170,6 +1171,14 @@ namespace uwvm2::runtime::uwvm_int
                     if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     store_u32(args_begin, static_cast<::std::uint_least32_t>(a + imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::mul_add_const_i32:
+                {
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>((a * imm_u32) + imm2_u32));
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }

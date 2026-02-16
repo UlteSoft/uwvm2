@@ -74,6 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         none,
         param0_i32,
         add_const_i32,
+        mul_add_const_i32,
         xor_i32,
         xor_add_const_i32,
         sub_or_const_i32,
@@ -90,6 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t result_bytes{};
         trivial_defined_call_kind trivial_kind{};
         ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 trivial_imm{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 trivial_imm2{};
     };
 
     struct uwvm_interpreter_full_function_symbol_t
