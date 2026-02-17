@@ -1109,41 +1109,12 @@ namespace uwvm2::runtime::uwvm_int
 
         UWVM_ALWAYS_INLINE inline void copy_bytes_small(::std::byte* dst, ::std::byte const* src, ::std::size_t n) noexcept
         {
-            switch(n)
-            {
-                case 0uz: return;
-                case 4uz: ::std::memcpy(dst, src, 4uz); return;
-                case 8uz: ::std::memcpy(dst, src, 8uz); return;
-                case 12uz: ::std::memcpy(dst, src, 12uz); return;
-                case 16uz: ::std::memcpy(dst, src, 16uz); return;
-                case 20uz: ::std::memcpy(dst, src, 20uz); return;
-                case 24uz: ::std::memcpy(dst, src, 24uz); return;
-                case 28uz: ::std::memcpy(dst, src, 28uz); return;
-                case 32uz: ::std::memcpy(dst, src, 32uz); return;
-                default: ::std::memcpy(dst, src, n); return;
-            }
+            if(n != 0uz) [[likely]] { ::std::memcpy(dst, src, n); }
         }
 
         UWVM_ALWAYS_INLINE inline void zero_bytes_small(::std::byte* dst, ::std::size_t n) noexcept
         {
-            switch(n)
-            {
-                case 0uz: return;
-                case 4uz: ::std::memset(dst, 0, 4uz); return;
-                case 8uz: ::std::memset(dst, 0, 8uz); return;
-                case 12uz: ::std::memset(dst, 0, 12uz); return;
-                case 16uz: ::std::memset(dst, 0, 16uz); return;
-                case 20uz: ::std::memset(dst, 0, 20uz); return;
-                case 24uz: ::std::memset(dst, 0, 24uz); return;
-                case 28uz: ::std::memset(dst, 0, 28uz); return;
-                case 32uz: ::std::memset(dst, 0, 32uz); return;
-                case 64uz: ::std::memset(dst, 0, 64uz); return;
-                case 128uz: ::std::memset(dst, 0, 128uz); return;
-                case 256uz: ::std::memset(dst, 0, 256uz); return;
-                case 512uz: ::std::memset(dst, 0, 512uz); return;
-                case 1024uz: ::std::memset(dst, 0, 1024uz); return;
-                default: ::std::memset(dst, 0, n); return;
-            }
+            if(n != 0uz) [[likely]]{ ::std::memset(dst, 0, n); }
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* align_ptr_up(::std::byte* p, ::std::size_t align) noexcept
