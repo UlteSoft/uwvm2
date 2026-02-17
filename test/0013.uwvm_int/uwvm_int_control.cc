@@ -1,7 +1,6 @@
 #include <uwvm2/runtime/compiler/uwvm_int/optable/control.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 
 namespace optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
@@ -10,9 +9,7 @@ using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
 template <typename T>
 inline void write_slot(::std::byte* p, T const& v) noexcept
-{
-    ::std::memcpy(p, ::std::addressof(v), sizeof(T));
-}
+{ ::std::memcpy(p, ::std::addressof(v), sizeof(T)); }
 
 template <typename T>
 inline void push_operand(::std::byte*& sp, T v) noexcept
@@ -34,7 +31,7 @@ static void reset_state() noexcept
     g_local_base = nullptr;
 }
 
-static void end0(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
+[[gnu::sysv_abi]] static void end0(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
     g_hit = 10;
     g_ip = ip;
@@ -42,7 +39,7 @@ static void end0(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base
     g_local_base = local_base;
 }
 
-static void end1(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
+[[gnu::sysv_abi]] static void end1(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
     g_hit = 11;
     g_ip = ip;
@@ -50,7 +47,7 @@ static void end1(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base
     g_local_base = local_base;
 }
 
-static void end2(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
+[[gnu::sysv_abi]] static void end2(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
     g_hit = 12;
     g_ip = ip;
@@ -58,7 +55,7 @@ static void end2(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base
     g_local_base = local_base;
 }
 
-static void end3(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
+[[gnu::sysv_abi]] static void end3(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base) noexcept
 {
     g_hit = 13;
     g_ip = ip;
@@ -66,7 +63,7 @@ static void end3(::std::byte const* ip, ::std::byte* sp, ::std::byte* local_base
     g_local_base = local_base;
 }
 
-static void end0_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+[[gnu::sysv_abi]] static void end0_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
 {
     g_hit = 20;
     g_ip = ip;
@@ -74,7 +71,7 @@ static void end0_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& loc
     g_local_base = local_base;
 }
 
-static void end1_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+[[gnu::sysv_abi]] static void end1_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
 {
     g_hit = 21;
     g_ip = ip;
@@ -82,7 +79,7 @@ static void end1_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& loc
     g_local_base = local_base;
 }
 
-static void end2_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
+[[gnu::sysv_abi]] static void end2_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& local_base) noexcept
 {
     g_hit = 22;
     g_ip = ip;
@@ -90,9 +87,7 @@ static void end2_ref(::std::byte const*& ip, ::std::byte*& sp, ::std::byte*& loc
     g_local_base = local_base;
 }
 
-inline constexpr optable::uwvm_interpreter_translate_option_t opt_i32_cache{.is_tail_call = true,
-                                                                            .i32_stack_top_begin_pos = 5uz,
-                                                                            .i32_stack_top_end_pos = 8uz};
+inline constexpr optable::uwvm_interpreter_translate_option_t opt_i32_cache{.is_tail_call = true, .i32_stack_top_begin_pos = 5uz, .i32_stack_top_end_pos = 8uz};
 
 int main()
 {
@@ -107,18 +102,18 @@ int main()
     {
         reset_state();
 
-        alignas(16) ::std::byte slot_end[sizeof(opfunc_t)]{};
+        alignas(16)::std::byte slot_end[sizeof(opfunc_t)]{};
         opfunc_t end_fn = &end0;
         write_slot(slot_end, end_fn);
 
-        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(T0)]{};
+        alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(T0)]{};
         opfunc_t br_fn = &optable::uwvmint_br<optable::uwvm_interpreter_translate_option_t{.is_tail_call = true}, T0, T1, T2>;
         write_slot(instr, br_fn);
 
         T0 jmp_ip = slot_end;
         write_slot(instr + sizeof(opfunc_t), jmp_ip);
 
-        alignas(16) ::std::byte mem[32]{};
+        alignas(16)::std::byte mem[32]{};
         ::std::byte* sp = mem;
         ::std::byte* local_base = mem;
 
@@ -136,7 +131,7 @@ int main()
 
         constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
 
-        alignas(16) ::std::byte return_ip[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
+        alignas(16)::std::byte return_ip[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
         opfunc_t return_fn = &optable::uwvmint_return<opt, T0, T1, T2>;
         write_slot(return_ip, return_fn);
 
@@ -144,14 +139,14 @@ int main()
         opfunc_t after_return = &end0;
         write_slot(return_ip + sizeof(opfunc_t), after_return);
 
-        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(T0)]{};
+        alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(T0)]{};
         opfunc_t br_fn = &optable::uwvmint_br<opt, T0, T1, T2>;
         write_slot(instr, br_fn);
 
         T0 jmp_ip = return_ip;
         write_slot(instr + sizeof(opfunc_t), jmp_ip);
 
-        alignas(16) ::std::byte mem[32]{};
+        alignas(16)::std::byte mem[32]{};
         ::std::byte* sp = mem;
         ::std::byte* local_base = mem;
 
@@ -171,18 +166,18 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte slot_target[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slot_target[sizeof(opfunc_ref_t)]{};
             opfunc_ref_t end_fn = &end0_ref;
             write_slot(slot_target, end_fn);
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0)]{};
             opfunc_ref_t br_fn = &optable::uwvmint_br<opt, T0, T1, T2>;
             write_slot(instr, br_fn);
 
             T0 jmp_ip = slot_target;
             write_slot(instr + sizeof(opfunc_ref_t), jmp_ip);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             T0 ip = instr;
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
@@ -204,11 +199,11 @@ int main()
             // False case
             reset_state();
 
-            alignas(16) ::std::byte slot_true[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slot_true[sizeof(opfunc_ref_t)]{};
             opfunc_ref_t end_true = &end1_ref;
             write_slot(slot_true, end_true);
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
             opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
@@ -218,7 +213,7 @@ int main()
             opfunc_ref_t end_false = &end2_ref;
             write_slot(instr + sizeof(opfunc_ref_t) + sizeof(T0), end_false);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             T0 ip = instr;
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
@@ -238,11 +233,11 @@ int main()
             // True case
             reset_state();
 
-            alignas(16) ::std::byte slot_true[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slot_true[sizeof(opfunc_ref_t)]{};
             opfunc_ref_t end_true = &end1_ref;
             write_slot(slot_true, end_true);
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_ref_t) + sizeof(T0) + sizeof(opfunc_ref_t)]{};
             opfunc_ref_t br_if_fn = &optable::uwvmint_br_if<opt, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
@@ -252,7 +247,7 @@ int main()
             opfunc_ref_t end_false = &end2_ref;
             write_slot(instr + sizeof(opfunc_ref_t) + sizeof(T0), end_false);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             T0 ip = instr;
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
@@ -272,9 +267,9 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte slot0[sizeof(opfunc_ref_t)]{};
-            alignas(16) ::std::byte slot1[sizeof(opfunc_ref_t)]{};
-            alignas(16) ::std::byte slotd[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slot0[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slot1[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte slotd[sizeof(opfunc_ref_t)]{};
 
             opfunc_ref_t fn0 = &end0_ref;
             opfunc_ref_t fn1 = &end1_ref;
@@ -284,7 +279,7 @@ int main()
             write_slot(slotd, fnd);
 
             constexpr ::std::size_t max_size = 2uz;
-            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_ref_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
             opfunc_ref_t br_table_fn = &optable::uwvmint_br_table<opt, T0, T1, T2>;
             write_slot(instr, br_table_fn);
             write_slot(instr + sizeof(opfunc_ref_t), max_size);
@@ -296,7 +291,7 @@ int main()
             write_slot(instr + sizeof(opfunc_ref_t) + sizeof(::std::size_t) + 1uz * sizeof(T0), t1);
             write_slot(instr + sizeof(opfunc_ref_t) + sizeof(::std::size_t) + 2uz * sizeof(T0), td);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             T0 ip = instr;
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
@@ -316,12 +311,12 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_ref_t)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_ref_t)]{};
             opfunc_ref_t ret_fn = &optable::uwvmint_return<opt, T0, T1, T2>;
             write_slot(instr, ret_fn);
 
             T0 ip = instr;
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
 
@@ -343,11 +338,11 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte slot_true[sizeof(opfunc_t)]{};
+            alignas(16)::std::byte slot_true[sizeof(opfunc_t)]{};
             opfunc_t end_true = &end1;
             write_slot(slot_true, end_true);
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(T0) + sizeof(opfunc_t)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(T0) + sizeof(opfunc_t)]{};
             opfunc_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
@@ -357,7 +352,7 @@ int main()
             opfunc_t end_false = &end2;
             write_slot(instr + sizeof(opfunc_t) + sizeof(T0), end_false);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
             push_operand(sp, wasm_i32{0});
@@ -373,11 +368,11 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte slot_true[sizeof(opfunc_t)]{};
+            alignas(16)::std::byte slot_true[sizeof(opfunc_t)]{};
             opfunc_t end_true = &end3;
             write_slot(slot_true, end_true);
 
-            alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(T0) + sizeof(opfunc_t)]{};
+            alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(T0) + sizeof(opfunc_t)]{};
             opfunc_t br_if_fn = &optable::uwvmint_br_if<opt, 0uz, T0, T1, T2>;
             write_slot(instr, br_if_fn);
 
@@ -387,7 +382,7 @@ int main()
             opfunc_t end_false = &end2;
             write_slot(instr + sizeof(opfunc_t) + sizeof(T0), end_false);
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
             push_operand(sp, wasm_i32{1});
@@ -404,9 +399,9 @@ int main()
     {
         constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
 
-        alignas(16) ::std::byte slot0[sizeof(opfunc_t)]{};
-        alignas(16) ::std::byte slot1[sizeof(opfunc_t)]{};
-        alignas(16) ::std::byte slotd[sizeof(opfunc_t)]{};
+        alignas(16)::std::byte slot0[sizeof(opfunc_t)]{};
+        alignas(16)::std::byte slot1[sizeof(opfunc_t)]{};
+        alignas(16)::std::byte slotd[sizeof(opfunc_t)]{};
 
         opfunc_t fn0 = &end0;
         opfunc_t fn1 = &end1;
@@ -417,7 +412,7 @@ int main()
 
         constexpr ::std::size_t max_size = 2uz;  // two explicit targets + default at index 2
 
-        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
+        alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(::std::size_t) + (max_size + 1uz) * sizeof(T0)]{};
         opfunc_t br_table_fn = &optable::uwvmint_br_table<opt, 0uz, T0, T1, T2>;
         write_slot(instr, br_table_fn);
         write_slot(instr + sizeof(opfunc_t), max_size);
@@ -433,7 +428,7 @@ int main()
         {
             reset_state();
 
-            alignas(16) ::std::byte mem[32]{};
+            alignas(16)::std::byte mem[32]{};
             ::std::byte* sp = mem;
             ::std::byte* local_base = mem;
             push_operand(sp, idx);
@@ -459,20 +454,17 @@ int main()
         optable::uwvm_interpreter_stacktop_currpos_t curr{};
 
         curr.i32_stack_top_curr_pos = 5uz;
-        op_cached_t got0 =
-            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got0 = optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp0 = &optable::uwvmint_br_if<opt_i32_cache, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got0 != exp0) { return 200; }
 
         curr.i32_stack_top_curr_pos = 6uz;
-        op_cached_t got1 =
-            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got1 = optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp1 = &optable::uwvmint_br_if<opt_i32_cache, 6uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got1 != exp1) { return 201; }
 
         curr.i32_stack_top_curr_pos = 7uz;
-        op_cached_t got2 =
-            optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got2 = optable::translate::get_uwvmint_br_if_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp2 = &optable::uwvmint_br_if<opt_i32_cache, 7uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got2 != exp2) { return 202; }
     }
@@ -483,20 +475,17 @@ int main()
         optable::uwvm_interpreter_stacktop_currpos_t curr{};
 
         curr.i32_stack_top_curr_pos = 5uz;
-        op_cached_t got0 =
-            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got0 = optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp0 = &optable::uwvmint_br_table<opt_i32_cache, 5uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got0 != exp0) { return 210; }
 
         curr.i32_stack_top_curr_pos = 6uz;
-        op_cached_t got1 =
-            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got1 = optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp1 = &optable::uwvmint_br_table<opt_i32_cache, 6uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got1 != exp1) { return 211; }
 
         curr.i32_stack_top_curr_pos = 7uz;
-        op_cached_t got2 =
-            optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
+        op_cached_t got2 = optable::translate::get_uwvmint_br_table_fptr<opt_i32_cache, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>(curr);
         op_cached_t exp2 = &optable::uwvmint_br_table<opt_i32_cache, 7uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32, wasm_i32, wasm_i32>;
         if(got2 != exp2) { return 212; }
     }

@@ -1,7 +1,6 @@
 #include <uwvm2/runtime/compiler/uwvm_int/optable/register_ring.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <cstring>
 
 namespace optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
@@ -10,9 +9,7 @@ using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
 
 template <typename T>
 inline void write_slot(::std::byte* p, T const& v) noexcept
-{
-    ::std::memcpy(p, ::std::addressof(v), sizeof(T));
-}
+{ ::std::memcpy(p, ::std::addressof(v), sizeof(T)); }
 
 inline int g_hit{};
 inline ::std::byte const* g_ip{};
@@ -31,7 +28,7 @@ static void reset_state() noexcept
     g_r5 = wasm_i32{};
 }
 
-static void end_capture(::std::byte const* ip, ::std::byte* sp, ::std::byte*, wasm_i32 r3, wasm_i32 r4, wasm_i32 r5) noexcept
+[[gnu::sysv_abi]] static void end_capture(::std::byte const* ip, ::std::byte* sp, ::std::byte*, wasm_i32 r3, wasm_i32 r4, wasm_i32 r5) noexcept
 {
     g_hit = 1;
     g_ip = ip;
@@ -61,19 +58,18 @@ int main()
         curr.i32_stack_top_curr_pos = 5uz;
         remain.i32_stack_top_remain_size = 3uz;
 
-        opfunc_t got =
-            optable::translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<opt, wasm_i32>(curr, remain, tup);
+        opfunc_t got = optable::translate::get_uwvmint_stacktop_to_operand_stack_fptr_from_tuple<opt, wasm_i32>(curr, remain, tup);
         opfunc_t exp = &optable::uwvmint_stacktop_to_operand_stack<opt, 5uz, 3uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32>;
         if(got != exp) { return 1; }
 
         reset_state();
 
-        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
+        alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
         write_slot(instr, got);
         opfunc_t end_fn = &end_capture;
         write_slot(instr + sizeof(opfunc_t), end_fn);
 
-        alignas(16) ::std::byte mem[32]{};
+        alignas(16)::std::byte mem[32]{};
         ::std::byte* sp = mem;
         ::std::byte* local_base = mem;
 
@@ -103,19 +99,18 @@ int main()
         curr.i32_stack_top_curr_pos = 5uz;
         remain.i32_stack_top_remain_size = 3uz;
 
-        opfunc_t got =
-            optable::translate::get_uwvmint_operand_stack_to_stacktop_fptr_from_tuple<opt, wasm_i32>(curr, remain, tup);
+        opfunc_t got = optable::translate::get_uwvmint_operand_stack_to_stacktop_fptr_from_tuple<opt, wasm_i32>(curr, remain, tup);
         opfunc_t exp = &optable::uwvmint_operand_stack_to_stacktop<opt, 5uz, 3uz, T0, T1, T2, wasm_i32, wasm_i32, wasm_i32>;
         if(got != exp) { return 7; }
 
         reset_state();
 
-        alignas(16) ::std::byte instr[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
+        alignas(16)::std::byte instr[sizeof(opfunc_t) + sizeof(opfunc_t)]{};
         write_slot(instr, got);
         opfunc_t end_fn = &end_capture;
         write_slot(instr + sizeof(opfunc_t), end_fn);
 
-        alignas(16) ::std::byte mem[32]{};
+        alignas(16)::std::byte mem[32]{};
         wasm_i32 const v3{0x01020304};
         wasm_i32 const v4{0x05060708};
         wasm_i32 const v5{0x090A0B0C};
