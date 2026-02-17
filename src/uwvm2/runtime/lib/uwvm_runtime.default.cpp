@@ -20,7 +20,6 @@
  ****************************************/
 
 // std
-#include <array>
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -51,14 +50,12 @@
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
-# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
-#  include <uwvm2/uwvm/imported/wasi/wasip1/storage/env.h>
-# endif
 #endif
 
 namespace uwvm2::runtime::uwvm_int
@@ -100,11 +97,6 @@ namespace uwvm2::runtime::uwvm_int
             compiled_module_t compiled{};
         };
 
-        inline ::uwvm2::utils::container::vector<compiled_module_record> g_modules{};
-        inline ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view, ::std::size_t> g_module_name_to_id{};
-        // Full-compile: keep the hot local-call path O(1) by indexing local funcs with vectors (not hash maps).
-        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<compiled_defined_func_info>> g_defined_func_cache{};
-
         struct defined_func_ptr_range
         {
             ::std::uintptr_t begin{};
@@ -112,11 +104,23 @@ namespace uwvm2::runtime::uwvm_int
             ::std::size_t module_id{};
         };
 
-        // For indirect calls / import-alias resolution that only has `local_defined_function_storage_t*`,
-        // map pointer-address to {module_id, local_index} via a sorted range table.
-        inline ::uwvm2::utils::container::vector<defined_func_ptr_range> g_defined_func_ptr_ranges{};
-        inline bool g_bridges_initialized{};
-        inline bool g_compiled_all{};
+        struct runtime_global_state
+        {
+            ::uwvm2::utils::container::vector<compiled_module_record> modules{};
+            ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string_view, ::std::size_t> module_name_to_id{};
+
+            // Full-compile: keep the hot local-call path O(1) by indexing local funcs with vectors (not hash maps).
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<compiled_defined_func_info>> defined_func_cache{};
+
+            // For indirect calls / import-alias resolution that only has `local_defined_function_storage_t*`,
+            // map pointer-address to {module_id, local_index} via a sorted range table.
+            ::uwvm2::utils::container::vector<defined_func_ptr_range> defined_func_ptr_ranges{};
+
+            bool bridges_initialized{};
+            bool compiled_all{};
+        };
+
+        inline runtime_global_state g_runtime{};  // [global]
 
         struct call_stack_frame
         {
@@ -124,24 +128,53 @@ namespace uwvm2::runtime::uwvm_int
             ::std::size_t function_index{};
         };
 
-        inline constexpr ::std::size_t kCallStackMaxDepth{4096uz};
-        inline thread_local ::std::array<call_stack_frame, kCallStackMaxDepth> g_call_stack_buf{};
-        inline thread_local ::std::size_t g_call_stack_size{};
-        inline thread_local bool g_call_stack_overflowed{};
+        struct call_stack_tls_state
+        {
+            static constexpr ::std::size_t kCallStackMaxDepth{4096uz};
+
+            using thread_local_allocator = ::fast_io::native_thread_local_allocator;
+            ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
+
+            bool overflowed{};
+
+            UWVM_ALWAYS_INLINE inline void ensure_reserved() noexcept
+            {
+                if(frames.capacity() < kCallStackMaxDepth) [[unlikely]] { frames.reserve(kCallStackMaxDepth); }
+            }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline bool push(call_stack_frame fr) noexcept
+            {
+                ensure_reserved();
+                if(frames.size() < kCallStackMaxDepth) [[likely]]
+                {
+                    frames.push_back(fr);
+                    return true;
+                }
+                overflowed = true;
+                return false;
+            }
+
+            UWVM_ALWAYS_INLINE inline void pop() noexcept
+            {
+                if(!frames.empty()) [[likely]] { frames.pop_back(); }
+            }
+        };
+
+        inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
             if(f == nullptr) [[unlikely]] { return nullptr; }
-            if(g_defined_func_ptr_ranges.empty()) [[unlikely]] { return nullptr; }
+            if(g_runtime.defined_func_ptr_ranges.empty()) [[unlikely]] { return nullptr; }
 
             ::std::uintptr_t const addr{reinterpret_cast<::std::uintptr_t>(f)};
-            auto const it{::std::upper_bound(g_defined_func_ptr_ranges.begin(),
-                                             g_defined_func_ptr_ranges.end(),
+            auto const it{::std::upper_bound(g_runtime.defined_func_ptr_ranges.begin(),
+                                             g_runtime.defined_func_ptr_ranges.end(),
                                              addr,
                                              [](auto const a, defined_func_ptr_range const& r) constexpr noexcept { return a < r.begin; })};
-            if(it == g_defined_func_ptr_ranges.begin()) [[unlikely]] { return nullptr; }
+            if(it == g_runtime.defined_func_ptr_ranges.begin()) [[unlikely]] { return nullptr; }
 
-            auto const& r{*(it - 1)};
+            auto const& r{*(it - 1u)};
             if(addr < r.begin || addr >= r.end) [[unlikely]] { return nullptr; }
 
             constexpr ::std::size_t elem_size{sizeof(runtime_local_func_storage_t)};
@@ -151,8 +184,8 @@ namespace uwvm2::runtime::uwvm_int
             if((off_bytes % elem_size) != 0u) [[unlikely]] { return nullptr; }
             auto const local_idx{static_cast<::std::size_t>(off_bytes / elem_size)};
 
-            if(r.module_id >= g_defined_func_cache.size()) [[unlikely]] { return nullptr; }
-            auto const& mod_cache{g_defined_func_cache.index_unchecked(r.module_id)};
+            if(r.module_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { return nullptr; }
+            auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(r.module_id)};
             if(local_idx >= mod_cache.size()) [[unlikely]] { return nullptr; }
 
             auto const* const info{::std::addressof(mod_cache.index_unchecked(local_idx))};
@@ -165,28 +198,14 @@ namespace uwvm2::runtime::uwvm_int
             bool active{};
 
             inline constexpr explicit call_stack_guard(::std::size_t module_id, ::std::size_t function_index) noexcept
-            {
-                if(g_call_stack_size < kCallStackMaxDepth) [[likely]]
-                {
-                    g_call_stack_buf[g_call_stack_size] = call_stack_frame{module_id, function_index};
-                    ++g_call_stack_size;
-                    active = true;
-                }
-                else
-                {
-                    g_call_stack_overflowed = true;
-                }
-            }
+            { active = g_call_stack.push(call_stack_frame{module_id, function_index}); }
 
             call_stack_guard(call_stack_guard const&) = delete;
             call_stack_guard& operator= (call_stack_guard const&) = delete;
 
             inline constexpr ~call_stack_guard()
             {
-                if(active) [[likely]]
-                {
-                    if(g_call_stack_size != 0uz) [[likely]] { --g_call_stack_size; }
-                }
+                if(active) [[likely]] { g_call_stack.pop(); }
             }
         };
 
@@ -308,13 +327,13 @@ namespace uwvm2::runtime::uwvm_int
                                 u8"Call stack:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-            auto const n{g_call_stack_size};
+            auto const n{g_call_stack.frames.size()};
             for(::std::size_t i{}; i != n; ++i)
             {
-                auto const& fr{g_call_stack_buf[n - 1uz - i]};
-                if(fr.module_id >= g_modules.size()) { continue; }
+                auto const& fr{g_call_stack.frames.index_unchecked(n - 1uz - i)};
+                if(fr.module_id >= g_runtime.modules.size()) { continue; }
 
-                auto const& mod_rec{g_modules.index_unchecked(fr.module_id)};
+                auto const& mod_rec{g_runtime.modules.index_unchecked(fr.module_id)};
                 auto const mod_name{resolve_module_display_name(mod_rec.module_name)};
                 auto const fn_name{resolve_func_display_name(mod_rec.module_name, fr.function_index)};
 
@@ -350,7 +369,7 @@ namespace uwvm2::runtime::uwvm_int
                 ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
-            if(g_call_stack_overflowed) [[unlikely]]
+            if(g_call_stack.overflowed) [[unlikely]]
             {
                 ::fast_io::io::perrln(u8log_output_ul,
                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -540,7 +559,7 @@ namespace uwvm2::runtime::uwvm_int
             } u{};
         };
 
-        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<cached_import_target>> g_import_call_cache{};
+        inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<cached_import_target>> g_import_call_cache{};  // [global]
 
         [[nodiscard]] inline constexpr ::std::size_t valtype_size(::std::uint_least8_t code) noexcept
         {
@@ -810,7 +829,7 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
-        inline thread_local thread_local_bump_allocator g_call_scratch{};
+        inline thread_local thread_local_bump_allocator g_call_scratch{};  // [global]
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         inline ::uwvm2::object::memory::linear::native_memory_t const* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
@@ -1246,7 +1265,7 @@ namespace uwvm2::runtime::uwvm_int
             constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
             bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
-                                   g_call_stack_size > kAllocaMaxCallDepth};
+                                   g_call_stack.frames.size() > kAllocaMaxCallDepth};
             ::std::size_t scratch_mark{};
             if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
 
@@ -1517,7 +1536,7 @@ namespace uwvm2::runtime::uwvm_int
         inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(!g_compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+            if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
 
             if(wasm_module_id == SIZE_MAX) [[likely]]
@@ -1536,8 +1555,8 @@ namespace uwvm2::runtime::uwvm_int
                 return;
             }
 
-            if(wasm_module_id >= g_modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-            auto const& module_rec{g_modules.index_unchecked(wasm_module_id)};
+            if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
 
             auto const import_n{module.imported_function_vec_storage.size()};
@@ -1585,8 +1604,8 @@ namespace uwvm2::runtime::uwvm_int
             auto const local_index{func_index - import_n};
             auto const lf{::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index))};
             call_stack_guard g{wasm_module_id, func_index};
-            if(wasm_module_id >= g_defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-            auto const& mod_cache{g_defined_func_cache.index_unchecked(wasm_module_id)};
+            if(wasm_module_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(wasm_module_id)};
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& info{mod_cache.index_unchecked(local_index)};
             if(info.runtime_func != lf) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1597,11 +1616,11 @@ namespace uwvm2::runtime::uwvm_int
             call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(!g_compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+            if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
 
-            if(wasm_module_id >= g_modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-            auto const& module_rec{g_modules.index_unchecked(wasm_module_id)};
+            if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
 
             // Pop selector index (i32).
@@ -1723,8 +1742,8 @@ namespace uwvm2::runtime::uwvm_int
 
         inline void ensure_bridges_initialized() noexcept
         {
-            if(g_bridges_initialized) { return; }
-            g_bridges_initialized = true;
+            if(g_runtime.bridges_initialized) { return; }
+            g_runtime.bridges_initialized = true;
 
             ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func = unreachable_trap;
             ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
@@ -1738,8 +1757,8 @@ namespace uwvm2::runtime::uwvm_int
         inline void compile_all_modules_if_needed() noexcept
         {
             ensure_bridges_initialized();
-            if(g_compiled_all) { return; }
-            g_compiled_all = true;
+            if(g_runtime.compiled_all) { return; }
+            g_runtime.compiled_all = true;
 
             ::fast_io::unix_timestamp start_time{};
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -1759,37 +1778,37 @@ namespace uwvm2::runtime::uwvm_int
             }
 
             // Assign module ids.
-            g_modules.clear();
-            g_module_name_to_id.clear();
-            g_defined_func_cache.clear();
-            g_defined_func_ptr_ranges.clear();
+            g_runtime.modules.clear();
+            g_runtime.module_name_to_id.clear();
+            g_runtime.defined_func_cache.clear();
+            g_runtime.defined_func_ptr_ranges.clear();
             g_import_call_cache.clear();
 
             auto const& rt_map{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage};
-            g_modules.reserve(rt_map.size());
-            g_module_name_to_id.reserve(rt_map.size());
+            g_runtime.modules.reserve(rt_map.size());
+            g_runtime.module_name_to_id.reserve(rt_map.size());
 
             ::std::size_t id{};
             for(auto const& kv: rt_map)
             {
-                g_module_name_to_id.emplace(kv.first, id);
+                g_runtime.module_name_to_id.emplace(kv.first, id);
                 compiled_module_record rec{};
                 rec.module_name = kv.first;
                 rec.runtime_module = ::std::addressof(kv.second);
-                g_modules.push_back(::std::move(rec));
+                g_runtime.modules.push_back(::std::move(rec));
                 ++id;
             }
 
-            g_defined_func_cache.resize(g_modules.size());
+            g_runtime.defined_func_cache.resize(g_runtime.modules.size());
 
             constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t kTranslateOpt{get_curr_target_tranopt()};
 
             // Compile modules and build function map.
-            for(auto& rec: g_modules)
+            for(auto& rec: g_runtime.modules)
             {
                 ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option opt{};
-                auto const it{g_module_name_to_id.find(rec.module_name)};
-                if(it == g_module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const it{g_runtime.module_name_to_id.find(rec.module_name)};
+                if(it == g_runtime.module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
                 opt.curr_wasm_id = it->second;
 
                 ::uwvm2::validation::error::code_validation_error_impl err{};
@@ -1813,7 +1832,7 @@ namespace uwvm2::runtime::uwvm_int
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
                 if(local_n != rec.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-                auto& mod_cache{g_defined_func_cache.index_unchecked(opt.curr_wasm_id)};
+                auto& mod_cache{g_runtime.defined_func_cache.index_unchecked(opt.curr_wasm_id)};
                 mod_cache.clear();
                 mod_cache.resize(local_n);
 
@@ -1829,7 +1848,7 @@ namespace uwvm2::runtime::uwvm_int
                     ::std::uintptr_t const bytes{static_cast<::std::uintptr_t>(local_n * elem_size)};
                     if(begin > ::std::numeric_limits<::std::uintptr_t>::max() - bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-                    g_defined_func_ptr_ranges.push_back(defined_func_ptr_range{begin, begin + bytes, opt.curr_wasm_id});
+                    g_runtime.defined_func_ptr_ranges.push_back(defined_func_ptr_range{begin, begin + bytes, opt.curr_wasm_id});
                 }
 
                 for(::std::size_t i{}; i != local_n; ++i)
@@ -1853,18 +1872,18 @@ namespace uwvm2::runtime::uwvm_int
                 }
             }
 
-            if(!g_defined_func_ptr_ranges.empty())
+            if(!g_runtime.defined_func_ptr_ranges.empty())
             {
-                ::std::sort(g_defined_func_ptr_ranges.begin(),
-                            g_defined_func_ptr_ranges.end(),
+                ::std::sort(g_runtime.defined_func_ptr_ranges.begin(),
+                            g_runtime.defined_func_ptr_ranges.end(),
                             [](defined_func_ptr_range const& a, defined_func_ptr_range const& b) constexpr noexcept { return a.begin < b.begin; });
             }
 
             // Build an O(1) dispatch table for imported calls, flattening any import-alias chains ahead of time.
-            g_import_call_cache.resize(g_modules.size());
-            for(::std::size_t mid{}; mid != g_modules.size(); ++mid)
+            g_import_call_cache.resize(g_runtime.modules.size());
+            for(::std::size_t mid{}; mid != g_runtime.modules.size(); ++mid)
             {
-                auto const& rec{g_modules.index_unchecked(mid)};
+                auto const& rec{g_runtime.modules.index_unchecked(mid)};
                 auto const rt{rec.runtime_module};
                 if(rt == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -1990,11 +2009,11 @@ namespace uwvm2::runtime::uwvm_int
     {
         compile_all_modules_if_needed();
 
-        auto const it{g_module_name_to_id.find(main_module_name)};
-        if(it == g_module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto const it{g_runtime.module_name_to_id.find(main_module_name)};
+        if(it == g_runtime.module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
         auto const main_id{it->second};
 
-        auto const main_module{g_modules.index_unchecked(main_id).runtime_module};
+        auto const main_module{g_runtime.modules.index_unchecked(main_id).runtime_module};
         if(main_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
@@ -2059,8 +2078,8 @@ namespace uwvm2::runtime::uwvm_int
         else
         {
             auto const local_index{cfg.entry_function_index - import_n};
-            if(main_id >= g_defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-            auto const& mod_cache{g_defined_func_cache.index_unchecked(main_id)};
+            if(main_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(main_id)};
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& entry_info{mod_cache.index_unchecked(local_index)};
             auto const* const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
