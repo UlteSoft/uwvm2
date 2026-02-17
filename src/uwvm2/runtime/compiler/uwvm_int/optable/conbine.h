@@ -191,6 +191,307 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }  // namespace conbine_details
 
     // ========================
+    // stacktop spill+push fusions
+    // ========================
+
+    /**
+     * @brief Fuses a single stack-top spill with a subsequent `local.get`.
+     *
+     * @details
+     * This targets the common "ring full" sequence emitted by the translator when stack-top caching is enabled:
+     * - `stacktop_to_operand_stack` (spill 1 deepest cached value)
+     * - `local.get <off>` (push 1 value)
+     *
+     * The fused opfunc:
+     * 1) Spills the deepest cached value in the *shared* physical range to operand stack memory,
+     * 2) Loads the local at `<off>`,
+     * 3) Writes it into the freed insertion slot (same slot that was just spilled),
+     * 4) Tail-calls the next opfunc.
+     *
+     * `SpilledT` may differ from `LocalT` when the physical cache range is merged (e.g. i32/i64-merged or f32/f64-merged).
+     *
+     * Bytecode layout: `[opfunc_ptr][local_offset_t][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              typename SpilledT,
+              typename LocalT,
+              ::std::size_t curr_stack_top,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_spill1_then_local_get_typed(Type... type) UWVM_THROWS
+    {
+        using local_offset_t = conbine_details::local_offset_t;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        local_offset_t const off{conbine_details::read_imm<local_offset_t>(type...[0])};
+
+        constexpr ::std::size_t begin_push{conbine_details::range_begin<CompileOption, LocalT>()};
+        constexpr ::std::size_t end_push{conbine_details::range_end<CompileOption, LocalT>()};
+        static_assert(begin_push != end_push, "spill+local.get fusion requires stack-top caching enabled for LocalT.");
+        static_assert(begin_push <= curr_stack_top && curr_stack_top < end_push);
+
+        constexpr ::std::size_t begin_spill{conbine_details::range_begin<CompileOption, SpilledT>()};
+        constexpr ::std::size_t end_spill{conbine_details::range_end<CompileOption, SpilledT>()};
+        static_assert(begin_spill == begin_push && end_spill == end_push, "SpilledT and LocalT must share the same physical stack-top range.");
+
+        constexpr ::std::size_t insert_pos{details::ring_prev_pos(curr_stack_top, begin_push, end_push)};
+
+        SpilledT const spilled{get_curr_val_from_operand_stack_top<CompileOption, SpilledT, insert_pos>(type...)};
+        ::std::memcpy(type...[1u], ::std::addressof(spilled), sizeof(spilled));
+        type...[1u] += sizeof(spilled);
+
+        LocalT const v{conbine_details::load_local<LocalT>(type...[2u], off)};
+        details::set_curr_val_to_stacktop_cache<CompileOption, LocalT, insert_pos>(v, type...);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fuses a single stack-top spill with a subsequent `T.const`.
+     *
+     * @details
+     * Targets the translator sequence:
+     * - `stacktop_to_operand_stack` (spill 1 deepest cached value)
+     * - `T.const <imm>` (push 1 value)
+     *
+     * `SpilledT` may differ from `ConstT` when cache ranges are merged.
+     *
+     * Bytecode layout: `[opfunc_ptr][imm:ConstT][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              typename SpilledT,
+              typename ConstT,
+              ::std::size_t curr_stack_top,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_spill1_then_const_typed(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ConstT const imm{conbine_details::read_imm<ConstT>(type...[0])};
+
+        constexpr ::std::size_t begin_push{conbine_details::range_begin<CompileOption, ConstT>()};
+        constexpr ::std::size_t end_push{conbine_details::range_end<CompileOption, ConstT>()};
+        static_assert(begin_push != end_push, "spill+const fusion requires stack-top caching enabled for ConstT.");
+        static_assert(begin_push <= curr_stack_top && curr_stack_top < end_push);
+
+        constexpr ::std::size_t begin_spill{conbine_details::range_begin<CompileOption, SpilledT>()};
+        constexpr ::std::size_t end_spill{conbine_details::range_end<CompileOption, SpilledT>()};
+        static_assert(begin_spill == begin_push && end_spill == end_push, "SpilledT and ConstT must share the same physical stack-top range.");
+
+        constexpr ::std::size_t insert_pos{details::ring_prev_pos(curr_stack_top, begin_push, end_push)};
+
+        SpilledT const spilled{get_curr_val_from_operand_stack_top<CompileOption, SpilledT, insert_pos>(type...)};
+        ::std::memcpy(type...[1u], ::std::addressof(spilled), sizeof(spilled));
+        type...[1u] += sizeof(spilled);
+
+        details::set_curr_val_to_stacktop_cache<CompileOption, ConstT, insert_pos>(imm, type...);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fuses a single stack-top spill with a subsequent `local.get` + `local.get` + `i32.add`.
+     *
+     * @details
+     * Targets the translator emission when stack-top caching is enabled and the ring is full:
+     * - `stacktop_to_operand_stack` (spill 1 deepest cached value)
+     * - `i32_add_2localget <lhs_off, rhs_off>` (push 1 result)
+     *
+     * `SpilledT` may differ from `wasm_i32` when cache ranges are merged.
+     *
+     * Bytecode layout: `[opfunc_ptr][lhs_off:local_offset_t][rhs_off:local_offset_t][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_spill1_then_i32_add_2localget_typed(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using wasm_u32 = numeric_details::wasm_u32;
+        using local_offset_t = conbine_details::local_offset_t;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        local_offset_t const lhs_off{conbine_details::read_imm<local_offset_t>(type...[0])};
+        local_offset_t const rhs_off{conbine_details::read_imm<local_offset_t>(type...[0])};
+
+        constexpr ::std::size_t begin_push{conbine_details::range_begin<CompileOption, wasm_i32>()};
+        constexpr ::std::size_t end_push{conbine_details::range_end<CompileOption, wasm_i32>()};
+        static_assert(begin_push != end_push, "spill+i32_add_2localget fusion requires stack-top caching enabled for i32.");
+        static_assert(begin_push <= curr_stack_top && curr_stack_top < end_push);
+
+        constexpr ::std::size_t begin_spill{conbine_details::range_begin<CompileOption, SpilledT>()};
+        constexpr ::std::size_t end_spill{conbine_details::range_end<CompileOption, SpilledT>()};
+        static_assert(begin_spill == begin_push && end_spill == end_push, "SpilledT and i32 must share the same physical stack-top range.");
+
+        constexpr ::std::size_t insert_pos{details::ring_prev_pos(curr_stack_top, begin_push, end_push)};
+
+        SpilledT const spilled{get_curr_val_from_operand_stack_top<CompileOption, SpilledT, insert_pos>(type...)};
+        ::std::memcpy(type...[1u], ::std::addressof(spilled), sizeof(spilled));
+        type...[1u] += sizeof(spilled);
+
+        wasm_i32 const lhs{conbine_details::load_local<wasm_i32>(type...[2u], lhs_off)};
+        wasm_i32 const rhs{conbine_details::load_local<wasm_i32>(type...[2u], rhs_off)};
+        wasm_i32 const out{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, wasm_u32>(lhs, rhs)};
+        details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, insert_pos>(out, type...);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fuses a single stack-top spill with a subsequent `local.get` + `local.get` + `i64.add`.
+     *
+     * @details
+     * Same as @ref uwvmint_stacktop_spill1_then_i32_add_2localget_typed but for i64.
+     *
+     * Bytecode layout: `[opfunc_ptr][lhs_off:local_offset_t][rhs_off:local_offset_t][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_stacktop_spill1_then_i64_add_2localget_typed(Type... type) UWVM_THROWS
+    {
+        using wasm_i64 = conbine_details::wasm_i64;
+        using wasm_u64 = numeric_details::wasm_u64;
+        using local_offset_t = conbine_details::local_offset_t;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        local_offset_t const lhs_off{conbine_details::read_imm<local_offset_t>(type...[0])};
+        local_offset_t const rhs_off{conbine_details::read_imm<local_offset_t>(type...[0])};
+
+        constexpr ::std::size_t begin_push{conbine_details::range_begin<CompileOption, wasm_i64>()};
+        constexpr ::std::size_t end_push{conbine_details::range_end<CompileOption, wasm_i64>()};
+        static_assert(begin_push != end_push, "spill+i64_add_2localget fusion requires stack-top caching enabled for i64.");
+        static_assert(begin_push <= curr_stack_top && curr_stack_top < end_push);
+
+        constexpr ::std::size_t begin_spill{conbine_details::range_begin<CompileOption, SpilledT>()};
+        constexpr ::std::size_t end_spill{conbine_details::range_end<CompileOption, SpilledT>()};
+        static_assert(begin_spill == begin_push && end_spill == end_push, "SpilledT and i64 must share the same physical stack-top range.");
+
+        constexpr ::std::size_t insert_pos{details::ring_prev_pos(curr_stack_top, begin_push, end_push)};
+
+        SpilledT const spilled{get_curr_val_from_operand_stack_top<CompileOption, SpilledT, insert_pos>(type...)};
+        ::std::memcpy(type...[1u], ::std::addressof(spilled), sizeof(spilled));
+        type...[1u] += sizeof(spilled);
+
+        wasm_i64 const lhs{conbine_details::load_local<wasm_i64>(type...[2u], lhs_off)};
+        wasm_i64 const rhs{conbine_details::load_local<wasm_i64>(type...[2u], rhs_off)};
+        wasm_i64 const out{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i64, wasm_u64>(lhs, rhs)};
+        details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, insert_pos>(out, type...);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    // ========================
+    // numeric + fill1 fusions
+    // ========================
+
+    /**
+     * @brief Fuses `i32.add` with a subsequent single-value canonical fill (`fill1`).
+     *
+     * @details
+     * Common sequence in deep-stack reductions with a non-empty operand stack memory segment:
+     * - `i32.add` (stack height -1; frees the old RHS cache slot)
+     * - `operand_stack_to_stacktop` (fill 1 value into the freed slot to keep cache canonical)
+     *
+     * This fused opfunc performs both in one dispatch. The fill slot is `curr_stack_top` (the RHS slot), which is the only free slot when the range was
+     * previously full and `fill1` is required.
+     *
+     * Bytecode layout: `[opfunc_ptr][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_add_then_fill1(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        numeric_details::int_binary<CompileOption, wasm_i32, numeric_details::int_binop::add, curr_stack_top>(type...);
+        manipulate::operand_stack_to_stacktop<CompileOption, curr_stack_top, 1uz, wasm_i32, Type...>(type...);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fuses `i64.add` with a subsequent single-value canonical fill (`fill1`).
+     *
+     * Bytecode layout: `[opfunc_ptr][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_add_then_fill1(Type... type) UWVM_THROWS
+    {
+        using wasm_i64 = conbine_details::wasm_i64;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        numeric_details::int_binary<CompileOption, wasm_i64, numeric_details::int_binop::add, curr_stack_top>(type...);
+        manipulate::operand_stack_to_stacktop<CompileOption, curr_stack_top, 1uz, wasm_i64, Type...>(type...);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fuses `f64.add` with a subsequent single-value canonical fill (`fill1`).
+     *
+     * Bytecode layout: `[opfunc_ptr][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_add_then_fill1(Type... type) UWVM_THROWS
+    {
+        using wasm_f64 = conbine_details::wasm_f64;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        numeric_details::float_binary<CompileOption, wasm_f64, numeric_details::float_binop::add, curr_stack_top>(type...);
+        manipulate::operand_stack_to_stacktop<CompileOption, curr_stack_top, 1uz, wasm_f64, Type...>(type...);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    // ========================
     // arith_imm / bit_imm / shift_imm / cmp_imm : local.get + imm + op
     // ========================
 
@@ -1352,6 +1653,369 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
 
         // Next opfunc.
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path fused `call` + `drop` for cached i32 params (tail-call).
+     *
+     * @details
+     * Net stack effect: pop ParamCount (call produces a result which is immediately dropped).
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][call_function][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_call_stacktop_i32_drop(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(ParamCount != 0uz);
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end);
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t call_function;  // no init
+        ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
+        type...[0] += sizeof(call_function);
+
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        ::std::array<::std::byte, param_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
+        ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path fused `call` + `local.set` for cached i32 params (tail-call).
+     *
+     * @details
+     * Net stack effect: pop ParamCount (call produces a result which is consumed by local.set).
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][call_function][local_offset][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_call_stacktop_i32_local_set(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+        static_assert(ParamCount != 0uz);
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end);
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t call_function;  // no init
+        ::std::memcpy(::std::addressof(call_function), type...[0], sizeof(call_function));
+        type...[0] += sizeof(call_function);
+
+        auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        ::std::array<::std::byte, param_bytes> scratch;
+        ::std::byte* scratch_top{scratch.data() + param_bytes};
+
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{(ParamCount - 1uz) - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        details::call(curr_module_id, call_function, ::std::addressof(scratch_top));
+
+        wasm_i32 out;  // no init
+        ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+        conbine_details::store_local(type...[2u], local_off, out);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path `call_indirect` when all operands are cached i32 values (tail-call).
+     *
+     * @details
+     * This avoids the translator's "spill-all-to-memory + call_indirect + fill-to-cache" sequence for hot indirect-call sites where:
+     * - The operand stack is entirely in the i32 stack-top cache (no memory segment).
+     * - The callee signature is `(i32 x ParamCount) -> RetT` (RetT = `void` or `wasm_i32`).
+     * - The selector index (i32) is on the stack-top above the params.
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][type_index][table_index][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption,
+              ::std::size_t curr_i32_stack_top,
+              ::std::size_t ParamCount,
+              typename RetT,
+              uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_call_indirect_stacktop_i32(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        static_assert(::std::is_void_v<RetT> || ::std::same_as<RetT, wasm_i32>,
+                      "stacktop i32 call_indirect fast-path currently supports RetT = void or wasm_i32.");
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end, "stacktop i32 call_indirect fast-path requires i32 stack-top cache enabled.");
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        // Advance to immediates.
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t type_index;  // no init
+        ::std::memcpy(::std::addressof(type_index), type...[0], sizeof(type_index));
+        type...[0] += sizeof(type_index);
+
+        ::std::size_t table_index;  // no init
+        ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
+        type...[0] += sizeof(table_index);
+
+        // Scratch operand stack for the call_indirect bridge: [params..., selector].
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
+
+        constexpr ::std::size_t result_bytes{[]() consteval noexcept -> ::std::size_t
+                                             {
+                                                 if constexpr(::std::is_void_v<RetT>) { return 0uz; }
+                                                 else
+                                                 {
+                                                     return sizeof(RetT);
+                                                 }
+                                             }()};
+        constexpr ::std::size_t scratch_bytes{arg_bytes >= result_bytes ? arg_bytes : result_bytes};
+
+        ::std::array<::std::byte, (scratch_bytes == 0uz ? 1uz : scratch_bytes)> scratch{};  // zero-init: keeps tools happy on debug builds
+        ::std::byte* scratch_top{scratch.data() + arg_bytes};
+
+        // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{ParamCount - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        // Selector index (i32) is on the stack-top.
+        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+
+        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
+
+        if constexpr(!::std::is_void_v<RetT>)
+        {
+            RetT out;  // no init
+            ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+
+            // Pop (ParamCount + selector) and push 1 => result lands in the old param0 slot.
+            constexpr ::std::size_t new_pos{details::ring_advance_next_pos<curr_i32_stack_top, ParamCount, begin, end>()};
+            details::set_curr_val_to_stacktop_cache<CompileOption, RetT, new_pos>(out, type...);
+        }
+
+        // Next opfunc.
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path fused `call_indirect` + `drop` for cached i32 selector+params (tail-call).
+     *
+     * @details
+     * Net stack effect: pop (ParamCount + selector).
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][type_index][table_index][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_call_indirect_stacktop_i32_drop(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end);
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t type_index;  // no init
+        ::std::memcpy(::std::addressof(type_index), type...[0], sizeof(type_index));
+        type...[0] += sizeof(type_index);
+
+        ::std::size_t table_index;  // no init
+        ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
+        type...[0] += sizeof(table_index);
+
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
+
+        ::std::array<::std::byte, arg_bytes> scratch;  // uninit: fully written below (and overwritten by bridge)
+        ::std::byte* scratch_top{scratch.data() + arg_bytes};
+
+        // Write params in canonical order (param0..paramN-1). Stack layout at site: [params..., selector], currpos points at selector.
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{ParamCount - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        // Selector index (i32) is on the stack-top.
+        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+
+        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
+     * @brief Fast-path fused `call_indirect` + `local.set` for cached i32 selector+params (tail-call).
+     *
+     * @details
+     * Net stack effect: pop (ParamCount + selector) (result is consumed by local.set).
+     *
+     * Bytecode layout: `[opfunc_ptr][curr_module_id][type_index][table_index][local_offset][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_call_indirect_stacktop_i32_local_set(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        constexpr ::std::size_t begin{CompileOption.i32_stack_top_begin_pos};
+        constexpr ::std::size_t end{CompileOption.i32_stack_top_end_pos};
+        static_assert(begin != end);
+        static_assert(begin <= curr_i32_stack_top && curr_i32_stack_top < end);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        ::std::size_t curr_module_id;  // no init
+        ::std::memcpy(::std::addressof(curr_module_id), type...[0], sizeof(curr_module_id));
+        type...[0] += sizeof(curr_module_id);
+
+        ::std::size_t type_index;  // no init
+        ::std::memcpy(::std::addressof(type_index), type...[0], sizeof(type_index));
+        type...[0] += sizeof(type_index);
+
+        ::std::size_t table_index;  // no init
+        ::std::memcpy(::std::addressof(table_index), type...[0], sizeof(table_index));
+        type...[0] += sizeof(table_index);
+
+        auto const local_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+
+        constexpr ::std::size_t param_bytes{ParamCount * sizeof(wasm_i32)};
+        constexpr ::std::size_t selector_bytes{sizeof(wasm_i32)};
+        constexpr ::std::size_t arg_bytes{param_bytes + selector_bytes};
+
+        ::std::array<::std::byte, arg_bytes> scratch;
+        ::std::byte* scratch_top{scratch.data() + arg_bytes};
+
+        [&]<::std::size_t... Is>(::std::index_sequence<Is...>) constexpr UWVM_THROWS
+        {
+            ((
+                 [&]() constexpr UWVM_THROWS
+                 {
+                     constexpr ::std::size_t steps{ParamCount - Is};
+                     constexpr ::std::size_t pos{details::ring_advance_next_pos<curr_i32_stack_top, steps, begin, end>()};
+                     wasm_i32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, pos>(type...)};
+                     ::std::memcpy(scratch.data() + (Is * sizeof(wasm_i32)), ::std::addressof(v), sizeof(v));
+                 }()),
+             ...);
+        }(::std::make_index_sequence<ParamCount>{});
+
+        wasm_i32 const selector{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+        ::std::memcpy(scratch.data() + param_bytes, ::std::addressof(selector), sizeof(selector));
+
+        details::call_indirect(curr_module_id, type_index, table_index, ::std::addressof(scratch_top));
+
+        wasm_i32 out;  // no init
+        ::std::memcpy(::std::addressof(out), scratch.data(), sizeof(out));
+        conbine_details::store_local(type...[2u], local_off, out);
+
         uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
         UWVM_MUSTTAIL return next_interpreter(type...);
@@ -3782,7 +4446,215 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_br_if_local_tee_nz<Opt, Type...>; }
             };
+
+            // ========================
+            // stacktop spill+push fusions selectors
+            // ========================
+
+            template <typename SpilledT, typename LocalT>
+            struct spill1_then_local_get_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_stacktop_spill1_then_local_get_typed<Opt, SpilledT, LocalT, Pos, Type...>; }
+            };
+
+            template <typename SpilledT, typename ConstT>
+            struct spill1_then_const_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_stacktop_spill1_then_const_typed<Opt, SpilledT, ConstT, Pos, Type...>; }
+            };
+
+            template <typename SpilledT>
+            struct spill1_then_i32_add_2localget_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_stacktop_spill1_then_i32_add_2localget_typed<Opt, SpilledT, Pos, Type...>; }
+            };
+
+            template <typename SpilledT>
+            struct spill1_then_i64_add_2localget_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_stacktop_spill1_then_i64_add_2localget_typed<Opt, SpilledT, Pos, Type...>; }
+            };
+
+            struct i32_add_then_fill1_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i32_add_then_fill1<Opt, Pos, Type...>; }
+            };
+
+            struct i64_add_then_fill1_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i64_add_then_fill1<Opt, Pos, Type...>; }
+            };
+
+            struct f64_add_then_fill1_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_f64_add_then_fill1<Opt, Pos, Type...>; }
+            };
         }  // namespace details
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, typename LocalT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_stacktop_spill1_then_local_get_typed_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, LocalT>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, LocalT>()};
+
+            ::std::size_t pos{};
+            if constexpr(::std::same_as<LocalT, conbine_details::wasm_i32>) { pos = curr.i32_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<LocalT, conbine_details::wasm_i64>) { pos = curr.i64_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<LocalT, conbine_details::wasm_f32>) { pos = curr.f32_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<LocalT, conbine_details::wasm_f64>) { pos = curr.f64_stack_top_curr_pos; }
+            else
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption, begin, end, details::spill1_then_local_get_op<SpilledT, LocalT>, Type...>(
+                pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, typename LocalT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_stacktop_spill1_then_local_get_typed_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_stacktop_spill1_then_local_get_typed_fptr<CompileOption, SpilledT, LocalT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, typename ConstT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_stacktop_spill1_then_const_typed_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, ConstT>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, ConstT>()};
+
+            ::std::size_t pos{};
+            if constexpr(::std::same_as<ConstT, conbine_details::wasm_i32>) { pos = curr.i32_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<ConstT, conbine_details::wasm_i64>) { pos = curr.i64_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<ConstT, conbine_details::wasm_f32>) { pos = curr.f32_stack_top_curr_pos; }
+            else if constexpr(::std::same_as<ConstT, conbine_details::wasm_f64>) { pos = curr.f64_stack_top_curr_pos; }
+            else
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption, begin, end, details::spill1_then_const_op<SpilledT, ConstT>, Type...>(pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, typename ConstT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_stacktop_spill1_then_const_typed_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                           ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_stacktop_spill1_then_const_typed_fptr<CompileOption, SpilledT, ConstT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_stacktop_spill1_then_i32_add_2localget_typed_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            using wasm_i32 = conbine_details::wasm_i32;
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i32>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_i32>()};
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption, begin, end, details::spill1_then_i32_add_2localget_op<SpilledT>, Type...>(
+                curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_stacktop_spill1_then_i32_add_2localget_typed_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_stacktop_spill1_then_i32_add_2localget_typed_fptr<CompileOption, SpilledT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_stacktop_spill1_then_i64_add_2localget_typed_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            using wasm_i64 = conbine_details::wasm_i64;
+            constexpr ::std::size_t begin{conbine_details::range_begin<CompileOption, wasm_i64>()};
+            constexpr ::std::size_t end{conbine_details::range_end<CompileOption, wasm_i64>()};
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption, begin, end, details::spill1_then_i64_add_2localget_op<SpilledT>, Type...>(
+                curr.i64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, typename SpilledT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto
+            get_uwvmint_stacktop_spill1_then_i64_add_2localget_typed_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_stacktop_spill1_then_i64_add_2localget_typed_fptr<CompileOption, SpilledT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i32_add_then_fill1_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.i32_stack_top_begin_pos,
+                                                                    CompileOption.i32_stack_top_end_pos,
+                                                                    details::i32_add_then_fill1_op,
+                                                                    Type...>(curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i32_add_then_fill1_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i32_add_then_fill1_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i64_add_then_fill1_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.i64_stack_top_begin_pos,
+                                                                    CompileOption.i64_stack_top_end_pos,
+                                                                    details::i64_add_then_fill1_op,
+                                                                    Type...>(curr.i64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i64_add_then_fill1_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i64_add_then_fill1_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f64_add_then_fill1_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.f64_stack_top_begin_pos,
+                                                                    CompileOption.f64_stack_top_end_pos,
+                                                                    details::f64_add_then_fill1_op,
+                                                                    Type...>(curr.f64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_f64_add_then_fill1_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_f64_add_then_fill1_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -4590,6 +5462,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             { return uwvmint_call_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>; }
         };
 
+        template <::std::size_t ParamCount>
+        struct call_stacktop_i32_drop_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            { return uwvmint_call_stacktop_i32_drop<CompileOption, Curr, ParamCount, Type...>; }
+        };
+
+        template <::std::size_t ParamCount>
+        struct call_stacktop_i32_local_set_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            { return uwvmint_call_stacktop_i32_local_set<CompileOption, Curr, ParamCount, Type...>; }
+        };
+
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
@@ -4610,11 +5500,217 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_call_stacktop_i32_drop_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_stacktop_i32_drop_op<ParamCount>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                return uwvmint_call_drop<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, Type...>;
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_i32_drop_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                 ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_drop_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_call_stacktop_i32_drop_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_call_drop<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_i32_drop_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                 ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_drop_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_stacktop_i32_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_stacktop_i32_local_set_op<ParamCount>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                return uwvmint_call_local_set<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, Type...>;
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_i32_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                      ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_local_set_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_call_stacktop_i32_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_call_local_set<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_i32_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                      ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_local_set_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_call_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_call_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_call_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        {
+            // Byref mode disables stack-top caching; always fall back to the normal `call` opfunc (operand-stack memory contract).
+            return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>;
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
+
+        template <::std::size_t ParamCount, typename RetT>
+        struct call_indirect_stacktop_i32_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            { return uwvmint_call_indirect_stacktop_i32<CompileOption, Curr, ParamCount, RetT, Type...>; }
+        };
+
+        template <::std::size_t ParamCount>
+        struct call_indirect_stacktop_i32_drop_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            { return uwvmint_call_indirect_stacktop_i32_drop<CompileOption, Curr, ParamCount, Type...>; }
+        };
+
+        template <::std::size_t ParamCount>
+        struct call_indirect_stacktop_i32_local_set_op
+        {
+            template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t Curr, uwvm_int_stack_top_type... Type>
+                requires (CompileOption.is_tail_call)
+            static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+            { return uwvmint_call_indirect_stacktop_i32_local_set<CompileOption, Curr, ParamCount, Type...>; }
+        };
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_indirect_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_indirect_stacktop_i32_op<ParamCount, RetT>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                // No scalar stack-top cache: fall back to the normal `call_indirect` opfunc which operates on operand-stack memory.
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call_indirect<CompileOption, Type...>;
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_indirect_stacktop_i32_drop_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_indirect_stacktop_i32_drop_op<ParamCount>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                // No scalar stack-top cache: translator must not select this fused stack-top fast-path opfunc.
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call_indirect<CompileOption, Type...>;
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_indirect_stacktop_i32_drop_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                          ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_indirect_stacktop_i32_drop_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_call_indirect_stacktop_i32_local_set_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                        CompileOption.i32_stack_top_begin_pos,
+                                                                        CompileOption.i32_stack_top_end_pos,
+                                                                        call_indirect_stacktop_i32_local_set_op<ParamCount>,
+                                                                        Type...>(curr.i32_stack_top_curr_pos);
+            }
+            else
+            {
+                // No scalar stack-top cache: translator must not select this fused stack-top fast-path opfunc.
+                return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call_indirect<CompileOption, Type...>;
+            }
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_indirect_stacktop_i32_local_set_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                               ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_indirect_stacktop_i32_local_set_fptr<CompileOption, ParamCount, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_indirect_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_indirect_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_call_indirect_stacktop_i32_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        {
+            // Byref mode disables stack-top caching; always fall back to the normal `call_indirect` opfunc.
+            return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call_indirect<CompileOption, Type...>;
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_indirect_stacktop_i32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_indirect_stacktop_i32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
 
         template <::std::size_t ParamCount, typename RetT>
         struct call_stacktop_f32_op
@@ -4649,6 +5745,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_call_stacktop_f32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
 
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_call_stacktop_f32_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_f32_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_f32_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
+
         template <::std::size_t ParamCount, typename RetT>
         struct call_stacktop_f64_op
         {
@@ -4678,6 +5785,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_call_stacktop_f64_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_call_stacktop_f64_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_call_stacktop_f64_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return ::uwvm2::runtime::compiler::uwvm_int::optable::uwvmint_call<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t ParamCount, typename RetT, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_call_stacktop_f64_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_call_stacktop_f64_fptr<CompileOption, ParamCount, RetT, TypeInTuple...>(curr); }

@@ -125,8 +125,103 @@ Think of u2 as:
 
 ---
 
+## Weaknesses and limitations (where u2 can lose its advantage)
+
+u2’s wins come from replacing “load operands from memory → compute → store back” with “keep operands in registers/locals → compute → continue dispatch”. That only works when the platform ABI and the surrounding control-flow shape allow a wide, stable **argument-pack cache** to remain resident with minimal shuffling/spilling.
+
+This section explains the main cases where u2 is structurally constrained, and why a design like Wasm3/M3 can look “closer” on those targets/workloads even if u2 is faster elsewhere.
+
+### 1) ABI-constrained targets: why Win64 MS ABI and AArch32 AAPCS/EABI are hard
+
+**Core mechanism reminder.** u2 uses an opfunc signature whose first fixed arguments are:
+1) `ip` (bytecode / op-pointer stream),
+2) `stack_top` (operand stack top pointer),
+3) `local_base` (locals buffer base),
+and then uses the **remaining argument slots** as the stack-top cache. This convention is encoded in the runtime’s target selection (`get_curr_target_tranopt()` in `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp`) and is assumed by the translator (`src/uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h`).
+
+On “wide” ABIs (x86_64 SysV, AArch64 AAPCS64), this is a good trade: after the 3 fixed args there are still multiple integer argument registers and multiple FP/SIMD argument registers available, so the stack-top cache can be several values wide for *both* scalar integer and scalar FP operations.
+
+On **Win64 MS ABI** and **AArch32 AAPCS/EABI**, the situation is fundamentally different:
+
+- **Win64 (Microsoft x64 ABI) has only 4 register argument positions total** (`rcx/rdx/r8/r9` and the “matching” `xmm0–xmm3` positions).
+  - After the 3 fixed interpreter args, **only 1 register position remains**.
+  - Worse (relative to SysV/AArch64): the MS ABI’s “4 positions” are shared between integer and FP arguments. If the first 3 positions are consumed by pointers, you effectively lose the ability to use the corresponding early XMM positions for FP cache entries as well.
+  - As a result, “keep a meaningful stack-top slice in registers” collapses into a **1-slot cache** at best, usually implemented as a scalar4-merged layout. This increases register pressure and forces frequent spill/fill and shuffling, which often costs more than it saves.
+  - The runtime therefore keeps stack-top caching **disabled by default** on Win64 MS ABI, and keeps a 1-slot experiment under `#if 0` for reference in `get_curr_target_tranopt()`.
+
+- **AArch32 AAPCS/EABI has only 4 core argument registers (`r0–r3`)**.
+  - After the 3 fixed interpreter args, there is at most **one remaining core argument register (`r3`)** for integer-like cached values.
+  - While some ARM32 hard-float variants can pass FP arguments in VFP registers, the exact rules depend on toolchain/ABI mode and interact poorly with “mixed typed” signatures. u2 intentionally targets a portable baseline here and therefore disables caching rather than risking an ABI-dependent “it benchmarks well on one compiler flag but regresses elsewhere” outcome.
+  - The runtime similarly keeps stack-top caching **disabled** for ARM32 in `get_curr_target_tranopt()`.
+
+**Why Wasm3 can be closer on these targets.** M3’s design keeps a *small fixed* set of VM state in registers (pc/sp/mem + a tiny number of temporaries) and performs operand access via memory loads/stores. That is not ideal on stack-heavy arithmetic, but it is also much less sensitive to “how many argument registers exist after 3 fixed arguments”, because it does not try to encode a wide operand-cache into the ABI call interface in the first place. When u2’s cache width collapses to ~1, u2’s advantage (removing operand-stack traffic) shrinks, while its remaining costs (dispatch + occasional canonicalization) stay.
+
+There is also a *threshold effect*: most hot Wasm scalar ops are binary (consume two operands). With a cache width < 2, u2 can keep at most one operand resident; the other operand must be fetched from the operand stack memory almost every time. At that point u2’s fast path starts to resemble an M3-style “one register + one stack load” topology, but still pays the overhead of maintaining a typed cache model and (optionally) canonicalizing it at control-flow edges. This is the main reason why MS ABI / AArch32 results can look surprisingly close to Wasm3 even when u2 wins decisively on SysV/AArch64.
+
+### 2) Mixed-typed Wasm stack: why “partial caching” is not a free knob
+
+The Wasm operand stack is *mixed typed*: i32/i64/f32/f64 values can interleave arbitrarily. u2’s translator models this stack and decides—at translation time—whether each operation’s operands are in the cache or must be materialized from memory.
+
+For correctness and simplicity of the optable layouts, when stack-top caching is enabled for Wasm1, the translator currently requires **full scalar coverage** and tail-call chaining:
+
+- In `compile_all_from_uwvm/wasm1.h`, enabling stack-top caching implies:
+  - `CompileOption.is_tail_call` must be true (the threaded opfunc chaining relies on tail-call mode), and
+  - the i32/i64/f32/f64 stack-top ranges must be enabled together (a `static_assert` enforces this).
+
+This matters on ABI-constrained targets: it prevents a tempting “cache only i32” configuration that might fit into 1–2 registers. Without full coverage, a mixed-typed operand stack would force frequent type-dependent materializations and/or additional runtime tags, which would add overhead and complexity and often defeats the point of caching.
+
+### 3) Control-flow dense code: dispatch and predictor pressure become the bottleneck
+
+Once u2 removes most operand-stack memory traffic on cache-hit paths, the dominant remaining cost often becomes **threaded dispatch**:
+- load next opfunc pointer,
+- advance `ip`,
+- indirect branch / musttail jump.
+
+In **control-flow dense** code (short basic blocks, frequent branches, loop bodies with many side exits), two effects become more pronounced:
+
+1) **Indirect-branch prediction and BTB pressure**: a hot loop that alternates among many opfunc entrypoints can stress the branch predictor, especially when code size grows and the instruction working set becomes less stable. Even with perfect operand caching, a mispredicted indirect jump is expensive.
+
+2) **More live “cached state” at joins**: u2’s stack-top cache makes more values “live in registers/locals”. At control-flow joins and loop headers, the interpreter must ensure the cached layout is valid for the target block.
+
+u2’s mitigation is *register-only canonicalization* (“transform-to-begin”):
+- The register ring is rotated so the current logical top maps back to the range’s begin slot, without touching operand-stack memory.
+- This is implemented in `optable/register_ring.h` (e.g., `uwvmint_stacktop_transform_to_begin`) and is used by control-flow helpers in `optable/conbine.h` (e.g., `uwvmint_br_stacktop_transform_to_begin`).
+- The translator emits these transforms at appropriate control-flow edges (see `compile_all_from_uwvm/wasm1.h`).
+
+This avoids the classic “spill everything at every join” strategy, but it is not free: on very branchy code, even small register shuffles add up, and dispatch remains the fundamental ceiling for a non-JIT threaded interpreter.
+
+From a compiler/µarch perspective, there is a real trade:
+- A **wider cache** increases the chance that operands are already in registers (good for arithmetic throughput),
+- but it also increases the amount of live state that must be kept consistent across control-flow edges, and can increase the number of moves needed for “transform-to-begin” (and the risk of spills under register pressure).
+
+The register-ring approach keeps this cost bounded and predictable (it is a rotation within a fixed range, not an arbitrary permutation), but it cannot make it disappear on extremely branchy kernels.
+
+**Practical consequence.** For branchy dispatch-bound kernels, large gains often come from **superinstruction / mega-op fusion** that reduces the number of dispatches per unit work (u2’s `combine` layers). This preserves the u2 architecture (still threaded, still argument-pack caching) while amortizing the indirect-branch cost over longer semantic sequences.
+
+### 4) Calls and memory-exposing operations reduce cache locality
+
+Any operation that must expose canonical operand-stack state to memory, interact with host imports, or perform complex address computations can force partial or full materialization:
+- `call` / `call_indirect`,
+- host import calls,
+- certain memory operations and boundary checks,
+- operations that require precise stack layout for traps/debugging.
+
+These are not “failures” of the cache; they are semantic boundaries. When a workload is dominated by such boundaries, u2’s cache-hit fraction drops and the performance gap to other interpreters naturally narrows.
+
+### 5) Specialization and fusion trade code size for speed
+
+u2 relies on template specialization (different `StartPos`/`Count`/merge layouts) and optional combine layers. This can increase:
+- I-cache pressure (more opfunc bodies),
+- BTB pressure (more indirect jump targets),
+- compile time and binary size.
+
+On large OoO cores this trade is typically favorable for hot code, but on small cores (or branch-heavy kernels with many unique opfunc targets) the “specialization tax” can reduce the marginal benefit of further fusions.
+
+---
+
 ## References (in this repository)
 
 - Stack-top cache ring + spill/fill machinery: `optable/register_ring.h`
 - Control-flow “transform-to-begin” emission in translation: `compile_all_from_uwvm/wasm1.h`
 - Control-flow helpers that combine transform + branch: `optable/conbine.h`
+- Per-target stack-top cache sizing (ABI selection): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)

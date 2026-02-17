@@ -172,7 +172,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                     {
                         u8string_view const ev{e.data(), e.size()};
                         if(get_env_key(ev).empty()) { continue; }
-                        filtered.emplace_back(::std::move(e));
+                        filtered.emplace_back_unchecked(::std::move(e));
                     }
                     env_vec = ::std::move(filtered);
                 }
@@ -197,7 +197,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                             }
                         }
 
-                        if(!should_delete) { kept.emplace_back(::std::move(e)); }
+                        if(!should_delete) { kept.emplace_back_unchecked(::std::move(e)); }
                     }
                     env_vec = ::std::move(kept);
                 }
@@ -232,7 +232,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             env.envs.reserve(wasip1_environment_storage.size());
             for(auto const& e: wasip1_environment_storage)
             {
-                env.envs.emplace_back(u8string_view{e.data(), e.size()});
+                env.envs.emplace_back_unchecked(u8string_view{e.data(), e.size()});
             }
         }
 
