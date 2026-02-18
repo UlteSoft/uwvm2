@@ -5886,6 +5886,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             switch(op)
                             {
+                                case wasm1_code::local_set: [[fallthrough]];
                                 case wasm1_code::i32_add: [[fallthrough]];
                                 case wasm1_code::i32_sub: [[fallthrough]];
                                 case wasm1_code::i32_mul: [[fallthrough]];
@@ -5910,6 +5911,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             switch(op)
                             {
+                                case wasm1_code::local_set: [[fallthrough]];
                                 case wasm1_code::i64_add: [[fallthrough]];
                                 case wasm1_code::i64_sub: [[fallthrough]];
                                 case wasm1_code::i64_mul: [[fallthrough]];
@@ -7689,7 +7691,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                                                                                           interpreter_tuple));
                                         emit_imm_to(bytecode, local_offset_from_index(0u));  // out_ptr
                                         emit_imm_to(bytecode, local_offset_from_index(1u));  // counter
-                                        emit_imm_to(bytecode, resolved_memory0.memory_p);     // memory0
+                                        emit_imm_to(bytecode, resolved_memory0.memory_p);    // memory0
                                     }
                                 }
                             }
@@ -12523,6 +12525,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         auto const local_off{local_offset_from_index(local_index)};
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        // Conbine: `i32.const imm; local.set dst` (common in crypto init sequences).
+                        if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::const_i32 && curr_local_type == curr_operand_stack_value_type::i32)
+                        {
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_i32_const_local_set_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, local_off);
+                            emit_imm_to(bytecode, conbine_pending.imm_i32);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            break;
+                        }
+
+                        // Conbine: `i64.const imm; local.set dst` (rare, but must preserve correctness when `const_i64` is pending).
+                        if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::const_i64 && curr_local_type == curr_operand_stack_value_type::i64)
+                        {
+                            if(have_set_operand) { operand_stack_pop_unchecked(); }
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_i64_const_local_set_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, local_off);
+                            emit_imm_to(bytecode, conbine_pending.imm_i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            break;
+                        }
+
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                         // Conbine (heavy): `select(local.get a,b,cond) ; local.set dst`
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::select_after_select && conbine_pending.vt == curr_local_type &&
