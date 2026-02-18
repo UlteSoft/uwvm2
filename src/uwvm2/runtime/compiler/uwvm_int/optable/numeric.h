@@ -296,15 +296,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == int_binop::rotl)
             {
                 constexpr unsigned mask{static_cast<unsigned>(sizeof(UnsignedT) * 8u - 1u)};
-                int const sh{static_cast<int>(static_cast<unsigned>(to_unsigned_bits<SignedT, UnsignedT>(rhs)) & mask)};
-                UnsignedT const out{::std::rotl(to_unsigned_bits<SignedT, UnsignedT>(lhs), sh)};
+                // Avoid `std::rotl`/`std::rotr` here: libc++'s header implementation often materializes a
+                // (sh == 0) fixup, which shows up as extra `tst`+`csel` in hot Wasm rotate-heavy kernels.
+                // With Wasm semantics (masked shift), we can implement rotate via shift/or without UB and
+                // let the compiler lower it to a single `ror` on AArch64.
+                constexpr unsigned bits{static_cast<unsigned>(sizeof(UnsignedT) * 8u)};
+                unsigned const sh{static_cast<unsigned>(to_unsigned_bits<SignedT, UnsignedT>(rhs)) & mask};
+                UnsignedT const u{to_unsigned_bits<SignedT, UnsignedT>(lhs)};
+                UnsignedT const out{static_cast<UnsignedT>((u << sh) | (u >> ((bits - sh) & mask)))};
                 return from_unsigned_bits<SignedT, UnsignedT>(out);
             }
             else if constexpr(Op == int_binop::rotr)
             {
                 constexpr unsigned mask{static_cast<unsigned>(sizeof(UnsignedT) * 8u - 1u)};
-                int const sh{static_cast<int>(static_cast<unsigned>(to_unsigned_bits<SignedT, UnsignedT>(rhs)) & mask)};
-                UnsignedT const out{::std::rotr(to_unsigned_bits<SignedT, UnsignedT>(lhs), sh)};
+                constexpr unsigned bits{static_cast<unsigned>(sizeof(UnsignedT) * 8u)};
+                unsigned const sh{static_cast<unsigned>(to_unsigned_bits<SignedT, UnsignedT>(rhs)) & mask};
+                UnsignedT const u{to_unsigned_bits<SignedT, UnsignedT>(lhs)};
+                UnsignedT const out{static_cast<UnsignedT>((u >> sh) | (u << ((bits - sh) & mask)))};
                 return from_unsigned_bits<SignedT, UnsignedT>(out);
             }
             else if constexpr(Op == int_binop::div_s)

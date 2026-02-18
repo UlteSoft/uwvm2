@@ -6891,7 +6891,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], local_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -6948,7 +6948,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
             wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const base{load_local<wasm_i32>(type...[2u], local_off)};
             wasm_i32 const addr{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(base, imm)};
@@ -7005,7 +7005,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], local_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7062,7 +7062,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const local_off{details::read_imm<local_offset_t>(type...[0])};
             wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const base{load_local<wasm_i32>(type...[2u], local_off)};
             wasm_i32 const addr{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(base, imm)};
@@ -7119,7 +7119,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const v_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             wasm_f32 const v{load_local<wasm_f32>(type...[2u], v_off)};
@@ -7175,7 +7175,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
             local_offset_t const v_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const base{load_local<wasm_i32>(type...[2u], p_off)};
             wasm_i32 const addr{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(base, imm)};
@@ -7231,7 +7231,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             wasm_f32 const imm{details::read_imm<wasm_f32>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7285,7 +7285,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const v_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             wasm_f64 const v{load_local<wasm_f64>(type...[2u], v_off)};
@@ -7341,7 +7341,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_i32 const imm{details::read_imm<wasm_i32>(type...[0])};
             local_offset_t const v_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const base{load_local<wasm_i32>(type...[2u], p_off)};
             wasm_i32 const addr{numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, numeric_details::wasm_u32>(base, imm)};
@@ -7397,7 +7397,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             wasm_f64 const imm{details::read_imm<wasm_f64>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7451,7 +7451,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7508,7 +7508,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7565,7 +7565,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -7622,7 +7622,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             local_offset_t const p_off{details::read_imm<local_offset_t>(type...[0])};
             local_offset_t const dst_off{details::read_imm<local_offset_t>(type...[0])};
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{load_local<wasm_i32>(type...[2u], p_off)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};

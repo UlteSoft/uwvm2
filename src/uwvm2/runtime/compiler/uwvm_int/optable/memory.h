@@ -107,6 +107,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return v;
         }
 
+        // Tail-call bytecode stores some small Wasm immediates (notably `memarg.offset`) in 8-byte slots to keep the opfunc-pointer stream aligned.
+        // This improves the steady-state dispatch path on 64-bit targets by avoiding unaligned loads of the next opfunc pointer.
+        using bytecode_wasm32_mem_offset_t = ::std::uint_least64_t;
+
+        UWVM_ALWAYS_INLINE inline constexpr wasm_u32 read_memarg_offset(::std::byte const*& ip) noexcept
+        { return static_cast<wasm_u32>(read_imm<bytecode_wasm32_mem_offset_t>(ip)); }
+
         UWVM_ALWAYS_INLINE inline constexpr ::std::uint_least8_t load_u8(::std::byte const* p) noexcept
         {
             ::std::uint_least8_t v;  // no init
@@ -713,7 +720,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -742,7 +749,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 addr{};
             if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
@@ -793,7 +800,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...);
 
@@ -848,7 +855,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...);
 
@@ -903,7 +910,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             (void)get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...);
 
@@ -953,7 +960,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -1016,7 +1023,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1086,7 +1093,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1156,7 +1163,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1440,7 +1447,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -1505,7 +1512,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
@@ -1575,7 +1582,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1653,7 +1660,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1734,7 +1741,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
             wasm_i32 const addr{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             auto const eff65{details::wasm32_effective_offset(addr, offset)};
 
@@ -1903,7 +1910,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
@@ -1972,7 +1979,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
 
@@ -2052,7 +2059,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_f32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
 
@@ -2132,7 +2139,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_f64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
 
@@ -2212,7 +2219,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i32 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
             constexpr ::std::size_t range_begin{CompileOption.i32_stack_top_begin_pos};
@@ -2293,7 +2300,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
 
             native_memory_t* memory_p{details::read_imm<native_memory_t*>(type...[0])};
-            wasm_u32 const offset{details::read_imm<wasm_u32>(type...[0])};
+            wasm_u32 const offset{details::read_memarg_offset(type...[0])};
 
             wasm_i64 const value{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
 

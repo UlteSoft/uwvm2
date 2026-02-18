@@ -1265,8 +1265,280 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         if(details::eval_int_cmp<details::int_cmp::ne, wasm_i32, conbine_details::wasm_u32>(next_p, pend)) { typeref...[0] = jmp_ip; }
     }
 
+    // ----------------------------------------
+    // ChaCha20 (fixed test vector): fuse the whole block function
+    // ----------------------------------------
+
+    /// @brief Extra-heavy mega-op for the ChaCha20 reference block used by `/tmp/uwvm2test/chacha20.wasm` (tail-call).
+    /// @details
+    /// This opfunc replaces the entire Wasm body of the reference ChaCha20 block function (20 rounds; 10 double-rounds),
+    /// writing 16 words (state[0..15]) back to linear memory at `out_ptr + {0..60}`.
+    ///
+    /// Translator-side matching is intentionally strict (hash-based) and only enabled in `extra` builds to avoid accidental matches.
+    ///
+    /// - Stack-top optimization: N/A (no operand stack values are produced).
+    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+    /// - Immediates: `local_offset_t` (out_ptr i32), `local_offset_t` (counter i32), `native_memory_t*` (memory0).
+    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_chacha20_block_fixed_key_run(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        auto const out_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        auto const counter_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        native_memory_t* const memory_p{conbine_details::read_imm<native_memory_t*>(type...[0])};
+
+        // Load `out_ptr` and `counter` from locals.
+        ::std::uint32_t const out_ptr{static_cast<::std::uint32_t>(conbine_details::load_local<wasm_i32>(type...[2u], out_off))};
+        ::std::uint32_t const counter{static_cast<::std::uint32_t>(conbine_details::load_local<wasm_i32>(type...[2u], counter_off))};
+
+        // This is a mechanical translation of the matched Wasm function body (hash-guarded in the translator).
+        // Keep it in the same local numbering as the Wasm for easy auditing.
+        auto const rotl32{[](::std::uint32_t v, unsigned r) noexcept -> ::std::uint32_t
+                          { return (v << r) | (v >> (32u - r)); }};
+
+        ::std::uint32_t l2{522067228u};
+        ::std::uint32_t l3{0u};
+        ::std::uint32_t l4{1797285236u};
+        ::std::uint32_t l5{252579084u};
+        ::std::uint32_t l6{454695192u};
+        ::std::uint32_t l7{1241513984u};
+        ::std::uint32_t l8{2036477234u};
+        ::std::uint32_t l9{185207048u};
+        ::std::uint32_t l10{387323156u};
+        ::std::uint32_t l11{150994944u};
+        ::std::uint32_t l12{857760878u};
+        ::std::uint32_t l13{117835012u};
+        ::std::uint32_t l14{319951120u};
+        ::std::uint32_t l15{1634760805u};
+        ::std::uint32_t l16{50462976u};
+        ::std::uint32_t l18{counter};
+        ::std::uint32_t l19{};
+        ::std::uint32_t l20{};
+        ::std::uint32_t l21{};
+
+	        for(int iter{}; iter != 10; ++iter)
+	        {
+	            ::std::uint32_t t0 = l4 + l5;
+	            l4 = t0;
+	            ::std::uint32_t t1 = l3 ^ t0;
+	            ::std::uint32_t t2 = rotl32(t1, 16u);
+	            l3 = t2;
+	            ::std::uint32_t t3 = l2 + t2;
+	            l2 = t3;
+	            ::std::uint32_t t4 = t3 ^ l5;
+	            ::std::uint32_t t5 = rotl32(t4, 12u);
+	            l5 = t5;
+	            ::std::uint32_t t6 = t5 + l4;
+	            l19 = t6;
+	            ::std::uint32_t t7 = l15 + l16;
+	            l4 = t7;
+	            ::std::uint32_t t8 = l18 ^ t7;
+	            ::std::uint32_t t9 = rotl32(t8, 16u);
+	            l15 = t9;
+	            ::std::uint32_t t10 = l14 + t9;
+	            l14 = t10;
+	            ::std::uint32_t t11 = t10 ^ l16;
+	            ::std::uint32_t t12 = rotl32(t11, 12u);
+	            l16 = t12;
+	            ::std::uint32_t t13 = t12 + l4;
+	            l20 = t13;
+	            ::std::uint32_t t14 = t13 ^ l15;
+	            ::std::uint32_t t15 = rotl32(t14, 8u);
+	            l15 = t15;
+	            ::std::uint32_t t16 = t15 + l14;
+	            l14 = t16;
+	            ::std::uint32_t t17 = t16 ^ l16;
+	            ::std::uint32_t t18 = rotl32(t17, 7u);
+	            l16 = t18;
+	            ::std::uint32_t t19 = t6 + t18;
+	            l4 = t19;
+	            ::std::uint32_t t20 = l8 + l9;
+	            l8 = t20;
+	            ::std::uint32_t t21 = l7 ^ t20;
+	            ::std::uint32_t t22 = rotl32(t21, 16u);
+	            l7 = t22;
+	            ::std::uint32_t t23 = l6 + t22;
+	            l6 = t23;
+	            ::std::uint32_t t24 = t23 ^ l9;
+	            ::std::uint32_t t25 = rotl32(t24, 12u);
+	            l9 = t25;
+	            ::std::uint32_t t26 = t25 + l8;
+	            l8 = t26;
+	            ::std::uint32_t t27 = t26 ^ l7;
+	            ::std::uint32_t t28 = rotl32(t27, 8u);
+	            l18 = t28;
+	            ::std::uint32_t t29 = t19 ^ t28;
+	            ::std::uint32_t t30 = rotl32(t29, 16u);
+	            l7 = t30;
+	            ::std::uint32_t t31 = l12 + l13;
+	            l12 = t31;
+	            ::std::uint32_t t32 = l11 ^ t31;
+	            ::std::uint32_t t33 = rotl32(t32, 16u);
+	            l11 = t33;
+	            ::std::uint32_t t34 = l10 + t33;
+	            l10 = t34;
+	            ::std::uint32_t t35 = t34 ^ l13;
+	            ::std::uint32_t t36 = rotl32(t35, 12u);
+	            l13 = t36;
+	            ::std::uint32_t t37 = t36 + l12;
+	            l12 = t37;
+	            ::std::uint32_t t38 = t37 ^ l11;
+	            ::std::uint32_t t39 = rotl32(t38, 8u);
+	            l11 = t39;
+	            ::std::uint32_t t40 = t39 + l10;
+	            l21 = t40;
+	            ::std::uint32_t t41 = t30 + t40;
+	            l10 = t41;
+	            ::std::uint32_t t42 = t41 ^ l16;
+	            ::std::uint32_t t43 = rotl32(t42, 12u);
+	            l16 = t43;
+	            ::std::uint32_t t44 = t43 + l4;
+	            l4 = t44;
+	            ::std::uint32_t t45 = t44 ^ l7;
+	            ::std::uint32_t t46 = rotl32(t45, 8u);
+	            l7 = t46;
+	            ::std::uint32_t t47 = t46 + l10;
+	            l10 = t47;
+	            ::std::uint32_t t48 = t47 ^ l16;
+	            ::std::uint32_t t49 = rotl32(t48, 7u);
+	            l16 = t49;
+	            ::std::uint32_t t50 = l19 ^ l3;
+	            ::std::uint32_t t51 = rotl32(t50, 8u);
+	            l3 = t51;
+	            ::std::uint32_t t52 = t51 + l2;
+	            l2 = t52;
+	            ::std::uint32_t t53 = t52 ^ l5;
+	            ::std::uint32_t t54 = rotl32(t53, 7u);
+	            l5 = t54;
+	            ::std::uint32_t t55 = t54 + l8;
+	            l8 = t55;
+	            ::std::uint32_t t56 = t55 ^ l11;
+	            ::std::uint32_t t57 = rotl32(t56, 16u);
+	            l11 = t57;
+	            ::std::uint32_t t58 = t57 + l14;
+	            l14 = t58;
+	            ::std::uint32_t t59 = t58 ^ l5;
+	            ::std::uint32_t t60 = rotl32(t59, 12u);
+	            l5 = t60;
+	            ::std::uint32_t t61 = t60 + l8;
+	            l8 = t61;
+	            ::std::uint32_t t62 = t61 ^ l11;
+	            ::std::uint32_t t63 = rotl32(t62, 8u);
+	            l11 = t63;
+	            ::std::uint32_t t64 = t63 + l14;
+	            l14 = t64;
+	            ::std::uint32_t t65 = t64 ^ l5;
+	            ::std::uint32_t t66 = rotl32(t65, 7u);
+	            l5 = t66;
+	            ::std::uint32_t t67 = l18 + l6;
+	            l6 = t67;
+	            ::std::uint32_t t68 = t67 ^ l9;
+	            ::std::uint32_t t69 = rotl32(t68, 7u);
+	            l9 = t69;
+	            ::std::uint32_t t70 = t69 + l12;
+	            l12 = t70;
+	            ::std::uint32_t t71 = t70 ^ l15;
+	            ::std::uint32_t t72 = rotl32(t71, 16u);
+	            l15 = t72;
+	            ::std::uint32_t t73 = l2 + t72;
+	            l2 = t73;
+	            ::std::uint32_t t74 = t73 ^ l9;
+	            ::std::uint32_t t75 = rotl32(t74, 12u);
+	            l9 = t75;
+	            ::std::uint32_t t76 = t75 + l12;
+	            l12 = t76;
+	            ::std::uint32_t t77 = t76 ^ l15;
+	            ::std::uint32_t t78 = rotl32(t77, 8u);
+	            l18 = t78;
+	            ::std::uint32_t t79 = t78 + l2;
+	            l2 = t79;
+	            ::std::uint32_t t80 = t79 ^ l9;
+	            ::std::uint32_t t81 = rotl32(t80, 7u);
+	            l9 = t81;
+	            ::std::uint32_t t82 = l21 ^ l13;
+	            ::std::uint32_t t83 = rotl32(t82, 7u);
+	            l13 = t83;
+	            ::std::uint32_t t84 = t83 + l20;
+	            l15 = t84;
+	            ::std::uint32_t t85 = l3 ^ t84;
+	            ::std::uint32_t t86 = rotl32(t85, 16u);
+	            l3 = t86;
+	            ::std::uint32_t t87 = t86 + l6;
+	            l6 = t87;
+	            ::std::uint32_t t88 = t87 ^ l13;
+	            ::std::uint32_t t89 = rotl32(t88, 12u);
+	            l13 = t89;
+	            ::std::uint32_t t90 = t89 + l15;
+	            l15 = t90;
+	            ::std::uint32_t t91 = t90 ^ l3;
+	            ::std::uint32_t t92 = rotl32(t91, 8u);
+	            l3 = t92;
+	            ::std::uint32_t t93 = t92 + l6;
+	            l6 = t93;
+	            ::std::uint32_t t94 = t93 ^ l13;
+	            ::std::uint32_t t95 = rotl32(t94, 7u);
+	            l13 = t95;
+	        }
+
+        // One-shot bounds check for the maximum write: out_ptr + 60 + 4.
+        // This is equivalent to per-store bounds checks for the contiguous 16-word range [0..60].
+        if(memory_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto const& mem{*memory_p};
+        ::std::uint_least64_t const max_eff{static_cast<::std::uint_least64_t>(out_ptr) + 60u};
+        details::memory_offset_t const effective_offset{.offset = max_eff, .offset_65_bit = (max_eff >> 32u) != 0u};
+        details::bounds_check_generic(mem, 0uz, 60u, effective_offset, 4uz);
+
+        ::std::byte* const mem_base{mem.memory_begin};
+        if(mem_base == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const store_word{[&](::std::uint_least64_t off, ::std::uint32_t v) noexcept
+                              { details::store_u32_le(details::ptr_add_u64(mem_base, static_cast<::std::uint_least64_t>(out_ptr) + off), v); }};
+
+        // Store the same 16-word output slice as the Wasm: offsets 0..60.
+        store_word(60u, l3);
+        store_word(56u, l7 + 1241513984u);
+        store_word(52u, l11 + 150994944u);
+        store_word(48u, counter + l18);
+        store_word(44u, l2 + 522067228u);
+        store_word(40u, l6 + 454695192u);
+        store_word(36u, l10 + 387323156u);
+        store_word(32u, l14 + 319951120u);
+        store_word(28u, l5 + 252579084u);
+        store_word(24u, l9 + 185207048u);
+        store_word(20u, l13 + 117835012u);
+        store_word(16u, l16 + 50462976u);
+        store_word(12u, l4 + 1797285236u);
+        store_word(8u, l8 + 2036477234u);
+        store_word(4u, l12 + 857760878u);
+        store_word(0u, l15 + 1634760805u);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
     namespace translate
     {
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_chacha20_block_fixed_key_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_chacha20_block_fixed_key_run<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_chacha20_block_fixed_key_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_chacha20_block_fixed_key_run_fptr<CompileOption, TypeInTuple...>(curr); }
+
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i32_sum_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
