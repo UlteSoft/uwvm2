@@ -205,7 +205,7 @@ option("enable-uwvm-int-delay-local", function()
         [[    soft: enable minimal delay-local fusions (default).]],
         [[    heavy: enable soft + extended delay-local fusions.]]
     )
-    set_default("soft")
+    set_default("heavy")
     set_values("none", "soft", "heavy")
 end)
 
