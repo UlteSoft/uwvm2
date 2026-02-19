@@ -138,7 +138,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     }};
 
             wasm1_code op0{};
-            if(!read_op(op0) || op0 != wasm1_code::local_get) { return res; }
+            if(!read_op(op0)) { return res; }
+            if(op0 == wasm1_code::end && curr == end)
+            {
+                res.kind = trivial_call_inline_kind::nop_void;
+                return res;
+            }
+            if(op0 == wasm1_code::i32_const)
+            {
+                wasm_i32 imm;  // no init
+                if(!read_i32_leb(imm)) { return res; }
+
+                wasm1_code op1{};
+                if(!read_op(op1)) { return res; }
+
+                if(op1 == wasm1_code::end && curr == end)
+                {
+                    res.kind = trivial_call_inline_kind::const_i32;
+                    res.imm = imm;
+                    return res;
+                }
+                if(op1 == wasm1_code::drop)
+                {
+                    wasm1_code op2{};
+                    if(!read_op(op2) || op2 != wasm1_code::end) { return res; }
+                    if(curr != end) { return res; }
+
+                    res.kind = trivial_call_inline_kind::nop_void;
+                    return res;
+                }
+
+                return res;
+            }
+            if(op0 != wasm1_code::local_get) { return res; }
             ::std::uint32_t idx0{};
             if(!read_u32_leb(idx0)) { return res; }
 
@@ -151,6 +183,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     res.kind = trivial_call_inline_kind::param0_i32;
                     return res;
                 }
+                return res;
+            }
+            if(op1 == wasm1_code::drop)
+            {
+                wasm1_code op2{};
+                if(!read_op(op2) || op2 != wasm1_code::end) { return res; }
+                if(curr != end) { return res; }
+
+                res.kind = trivial_call_inline_kind::nop_void;
                 return res;
             }
 
@@ -20539,6 +20580,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     bool ok{};
                     switch(m.kind)
                     {
+                        case trivial_kind_t::nop_void:
+                            ok = (res_n == 0uz);
+                            break;
+                        case trivial_kind_t::const_i32:
+                            ok = (res_n == 1uz) && is_i32(ft->result.begin[0]);
+                            break;
                         case trivial_kind_t::param0_i32:
                             ok = (res_n == 1uz) && is_i32(ft->result.begin[0]) && (param_n >= 1uz) && is_i32(ft->parameter.begin[0]);
                             break;

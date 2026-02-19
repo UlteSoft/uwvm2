@@ -72,6 +72,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     enum class trivial_defined_call_kind : ::std::uint_least8_t
     {
         none,
+        nop_void,
+        const_i32,
         param0_i32,
         add_const_i32,
         mul_add_const_i32,
