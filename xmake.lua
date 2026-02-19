@@ -124,6 +124,14 @@ function def_build()
 		end
 	end
 
+	local delay_local_mode = get_config("enable-uwvm-int-delay-local")
+	if delay_local_mode == "soft" or delay_local_mode == "heavy" then
+		add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT")
+		if delay_local_mode == "heavy" then
+			add_defines("UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY")
+		end
+	end
+
 	local detailed_debug_check = get_config("detailed-debug-check")
 	if is_mode("debug") and detailed_debug_check then
 		add_defines("UWVM_ENABLE_DETAILED_DEBUG_CHECK")

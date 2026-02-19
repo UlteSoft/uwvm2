@@ -197,6 +197,18 @@ option("enable-uwvm-int-combine-ops", function()
     set_values("none", "soft", "heavy", "extra")
 end)
 
+option("enable-uwvm-int-delay-local", function()
+    set_description
+    (
+        "Enable delay-local variantization for uwvm-int.",
+        [[    none: disable delay-local fusions.]],
+        [[    soft: enable minimal delay-local fusions (default).]],
+        [[    heavy: enable soft + extended delay-local fusions.]]
+    )
+    set_default("soft")
+    set_values("none", "soft", "heavy")
+end)
+
 option("detailed-debug-check", function()
     set_description
     (

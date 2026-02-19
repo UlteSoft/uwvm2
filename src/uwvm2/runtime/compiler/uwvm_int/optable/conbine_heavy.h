@@ -1178,6 +1178,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
     /// - Immediates: `local_offset_t` (lhs), `local_offset_t` (rhs).
 
+    // ----------------------------------------
+    // extra-heavy: float 2-local fusions
+    // ----------------------------------------
+    //
+    // These patterns (e.g. `local.get a; local.get b; f32.add`) are code-size heavy because they create a full family
+    // of `*_2localget` opfuncs for {add,sub,mul,div,min,max} and both f32/f64.
+    // They are therefore only built in `extra` mode.
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_binop_2localget(Type... type) UWVM_THROWS
@@ -1483,6 +1492,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_max_2localget(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_binop_2localget<CompileOption, numeric_details::float_binop::max>(typeref...); }
+
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
     // ----------------------------------------
     // float: local.get + unop (push T)
@@ -2784,6 +2795,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // ----------------------------------------
     // update_local: dst = a + b (set/tee)
     // ----------------------------------------
+    // Extra-heavy only: this is a 2-local pattern and is intentionally kept out of `heavy` to avoid code bloat.
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
     /// @brief Fused combined opcode entrypoint `uwvmint_f32_add_2localget_local_settee` (tail-call).
     /// @details
@@ -2964,6 +2977,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (!CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f64_add_2localget_local_tee(TypeRef & ... typeref) UWVM_THROWS
     { return uwvmint_f64_add_2localget_local_settee<CompileOption, true>(typeref...); }
+
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
     // ----------------------------------------
     // select_fuse: local selects -> local set/tee
@@ -4251,6 +4266,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f32_sub_from_imm_localget<Opt, Type...>; }
             };
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f32_add_2localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -4316,6 +4332,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_f32_binop_2localget<Opt, numeric_details::float_binop::max, Type...>; }
             };
+
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             struct f32_abs_localget_op
             {
@@ -4450,6 +4468,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f64_binop_imm_localget<Opt, numeric_details::float_binop::max, Type...>; }
             };
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f64_add_2localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -4524,6 +4543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_f64_binop_2localget<Opt, numeric_details::float_binop::max, Type...>; }
             };
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             struct f64_abs_localget_op
             {
@@ -4636,6 +4656,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f32_select_local_settee<Opt, true, Type...>; }
             };
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f32_add_2localget_local_tee_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -4657,6 +4678,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_f64_add_2localget_local_tee<Opt, Type...>; }
             };
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             // bit_mix
             struct i32_xorshift_mix_op
@@ -5450,6 +5472,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                     Type...>(curr.f64_stack_top_curr_pos);
         }
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // f32 add/sub/mul/div/min/max (2localget)
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -5588,6 +5611,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f32_max_2localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f32_max_2localget_fptr<CompileOption, TypeInTuple...>(curr); }
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         // f32 unary
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -5861,6 +5885,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_max_imm_localget_fptr<CompileOption, TypeInTuple...>(curr); }
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // f64 add/sub/mul/div/min/max (2localget)
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -6006,6 +6031,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f64_max_2localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_max_2localget_fptr<CompileOption, TypeInTuple...>(curr); }
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         // f64 unary
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -6307,6 +6333,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                 ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i64_mac_local_set_acc_fptr<CompileOption, TypeInTuple...>(curr); }
 
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // update_local: add_2localget -> local.set/local.tee
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -6413,6 +6440,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f64_add_2localget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_add_2localget_local_tee_fptr<CompileOption, TypeInTuple...>(curr); }
+# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         // select_fuse
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>

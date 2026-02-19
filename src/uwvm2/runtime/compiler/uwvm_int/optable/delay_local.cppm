@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
  * @copyright   APL-2.0 License
  */
 
@@ -20,23 +19,31 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+
+export module uwvm2.runtime.compiler.uwvm_int.optable:delay_local;
+
+import uwvm2.utils.container;
+import uwvm2.parser.wasm.standard.wasm1;
+import :define;
+import :register_ring;
+import :numeric;
 
 #ifndef UWVM_MODULE
-# include "define.h"
-# include "storage.h"
-# include "call.h"
-# include "compare.h"
-# include "constop.h"
-# include "control.h"
-# include "convert.h"
-# include "lazy.h"
-# include "memory.h"
-# include "numeric.h"
-# include "stack.h"
-# include "variable.h"
-# include "conbine.h"
-# include "delay_local.h"
-# include "conbine_heavy.h"
-# include "combine_extra_heavy.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "delay_local.h"
+
