@@ -1134,7 +1134,6 @@ namespace uwvm2::runtime::uwvm_int
 
             auto* const stack_top{*stack_top_ptr};
             auto* const args_begin{stack_top - info.param_bytes};
-            if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             auto const load_u32{[](::std::byte const* p) noexcept -> ::std::uint_least32_t
                                 {
@@ -1149,15 +1148,30 @@ namespace uwvm2::runtime::uwvm_int
 
             switch(info.trivial_kind)
             {
+                case trivial_kind_t::nop_void:
+                {
+                    if(info.result_bytes != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    *stack_top_ptr = args_begin;
+                    return true;
+                }
+                case trivial_kind_t::const_i32:
+                {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    store_u32(args_begin, imm_u32);
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
                 case trivial_kind_t::param0_i32:
                 {
                     // Keep the first i32 argument and drop the rest.
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes < 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }
                 case trivial_kind_t::add_const_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     store_u32(args_begin, static_cast<::std::uint_least32_t>(a + imm_u32));
@@ -1166,6 +1180,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case trivial_kind_t::mul_add_const_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     store_u32(args_begin, static_cast<::std::uint_least32_t>((a * imm_u32) + imm2_u32));
@@ -1174,6 +1189,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case trivial_kind_t::xor_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
@@ -1183,6 +1199,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case trivial_kind_t::xor_add_const_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
@@ -1192,6 +1209,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case trivial_kind_t::sub_or_const_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t const a{load_u32(args_begin)};
                     ::std::uint_least32_t const b{load_u32(args_begin + 4uz)};
@@ -1201,6 +1219,7 @@ namespace uwvm2::runtime::uwvm_int
                 }
                 case trivial_kind_t::sum8_xor_const_i32:
                 {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(info.param_bytes != 32uz) [[unlikely]] { ::fast_io::fast_terminate(); }
                     ::std::uint_least32_t acc{};
                     for(::std::size_t i{}; i != 8uz; ++i) { acc += load_u32(args_begin + i * 4uz); }
