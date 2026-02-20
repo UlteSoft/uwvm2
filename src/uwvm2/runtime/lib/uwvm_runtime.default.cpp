@@ -130,7 +130,7 @@ namespace uwvm2::runtime::uwvm_int
 
         struct call_stack_tls_state
         {
-            static constexpr ::std::size_t kCallStackMaxDepth{4096uz};
+            inline static constexpr ::std::size_t kCallStackMaxDepth{4096uz};
 
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
@@ -347,18 +347,6 @@ namespace uwvm2::runtime::uwvm_int
                 }
 
                 ::fast_io::io::perrln(u8log_output_ul, ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-            }
-
-            if(g_call_stack.overflowed) [[unlikely]]
-            {
-                ::fast_io::io::perrln(u8log_output_ul,
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                      u8"uwvm: ",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                      u8"[warn]  ",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                      u8"Call stack overflowed; frames truncated.",
-                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
             ::fast_io::io::perrln(u8log_output_ul);
