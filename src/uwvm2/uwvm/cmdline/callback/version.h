@@ -1304,21 +1304,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             #if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Conbine: Extra\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Opcode Conbine: Extra\n");
             #elif defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Conbine: Heavy\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Opcode Conbine: Heavy\n");
             #elif defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Conbine: Soft\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Opcode Conbine: Soft\n");
             #else
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Conbine: Off\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Opcode Conbine: Off\n");
             #endif
 
             #if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Delay: Heay\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Heay\n");
             #elif defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Delay: Soft\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Soft\n");
             #else
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Delay: Off\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Off\n");
             #endif
         }
 #endif
