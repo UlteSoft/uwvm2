@@ -17314,6 +17314,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         if(conbine_pending.kind == conbine_pending_kind::const_i32)
                         {
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                            wasm1_code next_op{};  // init
+                            if(!is_polymorphic && code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
+                            if(!is_polymorphic && next_op == wasm1_code::local_tee)
+                            {
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_i32_binop_imm_stack_local_tee_fptr_from_tuple<
+                                        CompileOption,
+                                        ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                                emit_imm_to(bytecode, conbine_pending.imm_i32);
+                                conbine_pending.kind = conbine_pending_kind::none;
+                                break;
+                            }
+# endif
                             emit_opfunc_to(
                                 bytecode,
                                 translate::get_uwvmint_i32_binop_imm_stack_fptr_from_tuple<
@@ -20580,12 +20595,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     bool ok{};
                     switch(m.kind)
                     {
-                        case trivial_kind_t::nop_void:
-                            ok = (res_n == 0uz);
-                            break;
-                        case trivial_kind_t::const_i32:
-                            ok = (res_n == 1uz) && is_i32(ft->result.begin[0]);
-                            break;
+                        case trivial_kind_t::nop_void: ok = (res_n == 0uz); break;
+                        case trivial_kind_t::const_i32: ok = (res_n == 1uz) && is_i32(ft->result.begin[0]); break;
                         case trivial_kind_t::param0_i32:
                             ok = (res_n == 1uz) && is_i32(ft->result.begin[0]) && (param_n >= 1uz) && is_i32(ft->parameter.begin[0]);
                             break;
