@@ -5984,7 +5984,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if(op == wasm1_code::local_get) { return true; }
                             if(conbine_pending.vt == curr_operand_stack_value_type::i32)
                             {
-                                return op == wasm1_code::i32_const || op == wasm1_code::i32_eqz || op == wasm1_code::i32_load ||
+                                return op == wasm1_code::i32_const || op == wasm1_code::i32_eqz || op == wasm1_code::i32_load || op == wasm1_code::f32_load ||
+                                       op == wasm1_code::f64_load ||
                                        (CompileOption.is_tail_call && (op == wasm1_code::i32_load8_s || op == wasm1_code::i32_load8_u ||
                                                                        op == wasm1_code::i32_load16_s || op == wasm1_code::i32_load16_u))
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
@@ -6100,6 +6101,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     case wasm1_code::i32_rem_s: [[fallthrough]];
                                     case wasm1_code::i32_rem_u: [[fallthrough]];
                                     case wasm1_code::i32_load: [[fallthrough]];
+                                    case wasm1_code::f32_load: [[fallthrough]];
+                                    case wasm1_code::f64_load: [[fallthrough]];
                                     case wasm1_code::i32_load8_s: [[fallthrough]];
                                     case wasm1_code::i32_load8_u: [[fallthrough]];
                                     case wasm1_code::i32_load16_s: [[fallthrough]];
@@ -13676,6 +13679,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::std::uint_least64_t const offset{validate_mem_load(u8"f32.load", 2u, wasm_value_type_u::f32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::local_get;
+                            conbine_pending.off1 = conbine_pending.off2;
+                        }
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            // Conbine: `local.get addr; f32.load` fused into `f32_load_localget_off`.
+                            // Stack effect: push 1 (result), because the address is taken directly from the local.
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f32); }
+                            if constexpr(CompileOption.is_tail_call)
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_f32_load_localget_off_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                           *resolved_memory0.memory_p,
+                                                                                                                           interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_f32_load_localget_off_fptr<CompileOption, ::std::byte const*, ::std::byte*, ::std::byte*>(
+                                                   curr_stacktop));
+                            }
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, resolved_memory0.memory_p);
+                            emit_imm_to(bytecode, offset);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
+                            break;
+                        }
+#endif
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32_add)
                         {
@@ -13744,6 +13781,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         ::std::uint_least64_t const offset{validate_mem_load(u8"f64.load", 3u, wasm_value_type_u::f64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::local_get;
+                            conbine_pending.off1 = conbine_pending.off2;
+                        }
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            // Conbine: `local.get addr; f64.load` fused into `f64_load_localget_off`.
+                            // Stack effect: push 1 (result), because the address is taken directly from the local.
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64); }
+                            if constexpr(CompileOption.is_tail_call)
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_f64_load_localget_off_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                           *resolved_memory0.memory_p,
+                                                                                                                           interpreter_tuple));
+                            }
+                            else
+                            {
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_f64_load_localget_off_fptr<CompileOption, ::std::byte const*, ::std::byte*, ::std::byte*>(
+                                                   curr_stacktop));
+                            }
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, resolved_memory0.memory_p);
+                            emit_imm_to(bytecode, offset);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
+                            break;
+                        }
+#endif
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32_add)
                         {
