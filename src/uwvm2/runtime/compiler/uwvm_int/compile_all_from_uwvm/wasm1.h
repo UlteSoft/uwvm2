@@ -8502,11 +8502,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         bool conbine_brif_i32_rem_u_eqz_2localget{};
                         local_offset_t conbine_brif_local_off2{};
                         bool conbine_brif_for_i32_inc_f64_lt_u_eqz{};
-                        wasm_i32 conbine_brif_step{};
-#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                         bool conbine_brif_for_i32_inc_lt_u{};
-                        bool conbine_brif_for_ptr_inc_ne{};
+                        wasm_i32 conbine_brif_step{};
                         wasm_i32 conbine_brif_end{};
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+                        bool conbine_brif_for_ptr_inc_ne{};
 #  endif
 # endif
 
@@ -8519,10 +8519,66 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
                         else if(conbine_pending.kind == conbine_pending_kind::local_get_const_i32_cmp_brif)
                         {
-                            conbine_brif_i32_cmp_imm = true;
-                            conbine_brif_local_off = conbine_pending.off1;
-                            conbine_brif_imm = conbine_pending.imm_i32;
-                            conbine_brif_cmp = conbine_pending.brif_cmp;
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                            // Heavy: fold the hot for-loop skeleton
+                            //   local += step; if(local < end) br_if <loop>
+                            // into a single `for_i32_inc_lt_u_br_if` opfunc. This triggers when the translator has
+                            // just emitted `i32_add_imm_local_set_same` and the next ops are the fused
+                            // `local.get; i32.const end; i32.lt_u; br_if`.
+                            if(!is_polymorphic && conbine_pending.brif_cmp == conbine_brif_cmp_kind::i32_lt_u)
+                            {
+                                using prev_fptr_t =
+                                    decltype(translate::get_uwvmint_i32_add_imm_local_set_same_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                              interpreter_tuple));
+                                constexpr ::std::size_t prev_inst_size{sizeof(prev_fptr_t) + sizeof(local_offset_t) + sizeof(wasm_i32)};
+                                if(bytecode.size() >= prev_inst_size)
+                                {
+                                    auto const prev_start{bytecode.size() - prev_inst_size};
+
+                                    prev_fptr_t prev_fptr{};  // init
+                                    ::std::memcpy(::std::addressof(prev_fptr), bytecode.data() + prev_start, sizeof(prev_fptr));
+
+                                    auto const expect_prev_fptr{
+                                        translate::get_uwvmint_i32_add_imm_local_set_same_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple)};
+                                    if(prev_fptr == expect_prev_fptr)
+                                    {
+                                        local_offset_t prev_local_off{};  // init
+                                        ::std::memcpy(::std::addressof(prev_local_off),
+                                                      bytecode.data() + prev_start + sizeof(prev_fptr),
+                                                      sizeof(prev_local_off));
+                                        wasm_i32 prev_step{};  // init
+                                        ::std::memcpy(::std::addressof(prev_step),
+                                                      bytecode.data() + prev_start + sizeof(prev_fptr) + sizeof(prev_local_off),
+                                                      sizeof(prev_step));
+
+                                        if(prev_local_off == conbine_pending.off1)
+                                        {
+                                            // Remove the already-emitted update-local op and replace the whole update+cmp+br_if
+                                            // with a single loop-skeleton opfunc.
+                                            bytecode.resize(prev_start);
+                                            while(!ptr_fixups.empty() && !ptr_fixups.back_unchecked().in_thunk &&
+                                                  ptr_fixups.back_unchecked().site >= prev_start)
+                                            {
+                                                ptr_fixups.pop_back_unchecked();
+                                            }
+
+                                            conbine_brif_for_i32_inc_lt_u = true;
+                                            conbine_brif_local_off = prev_local_off;
+                                            conbine_brif_step = prev_step;
+                                            conbine_brif_end = conbine_pending.imm_i32;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if(!conbine_brif_for_i32_inc_lt_u)
+# endif
+                            {
+                                conbine_brif_i32_cmp_imm = true;
+                                conbine_brif_local_off = conbine_pending.off1;
+                                conbine_brif_imm = conbine_pending.imm_i32;
+                                conbine_brif_cmp = conbine_pending.brif_cmp;
+                            }
                             conbine_pending.kind = conbine_pending_kind::none;
                             conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
                         }
@@ -9033,7 +9089,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     return;
                                 }
 
-#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                                 if(conbine_brif_for_i32_inc_lt_u)
                                 {
                                     emit_opfunc_to(
@@ -9046,6 +9101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     return;
                                 }
 
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
                                 if(conbine_brif_for_ptr_inc_ne)
                                 {
                                     emit_opfunc_to(
@@ -14686,6 +14742,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // [    safe   ] unsafe (could be the section_end)
                         //               ^^ code_curr
 
+                        // Fast-elide: `i32.const* + drop*` (dead stack traffic).
+                        // Many real-world Wasm producers (and our microbenchmarks) can emit long runs of pure stack
+                        // providers followed by the same number of `drop`s. Since `i32.const` is side-effect free,
+                        // `N×i32.const` immediately followed by `N×drop` is a semantic no-op and can be removed at
+                        // translation time to avoid dispatch-bound slowdowns (e.g. deepstack tests).
+                        if(!is_polymorphic)
+                        {
+                            auto const try_elide_const_run_with_drops{
+                                [&]() noexcept -> bool
+                                {
+                                    ::std::byte const* scan{code_curr};
+                                    ::std::size_t const_count{1uz};
+                                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                                    while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::i32_const))
+                                    {
+                                        ++scan;
+                                        wasm_i32 tmp;
+                                        auto const [next, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                              ::fast_io::mnp::leb128_get(tmp))};
+                                        if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                                        scan = reinterpret_cast<::std::byte const*>(next);
+                                        ++const_count;
+                                    }
+
+                                    ::std::byte const* const drop_begin{scan};
+                                    ::std::byte const* drop_scan{drop_begin};
+                                    while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
+                                    ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
+                                    if(drop_count < const_count) { return false; }
+
+                                    code_curr = drop_begin + const_count;
+                                    return true;
+                                }};
+
+                            if(try_elide_const_run_with_drops()) { break; }
+                        }
+
                         // Conbine: `local.get(i32) + i32.const` (delay emission for imm/localget fusions).
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
@@ -14803,6 +14898,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // [     safe  ] unsafe (could be the section_end)
                         //               ^^ code_curr
 
+                        // Fast-elide: `i64.const* + drop*` (dead stack traffic).
+                        if(!is_polymorphic)
+                        {
+                            auto const try_elide_const_run_with_drops{
+                                [&]() noexcept -> bool
+                                {
+                                    ::std::byte const* scan{code_curr};
+                                    ::std::size_t const_count{1uz};
+                                    using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+
+                                    while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::i64_const))
+                                    {
+                                        ++scan;
+                                        wasm_i64 tmp;
+                                        auto const [next, parse_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(scan),
+                                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                              ::fast_io::mnp::leb128_get(tmp))};
+                                        if(parse_err != ::fast_io::parse_code::ok) { return false; }
+                                        scan = reinterpret_cast<::std::byte const*>(next);
+                                        ++const_count;
+                                    }
+
+                                    ::std::byte const* const drop_begin{scan};
+                                    ::std::byte const* drop_scan{drop_begin};
+                                    while(drop_scan < code_end && drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop)) { ++drop_scan; }
+                                    ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
+                                    if(drop_count < const_count) { return false; }
+
+                                    code_curr = drop_begin + const_count;
+                                    return true;
+                                }};
+
+                            if(try_elide_const_run_with_drops()) { break; }
+                        }
+
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         // Conbine: `local.get(i64) + i64.const` (delay emission for imm/localget fusions).
                         if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i64)
@@ -14865,6 +14995,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // f32.const f32 ...
                         // [ safe      ] unsafe (could be the section_end)
                         //               ^^ code_curr
+
+                        // Fast-elide: `f32.const* + drop*` (dead stack traffic).
+                        if(!is_polymorphic)
+                        {
+                            auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+                                                                      {
+                                                                          ::std::byte const* scan{code_curr};
+                                                                          ::std::size_t const_count{1uz};
+
+                                                                          constexpr ::std::size_t kInstBytes{1uz + sizeof(wasm_f32)};
+                                                                          while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::f32_const))
+                                                                          {
+                                                                              if(static_cast<::std::size_t>(code_end - scan) < kInstBytes) { return false; }
+                                                                              scan += kInstBytes;
+                                                                              ++const_count;
+                                                                          }
+
+                                                                          ::std::byte const* const drop_begin{scan};
+                                                                          ::std::byte const* drop_scan{drop_begin};
+                                                                          while(drop_scan < code_end &&
+                                                                                drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop))
+                                                                          {
+                                                                              ++drop_scan;
+                                                                          }
+                                                                          ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
+                                                                          if(drop_count < const_count) { return false; }
+
+                                                                          code_curr = drop_begin + const_count;
+                                                                          return true;
+                                                                      }};
+
+                            if(try_elide_const_run_with_drops()) { break; }
+                        }
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         // Conbine (heavy): `local.get(f32) + f32.const` (delay emission for imm/localget fusions).
@@ -14938,6 +15101,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         // f64.const f64 ...
                         // [     safe  ] unsafe (could be the section_end)
                         //               ^^ code_curr
+
+                        // Fast-elide: `f64.const* + drop*` (dead stack traffic).
+                        if(!is_polymorphic)
+                        {
+                            auto const try_elide_const_run_with_drops{[&]() noexcept -> bool
+                                                                      {
+                                                                          ::std::byte const* scan{code_curr};
+                                                                          ::std::size_t const_count{1uz};
+
+                                                                          constexpr ::std::size_t kInstBytes{1uz + sizeof(wasm_f64)};
+                                                                          while(scan < code_end && scan[0] == static_cast<::std::byte>(wasm1_code::f64_const))
+                                                                          {
+                                                                              if(static_cast<::std::size_t>(code_end - scan) < kInstBytes) { return false; }
+                                                                              scan += kInstBytes;
+                                                                              ++const_count;
+                                                                          }
+
+                                                                          ::std::byte const* const drop_begin{scan};
+                                                                          ::std::byte const* drop_scan{drop_begin};
+                                                                          while(drop_scan < code_end &&
+                                                                                drop_scan[0] == static_cast<::std::byte>(wasm1_code::drop))
+                                                                          {
+                                                                              ++drop_scan;
+                                                                          }
+                                                                          ::std::size_t const drop_count{static_cast<::std::size_t>(drop_scan - drop_begin)};
+                                                                          if(drop_count < const_count) { return false; }
+
+                                                                          code_curr = drop_begin + const_count;
+                                                                          return true;
+                                                                      }};
+
+                            if(try_elide_const_run_with_drops()) { break; }
+                        }
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
                         // Conbine (heavy): `local.get(f64) + f64.const` (delay emission for imm/localget fusions).
