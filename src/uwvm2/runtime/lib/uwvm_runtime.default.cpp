@@ -135,28 +135,13 @@ namespace uwvm2::runtime::uwvm_int
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
 
-            bool overflowed{};
+            inline call_stack_tls_state() noexcept { frames.reserve(kCallStackMaxDepth); }
 
-            UWVM_ALWAYS_INLINE inline void ensure_reserved() noexcept
-            {
-                if(frames.capacity() < kCallStackMaxDepth) [[unlikely]] { frames.reserve(kCallStackMaxDepth); }
-            }
+            inline void push(call_stack_frame fr) noexcept { frames.push_back(fr); }
 
-            [[nodiscard]] UWVM_ALWAYS_INLINE inline bool push(call_stack_frame fr) noexcept
+            inline void pop() noexcept
             {
-                ensure_reserved();
-                if(frames.size() < kCallStackMaxDepth) [[likely]]
-                {
-                    frames.push_back(fr);
-                    return true;
-                }
-                overflowed = true;
-                return false;
-            }
-
-            UWVM_ALWAYS_INLINE inline void pop() noexcept
-            {
-                if(!frames.empty()) [[likely]] { frames.pop_back(); }
+                if(!frames.empty()) [[likely]] { frames.pop_back_unchecked(); }
             }
         };
 
@@ -195,18 +180,13 @@ namespace uwvm2::runtime::uwvm_int
 
         struct call_stack_guard
         {
-            bool active{};
-
             inline constexpr explicit call_stack_guard(::std::size_t module_id, ::std::size_t function_index) noexcept
-            { active = g_call_stack.push(call_stack_frame{module_id, function_index}); }
+            { g_call_stack.push(call_stack_frame{module_id, function_index}); }
 
             call_stack_guard(call_stack_guard const&) = delete;
             call_stack_guard& operator= (call_stack_guard const&) = delete;
 
-            inline constexpr ~call_stack_guard()
-            {
-                if(active) [[likely]] { g_call_stack.pop(); }
-            }
+            inline constexpr ~call_stack_guard() { g_call_stack.pop(); }
         };
 
         enum class trap_kind : unsigned
@@ -1114,7 +1094,7 @@ namespace uwvm2::runtime::uwvm_int
 
         UWVM_ALWAYS_INLINE inline void zero_bytes_small(::std::byte* dst, ::std::size_t n) noexcept
         {
-            if(n != 0uz) [[likely]]{ ::std::memset(dst, 0, n); }
+            if(n != 0uz) [[likely]] { ::std::memset(dst, 0, n); }
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* align_ptr_up(::std::byte* p, ::std::size_t align) noexcept
