@@ -109,13 +109,85 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 static_assert(CompileOption.i32_stack_top_begin_pos <= curr_i32_stack_top && curr_i32_stack_top < CompileOption.i32_stack_top_end_pos);
 
                 wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
-                wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs)};
+                wasm_i32 out{};  // init
+                if constexpr(Op == numeric_details::int_binop::div_s)
+                {
+                    if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+                    {
+                        UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                    }
+                    out = static_cast<wasm_i32>(lhs / rhs);
+                }
+                else if constexpr(Op == numeric_details::int_binop::div_u)
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_s)
+                {
+                    if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) { out = wasm_i32{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i32>(lhs % rhs);
+                    }
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_u)
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                }
+                else
+                {
+                    out = numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs);
+                }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
             }
             else
             {
                 wasm_i32 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
-                wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs)};
+                wasm_i32 out{};  // init
+                if constexpr(Op == numeric_details::int_binop::div_s)
+                {
+                    if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+                    {
+                        UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                    }
+                    out = static_cast<wasm_i32>(lhs / rhs);
+                }
+                else if constexpr(Op == numeric_details::int_binop::div_u)
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_s)
+                {
+                    if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) { out = wasm_i32{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i32>(lhs % rhs);
+                    }
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_u)
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                }
+                else
+                {
+                    out = numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs);
+                }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
 
@@ -152,6 +224,294 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i32 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
             wasm_i32 const out{numeric_details::eval_int_binop<Op, wasm_i32, wasm_u32>(lhs, rhs)};
+            set_curr_val_to_operand_stack_cache_top(out, typeref...);
+        }
+
+        /**
+         * @brief Heavy-delay-local dynamic i32 binop.
+         *
+         * @details
+         * This opfunc reads the binop kind from the bytecode stream to avoid instantiating one opfunc per `(Op × stacktop-pos)`
+         * in delay-local heavy mode. It is intended for heavy-only ops; soft keeps specialized fastpaths.
+         *
+         * Tail-call bytecode layout:
+         * - `[opfunc_ptr][rhs_off:local_offset_t][op:u64(low8)][next_opfunc_ptr]`
+         */
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_binop_localget_rhs_dyn(Type... type) UWVM_THROWS
+        {
+            static_assert(sizeof...(Type) >= 3uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            local_offset_t const off{read_imm<local_offset_t>(type...[0])};
+            ::std::uint_least64_t const op_raw{read_imm<::std::uint_least64_t>(type...[0])};
+            auto const op{static_cast<numeric_details::int_binop>(static_cast<::std::uint_least8_t>(op_raw))};
+
+            wasm_i32 rhs;  // no init
+            ::std::memcpy(::std::addressof(rhs), type...[2u] + off, sizeof(rhs));
+
+            if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+            {
+                static_assert(CompileOption.i32_stack_top_begin_pos <= curr_i32_stack_top && curr_i32_stack_top < CompileOption.i32_stack_top_end_pos);
+
+                wasm_i32 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
+                wasm_i32 out{};  // init
+                switch(op)
+                {
+                    case numeric_details::int_binop::add:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::sub:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::mul:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::and_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::or_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::xor_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_s:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_u:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotr:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::div_s:
+                        if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+                        {
+                            UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                        }
+                        out = static_cast<wasm_i32>(lhs / rhs);
+                        break;
+                    case numeric_details::int_binop::div_u:
+                    {
+                        wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                        if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) / urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                        break;
+                    }
+                    case numeric_details::int_binop::rem_s:
+                        if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) { out = wasm_i32{0}; }
+                        else
+                        {
+                            out = static_cast<wasm_i32>(lhs % rhs);
+                        }
+                        break;
+                    case numeric_details::int_binop::rem_u:
+                    {
+                        wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                        if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                        break;
+                    }
+                    [[unlikely]] default:
+                        ::fast_io::fast_terminate();
+                }
+                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i32, curr_i32_stack_top>(out, type...);
+            }
+            else
+            {
+                wasm_i32 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
+                wasm_i32 out{};  // init
+                switch(op)
+                {
+                    case numeric_details::int_binop::add:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::sub:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::mul:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::and_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::or_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::xor_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_s:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_u:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotr:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i32, wasm_u32>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::div_s:
+                        if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]]
+                        {
+                            UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                        }
+                        out = static_cast<wasm_i32>(lhs / rhs);
+                        break;
+                    case numeric_details::int_binop::div_u:
+                    {
+                        wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                        if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) / urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                        break;
+                    }
+                    case numeric_details::int_binop::rem_s:
+                        if(rhs == wasm_i32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) { out = wasm_i32{0}; }
+                        else
+                        {
+                            out = static_cast<wasm_i32>(lhs % rhs);
+                        }
+                        break;
+                    case numeric_details::int_binop::rem_u:
+                    {
+                        wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                        if(urhs == wasm_u32{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                        break;
+                    }
+                    [[unlikely]] default:
+                        ::fast_io::fast_terminate();
+                }
+                set_curr_val_to_operand_stack_cache_top(out, type...);
+            }
+
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
+            requires (!CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_binop_localget_rhs_dyn(TypeRef&... typeref) UWVM_THROWS
+        {
+            using wasm_i32 = delay_local_details::wasm_i32;
+            using wasm_u32 = delay_local_details::wasm_u32;
+
+            static_assert(sizeof...(TypeRef) >= 3uz);
+            static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
+
+            // Byref mode always has stack-top caching disabled for all types.
+            static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+            typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+
+            local_offset_t const off{read_imm<local_offset_t>(typeref...[0])};
+            ::std::uint_least64_t const op_raw{read_imm<::std::uint_least64_t>(typeref...[0])};
+            auto const op{static_cast<numeric_details::int_binop>(static_cast<::std::uint_least8_t>(op_raw))};
+
+            wasm_i32 rhs;  // no init
+            ::std::memcpy(::std::addressof(rhs), typeref...[2u] + off, sizeof(rhs));
+
+            wasm_i32 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
+            wasm_i32 out{};  // init
+
+            switch(op)
+            {
+                case numeric_details::int_binop::add:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::sub:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::mul:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::and_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::or_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::xor_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shl:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shr_s:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shr_u:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::rotl:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::rotr:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i32, wasm_u32>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::div_s:
+                    if(rhs == wasm_i32{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) [[unlikely]] { numeric_details::trap_integer_overflow(); }
+                    out = static_cast<wasm_i32>(lhs / rhs);
+                    break;
+                case numeric_details::int_binop::div_u:
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                    break;
+                }
+                case numeric_details::int_binop::rem_s:
+                    if(rhs == wasm_i32{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    if(lhs == ::std::numeric_limits<wasm_i32>::min() && rhs == wasm_i32{-1}) { out = wasm_i32{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i32>(lhs % rhs);
+                    }
+                    break;
+                case numeric_details::int_binop::rem_u:
+                {
+                    wasm_u32 const urhs{numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(rhs)};
+                    if(urhs == wasm_u32{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    wasm_u32 const out_u32{static_cast<wasm_u32>(numeric_details::to_unsigned_bits<wasm_i32, wasm_u32>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i32, wasm_u32>(out_u32);
+                    break;
+                }
+            }
+
             set_curr_val_to_operand_stack_cache_top(out, typeref...);
         }
 
@@ -363,13 +723,85 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 static_assert(CompileOption.i64_stack_top_begin_pos <= curr_i64_stack_top && curr_i64_stack_top < CompileOption.i64_stack_top_end_pos);
 
                 wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
-                wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs)};
+                wasm_i64 out{};  // init
+                if constexpr(Op == numeric_details::int_binop::div_s)
+                {
+                    if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+                    {
+                        UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                    }
+                    out = static_cast<wasm_i64>(lhs / rhs);
+                }
+                else if constexpr(Op == numeric_details::int_binop::div_u)
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_s)
+                {
+                    if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) { out = wasm_i64{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i64>(lhs % rhs);
+                    }
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_u)
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                }
+                else
+                {
+                    out = numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
                 details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
             }
             else
             {
                 wasm_i64 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
-                wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs)};
+                wasm_i64 out{};  // init
+                if constexpr(Op == numeric_details::int_binop::div_s)
+                {
+                    if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+                    {
+                        UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                    }
+                    out = static_cast<wasm_i64>(lhs / rhs);
+                }
+                else if constexpr(Op == numeric_details::int_binop::div_u)
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_s)
+                {
+                    if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) { out = wasm_i64{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i64>(lhs % rhs);
+                    }
+                }
+                else if constexpr(Op == numeric_details::int_binop::rem_u)
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                }
+                else
+                {
+                    out = numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs);
+                }
                 set_curr_val_to_operand_stack_cache_top(out, type...);
             }
 
@@ -406,6 +838,290 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             wasm_i64 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
             wasm_i64 const out{numeric_details::eval_int_binop<Op, wasm_i64, wasm_u64>(lhs, rhs)};
+            set_curr_val_to_operand_stack_cache_top(out, typeref...);
+        }
+
+        /**
+         * @brief Heavy-delay-local dynamic i64 binop.
+         *
+         * Tail-call bytecode layout:
+         * - `[opfunc_ptr][rhs_off:local_offset_t][op:u64(low8)][next_opfunc_ptr]`
+         */
+        template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i64_stack_top, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_binop_localget_rhs_dyn(Type... type) UWVM_THROWS
+        {
+            static_assert(sizeof...(Type) >= 3uz);
+            static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+            type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+            local_offset_t const off{read_imm<local_offset_t>(type...[0])};
+            ::std::uint_least64_t const op_raw{read_imm<::std::uint_least64_t>(type...[0])};
+            auto const op{static_cast<numeric_details::int_binop>(static_cast<::std::uint_least8_t>(op_raw))};
+
+            wasm_i64 rhs;  // no init
+            ::std::memcpy(::std::addressof(rhs), type...[2u] + off, sizeof(rhs));
+
+            if constexpr(CompileOption.i64_stack_top_begin_pos != CompileOption.i64_stack_top_end_pos)
+            {
+                static_assert(CompileOption.i64_stack_top_begin_pos <= curr_i64_stack_top && curr_i64_stack_top < CompileOption.i64_stack_top_end_pos);
+
+                wasm_i64 const lhs{get_curr_val_from_operand_stack_top<CompileOption, wasm_i64, curr_i64_stack_top>(type...)};
+                wasm_i64 out{};  // init
+                switch(op)
+                {
+                    case numeric_details::int_binop::add:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::sub:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::mul:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::and_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::or_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::xor_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_s:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_u:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotr:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::div_s:
+                        if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+                        {
+                            UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                        }
+                        out = static_cast<wasm_i64>(lhs / rhs);
+                        break;
+                    case numeric_details::int_binop::div_u:
+                    {
+                        wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                        if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) / urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                        break;
+                    }
+                    case numeric_details::int_binop::rem_s:
+                        if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) { out = wasm_i64{0}; }
+                        else
+                        {
+                            out = static_cast<wasm_i64>(lhs % rhs);
+                        }
+                        break;
+                    case numeric_details::int_binop::rem_u:
+                    {
+                        wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                        if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                        break;
+                    }
+                    [[unlikely]] default:
+                        ::fast_io::fast_terminate();
+                }
+                details::set_curr_val_to_stacktop_cache<CompileOption, wasm_i64, curr_i64_stack_top>(out, type...);
+            }
+            else
+            {
+                wasm_i64 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i64>(type...)};
+                wasm_i64 out{};  // init
+                switch(op)
+                {
+                    case numeric_details::int_binop::add:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::sub:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::mul:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::and_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::or_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::xor_:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_s:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::shr_u:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotl:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::rotr:
+                        out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i64, wasm_u64>(lhs, rhs);
+                        break;
+                    case numeric_details::int_binop::div_s:
+                        if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]]
+                        {
+                            UWVM_MUSTTAIL return numeric_details::trap_integer_overflow_tail<CompileOption>(type...);
+                        }
+                        out = static_cast<wasm_i64>(lhs / rhs);
+                        break;
+                    case numeric_details::int_binop::div_u:
+                    {
+                        wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                        if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) / urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                        break;
+                    }
+                    case numeric_details::int_binop::rem_s:
+                        if(rhs == wasm_i64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) { out = wasm_i64{0}; }
+                        else
+                        {
+                            out = static_cast<wasm_i64>(lhs % rhs);
+                        }
+                        break;
+                    case numeric_details::int_binop::rem_u:
+                    {
+                        wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                        if(urhs == wasm_u64{0}) [[unlikely]] { UWVM_MUSTTAIL return numeric_details::trap_integer_divide_by_zero_tail<CompileOption>(type...); }
+                        wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
+                        out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                        break;
+                    }
+                    [[unlikely]] default:
+                        ::fast_io::fast_terminate();
+                }
+                set_curr_val_to_operand_stack_cache_top(out, type...);
+            }
+
+            uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+            ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+            UWVM_MUSTTAIL return next_interpreter(type...);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
+            requires (!CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i64_binop_localget_rhs_dyn(TypeRef&... typeref) UWVM_THROWS
+        {
+            using wasm_i64 = delay_local_details::wasm_i64;
+            using wasm_u64 = delay_local_details::wasm_u64;
+
+            static_assert(sizeof...(TypeRef) >= 3uz);
+            static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+            static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
+
+            // Byref mode always has stack-top caching disabled for all types.
+            static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+            static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+            typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+
+            local_offset_t const off{read_imm<local_offset_t>(typeref...[0])};
+            ::std::uint_least64_t const op_raw{read_imm<::std::uint_least64_t>(typeref...[0])};
+            auto const op{static_cast<numeric_details::int_binop>(static_cast<::std::uint_least8_t>(op_raw))};
+
+            wasm_i64 rhs;  // no init
+            ::std::memcpy(::std::addressof(rhs), typeref...[2u] + off, sizeof(rhs));
+
+            wasm_i64 const lhs{peek_curr_val_from_operand_stack_cache<wasm_i64>(typeref...)};
+            wasm_i64 out{};  // init
+
+            switch(op)
+            {
+                case numeric_details::int_binop::add:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::add, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::sub:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::sub, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::mul:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::mul, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::and_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::and_, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::or_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::or_, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::xor_:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::xor_, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shl:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shl, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shr_s:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_s, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::shr_u:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::shr_u, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::rotl:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::rotl, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::rotr:
+                    out = numeric_details::eval_int_binop<numeric_details::int_binop::rotr, wasm_i64, wasm_u64>(lhs, rhs);
+                    break;
+                case numeric_details::int_binop::div_s:
+                    if(rhs == wasm_i64{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) [[unlikely]] { numeric_details::trap_integer_overflow(); }
+                    out = static_cast<wasm_i64>(lhs / rhs);
+                    break;
+                case numeric_details::int_binop::div_u:
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) / urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                    break;
+                }
+                case numeric_details::int_binop::rem_s:
+                    if(rhs == wasm_i64{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    if(lhs == ::std::numeric_limits<wasm_i64>::min() && rhs == wasm_i64{-1}) { out = wasm_i64{0}; }
+                    else
+                    {
+                        out = static_cast<wasm_i64>(lhs % rhs);
+                    }
+                    break;
+                case numeric_details::int_binop::rem_u:
+                {
+                    wasm_u64 const urhs{numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(rhs)};
+                    if(urhs == wasm_u64{0}) [[unlikely]] { numeric_details::trap_integer_divide_by_zero(); }
+                    wasm_u64 const out_u64{static_cast<wasm_u64>(numeric_details::to_unsigned_bits<wasm_i64, wasm_u64>(lhs) % urhs)};
+                    out = numeric_details::from_unsigned_bits<wasm_i64, wasm_u64>(out_u64);
+                    break;
+                }
+            }
+
             set_curr_val_to_operand_stack_cache_top(out, typeref...);
         }
 
@@ -1058,6 +1774,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_i32_binop_localget_rhs<Opt, Op, Type...>; }
             };
 
+            struct i32_binop_localget_rhs_dyn_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i32_binop_localget_rhs_dyn<Opt, Pos, Type...>; }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                { return uwvmint_i32_binop_localget_rhs_dyn<Opt, Type...>; }
+            };
+
             template <numeric_details::int_binop Op>
             struct i32_binop_localget_rhs_local_set_op
             {
@@ -1092,6 +1819,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_i64_binop_localget_rhs<Opt, Op, Type...>; }
+            };
+
+            struct i64_binop_localget_rhs_dyn_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_i64_binop_localget_rhs_dyn<Opt, Pos, Type...>; }
+
+                template <uwvm_interpreter_translate_option_t Opt, uwvm_int_stack_top_type... Type>
+                inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
+                { return uwvmint_i64_binop_localget_rhs_dyn<Opt, Type...>; }
             };
 
             template <numeric_details::int_binop Op>
@@ -1258,6 +1996,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                  ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i32_binop_localget_rhs_fptr<CompileOption, Op, TypeInTuple...>(curr); }
 
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_i32_binop_localget_rhs_dyn_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return delay_local_details::details::select_stacktop_fptr_or_default_delay_local<CompileOption,
+                                                                                             CompileOption.i32_stack_top_begin_pos,
+                                                                                             CompileOption.i32_stack_top_end_pos,
+                                                                                             delay_local_details::details::i32_binop_localget_rhs_dyn_op,
+                                                                                             Type...>(curr.i32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i32_binop_localget_rhs_dyn_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i32_binop_localget_rhs_dyn_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_i32_binop_localget_rhs_dyn_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return delay_local_details::details::i32_binop_localget_rhs_dyn_op::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i32_binop_localget_rhs_dyn_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i32_binop_localget_rhs_dyn_fptr<CompileOption, TypeInTuple...>(curr); }
+
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
         inline constexpr uwvm_interpreter_opfunc_t<Type...>
@@ -1347,6 +2115,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                  ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i64_binop_localget_rhs_fptr<CompileOption, Op, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_i64_binop_localget_rhs_dyn_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return delay_local_details::details::select_stacktop_fptr_or_default_delay_local<CompileOption,
+                                                                                             CompileOption.i64_stack_top_begin_pos,
+                                                                                             CompileOption.i64_stack_top_end_pos,
+                                                                                             delay_local_details::details::i64_binop_localget_rhs_dyn_op,
+                                                                                             Type...>(curr.i64_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i64_binop_localget_rhs_dyn_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i64_binop_localget_rhs_dyn_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_i64_binop_localget_rhs_dyn_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return delay_local_details::details::i64_binop_localget_rhs_dyn_op::template fptr_byref<CompileOption, Type...>(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_i64_binop_localget_rhs_dyn_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_i64_binop_localget_rhs_dyn_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::int_binop Op, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
