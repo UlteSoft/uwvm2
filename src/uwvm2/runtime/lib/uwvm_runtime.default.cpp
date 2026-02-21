@@ -146,7 +146,11 @@ namespace uwvm2::runtime::uwvm_int
         };
 
 #if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+# ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+# else
         [[__gnu__::__tls_model__("local-dynamic")]]
+# endif
 #endif
         inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
