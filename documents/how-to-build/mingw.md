@@ -100,3 +100,40 @@ Available values:
   - `NT310`: Windows NT 3.1, `-D_WIN32_WINNT=0x0310`
 
 If you set an unsupported value, you may see errors like: `version not recognized: Windows Version not recognized`.
+
+## Note
+If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=y` for static linking will resolve the issue.
+
+```
+=================================================================
+==5524==ERROR: AddressSanitizer: access-violation on unknown address 0x000000000111 (pc 0x000000000111 bp 0x114ccdaddf20 sp 0x003892bff1b8 T0)
+==5524==Hint: pc points to the zero page.
+==5524==The signal is caused by a UNKNOWN memory access.
+==5524==Hint: address points to the zero page.
+    #0 0x000000000110  (<unknown module>)
+    #1 0x7ff99eca5c38  (D:\tool-chain\x86_64-w64-mingw32\lib\libstdc++-6.dll+0x3be985c38)
+    #2 0x7ffa8a06bc74  (C:\WINDOWS\System32\ucrtbase.dll+0x18004bc74)
+    #3 0x7ffa8a06b896  (C:\WINDOWS\System32\ucrtbase.dll+0x18004b896)
+    #4 0x7ffa8a06b84c  (C:\WINDOWS\System32\ucrtbase.dll+0x18004b84c)
+    #5 0x7ff99ec8113b  (D:\tool-chain\x86_64-w64-mingw32\lib\libstdc++-6.dll+0x3be96113b)
+    #6 0x7ff99ec81216  (D:\tool-chain\x86_64-w64-mingw32\lib\libstdc++-6.dll+0x3be961216)
+    #7 0x7ffa8d51f739  (C:\WINDOWS\SYSTEM32\ntdll.dll+0x18015f739)
+    #8 0x7ffa8d3cbc32  (C:\WINDOWS\SYSTEM32\ntdll.dll+0x18000bc32)
+    #9 0x7ffa8d44d3fe  (C:\WINDOWS\SYSTEM32\ntdll.dll+0x18008d3fe)
+    #10 0x7ffa8d44c5cd  (C:\WINDOWS\SYSTEM32\ntdll.dll+0x18008c5cd)
+    #11 0x7ffa8c2518aa  (C:\WINDOWS\System32\KERNEL32.DLL+0x1800418aa)
+    #12 0x7ffa8a0c0092  (C:\WINDOWS\System32\ucrtbase.dll+0x1800a0092)
+    #13 0x7ff61e1a13be in __tmainCRTStartup /home/luo/mingw/mingw-w64-crt/crt/crtexe.c:261:7
+    #14 0x7ff61e1a13f5 in mainCRTStartup /home/luo/mingw/mingw-w64-crt/crt/crtexe.c:180:9
+    #15 0x7ffa8c23e8d6  (C:\WINDOWS\System32\KERNEL32.DLL+0x18002e8d6)
+    #16 0x7ffa8d44c48b  (C:\WINDOWS\SYSTEM32\ntdll.dll+0x18008c48b)
+
+==5524==Register values:
+rax = 0  rbx = 120e1c5a1900  rcx = 2081a6baab0  rdx = 0
+rdi = 7ffa8c24c620  rsi = 2081a6d3b70  rbp = 114ccdaddf20  rsp = 3892bff1b8
+r8  = 120e1c5a1900  r9  = 114ccdaddf20  r10 = 7ff99ec80000  r11 = 3892bff2b8
+r12 = 7ffe0385  r13 = 1  r14 = 3892bff2d8  r15 = 2081a6d3ae0
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: access-violation (<unknown module>)
+==5524==ABORTING
+```
