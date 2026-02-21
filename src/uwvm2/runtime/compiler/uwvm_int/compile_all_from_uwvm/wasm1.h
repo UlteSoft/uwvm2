@@ -4833,12 +4833,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                 f32_eq,
                 f32_ne,
+                f32_eq_localget_rhs,
+                f32_ne_localget_rhs,
                 f32_lt,
                 f32_gt,
+                f32_lt_localget_rhs,
+                f32_gt_localget_rhs,
                 f32_le,
                 f32_ge,
+                f32_le_localget_rhs,
+                f32_ge_localget_rhs,
                 f64_eq,
+                f64_ne,
+                f64_eq_localget_rhs,
+                f64_ne_localget_rhs,
                 f64_lt,
+                f64_gt,
+                f64_le,
+                f64_ge,
+                f64_lt_localget_rhs,
+                f64_gt_localget_rhs,
+                f64_le_localget_rhs,
+                f64_ge_localget_rhs,
                 f64_lt_eqz,
 # endif
             };
@@ -4871,7 +4887,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 const_f32,                       // imm_f32
                 const_f64,                       // imm_f64
                 const_f32_localget,              // off1=src, imm_f32
+                const_f64_localget,              // off1=src, imm_f64
                 f32_div_from_imm_localtee_wait,  // off1=src, imm_f32
+                f64_div_from_imm_localtee_wait,  // off1=src, imm_f64
 
                 // heavy: float mul-add/sub and 2mul patterns
                 float_mul_2localget,          // off1, off2, vt={f32|f64}
@@ -4880,7 +4898,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                 float_2mul_after_second_mul,  // off1, off2, off3, off4, vt={f32|f64}
 
                 // heavy: select(local.get a,b,cond)
-                select_localget3,     // off1=a, off2=b, off3=cond, vt={i32|f32}
+                select_localget3,     // off1=a, off2=b, off3=cond, vt={i32|i64|f32|f64}
                 select_after_select,  // waiting local.set/local.tee
 
                 // heavy: mac local accumulator (acc + x*y -> acc)
@@ -5011,8 +5029,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                              case conbine_pending_kind::const_f32: return u8"const_f32";
                                                              case conbine_pending_kind::const_f64: return u8"const_f64";
                                                              case conbine_pending_kind::const_f32_localget: return u8"const_f32_localget";
+                                                             case conbine_pending_kind::const_f64_localget: return u8"const_f64_localget";
                                                              case conbine_pending_kind::f32_div_from_imm_localtee_wait:
                                                                  return u8"f32_div_from_imm_localtee_wait";
+                                                             case conbine_pending_kind::f64_div_from_imm_localtee_wait:
+                                                                 return u8"f64_div_from_imm_localtee_wait";
                                                              case conbine_pending_kind::float_mul_2localget: return u8"float_mul_2localget";
                                                              case conbine_pending_kind::float_mul_2localget_local3: return u8"float_mul_2localget_local3";
                                                              case conbine_pending_kind::float_2mul_wait_second_mul: return u8"float_2mul_wait_second_mul";
@@ -5357,6 +5378,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::f32, conbine_pending.off1);
                             break;
                         }
+                        case conbine_pending_kind::const_f64_localget:
+                        {
+                            emit_const_f64_to(bytecode, conbine_pending.imm_f64);
+                            emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::f64, conbine_pending.off1);
+                            break;
+                        }
                         case conbine_pending_kind::f32_div_from_imm_localtee_wait:
                         {
                             if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f32); }
@@ -5365,6 +5392,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_imm_to(bytecode, conbine_pending.off1);
                             emit_imm_to(bytecode, conbine_pending.imm_f32);
                             if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
+                            break;
+                        }
+                        case conbine_pending_kind::f64_div_from_imm_localtee_wait:
+                        {
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64); }
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_f64_div_from_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.imm_f64);
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
                             break;
                         }
 #   ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
@@ -5484,13 +5521,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             emit_local_get_typed_to(bytecode, conbine_pending.vt, conbine_pending.off1);
                             emit_local_get_typed_to(bytecode, conbine_pending.vt, conbine_pending.off2);
                             emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off3);
-                            if(conbine_pending.vt == curr_operand_stack_value_type::i32)
+                            switch(conbine_pending.vt)
                             {
-                                emit_opfunc_to(bytecode, translate::get_uwvmint_select_i32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                            }
-                            else
-                            {
-                                emit_opfunc_to(bytecode, translate::get_uwvmint_select_f32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                case curr_operand_stack_value_type::i32:
+                                {
+                                    emit_opfunc_to(bytecode, translate::get_uwvmint_select_i32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::i64:
+                                {
+                                    emit_opfunc_to(bytecode, translate::get_uwvmint_select_i64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::f32:
+                                {
+                                    emit_opfunc_to(bytecode, translate::get_uwvmint_select_f32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::f64:
+                                {
+                                    emit_opfunc_to(bytecode, translate::get_uwvmint_select_f64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                    break;
+                                }
                             }
                             stacktop_after_pop_n_if_reachable(bytecode, 2uz);
                             break;
@@ -6030,6 +6089,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                if(op == wasm1_code::f32_lt || op == wasm1_code::f32_gt) { return true; }
                                 switch(op)
                                 {
                                     case wasm1_code::f32_const:
@@ -6352,7 +6412,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             return op == wasm1_code::f32_div || op == wasm1_code::f32_sub;
                         }
+                        case conbine_pending_kind::const_f64_localget:
+                        {
+                            return op == wasm1_code::f64_div || op == wasm1_code::f64_sub;
+                        }
                         case conbine_pending_kind::f32_div_from_imm_localtee_wait:
+                        {
+                            return op == wasm1_code::local_tee;
+                        }
+                        case conbine_pending_kind::f64_div_from_imm_localtee_wait:
                         {
                             return op == wasm1_code::local_tee;
                         }
@@ -8640,6 +8708,389 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             [&]() constexpr UWVM_THROWS
                             {
                                 if(fused_brif || fuse_kind == br_if_fuse_kind::none) { return; }
+                                using fptr_t = decltype(translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                if constexpr(CompileOption.is_tail_call)
+                                {
+                                    // Mega-fuse: `f32.load(local)` + `f32.{lt,gt}(local rhs)` + `br_if` into one dispatch.
+                                    // This is an AABB-style hot pattern: load a struct field, compare against a cached local scalar, and branch.
+                                    if(fuse_kind == br_if_fuse_kind::f32_lt_localget_rhs || fuse_kind == br_if_fuse_kind::f32_gt_localget_rhs ||
+                                       fuse_kind == br_if_fuse_kind::f32_le_localget_rhs || fuse_kind == br_if_fuse_kind::f32_ge_localget_rhs)
+                                    {
+                                        bool const mega_fused{[&]() constexpr UWVM_THROWS -> bool
+                                                              {
+                                                                  using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+                                                                  using memarg_offset_slot_t = wasm_u32;
+
+                                                                  if(fuse_site == SIZE_MAX || fuse_end == SIZE_MAX) { return false; }
+                                                                  if(fuse_end != bytecode.size()) { return false; }
+
+                                                                  local_offset_t rhs_off{};  // init
+                                                                  ::std::memcpy(::std::addressof(rhs_off),
+                                                                                bytecode.data() + fuse_site + sizeof(fptr_t),
+                                                                                sizeof(rhs_off));
+
+                                                                  auto pre_load_stacktop{fuse_stacktop_currpos};
+                                                                  if constexpr(CompileOption.f32_stack_top_begin_pos != CompileOption.f32_stack_top_end_pos)
+                                                                  {
+                                                                      auto const begin{CompileOption.f32_stack_top_begin_pos};
+                                                                      auto const end{CompileOption.f32_stack_top_end_pos};
+                                                                      auto const curr{pre_load_stacktop.f32_stack_top_curr_pos};
+                                                                      pre_load_stacktop.f32_stack_top_curr_pos = (curr + 1uz == end) ? begin : (curr + 1uz);
+                                                                  }
+
+                                                                  // Candidate 1: `f32_load_localget_off` immediately preceding the compare.
+                                                                  constexpr ::std::size_t kLoadLocalgetOffSize{
+                                                                      sizeof(fptr_t) + sizeof(local_offset_t) + sizeof(native_memory_t*) + sizeof(memarg_offset_slot_t)};
+                                                                  if(fuse_site >= kLoadLocalgetOffSize)
+                                                                  {
+                                                                      auto const load_site{fuse_site - kLoadLocalgetOffSize};
+
+                                                                      fptr_t stored_load{};  // init
+                                                                      ::std::memcpy(::std::addressof(stored_load), bytecode.data() + load_site, sizeof(stored_load));
+
+                                                                      local_offset_t addr_off{};  // init
+                                                                      ::std::memcpy(::std::addressof(addr_off),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load),
+                                                                                    sizeof(addr_off));
+
+                                                                      native_memory_t* memory_p{};  // init
+                                                                      ::std::memcpy(::std::addressof(memory_p),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off),
+                                                                                    sizeof(memory_p));
+                                                                      if(memory_p == nullptr) [[unlikely]] { return false; }
+
+                                                                      memarg_offset_slot_t offset_slot{};  // init
+                                                                      ::std::memcpy(::std::addressof(offset_slot),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off) +
+                                                                                        sizeof(memory_p),
+                                                                                    sizeof(offset_slot));
+
+                                                                      auto const expected_load{
+                                                                          translate::get_uwvmint_f32_load_localget_off_fptr_from_tuple<CompileOption>(pre_load_stacktop,
+                                                                                                                                                      *memory_p,
+                                                                                                                                                      interpreter_tuple)};
+                                                                      if(stored_load == expected_load)
+                                                                      {
+                                                                          bytecode.resize(load_site);
+
+                                                                          fptr_t mega_fptr{};  // init
+                                                                          if(fuse_kind == br_if_fuse_kind::f32_lt_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_localget_off_lt_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_gt_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_localget_off_gt_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_le_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_localget_off_le_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_ge_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_localget_off_ge_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else
+                                                                          {
+                                                                              return false;
+                                                                          }
+
+                                                                          emit_opfunc_to(bytecode, mega_fptr);
+                                                                          emit_imm_to(bytecode, addr_off);
+                                                                          emit_imm_to(bytecode, rhs_off);
+                                                                          emit_imm_to(bytecode, memory_p);
+                                                                          emit_imm_to(bytecode, offset_slot);
+
+                                                                          fused_brif = true;
+                                                                          return true;
+                                                                      }
+                                                                  }
+
+                                                                  // Candidate 2: `f32_load_local_plus_imm` immediately preceding the compare.
+                                                                  constexpr ::std::size_t kLoadLocalPlusImmSize{
+                                                                      sizeof(fptr_t) + sizeof(local_offset_t) + sizeof(wasm_i32) + sizeof(native_memory_t*) +
+                                                                      sizeof(memarg_offset_slot_t)};
+                                                                  if(fuse_site >= kLoadLocalPlusImmSize)
+                                                                  {
+                                                                      auto const load_site{fuse_site - kLoadLocalPlusImmSize};
+
+                                                                      fptr_t stored_load{};  // init
+                                                                      ::std::memcpy(::std::addressof(stored_load), bytecode.data() + load_site, sizeof(stored_load));
+
+                                                                      local_offset_t addr_off{};  // init
+                                                                      ::std::memcpy(::std::addressof(addr_off),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load),
+                                                                                    sizeof(addr_off));
+
+                                                                      wasm_i32 add_imm{};  // init
+                                                                      ::std::memcpy(::std::addressof(add_imm),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off),
+                                                                                    sizeof(add_imm));
+
+                                                                      native_memory_t* memory_p{};  // init
+                                                                      ::std::memcpy(::std::addressof(memory_p),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off) +
+                                                                                        sizeof(add_imm),
+                                                                                    sizeof(memory_p));
+                                                                      if(memory_p == nullptr) [[unlikely]] { return false; }
+
+                                                                      memarg_offset_slot_t offset_slot{};  // init
+                                                                      ::std::memcpy(::std::addressof(offset_slot),
+                                                                                    bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off) +
+                                                                                        sizeof(add_imm) + sizeof(memory_p),
+                                                                                    sizeof(offset_slot));
+
+                                                                      auto const expected_load{
+                                                                          translate::get_uwvmint_f32_load_local_plus_imm_fptr_from_tuple<CompileOption>(pre_load_stacktop,
+                                                                                                                                                         *memory_p,
+                                                                                                                                                         interpreter_tuple)};
+                                                                      if(stored_load == expected_load)
+                                                                      {
+                                                                          bytecode.resize(load_site);
+
+                                                                          fptr_t mega_fptr{};  // init
+                                                                          if(fuse_kind == br_if_fuse_kind::f32_lt_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_local_plus_imm_lt_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_gt_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_local_plus_imm_gt_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_le_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_local_plus_imm_le_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else if(fuse_kind == br_if_fuse_kind::f32_ge_localget_rhs)
+                                                                          {
+                                                                              mega_fptr =
+                                                                                  translate::get_uwvmint_br_if_f32_load_local_plus_imm_ge_localget_rhs_fptr_from_tuple<
+                                                                                      CompileOption>(fuse_stacktop_currpos, *memory_p, interpreter_tuple);
+                                                                          }
+                                                                          else
+                                                                          {
+                                                                              return false;
+                                                                          }
+
+                                                                          emit_opfunc_to(bytecode, mega_fptr);
+                                                                          emit_imm_to(bytecode, addr_off);
+                                                                          emit_imm_to(bytecode, add_imm);
+                                                                          emit_imm_to(bytecode, rhs_off);
+                                                                          emit_imm_to(bytecode, memory_p);
+                                                                          emit_imm_to(bytecode, offset_slot);
+
+                                                                          fused_brif = true;
+                                                                          return true;
+                                                                      }
+                                                                  }
+
+                                                                return false;
+                                                              }()};
+                                        if(mega_fused) { return; }
+                                    }
+
+                                    // Mega-fuse: `i32.load(local)` + `i32.const(imm)` + `i32.eq` + `br_if` into one dispatch.
+                                    // This targets AABB-style leaf checks like `objectIndex == -1` in tight traversal loops.
+                                    if(!is_polymorphic && fuse_kind == br_if_fuse_kind::i32_eq)
+                                    {
+                                        bool const mega_fused{[&]() constexpr UWVM_THROWS -> bool
+                                                              {
+                                                                  using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
+                                                                  using memarg_offset_slot_t = wasm_u32;
+                                                                  using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+
+                                                                  if(fuse_site == SIZE_MAX) { return false; }
+                                                                  if(fuse_end != SIZE_MAX) { return false; }
+                                                                  if(fuse_site + sizeof(fptr_t) != bytecode.size()) { return false; }
+
+                                                                  // Candidate: `i32.const imm` immediately preceding `i32.eq`.
+                                                                  constexpr ::std::size_t kConstSize{sizeof(fptr_t) + sizeof(wasm_i32)};
+                                                                  if(fuse_site < kConstSize) { return false; }
+                                                                  auto const const_site{fuse_site - kConstSize};
+
+                                                                  fptr_t stored_const{};  // init
+                                                                  ::std::memcpy(::std::addressof(stored_const), bytecode.data() + const_site, sizeof(stored_const));
+
+                                                                  wasm_i32 cmp_imm{};  // init
+                                                                  ::std::memcpy(::std::addressof(cmp_imm),
+                                                                                bytecode.data() + const_site + sizeof(stored_const),
+                                                                                sizeof(cmp_imm));
+
+                                                                  auto pre_const_stacktop{fuse_stacktop_currpos};
+                                                                  if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+                                                                  {
+                                                                      auto const begin{CompileOption.i32_stack_top_begin_pos};
+                                                                      auto const end{CompileOption.i32_stack_top_end_pos};
+                                                                      auto const curr{pre_const_stacktop.i32_stack_top_curr_pos};
+                                                                      pre_const_stacktop.i32_stack_top_curr_pos = (curr + 1uz == end) ? begin : (curr + 1uz);
+                                                                      if constexpr(CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                                                   CompileOption.i32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos)
+                                                                      {
+                                                                          pre_const_stacktop.i64_stack_top_curr_pos = pre_const_stacktop.i32_stack_top_curr_pos;
+                                                                      }
+                                                                  }
+
+                                                                  auto const expected_const{
+                                                                      translate::get_uwvmint_i32_const_fptr_from_tuple<CompileOption>(pre_const_stacktop, interpreter_tuple)};
+                                                                  if(stored_const != expected_const) { return false; }
+
+                                                                  // Candidate: `i32_load_localget_off` immediately preceding the const.
+                                                                  constexpr ::std::size_t kLoadSize{
+                                                                      sizeof(fptr_t) + sizeof(local_offset_t) + sizeof(native_memory_t*) + sizeof(memarg_offset_slot_t)};
+                                                                  if(const_site < kLoadSize) { return false; }
+                                                                  auto const load_site{const_site - kLoadSize};
+
+                                                                  fptr_t stored_load{};  // init
+                                                                  ::std::memcpy(::std::addressof(stored_load), bytecode.data() + load_site, sizeof(stored_load));
+
+                                                                  local_offset_t addr_off{};  // init
+                                                                  ::std::memcpy(::std::addressof(addr_off),
+                                                                                bytecode.data() + load_site + sizeof(stored_load),
+                                                                                sizeof(addr_off));
+
+                                                                  native_memory_t* memory_p{};  // init
+                                                                  ::std::memcpy(::std::addressof(memory_p),
+                                                                                bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off),
+                                                                                sizeof(memory_p));
+                                                                  if(memory_p == nullptr) [[unlikely]] { return false; }
+
+                                                                  memarg_offset_slot_t offset_slot{};  // init
+                                                                  ::std::memcpy(::std::addressof(offset_slot),
+                                                                                bytecode.data() + load_site + sizeof(stored_load) + sizeof(addr_off) + sizeof(memory_p),
+                                                                                sizeof(offset_slot));
+
+                                                                  auto pre_load_stacktop{fuse_stacktop_currpos};
+                                                                  if constexpr(CompileOption.i32_stack_top_begin_pos != CompileOption.i32_stack_top_end_pos)
+                                                                  {
+                                                                      auto const begin{CompileOption.i32_stack_top_begin_pos};
+                                                                      auto const end{CompileOption.i32_stack_top_end_pos};
+                                                                      auto curr{pre_load_stacktop.i32_stack_top_curr_pos};
+                                                                      // Undo two pushes: `i32.load` and `i32.const`.
+                                                                      curr = (curr + 1uz == end) ? begin : (curr + 1uz);
+                                                                      curr = (curr + 1uz == end) ? begin : (curr + 1uz);
+                                                                      pre_load_stacktop.i32_stack_top_curr_pos = curr;
+                                                                      if constexpr(CompileOption.i32_stack_top_begin_pos == CompileOption.i64_stack_top_begin_pos &&
+                                                                                   CompileOption.i32_stack_top_end_pos == CompileOption.i64_stack_top_end_pos)
+                                                                      {
+                                                                          pre_load_stacktop.i64_stack_top_curr_pos = pre_load_stacktop.i32_stack_top_curr_pos;
+                                                                      }
+                                                                  }
+
+                                                                  // Validate the candidate load without dereferencing the embedded `memory_p`.
+                                                                  // This avoids crashing the translator when the back-scan lands on unrelated opfunc bytes.
+                                                                  fptr_t mega_fptr{};  // init
+# if defined(UWVM_SUPPORT_MMAP)
+                                                                  auto const get_load_fptr{
+                                                                      [&]<auto BoundsCheckFn, typename... TypeInTuple>(
+                                                                          ::uwvm2::utils::container::tuple<TypeInTuple...> const&) constexpr noexcept -> fptr_t
+                                                                      {
+                                                                          return translate::details::select_stacktop_fptr_or_default_with<CompileOption,
+                                                                                                                                           CompileOption.i32_stack_top_begin_pos,
+                                                                                                                                           CompileOption.i32_stack_top_end_pos,
+                                                                                                                                           translate::details::i32_load_localget_off_op_with,
+                                                                                                                                           BoundsCheckFn,
+                                                                                                                                           0uz,
+                                                                                                                                           TypeInTuple...>(
+                                                                              pre_load_stacktop.i32_stack_top_curr_pos);
+                                                                      }};
+                                                                  auto const get_mega_fptr{
+                                                                      [&]<auto BoundsCheckFn, typename... TypeInTuple>(
+                                                                          ::uwvm2::utils::container::tuple<TypeInTuple...> const&) constexpr noexcept -> fptr_t
+                                                                      {
+                                                                          return translate::details::select_stacktop_fptr_or_default_with<CompileOption,
+                                                                                                                                           0uz,
+                                                                                                                                           0uz,
+                                                                                                                                           translate::details::br_if_i32_load_localget_off_eq_imm_op_with,
+                                                                                                                                           BoundsCheckFn,
+                                                                                                                                           0uz,
+                                                                                                                                           TypeInTuple...>(0uz);
+                                                                      }};
+
+                                                                  auto const expect_full{
+                                                                      get_load_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_full >(interpreter_tuple)};
+                                                                  auto const expect_path{
+                                                                      get_load_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_path >(interpreter_tuple)};
+                                                                  auto const expect_judge{
+                                                                      get_load_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_judge >(interpreter_tuple)};
+
+                                                                  if(stored_load == expect_full)
+                                                                  {
+                                                                      mega_fptr = get_mega_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_full >(
+                                                                          interpreter_tuple);
+                                                                  }
+                                                                  else if(stored_load == expect_path)
+                                                                  {
+                                                                      mega_fptr = get_mega_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_path >(
+                                                                          interpreter_tuple);
+                                                                  }
+                                                                  else if(stored_load == expect_judge)
+                                                                  {
+                                                                      mega_fptr = get_mega_fptr.template operator()< &translate::details::op_details::bounds_check_mmap_judge >(
+                                                                          interpreter_tuple);
+                                                                  }
+                                                                  else
+                                                                  {
+                                                                      return false;
+                                                                  }
+# else
+                                                                  auto const expected_load{
+                                                                      [&]<typename... TypeInTuple>(::uwvm2::utils::container::tuple<TypeInTuple...> const&)
+                                                                          constexpr noexcept -> fptr_t
+                                                                      {
+                                                                          return translate::details::select_stacktop_fptr_or_default_with<CompileOption,
+                                                                                                                                           CompileOption.i32_stack_top_begin_pos,
+                                                                                                                                           CompileOption.i32_stack_top_end_pos,
+                                                                                                                                           translate::details::i32_load_localget_off_op_with,
+                                                                                                                                           &translate::details::op_details::bounds_check_allocator,
+                                                                                                                                           0uz,
+                                                                                                                                           TypeInTuple...>(
+                                                                              pre_load_stacktop.i32_stack_top_curr_pos);
+                                                                      }(interpreter_tuple)};
+                                                                  if(stored_load != expected_load) { return false; }
+                                                                  mega_fptr = [&]<typename... TypeInTuple>(::uwvm2::utils::container::tuple<TypeInTuple...> const&)
+                                                                      constexpr noexcept -> fptr_t
+                                                                  {
+                                                                      return translate::details::select_stacktop_fptr_or_default_with<CompileOption,
+                                                                                                                                       0uz,
+                                                                                                                                       0uz,
+                                                                                                                                       translate::details::br_if_i32_load_localget_off_eq_imm_op_with,
+                                                                                                                                       &translate::details::op_details::bounds_check_allocator,
+                                                                                                                                       0uz,
+                                                                                                                                       TypeInTuple...>(0uz);
+                                                                  }(interpreter_tuple);
+# endif
+
+                                                                  bytecode.resize(load_site);
+
+                                                                  emit_opfunc_to(bytecode, mega_fptr);
+                                                                  emit_imm_to(bytecode, addr_off);
+                                                                  emit_imm_to(bytecode, cmp_imm);
+                                                                  emit_imm_to(bytecode, memory_p);
+                                                                  emit_imm_to(bytecode, offset_slot);
+
+                                                                  fused_brif = true;
+                                                                  return true;
+                                                              }()};
+                                        if(mega_fused) { return; }
+                                    }
+                                }
+# endif
                                 if constexpr(stacktop_enabled)
                                 {
                                     // Fused br_if opfuncs read the i32 condition from stack-top cache. With tiny rings,
@@ -8647,8 +9098,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     // case fusing would desync the runtime stack pointer.
                                     if(!brif_cond_cached_at_site) { return; }
                                 }
-
-                                using fptr_t = decltype(translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                                 if(fuse_site == SIZE_MAX) { return; }
                                 if(fuse_end != SIZE_MAX)
                                 {
@@ -8777,10 +9226,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             translate::get_uwvmint_br_if_f32_ne_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                                         break;
                                     }
+                                    case br_if_fuse_kind::f32_eq_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_eq_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f32_ne_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_ne_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
                                     case br_if_fuse_kind::f32_lt:
                                     {
                                         fused_fptr =
                                             translate::get_uwvmint_br_if_f32_lt_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f32_lt_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_lt_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
                                         break;
                                     }
                                     case br_if_fuse_kind::f32_gt:
@@ -8789,10 +9259,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             translate::get_uwvmint_br_if_f32_gt_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                                         break;
                                     }
+                                    case br_if_fuse_kind::f32_gt_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_gt_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
                                     case br_if_fuse_kind::f32_le:
                                     {
                                         fused_fptr =
                                             translate::get_uwvmint_br_if_f32_le_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f32_le_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_le_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
                                         break;
                                     }
                                     case br_if_fuse_kind::f32_ge:
@@ -8801,16 +9285,89 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                             translate::get_uwvmint_br_if_f32_ge_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                                         break;
                                     }
+                                    case br_if_fuse_kind::f32_ge_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f32_ge_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
                                     case br_if_fuse_kind::f64_eq:
                                     {
                                         fused_fptr =
                                             translate::get_uwvmint_br_if_f64_eq_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                                         break;
                                     }
+                                    case br_if_fuse_kind::f64_ne:
+                                    {
+                                        fused_fptr =
+                                            translate::get_uwvmint_br_if_f64_ne_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_eq_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_eq_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_ne_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_ne_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
                                     case br_if_fuse_kind::f64_lt:
                                     {
                                         fused_fptr =
                                             translate::get_uwvmint_br_if_f64_lt_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_lt_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_lt_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_gt:
+                                    {
+                                        fused_fptr =
+                                            translate::get_uwvmint_br_if_f64_gt_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_gt_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_gt_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_le:
+                                    {
+                                        fused_fptr =
+                                            translate::get_uwvmint_br_if_f64_le_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_le_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_le_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_ge:
+                                    {
+                                        fused_fptr =
+                                            translate::get_uwvmint_br_if_f64_ge_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                                        break;
+                                    }
+                                    case br_if_fuse_kind::f64_ge_localget_rhs:
+                                    {
+                                        fused_fptr = translate::get_uwvmint_br_if_f64_ge_localget_rhs_fptr_from_tuple<CompileOption>(
+                                            fuse_stacktop_currpos,
+                                            interpreter_tuple);
                                         break;
                                     }
                                     case br_if_fuse_kind::f64_lt_eqz:
@@ -11959,7 +12516,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                             if(conbine_pending.kind == conbine_pending_kind::select_localget3 && v1_type == conbine_pending.vt &&
-                               (v1_type == curr_operand_stack_value_type::i32 || v1_type == curr_operand_stack_value_type::f32))
+                               (v1_type == curr_operand_stack_value_type::i32 || v1_type == curr_operand_stack_value_type::i64 ||
+                                v1_type == curr_operand_stack_value_type::f32 || v1_type == curr_operand_stack_value_type::f64))
                             {
                                 conbine_pending.kind = conbine_pending_kind::select_after_select;
                                 break;
@@ -12424,9 +12982,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                                     if(next_op == wasm1_code::select)
                                     {
-                                        if((conbine_pending.vt == curr_operand_stack_value_type::i32 &&
-                                            curr_local_type == curr_operand_stack_value_type::i32) ||
-                                           (conbine_pending.vt == curr_operand_stack_value_type::f32 && curr_local_type == curr_operand_stack_value_type::i32))
+                                        if(curr_local_type == curr_operand_stack_value_type::i32 &&
+                                           (conbine_pending.vt == curr_operand_stack_value_type::i32 || conbine_pending.vt == curr_operand_stack_value_type::i64 ||
+                                            conbine_pending.vt == curr_operand_stack_value_type::f32 || conbine_pending.vt == curr_operand_stack_value_type::f64))
                                         {
                                             conbine_pending.kind = conbine_pending_kind::select_localget3;
                                             conbine_pending.off3 = local_off;
@@ -12507,6 +13065,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     conbine_pending.kind = conbine_pending_kind::const_f32_localget;
                                     conbine_pending.off1 = local_off;
                                     conbine_pending.vt = curr_operand_stack_value_type::f32;
+                                    break;
+                                }
+
+                                flush_conbine_pending();
+                                conbine_pending.kind = conbine_pending_kind::local_get;
+                                conbine_pending.vt = curr_local_type;
+                                conbine_pending.off1 = local_off;
+                                break;
+                            }
+                            case conbine_pending_kind::const_f64:
+                            {
+                                if(curr_local_type == curr_operand_stack_value_type::f64)
+                                {
+                                    conbine_pending.kind = conbine_pending_kind::const_f64_localget;
+                                    conbine_pending.off1 = local_off;
+                                    conbine_pending.vt = curr_operand_stack_value_type::f64;
                                     break;
                                 }
 
@@ -13019,6 +13593,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 
+                        // Conbine (heavy): `f64.const imm; local.get src; f64.div; local.tee dst`
+                        if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::f64_div_from_imm_localtee_wait &&
+                           curr_local_type == curr_operand_stack_value_type::f64)
+                        {
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64); }
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_f64_div_from_imm_localtee_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+
+                            // immediates: src_off, imm_f64, dst_off
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.imm_f64);
+                            emit_imm_to(bytecode, local_off);
+
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
+
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+                            break;
+                        }
+
                         // Conbine (heavy): `select(local.get a,b,cond) ; local.tee dst` (f32 only)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::select_after_select &&
                            conbine_pending.vt == curr_operand_stack_value_type::f32 && curr_local_type == curr_operand_stack_value_type::f32)
@@ -13042,23 +13638,56 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 
-                        // Conbine (heavy): `mac(acc + x*y -> acc) ; local.tee acc` (f32 only)
-                        if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::mac_after_add &&
-                           conbine_pending.vt == curr_operand_stack_value_type::f32 && curr_local_type == curr_operand_stack_value_type::f32 &&
+                        // Conbine (heavy): `mac(acc + x*y -> acc) ; local.tee acc`
+                        if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::mac_after_add && conbine_pending.vt == curr_local_type &&
+                           (curr_local_type == curr_operand_stack_value_type::i32 || curr_local_type == curr_operand_stack_value_type::i64 ||
+                            curr_local_type == curr_operand_stack_value_type::f32 || curr_local_type == curr_operand_stack_value_type::f64) &&
                            local_off == conbine_pending.off1)
                         {
                             namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
-                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f32); }
-                            emit_opfunc_to(bytecode,
-                                           translate::get_uwvmint_f32_mac_local_tee_acc_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_local_type); }
+                            switch(curr_local_type)
+                            {
+                                case curr_operand_stack_value_type::i32:
+                                {
+                                    emit_opfunc_to(bytecode,
+                                                   translate::get_uwvmint_i32_mac_local_tee_acc_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::i64:
+                                {
+                                    emit_opfunc_to(bytecode,
+                                                   translate::get_uwvmint_i64_mac_local_tee_acc_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::f32:
+                                {
+                                    emit_opfunc_to(bytecode,
+                                                   translate::get_uwvmint_f32_mac_local_tee_acc_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                case curr_operand_stack_value_type::f64:
+                                {
+                                    emit_opfunc_to(bytecode,
+                                                   translate::get_uwvmint_f64_mac_local_tee_acc_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                    break;
+                                }
+                                [[unlikely]] default:
+                                {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                                    break;
+                                }
+                            }
 
                             // immediates: x_off, y_off, acc_off
                             emit_imm_to(bytecode, conbine_pending.off2);
                             emit_imm_to(bytecode, conbine_pending.off3);
                             emit_imm_to(bytecode, conbine_pending.off1);
 
-                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
+                            if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_local_type); }
 
                             conbine_pending.kind = conbine_pending_kind::none;
                             conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
@@ -13491,7 +14120,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_load:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i32.load", 2u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_load(u8"i32.load", 2u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -13653,7 +14282,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load", 3u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load", 3u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -13676,7 +14305,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::f32_load:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"f32.load", 2u, wasm_value_type_u::f32)};
+                        wasm_u32 const offset{validate_mem_load(u8"f32.load", 2u, wasm_value_type_u::f32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -13778,7 +14407,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::f64_load:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"f64.load", 3u, wasm_value_type_u::f64)};
+                        wasm_u32 const offset{validate_mem_load(u8"f64.load", 3u, wasm_value_type_u::f64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -13878,7 +14507,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_load8_s:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i32.load8_s", 0u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_load(u8"i32.load8_s", 0u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -13923,7 +14552,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_load8_u:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i32.load8_u", 0u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_load(u8"i32.load8_u", 0u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -13968,7 +14597,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_load16_s:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i32.load16_s", 1u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_load(u8"i32.load16_s", 1u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14013,7 +14642,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_load16_u:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i32.load16_u", 1u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_load(u8"i32.load16_u", 1u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14071,7 +14700,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load8_s:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load8_s", 0u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load8_s", 0u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14095,7 +14724,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load8_u:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load8_u", 0u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load8_u", 0u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14119,7 +14748,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load16_s:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load16_s", 1u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load16_s", 1u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14143,7 +14772,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load16_u:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load16_u", 1u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load16_u", 1u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14167,7 +14796,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load32_s:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load32_s", 2u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load32_s", 2u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14191,7 +14820,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_load32_u:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_load(u8"i64.load32_u", 2u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_load(u8"i64.load32_u", 2u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14215,7 +14844,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_store:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i32.store", 2u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_store(u8"i32.store", 2u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
@@ -14298,7 +14927,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_store:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i64.store", 3u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_store(u8"i64.store", 3u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14318,7 +14947,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::f32_store:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"f32.store", 2u, wasm_value_type_u::f32)};
+                        wasm_u32 const offset{validate_mem_store(u8"f32.store", 2u, wasm_value_type_u::f32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -14367,7 +14996,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::f64_store:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"f64.store", 3u, wasm_value_type_u::f64)};
+                        wasm_u32 const offset{validate_mem_store(u8"f64.store", 3u, wasm_value_type_u::f64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
@@ -14418,7 +15047,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_store8:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i32.store8", 0u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_store(u8"i32.store8", 0u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14470,7 +15099,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i32_store16:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i32.store16", 1u, wasm_value_type_u::i32)};
+                        wasm_u32 const offset{validate_mem_store(u8"i32.store16", 1u, wasm_value_type_u::i32)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
@@ -14547,7 +15176,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_store8:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i64.store8", 0u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_store(u8"i64.store8", 0u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14567,7 +15196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_store16:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i64.store16", 1u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_store(u8"i64.store16", 1u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -14588,7 +15217,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     }
                     case wasm1_code::i64_store32:
                     {
-                        ::std::uint_least64_t const offset{validate_mem_store(u8"i64.store32", 2u, wasm_value_type_u::i64)};
+                        wasm_u32 const offset{validate_mem_store(u8"i64.store32", 2u, wasm_value_type_u::i64)};
                         ensure_memory0_resolved();
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(CompileOption.is_tail_call)
@@ -15950,7 +16579,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_eq:
                     {
                         validate_numeric_binary(u8"f32.eq", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f32); local.get(f32); f32.eq` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f32.eq(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f32_eq;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -15962,14 +16599,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             // f32.cmp -> i32: output may land in the i32 ring (2D variant), so ensure the i32 ring has a free slot.
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_eq_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_eq_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_eq_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_eq_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -15977,18 +16633,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -15996,7 +16652,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_ne:
                     {
                         validate_numeric_binary(u8"f32.ne", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f32); local.get(f32); f32.ne` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f32.ne(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f32_ne;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -16007,14 +16671,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_ne_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_ne_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_ne_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_ne_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16022,18 +16705,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16041,6 +16724,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_lt:
                     {
                         validate_numeric_binary(u8"f32.lt", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         // `local.get(f32); local.get(f32); f32.lt` is allowed to continue in the conbine state machine,
                         // but we don't have a dedicated `f32.lt(2localget)` opfunc. Flush the pending local.get(s) so the
@@ -16059,14 +16743,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_lt_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_lt_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_lt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_lt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16074,18 +16777,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16093,7 +16796,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_gt:
                     {
                         validate_numeric_binary(u8"f32.gt", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f32); local.get(f32); f32.gt` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f32.gt(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f32_gt;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -16104,14 +16815,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_gt_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_gt_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_gt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_gt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16119,18 +16849,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16138,7 +16868,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_le:
                     {
                         validate_numeric_binary(u8"f32.le", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f32); local.get(f32); f32.le` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f32.le(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f32_le;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -16149,14 +16887,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_le_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_le_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_le_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_le_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16164,18 +16921,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16183,7 +16940,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f32_ge:
                     {
                         validate_numeric_binary(u8"f32.ge", curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f32); local.get(f32); f32.ge` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f32.ge(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f32_ge;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -16194,14 +16959,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f32)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f32_ge_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f32_ge_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f32_ge_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_ge_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16209,18 +16993,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f32, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16228,7 +17012,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f64_eq:
                     {
                         validate_numeric_binary(u8"f64.eq", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.eq` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.eq(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
                         br_if_fuse.kind = br_if_fuse_kind::f64_eq;
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
@@ -16239,14 +17031,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f64_eq_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_eq_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_eq_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_eq_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16254,18 +17065,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16273,26 +17084,79 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f64_ne:
                     {
                         validate_numeric_binary(u8"f64.ne", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.ne` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.ne(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
+                        br_if_fuse.kind = br_if_fuse_kind::f64_ne;
+                        br_if_fuse.site = bytecode.size();
+                        br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
+#endif
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
                                      !stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ne_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
                         {
-                            stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.kind = br_if_fuse_kind::f64_ne_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_ne_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
                         }
                         else
                         {
-                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ne_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ne_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
+                        wasm1_code next_opbase{};  // init
+                        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+                        if(next_opbase == wasm1_code::br_if)
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                                }
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
                         }
                         break;
                     }
                     case wasm1_code::f64_lt:
                     {
                         validate_numeric_binary(u8"f64.lt", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert)
@@ -16303,6 +17167,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.lt` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.lt(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
+
                         // Enable compare+br_if fusion for:
                         // - `f64.lt; br_if` (branch on `lhs < rhs`), and
                         // - `f64.lt; i32.eqz; br_if` (branch on `!(lhs < rhs)` — including NaN cases).
@@ -16314,7 +17186,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         br_if_fuse.site = bytecode.size();
                         br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
 
-                        if(!is_polymorphic && code_curr != code_end)
+                        // NOTE: the `i32.eqz` skipping fusion is not applied when `local.get(rhs)` is delayed into the compare op.
+                        // In that case we fall back to the generic `i32.eqz` opcode for correctness (NaN semantics).
+                        if(!is_polymorphic && !(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64) &&
+                           code_curr != code_end)
                         {
                             wasm1_code op1{};  // init
                             ::std::memcpy(::std::addressof(op1), code_curr, sizeof(op1));
@@ -16341,14 +17216,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            br_if_fuse.kind = br_if_fuse_kind::f64_lt_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_lt_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
+                        }
+                        else
+                        {
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_lt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_lt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
                         wasm1_code next_opbase{};  // init
                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
                         if(next_opbase == wasm1_code::br_if)
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_no_fill_if_reachable(1uz);
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
                                 if constexpr(stacktop_enabled)
                                 {
                                     if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
@@ -16356,18 +17250,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         else
                         {
                             if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                             {
-                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
                             }
                             else
                             {
-                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
                             }
                         }
                         break;
@@ -16375,60 +17269,216 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     case wasm1_code::f64_gt:
                     {
                         validate_numeric_binary(u8"f64.gt", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.gt` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.gt(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
+                        br_if_fuse.kind = br_if_fuse_kind::f64_gt;
+                        br_if_fuse.site = bytecode.size();
+                        br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
+#endif
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
                                      !stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_gt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
                         {
-                            stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.kind = br_if_fuse_kind::f64_gt_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_gt_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
                         }
                         else
                         {
-                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_gt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_gt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
+                        wasm1_code next_opbase{};  // init
+                        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+                        if(next_opbase == wasm1_code::br_if)
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                                }
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
                         }
                         break;
                     }
                     case wasm1_code::f64_le:
                     {
                         validate_numeric_binary(u8"f64.le", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.le` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.le(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
+                        br_if_fuse.kind = br_if_fuse_kind::f64_le;
+                        br_if_fuse.site = bytecode.size();
+                        br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
+#endif
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
                                      !stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_le_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
                         {
-                            stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.kind = br_if_fuse_kind::f64_le_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_le_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
                         }
                         else
                         {
-                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_le_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_le_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
+                        wasm1_code next_opbase{};  // init
+                        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+                        if(next_opbase == wasm1_code::br_if)
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                                }
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
                         }
                         break;
                     }
                     case wasm1_code::f64_ge:
                     {
                         validate_numeric_binary(u8"f64.ge", curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32);
+                        bool localget_rhs_cmp{};
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        // `local.get(f64); local.get(f64); f64.ge` is allowed to continue in the conbine state machine,
+                        // but we don't have a dedicated `f64.ge(2localget)` opfunc. Flush the pending local.get(s) so the
+                        // generic compare sees the correct operands at runtime.
+                        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::f64)
+                        {
+                            flush_conbine_pending();
+                        }
+                        br_if_fuse.kind = br_if_fuse_kind::f64_ge;
+                        br_if_fuse.site = bytecode.size();
+                        br_if_fuse.stacktop_currpos_at_site = curr_stacktop;
+#endif
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                         if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
                                      !stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
                         }
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ge_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::f64)
                         {
-                            stacktop_after_pop_n_retype_top_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.kind = br_if_fuse_kind::f64_ge_localget_rhs;
+                            emit_opfunc_to(
+                                bytecode,
+                                translate::get_uwvmint_f64_ge_localget_rhs_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            br_if_fuse.end = bytecode.size();
+                            localget_rhs_cmp = true;
                         }
                         else
                         {
-                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 2uz, curr_operand_stack_value_type::i32);
+                            br_if_fuse.end = SIZE_MAX;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ge_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        }
+#else
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_ge_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+#endif
+                        wasm1_code next_opbase{};  // init
+                        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+                        if(next_opbase == wasm1_code::br_if)
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_no_fill_if_reachable(localget_rhs_cmp ? 0uz : 1uz);
+                                if constexpr(stacktop_enabled)
+                                {
+                                    if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                                }
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_no_fill_if_reachable(localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
+                        }
+                        else
+                        {
+                            if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::f64, curr_operand_stack_value_type::i32))
+                            {
+                                stacktop_after_pop_n_retype_top_if_reachable(bytecode, localget_rhs_cmp ? 0uz : 1uz, curr_operand_stack_value_type::i32);
+                            }
+                            else
+                            {
+                                stacktop_after_pop_n_push1_typed_if_reachable(bytecode, localget_rhs_cmp ? 1uz : 2uz, curr_operand_stack_value_type::i32);
+                            }
                         }
                         break;
                     }
@@ -17712,6 +18762,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i64.clz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i64)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i64_clz_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_clz_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
 
                         break;
@@ -17720,6 +18782,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i64.ctz", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i64)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i64_ctz_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_ctz_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
 
                         break;
@@ -17728,6 +18802,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i64.popcnt", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i64)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_i64_popcnt_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_popcnt_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
 
                         break;
@@ -18929,6 +20015,72 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             break;
                         }
 #endif
+                        if constexpr(stacktop_enabled)
+                        {
+                            if(!is_polymorphic)
+                            {
+                                auto const before_curr_stacktop{curr_stacktop};
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_f32_add_fptr_from_tuple<CompileOption>(before_curr_stacktop, interpreter_tuple));
+                                stacktop_commit_pop_n(1uz);
+                                codegen_stack_pop_n(1uz);
+
+                                bool fused_add_fill1{};
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                                if(stacktop_memory_count != 0uz)
+                                {
+                                    auto const vt0{codegen_operand_stack.index_unchecked(stacktop_memory_count - 1uz).type};
+                                    if(vt0 == curr_operand_stack_value_type::f32)
+                                    {
+                                        ::std::size_t const begin0{stacktop_range_begin_pos(vt0)};
+                                        ::std::size_t const end0{stacktop_range_end_pos(vt0)};
+                                        ::std::size_t const ring0{end0 - begin0};
+                                        if(ring0 != 0uz && stacktop_cache_count_for_range(begin0, end0) == ring0 - 1uz)
+                                        {
+                                            bool stop_after_one{};
+                                            if(stacktop_memory_count == 1uz) { stop_after_one = true; }
+                                            else
+                                            {
+                                                auto const vt1{codegen_operand_stack.index_unchecked(stacktop_memory_count - 2uz).type};
+                                                if(stacktop_ranges_merged_for(vt0, vt1)) { stop_after_one = true; }
+                                                else
+                                                {
+                                                    ::std::size_t const begin1{stacktop_range_begin_pos(vt1)};
+                                                    ::std::size_t const end1{stacktop_range_end_pos(vt1)};
+                                                    ::std::size_t const ring1{end1 - begin1};
+                                                    if(ring1 != 0uz && stacktop_cache_count_for_range(begin1, end1) == ring1) { stop_after_one = true; }
+                                                }
+                                            }
+
+                                            if(stop_after_one)
+                                            {
+                                                using opfunc_ptr_t =
+                                                    decltype(translate::get_uwvmint_f32_add_fptr_from_tuple<CompileOption>(before_curr_stacktop,
+                                                                                                                           interpreter_tuple));
+                                                ::std::size_t const patch_site{bytecode.size() - sizeof(opfunc_ptr_t)};
+                                                auto const fused_fptr{
+                                                    translate::get_uwvmint_f32_add_then_fill1_fptr_from_tuple<CompileOption>(before_curr_stacktop,
+                                                                                                                             interpreter_tuple)};
+                                                ::std::byte tmp[sizeof(fused_fptr)];
+                                                ::std::memcpy(tmp, ::std::addressof(fused_fptr), sizeof(fused_fptr));
+                                                ::std::memcpy(bytecode.data() + patch_site, tmp, sizeof(fused_fptr));
+
+                                                --stacktop_memory_count;
+                                                ++stacktop_cache_count;
+                                                ++stacktop_cache_count_ref_for_vt(vt0);
+                                                fused_add_fill1 = true;
+                                            }
+                                        }
+                                    }
+                                }
+#endif
+
+                                if(!fused_add_fill1) { stacktop_fill_to_canonical(bytecode); }
+                                break;
+                            }
+                        }
+
                         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_add_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         stacktop_after_pop_n_if_reachable(bytecode, 1uz);
 
@@ -19734,6 +20886,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             conbine_pending.kind = conbine_pending_kind::none;
                             break;
                         }
+                        if(conbine_pending.kind == conbine_pending_kind::const_f64_localget)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_f64_sub_from_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.imm_f64);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
                         if(conbine_pending.kind == conbine_pending_kind::float_mul_2localget_local3 && conbine_pending.vt == curr_operand_stack_value_type::f64)
                         {
                             stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
@@ -19879,6 +21042,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     CompileOption,
                                     ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::float_binop::div>(curr_stacktop, interpreter_tuple));
                             emit_imm_to(bytecode, conbine_pending.imm_f64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+                        if(conbine_pending.kind == conbine_pending_kind::const_f64_localget)
+                        {
+                            wasm1_code next_opbase{};  // init
+                            if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_opbase), code_curr, sizeof(next_opbase)); }
+
+                            if(next_opbase == wasm1_code::local_tee)
+                            {
+                                conbine_pending.kind = conbine_pending_kind::f64_div_from_imm_localtee_wait;
+                                break;
+                            }
+
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
+                            emit_opfunc_to(bytecode,
+                                           translate::get_uwvmint_f64_div_from_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            emit_imm_to(bytecode, conbine_pending.imm_f64);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
                             conbine_pending.kind = conbine_pending_kind::none;
                             break;
                         }
@@ -20534,6 +21717,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         validate_numeric_unary(u8"f64.convert_i32_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::f64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_from_i32_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
+                            conbine_pending.kind = conbine_pending_kind::none;
+                            break;
+                        }
+#endif
+
                         if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::f64) &&
                                      !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::f64))
                         {
@@ -20565,6 +21760,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         if(!is_polymorphic && conbine_pending.kind == conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_tee)
                         {
                             conbine_pending.kind = conbine_pending_kind::for_i32_inc_f64_lt_u_eqz_after_convert;
+                            break;
+                        }
+
+                        if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i32)
+                        {
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64);
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_f64_from_i32_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, conbine_pending.off1);
+                            stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64);
+                            conbine_pending.kind = conbine_pending_kind::none;
                             break;
                         }
 #endif

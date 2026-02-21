@@ -76,6 +76,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             // Unreachable must not continue execution. If the embedding callback returns, terminate as a safety net.
             ::fast_io::fast_terminate();
         }
+
+        // Keep opfuncs leaf: tail-call a cold, noinline wrapper instead of emitting `bl` directly in the hot threaded opfunc.
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void unreachable_tail(Type... /*type*/) UWVM_THROWS
+        { unreachable(); }
     }  // namespace details
 
     /// @brief `unreachable` opcode (tail-call): traps/terminates the VM.
@@ -86,7 +93,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_unreachable(Type...) UWVM_THROWS
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_unreachable(Type... type) UWVM_THROWS
     {
         static_assert(sizeof...(Type) >= 1uz);
         static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
@@ -98,7 +105,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Advance to the end of the current instruction for better diagnostics/debugging in case the trap is handled non-fatally by the embedding.
         // not necessary to: type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
-        details::unreachable();
+        UWVM_MUSTTAIL return details::unreachable_tail<CompileOption>(type...);
     }
 
     /// @brief `unreachable` opcode (non-tail-call/byref): traps/terminates the VM.

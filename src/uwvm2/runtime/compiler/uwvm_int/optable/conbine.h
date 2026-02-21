@@ -471,6 +471,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     }
 
     /**
+     * @brief Fuses `f32.add` with a subsequent single-value canonical fill (`fill1`).
+     *
+     * Bytecode layout: `[opfunc_ptr][next_opfunc_ptr]`.
+     */
+    template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_f32_add_then_fill1(Type... type) UWVM_THROWS
+    {
+        using wasm_f32 = conbine_details::wasm_f32;
+
+        static_assert(sizeof...(Type) >= 2uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+
+        numeric_details::float_binary<CompileOption, wasm_f32, numeric_details::float_binop::add, curr_stack_top>(type...);
+        manipulate::operand_stack_to_stacktop<CompileOption, curr_stack_top, 1uz, wasm_f32, Type...>(type...);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /**
      * @brief Fuses `f64.add` with a subsequent single-value canonical fill (`fill1`).
      *
      * Bytecode layout: `[opfunc_ptr][next_opfunc_ptr]`.
@@ -4780,6 +4803,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_i64_add_then_fill1<Opt, Pos, Type...>; }
             };
 
+            struct f32_add_then_fill1_op
+            {
+                template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
+                    requires (Opt.is_tail_call)
+                static consteval uwvm_interpreter_opfunc_t<Type...> fptr() noexcept
+                { return uwvmint_f32_add_then_fill1<Opt, Pos, Type...>; }
+            };
+
             struct f64_add_then_fill1_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -4917,6 +4948,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_i64_add_then_fill1_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                              ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i64_add_then_fill1_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_f32_add_then_fill1_fptr(uwvm_interpreter_stacktop_currpos_t const& curr) noexcept
+        {
+            return details::select_stacktop_fptr_or_default_conbine<CompileOption,
+                                                                    CompileOption.f32_stack_top_begin_pos,
+                                                                    CompileOption.f32_stack_top_end_pos,
+                                                                    details::f32_add_then_fill1_op,
+                                                                    Type...>(curr.f32_stack_top_curr_pos);
+        }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_f32_add_then_fill1_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_f32_add_then_fill1_fptr<CompileOption, TypeInTuple...>(curr); }
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
