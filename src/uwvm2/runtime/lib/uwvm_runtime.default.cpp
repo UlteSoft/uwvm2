@@ -145,6 +145,9 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
+#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#endif
         inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
