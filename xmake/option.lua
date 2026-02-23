@@ -127,7 +127,7 @@ end)
 option("static", function()
     set_description
     (
-        "The static flag is used to enable static linking of libraries instead of dynamic linking.",
+        "The static flag is used to enable static linking of libraries instead of dynamic linking and use lld when linking",
         "static linking is disable by default"
     )
     set_default(true)
