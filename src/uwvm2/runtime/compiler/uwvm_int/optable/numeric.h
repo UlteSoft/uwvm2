@@ -347,14 +347,82 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
         }
 
+        template <typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr bool float_isnan(FloatT v) noexcept
+        {
+#if defined(__GNUC__) || defined(__clang__)
+            return __builtin_isnan(v);
+#else
+            return ::std::isnan(v);
+#endif
+        }
+
+        template <typename FloatT>
+        UWVM_ALWAYS_INLINE inline constexpr bool float_signbit(FloatT v) noexcept
+        {
+#if defined(__GNUC__) || defined(__clang__)
+            return __builtin_signbit(v);
+#else
+            return ::std::signbit(v);
+#endif
+        }
+
         template <float_unop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
         {
-            if constexpr(Op == float_unop::abs) { return ::std::fabs(v); }
+            if constexpr(Op == float_unop::abs)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_fabsf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_fabs(v); }
+                else
+                {
+                    return ::std::fabs(v);
+                }
+#else
+                return ::std::fabs(v);
+#endif
+            }
             else if constexpr(Op == float_unop::neg) { return -v; }
-            else if constexpr(Op == float_unop::ceil) { return ::std::ceil(v); }
-            else if constexpr(Op == float_unop::floor) { return ::std::floor(v); }
-            else if constexpr(Op == float_unop::trunc) { return ::std::trunc(v); }
+            else if constexpr(Op == float_unop::ceil)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_ceilf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_ceil(v); }
+                else
+                {
+                    return ::std::ceil(v);
+                }
+#else
+                return ::std::ceil(v);
+#endif
+            }
+            else if constexpr(Op == float_unop::floor)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_floorf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_floor(v); }
+                else
+                {
+                    return ::std::floor(v);
+                }
+#else
+                return ::std::floor(v);
+#endif
+            }
+            else if constexpr(Op == float_unop::trunc)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_truncf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_trunc(v); }
+                else
+                {
+                    return ::std::trunc(v);
+                }
+#else
+                return ::std::trunc(v);
+#endif
+            }
             else if constexpr(Op == float_unop::nearest)
             {
                 // NOTE:
@@ -389,7 +457,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
+#  if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyintf(v);
+#  else
                     return ::std::nearbyint(v);
+#  endif
 # endif
                 }
                 else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
@@ -402,7 +474,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
+#  if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyint(v);
+#  else
                     return ::std::nearbyint(v);
+#  endif
 # endif
                 }
                 else
@@ -444,7 +520,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
+#  if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyintf(v);
+#  else
                     return ::std::nearbyint(v);
+#  endif
 # endif
                 }
                 else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
@@ -459,7 +539,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
+#  if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyint(v);
+#  else
                     return ::std::nearbyint(v);
+#  endif
 # endif
                 }
                 else
@@ -497,10 +581,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
+# if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_nearbyintf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_nearbyint(v); }
+                else
+                {
+                    return ::std::nearbyint(v);
+                }
+# else
                 return ::std::nearbyint(v);
+# endif
 #endif
             }
-            else if constexpr(Op == float_unop::sqrt) { return ::std::sqrt(v); }
+            else if constexpr(Op == float_unop::sqrt)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_sqrtf(v); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_sqrt(v); }
+                else
+                {
+                    return ::std::sqrt(v);
+                }
+#else
+                return ::std::sqrt(v);
+#endif
+            }
             else
             {
                 return {};
@@ -533,17 +638,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == float_binop::sub) { return lhs - rhs; }
             else if constexpr(Op == float_binop::mul) { return lhs * rhs; }
             else if constexpr(Op == float_binop::div) { return lhs / rhs; }
-            else if constexpr(Op == float_binop::copysign) { return ::std::copysign(lhs, rhs); }
+            else if constexpr(Op == float_binop::copysign)
+            {
+#if defined(__GNUC__) || defined(__clang__)
+                if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_copysignf(lhs, rhs); }
+                else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_copysign(lhs, rhs); }
+                else
+                {
+                    return ::std::copysign(lhs, rhs);
+                }
+#else
+                return ::std::copysign(lhs, rhs);
+#endif
+            }
             else if constexpr(Op == float_binop::min)
             {
-                if(::std::isnan(lhs) || ::std::isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
-                if(lhs == rhs) { return ::std::signbit(lhs) ? lhs : rhs; }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(lhs == rhs) { return float_signbit(lhs) ? lhs : rhs; }
                 return ::std::min(lhs, rhs);
             }
             else if constexpr(Op == float_binop::max)
             {
-                if(::std::isnan(lhs) || ::std::isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
-                if(lhs == rhs) { return ::std::signbit(lhs) ? rhs : lhs; }
+                if(float_isnan(lhs) || float_isnan(rhs)) { return ::std::numeric_limits<FloatT>::quiet_NaN(); }
+                if(lhs == rhs) { return float_signbit(lhs) ? rhs : lhs; }
                 return ::std::max(lhs, rhs);
             }
             else
