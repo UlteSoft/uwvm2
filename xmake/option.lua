@@ -130,7 +130,7 @@ option("static", function()
         "The static flag is used to enable static linking of libraries instead of dynamic linking.",
         "static linking is disable by default"
     )
-    set_default(false)
+    set_default(true)
 end)
 
 option("use-llvm", function()
