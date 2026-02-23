@@ -377,7 +377,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_fabs(v); }
                 else
                 {
-                    return ::std::fabs(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(abs): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::fabs(v);
@@ -391,7 +393,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_ceil(v); }
                 else
                 {
-                    return ::std::ceil(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(ceil): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::ceil(v);
@@ -404,7 +408,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_floor(v); }
                 else
                 {
-                    return ::std::floor(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(floor): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::floor(v);
@@ -417,7 +423,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_trunc(v); }
                 else
                 {
-                    return ::std::trunc(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(trunc): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::trunc(v);
@@ -586,7 +594,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_nearbyint(v); }
                 else
                 {
-                    return ::std::nearbyint(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(nearest): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 # else
                 return ::std::nearbyint(v);
@@ -600,7 +610,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_sqrt(v); }
                 else
                 {
-                    return ::std::sqrt(v);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_unop(sqrt): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::sqrt(v);
@@ -645,7 +657,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_copysign(lhs, rhs); }
                 else
                 {
-                    return ::std::copysign(lhs, rhs);
+                    static_assert(::std::same_as<FloatT, wasm_f32> || ::std::same_as<FloatT, wasm_f64>,
+                                  "eval_float_binop(copysign): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
+                    return {};
                 }
 #else
                 return ::std::copysign(lhs, rhs);
