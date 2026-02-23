@@ -66,6 +66,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         inline constexpr void exit_operation() noexcept {}
     };
+
+    // Defined in `allocator.h` when the standard library provides C++20 atomic wait/notify primitives.
+    struct memory_operation_guard_t;
 }  // namespace uwvm2::object::memory::linear
 
 #ifndef UWVM_MODULE
