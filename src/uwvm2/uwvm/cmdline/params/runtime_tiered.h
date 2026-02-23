@@ -63,7 +63,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_tiered{
         .name{u8"--runtime-tiered"},
-        .describe{u8"Shortcut selection of runtime (DEFAULT): tiered (lazy compile + interpreter/llvm-jit tiered)."},
+        .describe{u8"Shortcut selection of runtime"
+# if 0 /// @todo set to default
+                u8" (DEFAULT)"
+# endif
+                  u8": tiered (lazy compile + interpreter/llvm-jit tiered)."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_tiered_alias), 1uz}},
         .handle{::std::addressof(details::runtime_tiered_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed)},

@@ -87,15 +87,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @brief   The global runtime mode.
     /// @details default = runtime-tiered
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
+#if 0  /// @todo    set to lazy_compile
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile
+#else
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
+#endif
+
+    };  // [global]
 
     // The debug interpreter is never used as a regular interpreter.
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if 0  /// @todo    set to uwvm_interpreter_llvm_jit_tiered
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered
-#elif defined(UWVM_RUNTIME_LLVM_JIT)
+# elif defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
-#elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only
+# endif
+#else
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only
 #endif
     };  // [global]
