@@ -34,7 +34,7 @@ module;
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 // platform
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
 # include <cfenv>
 #endif
 

@@ -35,7 +35,7 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 // platform
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
 #  include <cfenv>
 # endif
 // import
@@ -367,6 +367,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
         }
 
+        UWVM_ALWAYS_INLINE inline constexpr bool fp_rounding_is_tonearest() noexcept
+        {
+#if __has_include(<cfenv>) && defined(FE_TONEAREST)
+            return ::std::fegetround() == FE_TONEAREST;
+#else
+            return true;
+#endif
+        }
+
         template <float_unop Op, typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr FloatT eval_float_unop(FloatT v) noexcept
         {
@@ -463,7 +472,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return __builtin_lasx_xvfrintrne_s(tmp)[0u];
 # else
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 #  if defined(__GNUC__) || defined(__clang__)
                     return __builtin_nearbyintf(v);
@@ -480,7 +489,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # else
                     // Implementation for msvc is not currently being considered; revert to the default implementation.
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 #  if defined(__GNUC__) || defined(__clang__)
                     return __builtin_nearbyint(v);
@@ -493,7 +502,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     // platform
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
                     return ::std::nearbyint(v);
                 }
@@ -526,7 +535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # else
                     // Implementation for msvc is not currently being considered; revert to the default implementation.
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 #  if defined(__GNUC__) || defined(__clang__)
                     return __builtin_nearbyintf(v);
@@ -545,7 +554,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 # else
                     // Implementation for msvc is not currently being considered; revert to the default implementation.
 #  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #  endif
 #  if defined(__GNUC__) || defined(__clang__)
                     return __builtin_nearbyint(v);
@@ -558,7 +567,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     // platform
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
                     return ::std::nearbyint(v);
                 }
@@ -580,14 +589,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 {
                     // platform
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
                     return ::std::nearbyint(v);
                 }
 #else
 
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                if(::std::fegetround() != FE_TONEAREST) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
 # if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_nearbyintf(v); }
