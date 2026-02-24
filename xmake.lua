@@ -170,6 +170,10 @@ function def_build()
 
 		-- Since neither LLVM nor Wextra supports this parameter by default, this addition prevents compilation.
 		add_cxflags("-Wimplicit-fallthrough", { force = true })
+	else
+		if not is_plat("windows") then
+			add_cxflags("-Wno-maybe-musttail-local-addr", { force = true })
+		end
 	end
 
 	before_build(
