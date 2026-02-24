@@ -1,228 +1,164 @@
-# UWVM2 “u2” Interpreter Architecture (Register-Ring Stack-Top Cache)
+# UWVM2 “u2” Interpreter: A Measurement-Driven Threaded VM Design (Register-Ring + Fusion)
 
-UWVM2’s **u2** interpreter (see `src/uwvm2/runtime/compiler/uwvm_int/`) is a **non-JIT, non-self-modifying** WebAssembly interpreter. The design goal is to push a threaded interpreter close to its practical performance ceiling on modern calling conventions by aggressively reducing **operand-stack memory traffic**.
+## Abstract
 
-At a high level, u2 keeps the hottest portion of the Wasm operand stack in an ABI-friendly **opfunc argument pack** (values carried in registers/locals across opfunc calls), and uses a **compile-time specialized ring buffer** (“register ring”) to move values between:
-- the **canonical operand stack** in memory (`sp`), and
-- the **stack-top cache** that stays resident across opfunc dispatch.
+**u2** is UWVM2’s WebAssembly interpreter (`src/uwvm2/runtime/compiler/uwvm_int/`). It is a **non-JIT, non-self-modifying** engine built around **direct threading** (a stream of opfunc pointers + immediates) and a register-friendly **stack-top cache** implemented as a compile-time specialized **register ring**.
 
-This document describes the architecture and how it differs from:
-1) Wasm3 / M3-style threaded interpreters (small fixed register file), and
-2) classic stack-top / slot-stack optimizations (slot IDs + copies at control-flow boundaries).
+The design goal is strong end-to-end performance for an interpreter tier: **fast translation** (linear-time emission of a code page with no runtime opcode decode) and **high interpreter throughput** (reduced operand-stack memory traffic + reduced dispatch density via fusion). u2 explicitly trades **code size** for predictable hot-path shape: it contains many template-specialized opfunc variants and therefore is not positioned as a minimal/lightweight interpreter in the wasm3/WAMR class. In a tiered system, u2 is intended to serve as a **JIT warm-start backend** rather than a smallest-possible standalone interpreter.
 
----
+This document summarizes both (1) the architecture and (2) the optimization workflow used to reach competitive results: instrument → quantify dispatch/fusion → audit codegen via AArch64 “asm stitching” → implement leaf-preserving fusion and translation-time peepholes.
 
-## Goals and non-goals
+## 1. Goals and non-goals
 
-### Goals
-- **Fast steady-state execution** for stack-heavy Wasm by turning many hot operations into **register-register ALU** on cache-hit paths.
-- **No RWX / no runtime codegen**: opfuncs are compiled ahead of time; runtime executes a precompiled opfunc set plus translated threaded bytecode.
-- **ABI-scalable caching**: cache width scales with the platform ABI (how many integer/FP/SIMD arguments can stay in registers).
+### 1.1 Goals
+- **Fast steady-state execution** for stack-heavy Wasm by turning hot scalar ops into mostly register-resident ALU.
+- **Low translation overhead**: emit a direct-threaded stream once; avoid runtime opcode decode.
+- **ABI-scalable caching**: widen the stack-top cache when the platform ABI provides more argument registers.
+- **Leaf-friendly opfuncs** in tail-threaded mode to keep dispatch as “load next pointer + indirect branch” without prologues on hot paths.
 
-### Non-goals
-- Eliminating dispatch cost entirely (that is primarily the domain of JIT/AOT, trace fusion, or superinstructions).
-- Building a general-purpose optimizing compiler pipeline inside the interpreter.
+### 1.2 Non-goals
+- Claiming “fastest” or “optimal” across all workloads.
+- Minimizing code size (u2’s optable is intentionally large due to specialization).
+- Eliminating dispatch entirely (that is the domain of JIT/AOT/tracing/superinstruction systems beyond adjacent fusion).
 
----
+## 2. System overview
 
-## Architecture overview
+### 2.1 Components
+- **Translator**: `compile_all_from_uwvm/wasm1.h`
+  - Parses Wasm bytecode and emits u2 bytecode (“code page”) per function.
+  - Performs local, linear-time fusion and peepholes (no global optimizer pass).
+- **Optable (opfunc set)**: `optable/*.h`
+  - Dispatch targets for arithmetic/control/memory/calls plus fused patterns.
+- **Register-ring cache**: `optable/register_ring.h`
+  - Spill/fill and transform operations between canonical operand stack memory and the cached stack-top segment.
 
-### 1) Threaded interpreter core (“opfunc chaining”)
-u2 is a **threaded interpreter**: each translated opcode points to a specialized **opfunc**; execution proceeds as “fetch next op pointer → advance PC → indirect tail-jump”. This is a common high-performance interpreter shape; u2’s main win is that many ops avoid **operand-stack loads/stores** when the stack-top cache hits.
+### 2.2 Execution model (direct-threaded stream)
+u2 executes a pointer stream:
+1) `ip` points at an opfunc pointer stored as raw bytes in the code page.
+2) The opfunc reads any immediates following the pointer (e.g., local offsets, memarg offsets).
+3) The opfunc tail-dispatches by loading the next opfunc pointer and `br`/`UWVM_MUSTTAIL return` to it.
 
-### 2) Operand stack + stack-top cache (spill/fill)
-WebAssembly is a **stack machine**. u2 keeps the top segment of that stack in the opfunc argument pack:
+The translator emits opfunc pointers directly (see `emit_opfunc_to(...)` in `compile_all_from_uwvm/wasm1.h`), so runtime does not decode Wasm opcodes.
 
-- **spill**: stack-top cache → operand stack memory
-- **fill**: operand stack memory → stack-top cache
+## 3. Register-ring stack-top cache (operand-stack traffic reduction)
 
-The implementation lives in `optable/register_ring.h` and is specialized so the runtime fast path is mostly pointer adjustment plus bulk moves when needed.
+### 3.1 What is cached
+WebAssembly is a mixed-typed stack machine. u2 caches the hot segment of the operand stack in an ABI-packed “opfunc argument tuple”:
+- fixed interpreter arguments: `(ip, operand_stack_top_ptr, local_base_ptr)`, plus
+- a configurable number of stack-top cache slots carried across dispatch.
 
-### 3) Per-type register rings (i32/i64/f32/f64/v128)
-The stack-top cache is modeled as **per-type rings** (i32/i64/f32/f64/v128), not a single untyped buffer.
+The cache is modeled as per-type rings (i32/i64/f32/f64, optionally v128 carriers), and ranges may be merged to reduce register pressure.
 
-Key properties:
-- **Compile-time known** spill/fill sizes and start positions are expanded via templates and compile-time evaluation, so runtime work stays small.
-- Ranges may be **merged** (shared slots with union-like layouts) to reduce register pressure while keeping compile-time validation.
+### 3.2 Spill/fill and transforms
+When the cache cannot satisfy an operand or must materialize state, the translator emits spill/fill opfuncs:
+- **spill**: cache → operand stack memory
+- **fill**: operand stack memory → cache
 
-### 4) Translation-time “cache layout” options
-u2 tracks stack-top cache ranges **per value category**, because ABI and target details affect how values map to registers/slots (e.g., integer vs FP register files, v128 availability).
+These mechanisms live in `optable/register_ring.h` and are specialized so hot paths remain small (pointer bumps + bounded moves).
 
-This is represented by `uwvm_interpreter_translate_option_t` fields such as:
-- `i32_stack_top_begin_pos` / `i32_stack_top_end_pos`
-- `i64_stack_top_begin_pos` / `i64_stack_top_end_pos`
-- `f32_stack_top_begin_pos` / `f32_stack_top_end_pos`
-- `f64_stack_top_begin_pos` / `f64_stack_top_end_pos`
-(and optionally v128)
+### 3.3 Control-flow re-entry: register-only canonicalization
+Control-flow joins (loops, if/else merges) can require a canonical cache layout. u2 supports a register-only “transform-to-begin” that rotates the ring to a canonical begin position without touching operand-stack memory:
+- emission: `compile_all_from_uwvm/wasm1.h`
+- helpers: `optable/register_ring.h`, plus control variants in `optable/conbine.h`
 
----
+## 4. Translation pipeline (startup cost and translation throughput)
 
-## Why the ring matters
+Translation in `compile_all_from_uwvm/wasm1.h` is designed as a single-pass state machine:
+- Track a compiler-side model of operand stack + cache residency.
+- Emit direct-threaded bytecode: opfunc pointer bytes + immediates.
+- Batch consecutive spill/fill when safe to reduce dispatch and bytecode size.
 
-### Adjacent-by-construction operands (TOS/NOS)
-Binary stack ops (add/or/mul/…) consume the **top two** stack values. In u2’s ring, the top (TOS) and next (NOS) are **adjacent positions by construction**, so opfunc specialization typically depends on:
-- `StartPos` (logical top), and
-- `Count` (how many cached values are available),
+Because the runtime stream is already “decoded” into opfunc pointers, translation time is part of the end-to-end performance story: u2 aims to keep translation close to linear in Wasm instruction count and to keep fusion localized (bounded lookahead / peepholes), avoiding heavyweight IR pipelines.
 
-rather than an arbitrary `(i, j)` register-pair placement.
+## 5. Fusion layers (dispatch density reduction)
 
-Consequence: specialization growth for 2-operand ops is approximately **O(N)** (possible start positions), not **O(N²)** combinations in “free pairing” designs.
+Threaded interpreters have a hard ceiling set by dispatch (`load next target + indirect jump`). Once operand-stack traffic is reduced, dispatch can become dominant. u2 therefore uses translation-time fusion to increase “work per dispatch”.
 
----
+### 5.1 `conbine`: adjacent-op fusion (soft/heavy/extra)
+The translator maintains a small pending state machine (`conbine_pending_t` in `compile_all_from_uwvm/wasm1.h`). When a provider sequence can continue (`conbine_can_continue(...)`), emission is delayed and later flushed as a fused opfunc. This provides superinstruction-like wins while keeping translation local and predictable.
 
-## Control flow: keeping values cached across re-entry
+Optable implementations:
+- baseline: `optable/conbine.h`
+- heavy (higher-coverage skeletons): `optable/conbine_heavy.h`
+- extra-heavy (mega-ops): `optable/combine_extra_heavy.h`
 
-Classic stack caching often pays at control-flow boundaries (loops, if/else joins) by forcing copies or spilling to memory.
+### 5.2 `delay_local`: treating `local.get` as a virtual operand source
+Many real Wasm workloads are dominated by “providers” (`local.get`, `*.const`) feeding short consumers. A major performance lever is to avoid standalone provider dispatch and instead select consumer variants that read from locals/slots directly (wasm3’s systematic `_rs/_sr/_ss` strategy).
 
-u2 adds an **experimental register-only canonicalization** step for control-flow re-entry:
-- It **rotates** the stack-top ring(s) so the current position becomes the range’s begin slot.
-- This is a **register/argument-pack transform only**: it shuffles cached slots and does not touch operand-stack memory.
+u2’s `delay_local` provides analogous consumer variants:
+- It defers materializing `local.get` until the first consuming op.
+- It emits consumer opfuncs that load directly from the local slot (e.g., `uwvmint_i32_binop_localget_rhs` in `optable/delay_local.h`).
+- It compiles `local.get rhs; binop` as a **net stack effect = 0** transformation relative to the pre-`local.get` state, avoiding push/pop state-machine overhead.
 
-In the codebase this shows up as stack-top “transform-to-begin” helpers (e.g., `uwvmint_stacktop_transform_to_begin` in `optable/register_ring.h`) and control-flow variants (e.g., `uwvmint_br_stacktop_transform_to_begin` in `optable/conbine.h`).
+Build knobs (see the analysis note for empirical motivation):
+- `--enable-uwvm-int-combine-ops={none,soft,heavy,extra}`
+- `--enable-uwvm-int-delay-local={none,soft,heavy}`
 
----
+## 6. Leaf hot-path discipline (tail-threaded correctness and performance)
 
-## ABI leverage (why u2 benefits from “wide argument passing”)
+In tail-threaded mode, u2 keeps opfunc hot paths strictly **leaf** where possible. This matters on AArch64 because a normal call (`bl`) tends to force prologue/epilogue in the caller to preserve the link register, even if the call is cold.
 
-u2 benefits most when the platform ABI passes **many arguments in registers** (integer + FP/SIMD), because the opfunc argument pack can keep a wider stack-top cache resident in registers/locals:
+Numeric traps illustrate the pattern:
+- `optable/numeric.h` defines cold, noinline tail wrappers such as `trap_integer_divide_by_zero_tail<CompileOption>()` and `trap_integer_overflow_tail<CompileOption>()`.
+- Hot opfuncs (including `delay_local` variants in `optable/delay_local.h`) branch/tail-call to these wrappers on exceptional paths, keeping the fast path as leaf + direct tail-dispatch.
 
-- x86_64 SysV: multiple GPR + XMM argument registers
-- AArch64 AAPCS64: `x0–x7` for integer/pointers and `v0–v7` for FP/SIMD arguments
+## 7. Engineering workflow: quantify → audit → patch
 
-This directly increases the cache-hit rate, which is why u2 tends to scale sharply once it can keep **more than ~2** hot operands cached for typical code patterns.
+The u2 design is validated and refined by a measurement-driven loop (captured in the MacroModel analysis note `test/uwvm2test/u2_vs_wasm3_asm_stitch_analysis.txt`, dated 2026-02-20…2026-02-23):
 
----
+1) **Quantify fusion and dispatch** with u2 runtime logs (`-Rclog`): wasm op counts, opfunc counts (dispatch), spill/fill counts, and control-flow pressure.
+2) **Audit codegen limits** by compiling opfuncs to AArch64 assembly and “stitching” representative hot sequences. This reveals when both interpreters are already near the same dispatch skeleton ceiling.
+3) **Implement the highest-leverage fixes**:
+   - Reduce dispatch by systematic provider/consumer handling (`delay_local`).
+   - Add high-hit-rate skeleton fusions in heavy mode (e.g., loop counters).
+   - Add translation-time peepholes that remove semantic no-ops.
+   - Preserve leaf hot paths (trap tail wrappers; avoid cold `bl` in opfunc bodies).
 
-## Comparison notes
+## 8. Representative high-impact optimizations (source-linked)
 
-### u2 vs Wasm3 (M3-style threaded interpreter)
-Wasm3 is a well-known fast interpreter design that pairs threaded dispatch with a small, fixed VM register set mapped to hardware registers. Concretely, Wasm3’s “meta-machine” has a *very small* stack-top fast path: it effectively provides **one integer register** (`r0`, used for i32/i64) and **one floating register** (`fp0`, used for f32/f64) as its cached top-of-stack registers; additional operands are typically loaded from the operand stack in memory (see Wasm3’s `docs/Interpreter.md` for the canonical signature examples). u2 is also threaded, but it targets a different bottleneck: in a stack machine, steady-state cost is often dominated by repeated **operand-stack loads/stores**, not only dispatch. u2 tries to remove that memory traffic on cache-hit paths by keeping multiple stack-top values in the argument pack and executing **register-register** operations most of the time.
+These mechanisms are examples of u2’s “heavy but general” direction: they aim for broad coverage without workload-private mega-ops.
 
-Worked-example intuition: for a hot arithmetic opcode (e.g., `i64.or`), a classic stack-machine interpreter often pays a chain of “compute stack address → load operand(s) → ALU → store result”. When u2 hits in the stack-top cache, the same opcode can reduce to “register-register ALU → continue dispatch”, leaving dispatch and control-flow structure as the dominant residual cost.
+### 8.1 Dead stack traffic elimination (`const* + drop*`)
+Some modules (and microbenchmarks) contain long runs of side-effect-free providers followed by the same number of `drop`s; semantically these segments are no-ops. u2 can remove them at translation time to avoid pathological dispatch-bound loops:
+- implementation: `try_elide_const_run_with_drops()` in `compile_all_from_uwvm/wasm1.h`
 
-### u2 vs classic “slot stack” caching
-Many fast interpreters use a **slot stack** (assign slot IDs and insert copies when control flow causes mismatches). u2 instead models the hot region as a **ring** where consumed operands are adjacent-by-definition, keeping specialization small and enabling control-flow re-entry canonicalization via ring rotation (register-only shuffles) rather than pervasive slot-copy code or forced spills.
+### 8.2 Trivial local-defined call fast path
+Small local-defined callees that are semantic no-ops or constant-return functions can be recognized and executed without constructing a full call frame:
+- matcher: `match_trivial_call_inline_body()` in `compile_all_from_uwvm/wasm1.h`
+- metadata: `trivial_defined_call_kind` and `compiled_defined_call_info` in `optable/define.h`
 
----
+### 8.3 Loop skeleton fusion (“inc; cmp; br_if”)
+High-hit-rate counter-loop patterns can be emitted as a single fused opfunc to reduce per-iteration dispatch:
+- opfunc: `uwvmint_for_i32_inc_lt_u_br_if` in `optable/conbine_heavy.h`
+- translator rewrite at `br_if`: `compile_all_from_uwvm/wasm1.h`
 
-## Why u2 is “near the interpreter ceiling”
+## 9. Interpreting results: when u2 is “good”
 
-On cache-hit paths, u2’s goal is to make operand-stack traffic largely disappear. Once the interpreter stops loading/storing operands from memory for most opcodes, a threaded interpreter is often left primarily with:
-- the structural dispatch sequence (fetch next op pointer, advance PC, indirect branch), and
-- unavoidable boundary cases (cache boundary spill/fill, memory-exposing ops, calls, etc.).
+u2 is evaluated on two axes:
+- **Translation performance**: linear-time translation to a direct-threaded stream; localized fusion/peepholes.
+- **Interpretation performance**: register-ring cache reduces operand-stack traffic; fusion reduces dispatch density.
 
-At that point, further large wins typically require changing the execution model (JIT/AOT, trace fusion, superinstructions) rather than squeezing more out of operand handling.
+Key lessons from the 2026-02 analysis on AArch64 (Apple M-series) are:
+- If the average fusion ratio is low (e.g., ~1.5 wasm ops per dispatch), different threaded interpreters tend to converge toward the same dispatch ceiling (indirect branch + next pointer load), and performance differences narrow.
+- Large gains often come from reducing dispatch count (provider/consumer variantization, loop skeleton fusion) rather than shaving single instructions inside an already-minimal opfunc.
+- u2’s generality (notably in memory and runtime paths) can lengthen dependence chains and increase register pressure in memory-heavy or branch-heavy kernels; this is an accepted trade for broader functionality and JIT-warm-start positioning.
 
----
+### 9.1 AArch64 case study (2026-02-20…2026-02-23)
 
-## Practical mental model
+The following results are *not* universal claims; they summarize a specific AArch64/Apple Silicon workflow captured in `test/uwvm2test/u2_vs_wasm3_asm_stitch_analysis.txt`:
 
-Think of u2 as:
-1. A **threaded interpreter** (dispatch is shared and unavoidable),
-2. with a **typed, ABI-backed stack-top cache** (operand-stack traffic is the main target),
-3. implemented as a **per-type register ring** (operands are adjacent-by-definition, keeping specialization manageable),
-4. plus **register-only control-flow canonicalization** to preserve cached values across re-entry when possible.
+- **Corpus matrix (wall-time, 2026-02-23)**: scanning `*.wasm` under `/tmp/uwvm2test` and comparing modules where both engines succeeded (n=383), the reported wall-time ratio geomean was `uwvm/wasm3 = 0.5957` (u2 faster on average), with median `0.7116`.
+- **Algorithm kernels (internal-time, 2026-02-20)**: for representative WASI algorithm modules, the report includes examples such as ChaCha20 (u2 398ms vs wasm3 515ms), SHA512 (u2 202ms vs wasm3 220ms), and BLAKE2s (u2 3094ms vs wasm3 3427ms).
+- **Code size trade (Mach-O `__TEXT`)**: enabling `delay_local` was measured as a small increase in text size (e.g., heavy+delay=none `__TEXT≈1,409,024` vs heavy+delay=heavy `__TEXT≈1,441,792`), while extra-heavy options increased it further in that setup.
 
----
+The main engineering takeaway from these measurements is methodological: when two interpreters share a similar direct-threaded dispatch skeleton, the largest remaining wins often come from **reducing dispatch count** (systematic provider/consumer handling and high-hit-rate skeleton fusion), while maintaining the “leaf hot-path” invariant needed for clean tail-threaded codegen.
 
-## Weaknesses and limitations (where u2 can lose its advantage)
+## 10. Repository map
 
-u2’s wins come from replacing “load operands from memory → compute → store back” with “keep operands in registers/locals → compute → continue dispatch”. That only works when the platform ABI and the surrounding control-flow shape allow a wide, stable **argument-pack cache** to remain resident with minimal shuffling/spilling.
-
-This section explains the main cases where u2 is structurally constrained, and why a design like Wasm3/M3 can look “closer” on those targets/workloads even if u2 is faster elsewhere.
-
-### 1) ABI-constrained targets: why Win64 MS ABI and AArch32 AAPCS/EABI are hard
-
-**Core mechanism reminder.** u2 uses an opfunc signature whose first fixed arguments are:
-1) `ip` (bytecode / op-pointer stream),
-2) `stack_top` (operand stack top pointer),
-3) `local_base` (locals buffer base),
-and then uses the **remaining argument slots** as the stack-top cache. This convention is encoded in the runtime’s target selection (`get_curr_target_tranopt()` in `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp`) and is assumed by the translator (`src/uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h`).
-
-On “wide” ABIs (x86_64 SysV, AArch64 AAPCS64), this is a good trade: after the 3 fixed args there are still multiple integer argument registers and multiple FP/SIMD argument registers available, so the stack-top cache can be several values wide for *both* scalar integer and scalar FP operations.
-
-On **Win64 MS ABI** and **AArch32 AAPCS/EABI**, the situation is fundamentally different:
-
-- **Win64 (Microsoft x64 ABI) has only 4 register argument positions total** (`rcx/rdx/r8/r9` and the “matching” `xmm0–xmm3` positions).
-  - After the 3 fixed interpreter args, **only 1 register position remains**.
-  - Worse (relative to SysV/AArch64): the MS ABI’s “4 positions” are shared between integer and FP arguments. If the first 3 positions are consumed by pointers, you effectively lose the ability to use the corresponding early XMM positions for FP cache entries as well.
-  - As a result, “keep a meaningful stack-top slice in registers” collapses into a **1-slot cache** at best, usually implemented as a scalar4-merged layout. This increases register pressure and forces frequent spill/fill and shuffling, which often costs more than it saves.
-  - The runtime therefore keeps stack-top caching **disabled by default** on Win64 MS ABI, and keeps a 1-slot experiment under `#if 0` for reference in `get_curr_target_tranopt()`.
-
-- **AArch32 AAPCS/EABI has only 4 core argument registers (`r0–r3`)**.
-  - After the 3 fixed interpreter args, there is at most **one remaining core argument register (`r3`)** for integer-like cached values.
-  - While some ARM32 hard-float variants can pass FP arguments in VFP registers, the exact rules depend on toolchain/ABI mode and interact poorly with “mixed typed” signatures. u2 intentionally targets a portable baseline here and therefore disables caching rather than risking an ABI-dependent “it benchmarks well on one compiler flag but regresses elsewhere” outcome.
-  - The runtime similarly keeps stack-top caching **disabled** for ARM32 in `get_curr_target_tranopt()`.
-
-**Why Wasm3 can be closer on these targets.** M3’s design keeps a *small fixed* set of VM state in registers (pc/sp/mem + a tiny number of temporaries) and performs operand access via memory loads/stores. That is not ideal on stack-heavy arithmetic, but it is also much less sensitive to “how many argument registers exist after 3 fixed arguments”, because it does not try to encode a wide operand-cache into the ABI call interface in the first place. When u2’s cache width collapses to ~1, u2’s advantage (removing operand-stack traffic) shrinks, while its remaining costs (dispatch + occasional canonicalization) stay.
-In Wasm3’s baseline model, that “tiny number of temporaries” is intentionally minimal: one general-purpose register (`r0`) covers i32/i64 results/temporaries and one FP register (`fp0`) covers f32/f64, with the operand stack in memory providing the rest.
-
-There is also a *threshold effect*: most hot Wasm scalar ops are binary (consume two operands). With a cache width < 2, u2 can keep at most one operand resident; the other operand must be fetched from the operand stack memory almost every time. At that point u2’s fast path starts to resemble an M3-style “one register + one stack load” topology, but still pays the overhead of maintaining a typed cache model and (optionally) canonicalizing it at control-flow edges. This is the main reason why MS ABI / AArch32 results can look surprisingly close to Wasm3 even when u2 wins decisively on SysV/AArch64.
-
-### 2) Mixed-typed Wasm stack: why “partial caching” is not a free knob
-
-The Wasm operand stack is *mixed typed*: i32/i64/f32/f64 values can interleave arbitrarily. u2’s translator models this stack and decides—at translation time—whether each operation’s operands are in the cache or must be materialized from memory.
-
-For correctness and simplicity of the optable layouts, when stack-top caching is enabled for Wasm1, the translator currently requires **full scalar coverage** and tail-call chaining:
-
-- In `compile_all_from_uwvm/wasm1.h`, enabling stack-top caching implies:
-  - `CompileOption.is_tail_call` must be true (the threaded opfunc chaining relies on tail-call mode), and
-  - the i32/i64/f32/f64 stack-top ranges must be enabled together (a `static_assert` enforces this).
-
-This matters on ABI-constrained targets: it prevents a tempting “cache only i32” configuration that might fit into 1–2 registers. Without full coverage, a mixed-typed operand stack would force frequent type-dependent materializations and/or additional runtime tags, which would add overhead and complexity and often defeats the point of caching.
-
-### 3) Control-flow dense code: dispatch and predictor pressure become the bottleneck
-
-Once u2 removes most operand-stack memory traffic on cache-hit paths, the dominant remaining cost often becomes **threaded dispatch**:
-- load next opfunc pointer,
-- advance `ip`,
-- indirect branch / musttail jump.
-
-In **control-flow dense** code (short basic blocks, frequent branches, loop bodies with many side exits), two effects become more pronounced:
-
-1) **Indirect-branch prediction and BTB pressure**: a hot loop that alternates among many opfunc entrypoints can stress the branch predictor, especially when code size grows and the instruction working set becomes less stable. Even with perfect operand caching, a mispredicted indirect jump is expensive.
-
-2) **More live “cached state” at joins**: u2’s stack-top cache makes more values “live in registers/locals”. At control-flow joins and loop headers, the interpreter must ensure the cached layout is valid for the target block.
-
-u2’s mitigation is *register-only canonicalization* (“transform-to-begin”):
-- The register ring is rotated so the current logical top maps back to the range’s begin slot, without touching operand-stack memory.
-- This is implemented in `optable/register_ring.h` (e.g., `uwvmint_stacktop_transform_to_begin`) and is used by control-flow helpers in `optable/conbine.h` (e.g., `uwvmint_br_stacktop_transform_to_begin`).
-- The translator emits these transforms at appropriate control-flow edges (see `compile_all_from_uwvm/wasm1.h`).
-
-This avoids the classic “spill everything at every join” strategy, but it is not free: on very branchy code, even small register shuffles add up, and dispatch remains the fundamental ceiling for a non-JIT threaded interpreter.
-
-From a compiler/µarch perspective, there is a real trade:
-- A **wider cache** increases the chance that operands are already in registers (good for arithmetic throughput),
-- but it also increases the amount of live state that must be kept consistent across control-flow edges, and can increase the number of moves needed for “transform-to-begin” (and the risk of spills under register pressure).
-
-The register-ring approach keeps this cost bounded and predictable (it is a rotation within a fixed range, not an arbitrary permutation), but it cannot make it disappear on extremely branchy kernels.
-
-**Practical consequence.** For branchy dispatch-bound kernels, large gains often come from **superinstruction / mega-op fusion** that reduces the number of dispatches per unit work (u2’s `combine` layers). This preserves the u2 architecture (still threaded, still argument-pack caching) while amortizing the indirect-branch cost over longer semantic sequences.
-
-### 4) Calls and memory-exposing operations reduce cache locality
-
-Any operation that must expose canonical operand-stack state to memory, interact with host imports, or perform complex address computations can force partial or full materialization:
-- `call` / `call_indirect`,
-- host import calls,
-- certain memory operations and boundary checks,
-- operations that require precise stack layout for traps/debugging.
-
-These are not “failures” of the cache; they are semantic boundaries. When a workload is dominated by such boundaries, u2’s cache-hit fraction drops and the performance gap to other interpreters naturally narrows.
-
-### 5) Specialization and fusion trade code size for speed
-
-u2 relies on template specialization (different `StartPos`/`Count`/merge layouts) and optional combine layers. This can increase:
-- I-cache pressure (more opfunc bodies),
-- BTB pressure (more indirect jump targets),
-- compile time and binary size.
-
-On large OoO cores this trade is typically favorable for hot code, but on small cores (or branch-heavy kernels with many unique opfunc targets) the “specialization tax” can reduce the marginal benefit of further fusions.
-
----
-
-## References (in this repository)
-
-- Stack-top cache ring + spill/fill machinery: `optable/register_ring.h`
-- Control-flow “transform-to-begin” emission in translation: `compile_all_from_uwvm/wasm1.h`
-- Control-flow helpers that combine transform + branch: `optable/conbine.h`
-- Per-target stack-top cache sizing (ABI selection): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)
+- Translation and fusion state machine: `compile_all_from_uwvm/wasm1.h`
+- Stack-top cache ring, spill/fill, transforms: `optable/register_ring.h`
+- Adjacent fusion: `optable/conbine.h`, `optable/conbine_heavy.h`, `optable/combine_extra_heavy.h`
+- Delay-local fused opfuncs: `optable/delay_local.h`
+- Numeric ops and trap wrappers: `optable/numeric.h`
+- Memory ops (generality and fast paths): `optable/memory.h`
+- Per-target translate options (ABI sizing): `src/uwvm2/runtime/lib/uwvm_runtime.default.cpp` (`get_curr_target_tranopt()`)
