@@ -1052,9 +1052,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             using size_type = ::std::size_t;
             constexpr size_type npos{static_cast<size_type>(-1)};
-
-            // !(defined(__pdp11) || (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
-            constexpr bool is_tail_call{true};
+            constexpr bool is_tail_call{
+# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+                true
+# else
+                false
+# endif
+            };
 
             size_type i32_begin{npos}, i32_end{npos};
             size_type i64_begin{npos}, i64_end{npos};

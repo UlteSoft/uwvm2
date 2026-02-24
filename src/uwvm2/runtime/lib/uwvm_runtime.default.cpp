@@ -938,8 +938,9 @@ namespace uwvm2::runtime::uwvm_int
         {
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-            // !(defined(__pdp11) || (defined(__MSDOS__) || defined(__DJGPP__)) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+#if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
+#endif
 
 #if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             // aarch64: AAPCS64 (x0-x7 integer args, v0-v7 fp/simd args)
