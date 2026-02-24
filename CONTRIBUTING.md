@@ -1,19 +1,20 @@
-## Contributing to uwvm2
+# Contributing to uwvm2
 
 This document defines the engineering conventions for uwvm2. The priorities are portability (freestanding-first), performance, determinism, and maintainability. All contributions must follow these rules unless explicitly waived by maintainers.
 
 ### Language, toolchain, and targets
-- Use modern C++ with modules (C++20) and carefully selected C++23 library components that are available in freestanding environments.
+- Use modern C++ (C++26) with modules and carefully selected library components that are available in freestanding environments.
+- The runtime layer (`src/uwvm2/runtime/`) relies on C++26 features such as pack indexing (`Type...[i]`); ensure the toolchain defines `__cpp_pack_indexing >= 202311L` and build with `-std=c++26`.
 - Prefer freestanding builds where possible; guard hosted-only features with preprocessor macros.
 - Compiler warnings should be clean with, at minimum: `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wuninitialized -Wunused -Wmisleading-indentation` (or the closest equivalents across toolchains). Some content uwvm2 does not provide redundant warnings during construction, but it is best to enable these recommended warnings during development to ensure that errors are less likely to occur.
 
 ### File, directory, and naming conventions
 - Headers use the `.h` extension. Do not use `.hpp`.
 - In `src/`, implementation files use `.cpp`. In `test/`, test sources use `.cc`.
-- For each module group that needs translation-unit code, split source files into two files per group:
-  - `module.cpp`: contains only module interface/import surface and wiring.
-  - `default.cpp`: contains default implementations and non-module code that depends on preprocessing.
-  This split is required because module import processing precedes preprocessing.
+- For each module group that needs translation-unit code with preprocessing, split source files into two files per group:
+  - `<name>.module.cpp` (or `module.cpp` in a leaf directory): imports-only + wiring, then `#include` the matching `<name>.default.cpp`.
+  - `<name>.default.cpp` (or `default.cpp`): default implementations and preprocessor-dependent code.
+  This split is required because module import processing precedes preprocessing (imports are processed before `#if`).
 - Module interface units use `.cppm`.
 
 ### Module/header import rules
@@ -31,6 +32,18 @@ See Appendix A for minimal module/header templates.
 
 To validate these rules run: `python3 test/0006.check_module/check_uwvm_module.py`
 
+### Runtime layer conventions (`src/uwvm2/runtime/`)
+- Follow the standardized file prologue used by neighboring runtime files (copyright/license block + `@author`/`@version` banner). Do not invent new prologue styles.
+- Use the runtime include structure:
+  - include groups with explicit headings such as `// std`, `// macro`, `// platform`, `// import`;
+  - include `.../macro/push_macros.h` near the top (and feature push macros when needed);
+  - include the corresponding `.../macro/pop_macros.h` at the end of the file.
+- Prefer project portability/annotation macros in hot code: `UWVM_ALWAYS_INLINE`, `UWVM_NOINLINE`, `UWVM_MUSTTAIL`, `UWVM_THROWS`, and `UWVM_IF_NOT_CONSTEVAL` (see `src/uwvm2/utils/macro/*` and the `src/uwvm2/runtime/**/macro/*` layers).
+- Module/export bridge pattern for headers:
+  - headers default `UWVM_MODULE_EXPORT` to empty and may use it to prefix namespaces/declarations;
+  - `.cppm` units define `UWVM_MODULE_EXPORT` as `export` before including the header mirror.
+- Threaded-interpreter hot paths should remain leaf in tail-threaded mode. Avoid introducing cold `call` edges that force prologues on AArch64; use tail wrappers for traps where appropriate (e.g., `trap_integer_divide_by_zero_tail` in `src/uwvm2/runtime/compiler/uwvm_int/optable/numeric.h`).
+
 ### Namespaces and qualification
 - Across namespace boundaries, use fully-qualified names:
 ```cpp
@@ -44,13 +57,13 @@ namespace A { void f(); inline void ff() { return f(); } }
 
 ### Standard library and freestanding policy
 - Default to freestanding-friendly facilities. Avoid non-freestanding headers prior to their freestanding adoption and toolchain maturity.
-- Prefer `uwvm2::utils::container::string` and other project-provided containers over `std::string` and non-freestanding STL containers in core layers to keep behavior controlled and portable.
+- Prefer `::uwvm2::utils::container::string` and other project-provided containers over `::std::string` and non-freestanding STL containers in core layers to keep behavior controlled and portable.
 - Prefer `<cstdint>` integer types and explicit-width aliases. Default to `::std::size_t` for sizes and indices.
-- Use `std::addressof` for addresses of objects where operators may be overloaded.
+- Use `::std::addressof` for addresses of objects where operators may be overloaded.
 - Exceptions are discouraged in low-level code and freestanding contexts. Prefer explicit error codes and RAII for lifetime management. If exceptions are used in hosted layers, document propagation and cost.
 - IO policy is centralized; see section “IO and file handling (expanded)”.
 
-### Formatting policy: avoid fmt-based formatting (fmtlib, std::format, std::print)
+### Formatting policy: avoid fmt-based formatting (fmtlib, ::std::format, ::std::print)
 
 Avoid fmt-based formatting in uwvm2. Prefer `fast_io` for formatting and output:
 
@@ -102,13 +115,13 @@ If in doubt, open an issue before investing in a large change.
 
 ## Deep modules conformance guide
 
-This section specifies normative rules, examples, and anti-examples for C++20 modules in uwvm2.
+This section specifies normative rules, examples, and anti-examples for C++26 modules in uwvm2.
 
 ### Normative rules
 - Each interface unit `.cppm` must have a `.h` mirror with one-to-one, order-preserving imports-includes mapping inside `#ifndef UWVM_MODULE`.
 - Interface unit and header mirror must preserve the category order defined earlier. Do not interleave categories.
-- Interface units must not contain preprocessor-dependent behavior prior to the `#ifndef UWVM_MODULE` header-bridge block. Conditional logic belongs in `default.cpp`.
-- `module.cpp` is restricted to wiring, `import` statements, and module-level scaffolding. No macros, no platform conditionals, no heavy logic.
+- Interface units must not contain preprocessor-dependent behavior prior to the `#ifndef UWVM_MODULE` header-bridge block. Conditional logic belongs in `default.cpp` / `*.default.cpp`.
+- `module.cpp` / `*.module.cpp` is restricted to wiring, `import` statements, and module-level scaffolding. No platform conditionals, no heavy logic.
 - Partition imports (e.g., `import :detail;`) must correspond to local headers (e.g., `"detail.h"`) in the mirror block.
 - Aggregator modules expose only stable submodule surfaces via `export import`; transient or experimental modules must not be exported from aggregators.
 
@@ -166,7 +179,7 @@ export import :adapters;
 - Exporting unstable submodules from an aggregator.
 
 ### Rationale
-Strict mirroring ensures that non-module consumers receive an equivalent dependency graph and that hybrid builds behave identically. The two-file split (`module.cpp` and `default.cpp`) eliminates subtle bugs introduced by the C++20 import-before-preprocessing rule.
+Strict mirroring ensures that non-module consumers receive an equivalent dependency graph and that hybrid builds behave identically. The two-file split (`*.module.cpp` including `*.default.cpp`) eliminates subtle bugs introduced by the modules import-before-preprocessing rule.
 
 ---
 
@@ -203,6 +216,7 @@ src/uwvm2/parser/wasm/base/
 ```
 
 The directory hierarchy mirrors module names (`uwvm2.parser.wasm.base` → `src/uwvm2/parser/wasm/base/`). Aggregators (`impl.*`) live at the directory root and expose cohesive partitions.
+In some directories (notably `src/uwvm2/runtime/lib/`), the same split is written as `<name>.module.cpp` and `<name>.default.cpp` to avoid ambiguous filenames and to make cross-directory grepping easier.
 
 ---
 
@@ -213,9 +227,12 @@ The category order applies globally and locally in every unit:
 2) `uwvm_predefine/*` (standalone category)
 3) `utils/*`
 4) `parser/*`
-5) `uwvm/io/*`
-6) `uwvm/utils/*`
-7) remaining items
+5) `validation/*`
+6) `object/*`
+7) `imported/*`
+8) `uwvm/*`
+9) `runtime/*`
+10) local headers (same directory) and remaining items
 
 Notes:
 - Do not mix `uwvm_predefine/*` into `utils/*` ordering.
@@ -271,7 +288,7 @@ namespace A {
 - Avoid `::std::nothrow`/`::std::nothrow_t`; library implementations typically route through throwing paths internally.
 
 ### Allocation failure
-- Prefer fail-fast at appropriate boundaries (e.g., `std::abort`) rather than attempting universal recovery from OOM.
+- Prefer fail-fast at appropriate boundaries (e.g., `::std::abort`) rather than attempting universal recovery from OOM.
 - Recognize that many dependencies and OS subsystems will terminate on OOM regardless of caller policy.
 
 ### 128-bit arithmetic
@@ -318,7 +335,7 @@ namespace A {
 Do not include `windows.h` in public headers. Import only the required APIs with the correct calling conventions and attributes, and wrap resources in RAII types.
 
 ### Unicode and resources
-Prefer W (Unicode) APIs on NT-family systems. CRT file descriptors wrap HANDLEs but are not interchangeable; provide clear RAII wrappers and avoid `std::unique_ptr` for HANDLEs.
+Prefer W (Unicode) APIs on NT-family systems. CRT file descriptors wrap HANDLEs but are not interchangeable; provide clear RAII wrappers and avoid `::std::unique_ptr` for HANDLEs.
 
 ### Threading ABIs
 Do not assume `<pthread.h>` availability on Windows (ABI variants: win32, posix, mcf). Use portability layers or platform primitives via abstractions.
@@ -360,7 +377,7 @@ Do not assume `<pthread.h>` availability on Windows (ABI variants: win32, posix,
 - [ ] `.cppm` with correct module name and imports
 - [ ] `.h` mirror with exact, ordered includes inside `#ifndef UWVM_MODULE`
 - [ ] `impl.cppm`/`impl.h` if aggregating partitions
-- [ ] `module.cpp` (imports-only) and `default.cpp` (preprocessor-dependent code)
+- [ ] `module.cpp` / `*.module.cpp` (imports-only) and `default.cpp` / `*.default.cpp` (preprocessor-dependent code)
 - [ ] tests in `test/` (`.cc`)
 - [ ] module conformance checker passing
 
@@ -406,7 +423,7 @@ export import :concepts;
 ## Extended standard library guidance (freestanding-first)
 
 ### Current standard status
-- Target C++23 for language/library expectations. Adopt features only when available and stable across toolchains.
+- Target C++26 for the language/toolchain baseline. Adopt library features only when available and stable across toolchains and in the intended freestanding profile.
 
 ### Avoid locale-coupled and non-freestanding headers in core layers
 - Do not use `<charconv>`, `<format>`, or other locale-heavy facilities in core code.
@@ -419,13 +436,13 @@ export import :concepts;
 
 ### Format-string safety
 ```cpp
-inline void bad(std::string const& s) {
+inline void bad(::std::string const& s) {
   // DANGER: format-string vulnerability (do not do this)
   // printf(s.c_str());
 }
 ```
 
-### Avoid `std::filesystem` in core code
+### Avoid `::std::filesystem` in core code
 - Design limitations (locale, TOCTOU risks, error reporting) and code size concerns make it unsuitable for core layers. Prefer narrow, explicit APIs.
 
 ---
@@ -454,16 +471,16 @@ inline void bad(std::string const& s) {
 
 ## Floating point and strict aliasing
 
-### Avoid pointer punning; use `std::bit_cast`
+### Avoid pointer punning; use `::std::bit_cast`
 ```cpp
 #include <bit>
 #include <cstdint>
 #include <limits>
 
 constexpr float fast_inverse_sqrt(float number) noexcept {
-  static_assert(std::numeric_limits<float>::is_iec559);
-  const auto bits = std::bit_cast<std::uint32_t>(number);
-  const float y = std::bit_cast<float>(UINT32_C(0x5f3759df) - (bits >> 1));
+  static_assert(::std::numeric_limits<float>::is_iec559);
+  const auto bits = ::std::bit_cast<::std::uint32_t>(number);
+  const float y = ::std::bit_cast<float>(UINT32_C(0x5f3759df) - (bits >> 1));
   return y * (1.5f - (number * 0.5f * y * y));
 }
 ```
@@ -632,17 +649,27 @@ Example bridge pattern:
 #endif
 ```
 
+Header-side pattern (so the same header can be included by `.cppm` with `export` and by non-module builds):
+```cpp
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::example
+{
+    // exported declarations...
+}
+```
+
 ---
 
 ### Appendix L: Header and file prologues
 
-Each public header should include a short file prologue comment stating purpose, invariants, and any portability constraints. Keep it brief and actionable.
+Most core/runtime files use a standardized UWVM2 prologue (license/copyright + `@author`/`@version` banner and an ASCII mark). When adding a new file under `src/uwvm2/runtime/` (or adjacent core directories), copy the prologue from a nearby file and keep it intact.
 
-Required elements:
-- One-sentence purpose.
-- Module association (if applicable).
-- Constraints (freestanding-only, no exceptions, etc.).
-- Thread-safety notes where relevant.
+Prefer documenting purpose and constraints as close to the exported surface as practical:
+- a short `@brief` Doxygen comment for the primary namespace/type/function,
+- explicit constraints (freestanding-only, exceptions, thread-safety) near the API, not buried in file boilerplate.
 
 ---
 
@@ -780,4 +807,3 @@ struct result {
 
 - Unit tests in `test/` (`.cc`) should avoid platform-specific assumptions; gate when unavoidable.
 - Fuzzers target parser and binary format boundaries; seed corpora with minimal valid/invalid samples; enforce timeouts and memory limits.
-
