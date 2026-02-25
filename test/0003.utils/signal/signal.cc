@@ -43,10 +43,13 @@
 namespace
 {
 
-    using ::uwvm2::object::memory::linear::mmap_memory_t;
     using ::uwvm2::object::memory::platform_page::get_platform_page_size;
+
+#if defined(UWVM_SUPPORT_MMAP)
+    using ::uwvm2::object::memory::linear::mmap_memory_t;
     using ::uwvm2::object::memory::signal::clear_protected_segments;
     using ::uwvm2::object::memory::signal::register_protected_segment;
+#endif
 
     // Child path: install signal handler, register a protected mmap segment,
     // then intentionally perform an out-of-bounds access to trigger the handler.
@@ -139,4 +142,3 @@ int main(int argc, char** argv)
     char const* self_path{(argv != nullptr && argc > 0) ? argv[0] : nullptr};
     return run_parent(self_path);
 }
-
