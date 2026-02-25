@@ -365,7 +365,8 @@ jobs:
           version: ${{ env.version }}
           run: |
             sudo pkg install -y llvm21
-            bash "<(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)"
+            curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh
+            bash xmake-get.sh
             xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n
       - name: Configure
         if: matrix.compiler == 'GCC'
@@ -375,7 +376,8 @@ jobs:
           version: ${{ env.version }}
           run: |
             sudo pkg install -y gcc16-devel
-            bash "<(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)"
+            curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh
+            bash xmake-get.sh
             xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
