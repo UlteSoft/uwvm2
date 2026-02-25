@@ -448,6 +448,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                     this->memory_begin = this->reserved_begin;
                 }
 
+                // Register the reserved range so SIGSEGV/SIGBUS (or VEH) can be translated to a wasm memory fault report.
+                // init/clear/destroy are only called outside guest execution, so structural updates are safe here.
+                if UWVM_IF_NOT_CONSTEVAL
+                {
+                    auto const reserved_space_for_signal{get_acquire_reserved_space_ceil()};
+                    ::uwvm2::object::memory::signal::register_protected_segment(this->reserved_begin,
+                                                                                this->reserved_begin + reserved_space_for_signal,
+                                                                                this->memory_length_p,
+                                                                                0uz);
+                }
+
                 // Set pages according to the initialized size
                 // The minimum allocation unit for mmap is a page. Even if you request a size smaller than a page, the kernel will ultimately manage and
                 // map the memory in page-sized units.
