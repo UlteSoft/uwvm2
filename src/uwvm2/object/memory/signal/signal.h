@@ -176,8 +176,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             bool expected{false};
             if(!signal_installed.compare_exchange_strong(expected, true, ::std::memory_order_acq_rel, ::std::memory_order_acquire)) { return; }
 
-            signal_handlers.vectored_handler_handle = ::fast_io::win32::AddVectoredExceptionHandler(1u, vectored_exception_handler);
-            if(signal_handlers.vectored_handler_handle == nullptr) [[unlikely]]
+            auto& handlers{signal_handlers};
+
+            // NOTE: In C++17 and later, for `E1 = E2`, `E2` is sequenced before `E1`.
+            // Keep handler-state evaluation separated from installing the handler to avoid re-entrancy
+            // pitfalls if `signal_handlers` ever becomes lazily initialized.
+            handlers.vectored_handler_handle = ::fast_io::win32::AddVectoredExceptionHandler(1u, vectored_exception_handler);
+            if(handlers.vectored_handler_handle == nullptr) [[unlikely]]
             {
 #  ifdef UWVM
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

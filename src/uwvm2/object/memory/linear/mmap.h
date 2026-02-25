@@ -138,7 +138,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     ///            - WebAssembly linear memory is grow-only: once a given `(offset, size)` range has been validated against some length, that range remains
     ///              valid after subsequent grows, so callers do not need to re-run bounds checks for the same range after a successful grow.
 
-    struct mmap_memory_t 
+    struct mmap_memory_t
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"mmap"};
 
@@ -459,6 +459,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 # endif
 
 # if (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) && (defined(__clang__) || defined(__GNUC__))
+#  if !(defined(_WIN32) || defined(__CYGWIN__))
                 // Disable ASan shadow checking for the entire reserved VMA (guarded linear memory relies on OS protection).
                 // Use a page-ceiled length to match the actual VMA mapping size.
                 if UWVM_IF_NOT_CONSTEVAL
@@ -486,10 +487,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                 {
                     details::asan_unpoison_mmap_region(this->reserved_begin, max_space);
                 }
+#  endif
 # endif
 
                 // Register the reserved range so SIGSEGV/SIGBUS (or VEH) can be translated to a wasm memory fault report.
                 // init/clear/destroy are only called outside guest execution, so structural updates are safe here.
+# if !((defined(_WIN32) || defined(__CYGWIN__)) && (UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__)) &&                                   \
+       (defined(__clang__) || defined(__GNUC__)))
                 if UWVM_IF_NOT_CONSTEVAL
                 {
                     auto const reserved_space_for_signal{get_acquire_reserved_space_ceil()};
@@ -498,6 +502,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
                                                                                 this->memory_length_p,
                                                                                 0uz);
                 }
+# endif
 
                 // Place the usable base address inside the reserved VMA (full protection wasm32 on 64-bit hosts),
                 // otherwise the usable base equals the reserved base.
