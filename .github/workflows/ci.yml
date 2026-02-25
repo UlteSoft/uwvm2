@@ -367,8 +367,7 @@ jobs:
             bash -c "sudo pkg install -y llvm21 gmake"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile"
-            bash -c "xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
@@ -379,15 +378,13 @@ jobs:
             bash -c "sudo pkg install -y gcc16-devel gmake"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile"
-            bash -c "xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n"
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            bash -c "xmake b -rv"
-            bash -c "export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1"
-            bash -c "xmake run uwvm --version"
-            bash -c "xmake test -v"
+            bash -c "source ~/.xmake/profile && xmake b -rv"
+            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
+            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v"
