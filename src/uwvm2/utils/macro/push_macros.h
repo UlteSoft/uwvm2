@@ -565,12 +565,16 @@
 #endif
 
 /// @brief        Determine whether the operating system supports mmap
-/// @note         support: win9x, winnt, posix
+/// @note         support: win9x, winnt, posix.
+///               When AddressSanitizer is enabled, disable mmap-backed linear memory because the mmap backend
+///               reserves very large VMAs (e.g. wasm32 full-protection) which can cause excessive ASan shadow
+///               memory usage and OOM in fuzzing/CI environments.
 #pragma push_macro("UWVM_SUPPORT_MMAP")
 #undef UWVM_SUPPORT_MMAP
 #if !defined(UWVM_FORCE_DISABLE_MMAP) &&                                                                                                                       \
-    (((defined(_WIN32) || defined(__CYGWIN__)) || (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&                                      \
-                                                   (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) && __has_include(<sys/mman.h>))))
+    (((defined(_WIN32) || defined(__CYGWIN__)) ||                                                                                                              \
+      (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) && (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) &&   \
+       __has_include(<sys/mman.h>)))) && !(UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
 # define UWVM_SUPPORT_MMAP
 #endif
 
