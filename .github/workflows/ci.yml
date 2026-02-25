@@ -364,7 +364,7 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo pkg install -y llvm21 make
+            sudo pkg install -y llvm21 gmake
             curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh
             bash xmake-get.sh
             xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n
@@ -375,7 +375,7 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo pkg install -y gcc16-devel make
+            sudo pkg install -y gcc16-devel gmake
             curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh
             bash xmake-get.sh
             xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n
