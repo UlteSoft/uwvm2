@@ -364,8 +364,9 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo pkg install -y llvm21 xmake
-            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n
+            sudo pkg install -y llvm21
+            bash <(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)
+            xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
@@ -373,8 +374,9 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo pkg install -y gcc16-devel xmake
-            xmake f -m debug -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n
+            sudo pkg install -y gcc16-devel
+            bash <(curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh)
+            xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=n
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
         with:
