@@ -346,8 +346,8 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            sudo mkdir -p /usr/local/etc/pkg/repos
-            sudo tee /usr/local/etc/pkg/repos/FreeBSD.conf << EOF
+            sudo mkdir -p /usr/local/etc/repos
+            sudo tee /usr/local/etc/repos/FreeBSD.conf << EOF
               FreeBSD: { enabled: false }
               FreeBSD-latest: {
                 url: "pkg+https://pkg.freebsd.org/${ABI}/latest",
