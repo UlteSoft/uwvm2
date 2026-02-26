@@ -97,7 +97,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
         struct signal_handlers_t
         {
 # if defined(_WIN32) || defined(__CYGWIN__)
+#  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
+            ::fast_io::win32::pvectored_exception_handler previous_unhandled_exception_filter{};
+#  else
             void* vectored_handler_handle{};
+#  endif
 # else
             struct ::sigaction previous_sigsegv{};
             struct ::sigaction previous_sigbus{};
@@ -150,7 +154,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
 
             auto const code{exception_pointers->ExceptionRecord->ExceptionCode};
             if(code ==
-#  if defined(_WIN32_WINDOWS)
+#  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
                998 /*EXCEPTION_ACCESS_VIOLATION*/
 #  else
                0xC0000005u /*STATUS_ACCESS_VIOLATION*/
@@ -168,6 +172,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             return 0 /*EXCEPTION_CONTINUE_SEARCH*/;
         }
 
+#  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
+        inline constexpr ::std::int_least32_t UWVM_WINSTDCALL unhandled_exception_filter(::fast_io::win32::exception_pointers* exception_pointers) noexcept
+        {
+            auto const ret{vectored_exception_handler(exception_pointers)};
+            if(ret != 0) { return ret; }
+
+            auto const prev{signal_handlers.previous_unhandled_exception_filter};
+            if(prev != nullptr && prev != unhandled_exception_filter) { return prev(exception_pointers); }
+
+            return 0 /*EXCEPTION_CONTINUE_SEARCH*/;
+        }
+#  endif
+
         inline constexpr void install_signal_handler() noexcept
         {
             static ::std::atomic_bool signal_installed{};  // [global]
@@ -181,10 +198,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
             // NOTE: In C++17 and later, for `E1 = E2`, `E2` is sequenced before `E1`.
             // Keep handler-state evaluation separated from installing the handler to avoid re-entrancy
             // pitfalls if `signal_handlers` ever becomes lazily initialized.
+#  if defined(_WIN32_WINDOWS) || (defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0501)
+            handlers.previous_unhandled_exception_filter = ::fast_io::win32::SetUnhandledExceptionFilter(unhandled_exception_filter);
+#  else
             handlers.vectored_handler_handle = ::fast_io::win32::AddVectoredExceptionHandler(1u, vectored_exception_handler);
             if(handlers.vectored_handler_handle == nullptr) [[unlikely]]
             {
-#  ifdef UWVM
+#   ifdef UWVM
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                     u8"uwvm: ",
@@ -193,11 +213,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::signal
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Failed to install signal handler.\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-#  else
+#   else
                 ::fast_io::io::perr(::fast_io::u8err(), u8"uwvm: [fatal] Failed to install signal handler.\n\n");
-#  endif
+#   endif
                 ::fast_io::fast_terminate();
             }
+#  endif
         }
 
 # else

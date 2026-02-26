@@ -194,5 +194,6 @@ FAST_IO_DLLIMPORT int FAST_IO_WINSTDCALL GetDiskFreeSpaceA(char const *, ::std::
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL RaiseException(::std::uint_least32_t, ::std::uint_least32_t, ::std::uint_least32_t, ::std::size_t const *) noexcept FAST_IO_WINSTDCALL_RENAME(RaiseException, 16);
 FAST_IO_DLLIMPORT void FAST_IO_WINSTDCALL ExitProcess(::std::uint_least32_t) noexcept FAST_IO_WINSTDCALL_RENAME(ExitProcess, 4);
 FAST_IO_DLLIMPORT void *FAST_IO_WINSTDCALL AddVectoredExceptionHandler(::std::uint_least32_t, pvectored_exception_handler) noexcept FAST_IO_WINSTDCALL_RENAME(AddVectoredExceptionHandler, 8);
+FAST_IO_DLLIMPORT pvectored_exception_handler FAST_IO_WINSTDCALL SetUnhandledExceptionFilter(pvectored_exception_handler) noexcept FAST_IO_WINSTDCALL_RENAME(SetUnhandledExceptionFilter, 4);
 
 } // namespace fast_io::win32
