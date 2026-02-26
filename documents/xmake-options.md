@@ -152,6 +152,15 @@ Enables C++ Modules support in Xmake and defines `UWVM_MODULE`.
 - **Example:**
   - `xmake f --use-cxx-module=y`
 
+### `--use-thread-local=[y|n]`
+
+Controls whether UWVM2 uses C++ `thread_local` for per-thread runtime state.
+
+- **Default:** `y`
+- **Impact:** `y` is typically faster (avoids global maps/locks on hot paths). Set to `n` for maximum portability when targeting unusual platforms/toolchains.
+- **Example:**
+  - `xmake f --use-thread-local=y`
+
 ### `--enable-int=ENABLE-INT`
 
 Controls the interpreter backend selection.

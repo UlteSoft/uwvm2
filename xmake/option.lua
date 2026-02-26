@@ -151,6 +151,15 @@ option("use-cxx-module", function()
     set_default(false)
 end)
 
+option("use-thread-local", function()
+    set_description
+    (
+        "Use C++ `thread_local` for per-thread runtime state (faster, but may reduce compatibility on some platforms/toolchains).",
+        "default = true"
+    )
+    set_default(true)
+end)
+
 option("enable-int", function()
     set_description
     (

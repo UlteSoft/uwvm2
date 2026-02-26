@@ -1025,6 +1025,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
 #endif
                             u8"\n"
+        // thread_local
+                            u8"  * C++ thread_local: "
+#if defined(UWVM_USE_THREAD_LOCAL)
+                            u8"Enabled\n"
+#else
+                            u8"Disabled\n"
+#endif
         // runtime compiler
                             u8"  * Runtime Compiler:"
 #ifdef UWVM_RUNTIME_UWVM_INTERPRETER

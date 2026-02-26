@@ -149,12 +149,26 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
-        using os_thread_id_t =
-#if defined(__SINGLE_THREAD__)
-            ::std::size_t;
+#if defined(UWVM_USE_THREAD_LOCAL)
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return g_call_stack; }
+
+        inline void erase_current_thread_state() noexcept {}
 #else
+        using os_thread_id_t =
+# if defined(__SINGLE_THREAD__)
+            ::std::size_t;
+# else
             decltype(::fast_io::this_thread::get_id());
-#endif
+# endif
 
         struct runtime_thread_state
         {
@@ -163,11 +177,11 @@ namespace uwvm2::runtime::uwvm_int
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
         {
-#if defined(__SINGLE_THREAD__)
+# if defined(__SINGLE_THREAD__)
             return 0uz;
-#else
+# else
             return ::fast_io::this_thread::get_id();
-#endif
+# endif
         }
 
         inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};
@@ -202,6 +216,7 @@ namespace uwvm2::runtime::uwvm_int
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
+#endif
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -804,6 +819,73 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
+#if defined(UWVM_USE_THREAD_LOCAL)
+        struct thread_local_bump_allocator
+        {
+            ::std::byte* base{};
+            ::std::size_t cap{};
+            ::std::size_t sp{};
+
+            thread_local_bump_allocator(thread_local_bump_allocator const&) = delete;
+            thread_local_bump_allocator& operator= (thread_local_bump_allocator const&) = delete;
+
+            inline constexpr thread_local_bump_allocator() noexcept = default;
+
+            inline ~thread_local_bump_allocator()
+            {
+                if(base) { byte_allocator::deallocate(base); }
+            }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t mark() const noexcept { return sp; }
+
+            UWVM_ALWAYS_INLINE inline constexpr void release(::std::size_t m) noexcept { sp = m; }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE static inline constexpr ::std::size_t align_up(::std::size_t v, ::std::size_t a) noexcept
+            { return (v + (a - 1uz)) & ~(a - 1uz); }
+
+            UWVM_ALWAYS_INLINE inline void ensure_capacity(::std::size_t need) noexcept
+            {
+                if(need <= cap) [[likely]] { return; }
+
+                auto new_cap{cap ? cap : 4096uz};
+                while(new_cap < need) { new_cap <<= 1; }
+
+                void* const new_mem{byte_allocator::allocate(new_cap)};
+                if(new_mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                if(base) [[likely]]
+                {
+                    ::std::memcpy(new_mem, base, sp);
+                    byte_allocator::deallocate(base);
+                }
+
+                base = static_cast<::std::byte*>(new_mem);
+                cap = new_cap;
+            }
+
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* allocate_bytes(::std::size_t n, ::std::size_t align = 16uz) noexcept
+            {
+                if(n == 0uz) [[unlikely]] { n = 1uz; }
+                sp = align_up(sp, align);
+                if(sp > (::std::numeric_limits<::std::size_t>::max() - n)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const need{sp + n};
+                ensure_capacity(need);
+                auto* const p{base + sp};
+                sp = need;
+                return p;
+            }
+        };
+
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        inline thread_local thread_local_bump_allocator g_call_scratch{};  // [global] [thread_local]
+#endif
+
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         inline ::uwvm2::object::memory::linear::native_memory_t const* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
         {
@@ -1228,6 +1310,12 @@ namespace uwvm2::runtime::uwvm_int
             auto const zero_n{zeroinit_end_raw - param_bytes};
             constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
+#if defined(UWVM_USE_THREAD_LOCAL)
+            bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
+                                   call_stack.frames.size() > kAllocaMaxCallDepth};
+            ::std::size_t scratch_mark{};
+            if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
+#else
             bool const use_heap{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
                                 call_stack.frames.size() > kAllocaMaxCallDepth};
 
@@ -1244,6 +1332,7 @@ namespace uwvm2::runtime::uwvm_int
                                               g.ptr = raw;
                                               return align_ptr_up(static_cast<::std::byte*>(raw), align);
                                           }};
+#endif
 
             auto caller_stack_top{*caller_stack_top_ptr};
             auto const caller_args_begin{caller_stack_top - param_bytes};
@@ -1262,13 +1351,20 @@ namespace uwvm2::runtime::uwvm_int
                 if(local_alloc_n > (::std::numeric_limits<::std::size_t>::max() - kFrameAlignPad)) [[unlikely]] { ::fast_io::fast_terminate(); }
                 local_alloc_n += kFrameAlignPad;
             }
-            heap_buf_guard local_heap_guard{};
             ::std::byte* local_alloc{};
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+            if(use_scratch) { local_alloc = g_call_scratch.allocate_bytes(local_alloc_n, kFrameAlign); }
+            else
+#else
+            heap_buf_guard local_heap_guard{};
             if(use_heap) { local_alloc = heap_alloc_aligned(local_alloc_n, kFrameAlign, local_heap_guard); }
             else
+#endif
             {
                 local_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_alloc_n));
             }
+            
             if(align_wasm_locals_start)
             {
                 // Align the start of the Wasm locals region (after params). This can improve bulk-zero performance on some libc `memset`s.
@@ -1301,9 +1397,15 @@ namespace uwvm2::runtime::uwvm_int
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw, kFrameAlign); }
+            else
+#else
             heap_buf_guard operand_heap_guard{};
             if(use_heap) { operand_base = heap_alloc_aligned(stack_cap_raw, kFrameAlign, operand_heap_guard); }
             else
+#endif
             {
                 ::std::size_t op_n{stack_cap_raw};
                 if(op_n == 0uz) [[unlikely]] { op_n = 1uz; }
@@ -1343,6 +1445,10 @@ namespace uwvm2::runtime::uwvm_int
             // Append results back to caller stack.
             copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
+
+#if defined(UWVM_USE_THREAD_LOCAL)
+            if(use_scratch) { g_call_scratch.release(scratch_mark); }
+#endif
         }
 
         inline void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,

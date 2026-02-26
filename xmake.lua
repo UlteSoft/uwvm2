@@ -132,6 +132,11 @@ function def_build()
 		end
 	end
 
+	local use_thread_local = get_config("use-thread-local")
+	if use_thread_local then
+		add_defines("UWVM_USE_THREAD_LOCAL")
+	end
+
 	local detailed_debug_check = get_config("detailed-debug-check")
 	if is_mode("debug") and detailed_debug_check then
 		add_defines("UWVM_ENABLE_DETAILED_DEBUG_CHECK")
