@@ -21,11 +21,15 @@
 
 // std
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <limits>
+#include <new>
+#include <type_traits>
 #include <utility>
 // macro
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
@@ -145,14 +149,51 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
-#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
-# ifdef UWVM
-        [[__gnu__::__tls_model__("local-exec")]]
-# else
-        [[__gnu__::__tls_model__("local-dynamic")]]
-# endif
+        using os_thread_id_t =
+#if defined(__SINGLE_THREAD__)
+            ::std::size_t;
+#else
+            decltype(::fast_io::this_thread::get_id());
 #endif
-        inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
+
+        struct runtime_thread_state
+        {
+            call_stack_tls_state call_stack{};
+        };
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
+        {
+#if defined(__SINGLE_THREAD__)
+            return 0uz;
+#else
+            return ::fast_io::this_thread::get_id();
+#endif
+        }
+
+        inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};
+
+        struct thread_states_reserve_guard
+        {
+            inline thread_states_reserve_guard() noexcept { g_thread_states.reserve(256uz); }
+        };
+
+        inline thread_states_reserve_guard g_thread_states_reserve_guard{};  // [global]
+
+        [[nodiscard]] inline runtime_thread_state& get_thread_state() noexcept
+        {
+            auto const id{current_thread_id()};
+            runtime_thread_state* st{};
+
+            g_thread_states.try_emplace_and_visit(
+                id,
+                [&](auto& kv) noexcept { st = ::std::addressof(kv.second); },
+                [&](auto& kv) noexcept { st = ::std::addressof(kv.second); });
+
+            if(st == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return *st;
+        }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -187,13 +228,18 @@ namespace uwvm2::runtime::uwvm_int
 
         struct call_stack_guard
         {
-            inline constexpr explicit call_stack_guard(::std::size_t module_id, ::std::size_t function_index) noexcept
-            { g_call_stack.push(call_stack_frame{module_id, function_index}); }
+            call_stack_tls_state* tls{};
+
+            inline constexpr explicit call_stack_guard(call_stack_tls_state& s, ::std::size_t module_id, ::std::size_t function_index) noexcept : tls{&s}
+            { tls->push(call_stack_frame{module_id, function_index}); }
 
             call_stack_guard(call_stack_guard const&) = delete;
             call_stack_guard& operator= (call_stack_guard const&) = delete;
 
-            inline constexpr ~call_stack_guard() { g_call_stack.pop(); }
+            inline constexpr ~call_stack_guard()
+            {
+                if(tls) [[likely]] { tls->pop(); }
+            }
         };
 
         enum class trap_kind : unsigned
@@ -314,10 +360,11 @@ namespace uwvm2::runtime::uwvm_int
                                 u8"Call stack:\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
-            auto const n{g_call_stack.frames.size()};
+            auto const& frames{get_call_stack().frames};
+            auto const n{frames.size()};
             for(::std::size_t i{}; i != n; ++i)
             {
-                auto const& fr{g_call_stack.frames.index_unchecked(n - 1uz - i)};
+                auto const& fr{frames.index_unchecked(n - 1uz - i)};
                 if(fr.module_id >= g_runtime.modules.size()) { continue; }
 
                 auto const& mod_rec{g_runtime.modules.index_unchecked(fr.module_id)};
@@ -748,64 +795,6 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
-        struct thread_local_bump_allocator
-        {
-            ::std::byte* base{};
-            ::std::size_t cap{};
-            ::std::size_t sp{};
-
-            thread_local_bump_allocator(thread_local_bump_allocator const&) = delete;
-            thread_local_bump_allocator& operator= (thread_local_bump_allocator const&) = delete;
-
-            inline constexpr thread_local_bump_allocator() noexcept = default;
-
-            inline ~thread_local_bump_allocator()
-            {
-                if(base) { byte_allocator::deallocate(base); }
-            }
-
-            [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t mark() const noexcept { return sp; }
-
-            UWVM_ALWAYS_INLINE inline constexpr void release(::std::size_t m) noexcept { sp = m; }
-
-            [[nodiscard]] UWVM_ALWAYS_INLINE static inline constexpr ::std::size_t align_up(::std::size_t v, ::std::size_t a) noexcept
-            { return (v + (a - 1uz)) & ~(a - 1uz); }
-
-            UWVM_ALWAYS_INLINE inline void ensure_capacity(::std::size_t need) noexcept
-            {
-                if(need <= cap) [[likely]] { return; }
-
-                auto new_cap{cap ? cap : 4096uz};
-                while(new_cap < need) { new_cap <<= 1; }
-
-                void* const new_mem{byte_allocator::allocate(new_cap)};
-                if(new_mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                if(base) [[likely]]
-                {
-                    ::std::memcpy(new_mem, base, sp);
-                    byte_allocator::deallocate(base);
-                }
-
-                base = static_cast<::std::byte*>(new_mem);
-                cap = new_cap;
-            }
-
-            [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* allocate_bytes(::std::size_t n, ::std::size_t align = 16uz) noexcept
-            {
-                if(n == 0uz) [[unlikely]] { n = 1uz; }
-                sp = align_up(sp, align);
-                if(sp > (::std::numeric_limits<::std::size_t>::max() - n)) [[unlikely]] { ::fast_io::fast_terminate(); }
-                auto const need{sp + n};
-                ensure_capacity(need);
-                auto* const p{base + sp};
-                sp = need;
-                return p;
-            }
-        };
-
-        inline thread_local thread_local_bump_allocator g_call_scratch{};  // [global]
-
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
         inline ::uwvm2::object::memory::linear::native_memory_t const* resolve_memory0_ptr(runtime_module_storage_t const& rt) noexcept
         {
@@ -1211,7 +1200,8 @@ namespace uwvm2::runtime::uwvm_int
             return false;
         }
 
-        inline void execute_compiled_defined([[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
+        inline void execute_compiled_defined(call_stack_tls_state& call_stack,
+                                             [[maybe_unused]] runtime_local_func_storage_t const* runtime_func,
                                              compiled_local_func_t const* compiled_func,
                                              ::std::size_t param_bytes,
                                              ::std::size_t result_bytes,
@@ -1229,10 +1219,22 @@ namespace uwvm2::runtime::uwvm_int
             auto const zero_n{zeroinit_end_raw - param_bytes};
             constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
-            bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
-                                   g_call_stack.frames.size() > kAllocaMaxCallDepth};
-            ::std::size_t scratch_mark{};
-            if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
+            bool const use_heap{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
+                                call_stack.frames.size() > kAllocaMaxCallDepth};
+
+            auto const heap_alloc_aligned{[](::std::size_t n, ::std::size_t align, heap_buf_guard& g) noexcept -> ::std::byte*
+                                          {
+                                              if(n == 0uz) [[unlikely]] { n = 1uz; }
+                                              if(n > (::std::numeric_limits<::std::size_t>::max() - (align - 1uz))) [[unlikely]]
+                                              {
+                                                  ::fast_io::fast_terminate();
+                                              }
+                                              auto const raw_n{n + (align - 1uz)};
+                                              void* const raw{byte_allocator::allocate(raw_n)};
+                                              if(raw == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                                              g.ptr = raw;
+                                              return align_ptr_up(static_cast<::std::byte*>(raw), align);
+                                          }};
 
             auto caller_stack_top{*caller_stack_top_ptr};
             auto const caller_args_begin{caller_stack_top - param_bytes};
@@ -1251,8 +1253,9 @@ namespace uwvm2::runtime::uwvm_int
                 if(local_alloc_n > (::std::numeric_limits<::std::size_t>::max() - kFrameAlignPad)) [[unlikely]] { ::fast_io::fast_terminate(); }
                 local_alloc_n += kFrameAlignPad;
             }
+            heap_buf_guard local_heap_guard{};
             ::std::byte* local_alloc{};
-            if(use_scratch) { local_alloc = g_call_scratch.allocate_bytes(local_alloc_n, kFrameAlign); }
+            if(use_heap) { local_alloc = heap_alloc_aligned(local_alloc_n, kFrameAlign, local_heap_guard); }
             else
             {
                 local_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_alloc_n));
@@ -1289,7 +1292,8 @@ namespace uwvm2::runtime::uwvm_int
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
-            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw, kFrameAlign); }
+            heap_buf_guard operand_heap_guard{};
+            if(use_heap) { operand_base = heap_alloc_aligned(stack_cap_raw, kFrameAlign, operand_heap_guard); }
             else
             {
                 ::std::size_t op_n{stack_cap_raw};
@@ -1330,8 +1334,6 @@ namespace uwvm2::runtime::uwvm_int
             // Append results back to caller stack.
             copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
-
-            if(use_scratch) { g_call_scratch.release(scratch_mark); }
         }
 
         inline void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,
@@ -1390,7 +1392,8 @@ namespace uwvm2::runtime::uwvm_int
                 {
                     auto const* const info{find_defined_func_info(rf.u.defined_ptr)};
                     if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    execute_compiled_defined(info->runtime_func, info->compiled_func, info->param_bytes, info->result_bytes, caller_stack_top_ptr);
+                    auto& call_stack{get_call_stack()};
+                    execute_compiled_defined(call_stack, info->runtime_func, info->compiled_func, info->param_bytes, info->result_bytes, caller_stack_top_ptr);
                     return;
                 }
                 case resolved_func::kind::local_imported:
@@ -1503,6 +1506,7 @@ namespace uwvm2::runtime::uwvm_int
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
+            auto& call_stack{get_call_stack()};
 
             if(wasm_module_id == SIZE_MAX) [[likely]]
             {
@@ -1515,8 +1519,8 @@ namespace uwvm2::runtime::uwvm_int
 
                 if(try_execute_trivial_defined_call(*info, stack_top_ptr)) { return; }
 
-                call_stack_guard g{info->module_id, info->function_index};
-                execute_compiled_defined(rf, cf, info->param_bytes, info->result_bytes, stack_top_ptr);
+                call_stack_guard g{call_stack, info->module_id, info->function_index};
+                execute_compiled_defined(call_stack, rf, cf, info->param_bytes, info->result_bytes, stack_top_ptr);
                 return;
             }
 
@@ -1535,13 +1539,18 @@ namespace uwvm2::runtime::uwvm_int
                 if(func_index >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 auto const& tgt{cache.index_unchecked(func_index)};
-                call_stack_guard g{tgt.frame.module_id, tgt.frame.function_index};
+                call_stack_guard g{call_stack, tgt.frame.module_id, tgt.frame.function_index};
 
                 switch(tgt.k)
                 {
                     case cached_import_target::kind::defined:
                     {
-                        execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        execute_compiled_defined(call_stack,
+                                                 tgt.u.defined.runtime_func,
+                                                 tgt.u.defined.compiled_func,
+                                                 tgt.param_bytes,
+                                                 tgt.result_bytes,
+                                                 stack_top_ptr);
                         return;
                     }
                     case cached_import_target::kind::local_imported:
@@ -1568,13 +1577,13 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const local_index{func_index - import_n};
             auto const lf{::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index))};
-            call_stack_guard g{wasm_module_id, func_index};
+            call_stack_guard g{call_stack, wasm_module_id, func_index};
             if(wasm_module_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(wasm_module_id)};
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& info{mod_cache.index_unchecked(local_index)};
             if(info.runtime_func != lf) [[unlikely]] { ::fast_io::fast_terminate(); }
-            execute_compiled_defined(info.runtime_func, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
+            execute_compiled_defined(call_stack, info.runtime_func, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
         }
 
         inline void
@@ -1583,6 +1592,7 @@ namespace uwvm2::runtime::uwvm_int
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
+            auto& call_stack{get_call_stack()};
 
             if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
@@ -1642,10 +1652,10 @@ namespace uwvm2::runtime::uwvm_int
                     if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
 
-                    call_stack_guard g{info.module_id, info.function_index};
+                    call_stack_guard g{call_stack, info.module_id, info.function_index};
                     auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    execute_compiled_defined(rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
+                    execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                     return;
                 }
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported:
@@ -1673,12 +1683,17 @@ namespace uwvm2::runtime::uwvm_int
                     if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const& tgt{cache.index_unchecked(idx)};
 
-                    call_stack_guard g{tgt.frame.module_id, tgt.frame.function_index};
+                    call_stack_guard g{call_stack, tgt.frame.module_id, tgt.frame.function_index};
                     switch(tgt.k)
                     {
                         case cached_import_target::kind::defined:
                         {
-                            execute_compiled_defined(tgt.u.defined.runtime_func, tgt.u.defined.compiled_func, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            execute_compiled_defined(call_stack,
+                                                     tgt.u.defined.runtime_func,
+                                                     tgt.u.defined.compiled_func,
+                                                     tgt.param_bytes,
+                                                     tgt.result_bytes,
+                                                     stack_top_ptr);
                             return;
                         }
                         case cached_import_target::kind::local_imported:

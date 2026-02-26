@@ -17,7 +17,7 @@
 // Distributed under the Boost Software License, Version 1.0
 // https://www.boost.org/LICENSE_1_0.txt
 
-#include "../minconfig.hpp"
+#include "../../minconfig.hpp"
 
 #if defined(__has_builtin)
 # if __has_builtin(__builtin_ia32_pause) && !defined(__INTEL_COMPILER)
