@@ -37,7 +37,11 @@ namespace detail
 
 inline void sp_thread_yield() noexcept
 {
+#if (!defined(_WIN32_WINNT) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0500)) && !defined(_WIN32_WINDOWS)
     SwitchToThread();
+#else
+	  Sleep(0);
+#endif
 }
 
 } // namespace detail
