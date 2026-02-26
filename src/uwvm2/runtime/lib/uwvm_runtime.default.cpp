@@ -120,8 +120,8 @@ namespace uwvm2::runtime::uwvm_int
             // map pointer-address to {module_id, local_index} via a sorted range table.
             ::uwvm2::utils::container::vector<defined_func_ptr_range> defined_func_ptr_ranges{};
 
-            bool bridges_initialized{};
-            bool compiled_all{};
+            ::std::atomic_bool bridges_initialized{};
+            ::std::atomic_bool compiled_all{};
         };
 
         inline runtime_global_state g_runtime{};  // [global]
@@ -172,6 +172,12 @@ namespace uwvm2::runtime::uwvm_int
 
         inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};
 
+        /// @warning `g_thread_states` entries MUST be cleaned up on thread exit.
+        ///          Currently only the main thread is used; we clear `g_thread_states` at the end of
+        ///          `full_compile_and_run_main_module()` (by erasing the current thread state).
+        ///          When implementing `wasi-thread`, every created thread must erase its own state on exit to avoid
+        ///          unbounded growth and possible thread-id reuse issues.
+
         struct thread_states_reserve_guard
         {
             inline thread_states_reserve_guard() noexcept { g_thread_states.reserve(256uz); }
@@ -194,6 +200,8 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
+
+        inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -1504,7 +1512,7 @@ namespace uwvm2::runtime::uwvm_int
         inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+            if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
             auto& call_stack{get_call_stack()};
 
@@ -1590,7 +1598,7 @@ namespace uwvm2::runtime::uwvm_int
             call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            if(!g_runtime.compiled_all) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+            if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
             auto& call_stack{get_call_stack()};
 
@@ -1722,23 +1730,48 @@ namespace uwvm2::runtime::uwvm_int
 
         inline void ensure_bridges_initialized() noexcept
         {
-            if(g_runtime.bridges_initialized) { return; }
-            g_runtime.bridges_initialized = true;
+            if(g_runtime.bridges_initialized.load(::std::memory_order_acquire)) { return; }
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func = unreachable_trap;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
+            static ::std::atomic_flag init_lock = ATOMIC_FLAG_INIT;
+            while(init_lock.test_and_set(::std::memory_order_acquire))
+            {
+                if(g_runtime.bridges_initialized.load(::std::memory_order_acquire)) { return; }
+                ::fast_io::this_thread::yield();
+            }
 
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
-            ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
+            if(!g_runtime.bridges_initialized.load(::std::memory_order_relaxed))
+            {
+                ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func = unreachable_trap;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func = trap_invalid_conversion_to_integer;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
+
+                ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
+
+                g_runtime.bridges_initialized.store(true, ::std::memory_order_release);
+            }
+
+            init_lock.clear(::std::memory_order_release);
         }
 
         inline void compile_all_modules_if_needed() noexcept
         {
             ensure_bridges_initialized();
-            if(g_runtime.compiled_all) { return; }
-            g_runtime.compiled_all = true;
+            if(g_runtime.compiled_all.load(::std::memory_order_acquire)) { return; }
+
+            static ::std::atomic_flag compile_lock = ATOMIC_FLAG_INIT;
+            while(compile_lock.test_and_set(::std::memory_order_acquire))
+            {
+                if(g_runtime.compiled_all.load(::std::memory_order_acquire)) { return; }
+                ::fast_io::this_thread::yield();
+            }
+
+            if(g_runtime.compiled_all.load(::std::memory_order_relaxed))
+            {
+                compile_lock.clear(::std::memory_order_release);
+                return;
+            }
 
             ::fast_io::unix_timestamp start_time{};
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -1981,6 +2014,9 @@ namespace uwvm2::runtime::uwvm_int
                                     u8"(verbose)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
+
+            g_runtime.compiled_all.store(true, ::std::memory_order_release);
+            compile_lock.clear(::std::memory_order_release);
         }
 
     }  // namespace
@@ -2107,6 +2143,10 @@ namespace uwvm2::runtime::uwvm_int
             trap_fatal(trap_kind::uncatched_int_tag);
         }
 #endif
+
+        // Currently only main-thread execution exists. Clean up current thread state on exit to avoid state growth and
+        // possible thread-id reuse issues. Do NOT `clear()` here: main-thread exit does not imply other threads exit.
+        erase_current_thread_state();
     }
 }  // namespace uwvm2::runtime::uwvm_int
 
