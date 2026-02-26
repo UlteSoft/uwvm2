@@ -120,8 +120,8 @@ namespace uwvm2::runtime::uwvm_int
             // map pointer-address to {module_id, local_index} via a sorted range table.
             ::uwvm2::utils::container::vector<defined_func_ptr_range> defined_func_ptr_ranges{};
 
-            ::std::atomic_bool bridges_initialized{};
-            ::std::atomic_bool compiled_all{};
+            ::std::atomic_bool bridges_initialized{false};
+            ::std::atomic_bool compiled_all{false};
         };
 
         inline runtime_global_state g_runtime{};  // [global]
@@ -640,6 +640,7 @@ namespace uwvm2::runtime::uwvm_int
             {
                 auto const sz{valtype_size(v.at(i))};
                 if(sz == 0uz) [[unlikely]] { return 0uz; }
+                if(total > (::std::numeric_limits<::std::size_t>::max() - sz)) [[unlikely]] { return 0uz; }
                 total += sz;
             }
             return total;
