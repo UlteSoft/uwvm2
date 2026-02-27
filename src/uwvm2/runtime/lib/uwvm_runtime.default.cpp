@@ -1233,6 +1233,35 @@ namespace uwvm2::runtime::uwvm_int
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }
+                case trivial_kind_t::xor_const_i32:
+                {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a ^ imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::mul_const_i32:
+                {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(a * imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
+                case trivial_kind_t::rotr_add_const_i32:
+                {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t const a{load_u32(args_begin)};
+                    ::std::uint_least32_t const shift{static_cast<::std::uint_least32_t>(imm2_u32) & 31u};
+                    ::std::uint_least32_t const r{::std::rotr(static_cast<::std::uint_least32_t>(a), shift)};
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(r + imm_u32));
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
                 case trivial_kind_t::mul_add_const_i32:
                 {
                     if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1364,7 +1393,7 @@ namespace uwvm2::runtime::uwvm_int
             {
                 local_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_alloc_n));
             }
-            
+
             if(align_wasm_locals_start)
             {
                 // Align the start of the Wasm locals region (after params). This can improve bulk-zero performance on some libc `memset`s.
@@ -1621,8 +1650,6 @@ namespace uwvm2::runtime::uwvm_int
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-            auto& call_stack{get_call_stack()};
-
             if(wasm_module_id == SIZE_MAX) [[likely]]
             {
                 using call_info_t = ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info;
@@ -1634,10 +1661,13 @@ namespace uwvm2::runtime::uwvm_int
 
                 if(try_execute_trivial_defined_call(*info, stack_top_ptr)) { return; }
 
+                auto& call_stack{get_call_stack()};
                 call_stack_guard g{call_stack, info->module_id, info->function_index};
                 execute_compiled_defined(call_stack, rf, cf, info->param_bytes, info->result_bytes, stack_top_ptr);
                 return;
             }
+
+            auto& call_stack{get_call_stack()};
 
             if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
@@ -1707,8 +1737,6 @@ namespace uwvm2::runtime::uwvm_int
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-            auto& call_stack{get_call_stack()};
-
             if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
@@ -1767,6 +1795,7 @@ namespace uwvm2::runtime::uwvm_int
                     if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
 
+                    auto& call_stack{get_call_stack()};
                     call_stack_guard g{call_stack, info.module_id, info.function_index};
                     auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1798,6 +1827,7 @@ namespace uwvm2::runtime::uwvm_int
                     if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const& tgt{cache.index_unchecked(idx)};
 
+                    auto& call_stack{get_call_stack()};
                     call_stack_guard g{call_stack, tgt.frame.module_id, tgt.frame.function_index};
                     switch(tgt.k)
                     {

@@ -80,7 +80,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         xor_i32,
         xor_add_const_i32,
         sub_or_const_i32,
-        sum8_xor_const_i32
+        sum8_xor_const_i32,
+        xor_const_i32,
+        mul_const_i32,
+        rotr_add_const_i32
     };
 
     struct compiled_defined_call_info

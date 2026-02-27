@@ -219,10 +219,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         res.imm = imm0;
                         return res;
                     }
+                    else if(op2 == wasm1_code::i32_xor)
+                    {
+                        wasm1_code op3{};
+                        if(!read_op(op3) || op3 != wasm1_code::end) { return res; }
+                        if(curr != end) { return res; }
+
+                        res.kind = trivial_call_inline_kind::xor_const_i32;
+                        res.imm = imm0;
+                        return res;
+                    }
                     else if(op2 == wasm1_code::i32_mul)
                     {
                         wasm1_code op3{};
-                        if(!read_op(op3) || op3 != wasm1_code::i32_const) { return res; }
+                        if(!read_op(op3)) { return res; }
+                        if(op3 == wasm1_code::end && curr == end)
+                        {
+                            res.kind = trivial_call_inline_kind::mul_const_i32;
+                            res.imm = imm0;
+                            return res;
+                        }
+                        if(op3 != wasm1_code::i32_const) { return res; }
                         wasm_i32 imm1;  // no init
                         if(!read_i32_leb(imm1)) { return res; }
 
@@ -235,6 +252,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         res.kind = trivial_call_inline_kind::mul_add_const_i32;
                         res.imm = imm0;
                         res.imm2 = imm1;
+                        return res;
+                    }
+                    else if(op2 == wasm1_code::i32_rotr)
+                    {
+                        wasm1_code op3{};
+                        if(!read_op(op3) || op3 != wasm1_code::i32_const) { return res; }
+                        wasm_i32 imm1;  // no init
+                        if(!read_i32_leb(imm1)) { return res; }
+
+                        wasm1_code op4{};
+                        wasm1_code op5{};
+                        if(!read_op(op4) || op4 != wasm1_code::i32_add) { return res; }
+                        if(!read_op(op5) || op5 != wasm1_code::end) { return res; }
+                        if(curr != end) { return res; }
+
+                        res.kind = trivial_call_inline_kind::rotr_add_const_i32;
+                        res.imm = imm1;
+                        res.imm2 = imm0;
                         return res;
                     }
 
@@ -22079,6 +22114,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             ok = (res_n == 1uz) && is_i32(ft->result.begin[0]) && (param_n >= 1uz) && is_i32(ft->parameter.begin[0]);
                             break;
                         case trivial_kind_t::add_const_i32:
+                            ok = (param_n == 1uz) && (res_n == 1uz) && is_i32(ft->parameter.begin[0]) && is_i32(ft->result.begin[0]);
+                            break;
+                        case trivial_kind_t::xor_const_i32:
+                            ok = (param_n == 1uz) && (res_n == 1uz) && is_i32(ft->parameter.begin[0]) && is_i32(ft->result.begin[0]);
+                            break;
+                        case trivial_kind_t::mul_const_i32:
+                            ok = (param_n == 1uz) && (res_n == 1uz) && is_i32(ft->parameter.begin[0]) && is_i32(ft->result.begin[0]);
+                            break;
+                        case trivial_kind_t::rotr_add_const_i32:
                             ok = (param_n == 1uz) && (res_n == 1uz) && is_i32(ft->parameter.begin[0]) && is_i32(ft->result.begin[0]);
                             break;
                         case trivial_kind_t::mul_add_const_i32:
