@@ -101,6 +101,21 @@ Available values:
 
 If you set an unsupported value, you may see errors like: `version not recognized: Windows Version not recognized`.
 
+## Windows 9x note (thread_local)
+
+When targeting Windows 9x (`WIN95`/`WIN98`/`WINME`) with MinGW-w64 + libstdc++, you must disable C++ `thread_local` in UWVM2:
+
+```shell
+xmake f -m release --mingw-min=WIN98 --use-thread-local=n
+xmake
+```
+
+Reason: libstdc++'s TLS support requires at least Windows XP on some configurations/toolchains. See GCC Bug 108222:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108222
+
+Additionally, running on Windows 9x may require extra prerequisite components (depending on your toolchain/build options). Install prerequisites from:
+https://github.com/UlteSoft/uwvm2-prerequisites/tree/master/win95
+
 ## Note
 If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=y` for static linking will resolve the issue.
 

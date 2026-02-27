@@ -20,6 +20,14 @@ xmake
 xmake i -o C:/uwvm2
 ```
 
+## Windows 9x note (thread_local)
+
+Windows 9x targets (WIN95/WIN98/WINME) are only supported via the MinGW build. When targeting Windows 9x with libstdc++, pass `--use-thread-local=n`
+to disable C++ `thread_local` in UWVM2, because libstdc++ TLS support may require at least Windows XP on some configurations.
+
+Additionally, running on Windows 9x may require extra prerequisite components (depending on your toolchain/build options). Install prerequisites from:
+https://github.com/UlteSoft/uwvm2-prerequisites/tree/master/win95
+
 ## Use MSVC
 1. Install [[xmake]](https://github.com/xmake-io/xmake/)
 2. Install [[MSVC]](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2026)
