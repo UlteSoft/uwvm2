@@ -6726,7 +6726,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                                if(op == wasm1_code::f32_lt || op == wasm1_code::f32_gt) { return true; }
+                                if(op == wasm1_code::f32_eq || op == wasm1_code::f32_ne || op == wasm1_code::f32_lt || op == wasm1_code::f32_gt ||
+                                   op == wasm1_code::f32_le || op == wasm1_code::f32_ge)
+                                {
+                                    return true;
+                                }
                                 switch(op)
                                 {
                                     case wasm1_code::f32_const:
@@ -6764,6 +6768,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 }
 # endif
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                if(op == wasm1_code::f64_eq || op == wasm1_code::f64_ne || op == wasm1_code::f64_lt || op == wasm1_code::f64_gt ||
+                                   op == wasm1_code::f64_le || op == wasm1_code::f64_ge)
+                                {
+                                    return true;
+                                }
                                 switch(op)
                                 {
                                     case wasm1_code::f64_const:
@@ -7101,15 +7110,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                        case conbine_pending_kind::local_get_const_f32: [[fallthrough]];
-                        case conbine_pending_kind::local_get_const_f64:
-                        {
-                            if(conbine_pending.kind == conbine_pending_kind::local_get_const_f32)
-                            {
-                                return op == wasm1_code::f32_add || op == wasm1_code::f32_mul || op == wasm1_code::f32_min || op == wasm1_code::f32_max;
-                            }
-                            return op == wasm1_code::f64_add || op == wasm1_code::f64_mul || op == wasm1_code::f64_min || op == wasm1_code::f64_max;
-                        }
+	                        case conbine_pending_kind::local_get_const_f32: [[fallthrough]];
+	                        case conbine_pending_kind::local_get_const_f64:
+	                        {
+	                            if(conbine_pending.kind == conbine_pending_kind::local_get_const_f32)
+	                            {
+	                                return op == wasm1_code::f32_add || op == wasm1_code::f32_sub || op == wasm1_code::f32_mul || op == wasm1_code::f32_min ||
+	                                       op == wasm1_code::f32_max;
+	                            }
+	                            return op == wasm1_code::f64_add || op == wasm1_code::f64_sub || op == wasm1_code::f64_mul || op == wasm1_code::f64_min ||
+	                                   op == wasm1_code::f64_max;
+	                        }
                         case conbine_pending_kind::const_f32:
                         {
                             switch(op)
@@ -10554,59 +10565,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
                             // Extra-heavy: mega-fuse `test9`-like hot f32 loops into a single opfunc dispatch.
                             // This removes huge threaded-interpreter dispatch overhead from the tight arithmetic loops.
-                            if(!need_repair && target_arity == 0uz && target_frame.type == block_type::loop && label_index_uz == 0uz &&
-                               curr_size == target_base && target_base == 0uz && target_frame.wasm_code_curr_at_start_label != nullptr)
+                            if constexpr(CompileOption.is_tail_call)
                             {
-                                bool fused_extra_heavy_loop_run{};
-
-                                auto const startp{target_frame.wasm_code_curr_at_start_label};
-                                auto const endp{op_begin};
-
-                                if(startp < endp)
+                                if(!need_repair && target_arity == 0uz && target_frame.type == block_type::loop && label_index_uz == 0uz &&
+                                   curr_size == target_base && target_base == 0uz && target_frame.wasm_code_curr_at_start_label != nullptr)
                                 {
-                                    auto const consume_op{[&](wasm1_code expected, ::std::byte const*& p) constexpr noexcept -> bool
-                                                          {
-                                                              if(p >= endp) [[unlikely]] { return false; }
-                                                              wasm1_code op;  // no init
-                                                              ::std::memcpy(::std::addressof(op), p, sizeof(op));
-                                                              if(op != expected) { return false; }
-                                                              ++p;
-                                                              return true;
-                                                          }};
+                                    bool fused_extra_heavy_loop_run{};
 
-                                    auto const consume_u32_leb{[&](wasm_u32& v, ::std::byte const*& p) constexpr noexcept -> bool
-                                                               {
-                                                                   using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                                                                   auto const [next, err]{
-                                                                       ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
-                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
-                                                                                                ::fast_io::mnp::leb128_get(v))};
-                                                                   if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
-                                                                   p = reinterpret_cast<::std::byte const*>(next);
-                                                                   return true;
-                                                               }};
+                                    auto const startp{target_frame.wasm_code_curr_at_start_label};
+                                    auto const endp{op_begin};
 
-                                    auto const consume_i32_leb{[&](wasm_i32& v, ::std::byte const*& p) constexpr noexcept -> bool
-                                                               {
-                                                                   using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                                                                   auto const [next, err]{
-                                                                       ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
-                                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
-                                                                                                ::fast_io::mnp::leb128_get(v))};
-                                                                   if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
-                                                                   p = reinterpret_cast<::std::byte const*>(next);
-                                                                   return true;
-                                                               }};
+                                    if(startp < endp)
+                                    {
+                                        auto const consume_op{[&](wasm1_code expected, ::std::byte const*& p) constexpr noexcept -> bool
+                                                              {
+                                                                  if(p >= endp) [[unlikely]] { return false; }
+                                                                  wasm1_code op;  // no init
+                                                                  ::std::memcpy(::std::addressof(op), p, sizeof(op));
+                                                                  if(op != expected) { return false; }
+                                                                  ++p;
+                                                                  return true;
+                                                              }};
 
-                                    auto const consume_f32_const_bits{[&](wasm_u32 expected_bits, ::std::byte const*& p) constexpr noexcept -> bool
-                                                                      {
-                                                                          if(!consume_op(wasm1_code::f32_const, p)) { return false; }
-                                                                          if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                                          wasm_u32 bits;  // no init
-                                                                          ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                                          p += 4;
-                                                                          return bits == expected_bits;
-                                                                      }};
+                                        auto const consume_u32_leb{[&](wasm_u32& v, ::std::byte const*& p) constexpr noexcept -> bool
+                                                                   {
+                                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                                       auto const [next, err]{
+                                                                           ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                    ::fast_io::mnp::leb128_get(v))};
+                                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                                       return true;
+                                                                   }};
+
+                                        auto const consume_i32_leb{[&](wasm_i32& v, ::std::byte const*& p) constexpr noexcept -> bool
+                                                                   {
+                                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                                       auto const [next, err]{
+                                                                           ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                    reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                    ::fast_io::mnp::leb128_get(v))};
+                                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                                       return true;
+                                                                   }};
+
+                                        auto const consume_f32_const_bits{
+                                            [&](wasm_u32 expected_bits, ::std::byte const*& p) constexpr noexcept -> bool
+                                            {
+                                                if(!consume_op(wasm1_code::f32_const, p)) { return false; }
+                                                if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
+                                                wasm_u32 bits;  // no init
+                                                ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
+                                                p += 4;
+                                                return bits == expected_bits;
+                                            }};
 
                                     constexpr wasm_u32 f32_one_bits{0x3f800000u};
                                     constexpr wasm_u32 f32_half_bits{0x3f000000u};
@@ -10845,19 +10859,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     }
                                 }
 
-                                if(fused_extra_heavy_loop_run)
-                                {
-                                    if constexpr(stacktop_enabled)
+                                    if(fused_extra_heavy_loop_run)
                                     {
-                                        if(brif_consumes_stack_cond)
+                                        if constexpr(stacktop_enabled)
                                         {
-                                            // Model the i32 condition pop (no runtime code needed because the entire loop
-                                            // body (including the compare) is replaced by the mega-fused opfunc).
-                                            stacktop_commit_pop_n(1uz);
-                                            codegen_stack_pop_n(1uz);
+                                            if(brif_consumes_stack_cond)
+                                            {
+                                                // Model the i32 condition pop (no runtime code needed because the entire loop
+                                                // body (including the compare) is replaced by the mega-fused opfunc).
+                                                stacktop_commit_pop_n(1uz);
+                                                codegen_stack_pop_n(1uz);
+                                            }
                                         }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
 #endif
@@ -12304,35 +12319,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     }
                                     else
                                     {
-                                        // f32 -> f64 (requires merged fp ranges; enforced in selector/opfunc static_asserts)
-                                        switch(param_count)
+                                        // f32 -> f64 stacktop fast-path requires merged fp ranges.
+                                        // Note: `use_stacktop_call_fast` already checks this constraint (via `res_ok`), but we
+                                        // must also guard template instantiation here so split f32/f64 layouts remain buildable.
+                                        constexpr bool fp_ranges_merged_for_call_stacktop{stacktop_f32_enabled && stacktop_f64_enabled &&
+                                                                                           CompileOption.f32_stack_top_begin_pos ==
+                                                                                               CompileOption.f64_stack_top_begin_pos &&
+                                                                                           CompileOption.f32_stack_top_end_pos ==
+                                                                                               CompileOption.f64_stack_top_end_pos};
+                                        if constexpr(fp_ranges_merged_for_call_stacktop)
                                         {
-                                            case 1uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 1uz, wasm_f64>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 2uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 2uz, wasm_f64>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 3uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 3uz, wasm_f64>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 4uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 4uz, wasm_f64>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            [[unlikely]] default:
-                                                ::fast_io::fast_terminate();
+                                            switch(param_count)
+                                            {
+                                                case 1uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 1uz, wasm_f64>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 2uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 2uz, wasm_f64>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 3uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 3uz, wasm_f64>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 4uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 4uz, wasm_f64>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                [[unlikely]] default:
+                                                    ::fast_io::fast_terminate();
+                                            }
+                                        }
+                                        else
+                                        {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                            ::fast_io::fast_terminate();
                                         }
                                     }
                                     break;
@@ -12405,35 +12437,52 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                     }
                                     else
                                     {
-                                        // f64 -> f32 (requires merged fp ranges; enforced in selector/opfunc static_asserts)
-                                        switch(param_count)
+                                        // f64 -> f32 stacktop fast-path requires merged fp ranges.
+                                        // Note: `use_stacktop_call_fast` already checks this constraint (via `res_ok`), but we
+                                        // must also guard template instantiation here so split f32/f64 layouts remain buildable.
+                                        constexpr bool fp_ranges_merged_for_call_stacktop{stacktop_f32_enabled && stacktop_f64_enabled &&
+                                                                                           CompileOption.f32_stack_top_begin_pos ==
+                                                                                               CompileOption.f64_stack_top_begin_pos &&
+                                                                                           CompileOption.f32_stack_top_end_pos ==
+                                                                                               CompileOption.f64_stack_top_end_pos};
+                                        if constexpr(fp_ranges_merged_for_call_stacktop)
                                         {
-                                            case 1uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 1uz, wasm_f32>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 2uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 2uz, wasm_f32>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 3uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 3uz, wasm_f32>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            case 4uz:
-                                                emit_opfunc_to(
-                                                    bytecode,
-                                                    translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 4uz, wasm_f32>(curr_stacktop,
-                                                                                                                                           interpreter_tuple));
-                                                break;
-                                            [[unlikely]] default:
-                                                ::fast_io::fast_terminate();
+                                            switch(param_count)
+                                            {
+                                                case 1uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 1uz, wasm_f32>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 2uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 2uz, wasm_f32>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 3uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 3uz, wasm_f32>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                case 4uz:
+                                                    emit_opfunc_to(
+                                                        bytecode,
+                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 4uz, wasm_f32>(curr_stacktop,
+                                                                                                                                               interpreter_tuple));
+                                                    break;
+                                                [[unlikely]] default:
+                                                    ::fast_io::fast_terminate();
+                                            }
+                                        }
+                                        else
+                                        {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                            ::fast_io::fast_terminate();
                                         }
                                     }
                                     break;
@@ -13770,26 +13819,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         wasm1_code next_op{};  // init
                                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
                                         if(next_op == wasm1_code::i32_store)
-                                        {
-                                            conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
-                                            conbine_pending.off2 = local_off;
-                                            break;
-                                        }
-                                    }
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
-                                    // Extra-heavy: allow forming a 2-local pending window for 2-local fusions.
-                                    conbine_pending.kind = conbine_pending_kind::local_get2;
-                                    conbine_pending.off2 = local_off;
-# else
-                                    // Heavy/soft: keep only a single delayed local.get so delay-local can fuse it into the first use site.
-                                    // This compiles `local.get a; local.get b; binop` into:
-                                    // - `local.get a`
-                                    // - `delay-local(b)+binop`
-                                    // instead of materializing both locals or relying on 2-local mega fusions (code-size heavy).
-#  ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                                    // Heavy: `local.get acc; local.get x; f.unop; f.add; local.set acc` -> one mega-op (`acc += unop(x)`).
-                                    // This is a big win for local-heavy kernels (e.g. round_f32/round_f64 dense loops) without enabling a generic 2-local
-                                    // pending window.
+	                                        {
+	                                            conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
+	                                            conbine_pending.off2 = local_off;
+	                                            break;
+	                                        }
+	                                    }
+	                                    // Conbine: for two consecutive same-type `local.get`, try heavy fusions first, then form either a 2-local pending window
+	                                    // (extra-heavy) or keep only one delayed local.get (heavy/soft).
+	#  ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+	                                    // Heavy: `local.get acc; local.get x; f.unop; f.add; local.set acc` -> one mega-op (`acc += unop(x)`).
+	                                    // This is a big win for local-heavy kernels (e.g. round_f32/round_f64 dense loops) without enabling a generic 2-local
+	                                    // pending window.
                                     if(!is_polymorphic &&
                                        (curr_local_type == curr_operand_stack_value_type::f32 || curr_local_type == curr_operand_stack_value_type::f64) &&
                                        code_curr != code_end)
@@ -13926,15 +13967,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                     break;
                                                 }
                                             }
-                                        }
-                                    }
-#  endif
-                                    flush_conbine_pending();
-                                    conbine_pending.kind = conbine_pending_kind::local_get;
-                                    conbine_pending.vt = curr_local_type;
-                                    conbine_pending.off1 = local_off;
-# endif
-                                }
+	                                        }
+	                                    }
+	#  endif
+	# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+	                                    // Extra-heavy: allow forming a 2-local pending window for 2-local fusions.
+	                                    conbine_pending.kind = conbine_pending_kind::local_get2;
+	                                    conbine_pending.off2 = local_off;
+	# else
+	                                    // Heavy/soft: keep only a single delayed local.get so delay-local can fuse it into the first use site.
+	                                    // This compiles `local.get a; local.get b; binop` into:
+	                                    // - `local.get a`
+	                                    // - `delay-local(b)+binop`
+	                                    // instead of materializing both locals or relying on 2-local mega fusions (code-size heavy).
+	                                    flush_conbine_pending();
+	                                    conbine_pending.kind = conbine_pending_kind::local_get;
+	                                    conbine_pending.vt = curr_local_type;
+	                                    conbine_pending.off1 = local_off;
+	# endif
+	                                }
                                 else
                                 {
                                     if(!is_polymorphic && conbine_pending.vt == curr_operand_stack_value_type::i32 &&

@@ -11083,6 +11083,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_i32_load_and_imm_fptr<CompileOption, TypeInTuple...>(curr_stacktop, memory); }
 
 # ifndef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+        // Forward declare to satisfy two-phase lookup in the `_from_tuple` selector.
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_f32_load_localget_off_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                                   details::op_details::native_memory_t const& memory) noexcept;
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_f64_load_localget_off_fptr(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+                                                   details::op_details::native_memory_t const& memory) noexcept;
+
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_f32_load_localget_off_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
