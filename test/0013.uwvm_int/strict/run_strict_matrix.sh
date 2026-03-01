@@ -12,6 +12,19 @@ if [[ -z "${SYSROOT:-}" ]]; then
   exit 2
 fi
 
+# macOS: when using a custom clang toolchain + sanitizer policies, dyld may not find
+# `libclang_rt.{asan,lsan,ubsan}_osx_dynamic.dylib` unless we point it at clang's runtime dir.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+  CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  if [[ -x "${CLANG_BIN}" ]]; then
+    CLANG_RUNTIME_DIR="$("${CLANG_BIN}" --print-runtime-dir 2>/dev/null || true)"
+    if [[ -n "${CLANG_RUNTIME_DIR}" ]]; then
+      export DYLD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    fi
+  fi
+fi
+
 COMMON_F_FLAGS=(
   -m debug
   --use-llvm=y

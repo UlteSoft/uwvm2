@@ -527,12 +527,16 @@ namespace uwvm2test::uwvm_int_strict
             };
 
             byte_vec local_buf(fn.local_bytes_max + k_align);
-            ::std::memset(local_buf.data(), 0, local_buf.size());
+            // Fill with non-zero pattern, then zero-initialize only the Wasm-visible locals region.
+            // This catches bugs where `local_bytes_zeroinit_end` is computed too small or internal-temp locals are read before write.
+            ::std::memset(local_buf.data(), 0xCD, local_buf.size());
             ::std::byte* local_base = align_up(local_buf);
+            if(fn.local_bytes_zeroinit_end > fn.local_bytes_max) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(fn.local_bytes_zeroinit_end != 0uz) { ::std::memset(local_base, 0, fn.local_bytes_zeroinit_end); }
             if(param_bytes != 0uz) { ::std::memcpy(local_base, packed_params.data(), param_bytes); }
 
             byte_vec stack_buf((fn.operand_stack_byte_max == 0uz ? 64uz : fn.operand_stack_byte_max) + k_align);
-            ::std::memset(stack_buf.data(), 0, stack_buf.size());
+            ::std::memset(stack_buf.data(), 0xCC, stack_buf.size());
             ::std::byte* operand_base = align_up(stack_buf);
 
             auto args = make_args(::std::make_index_sequence<tuple_size>{}, fn.op.operands.data(), operand_base, local_base);
