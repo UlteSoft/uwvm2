@@ -2713,8 +2713,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
-            memory_p->grow_silently(delta_pages, max_limit_memory_length);
-            result_pages = static_cast<wasm_i32>(old_pages);
+            // Even in "silent" allocator mode, Wasm requires `memory.grow` to return -1 on failure
+            // (e.g. exceeding the declared maximum). Do the deterministic limit check here to avoid
+            // trapping inside `grow_silently()` on max-exceed / overflow.
+            auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
+            if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+            {
+                result_pages = static_cast<wasm_i32>(-1);
+            }
+            else
+            {
+                memory_p->grow_silently(delta_pages, max_limit_memory_length);
+                result_pages = static_cast<wasm_i32>(old_pages);
+            }
         }
 
         if constexpr(details::stacktop_enabled_for<CompileOption, wasm_i32>())
@@ -3301,8 +3312,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
-            memory_p->grow_silently(delta_pages, max_limit_memory_length);
-            result_pages = static_cast<wasm_i32>(old_pages);
+            // Even in "silent" allocator mode, Wasm requires `memory.grow` to return -1 on failure
+            // (e.g. exceeding the declared maximum). Do the deterministic limit check here to avoid
+            // trapping inside `grow_silently()` on max-exceed / overflow.
+            auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
+            if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+            {
+                result_pages = static_cast<wasm_i32>(-1);
+            }
+            else
+            {
+                memory_p->grow_silently(delta_pages, max_limit_memory_length);
+                result_pages = static_cast<wasm_i32>(old_pages);
+            }
         }
 
         ::std::memcpy(typeref...[1u], ::std::addressof(result_pages), sizeof(result_pages));
