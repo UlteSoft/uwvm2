@@ -652,7 +652,7 @@ namespace
         runtime_module_t const& rt = *prep.mod;
 
         UWVM2TEST_REQUIRE(!rt.local_defined_memory_vec_storage.empty());
-        auto const& mem = rt.local_defined_memory_vec_storage.index_unchecked(0).memory;
+        [[maybe_unused]] auto const& mem = rt.local_defined_memory_vec_storage.index_unchecked(0).memory;
 
         // Tailcall mode: strict bytecode assertions.
         {
@@ -763,4 +763,3 @@ int main()
 {
     return test_translate_memory_localget_fuse();
 }
-
