@@ -10503,9 +10503,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 
                         bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i32_cmp_imm
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                                                              || conbine_brif_i32_rem_u_eqz_2localget || conbine_brif_for_i32_inc_f64_lt_u_eqz
+                                                              || conbine_brif_i32_rem_u_eqz_2localget || conbine_brif_for_i32_inc_f64_lt_u_eqz ||
+                                                              conbine_brif_for_i32_inc_lt_u
 #  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
-                                                              || conbine_brif_for_i32_inc_lt_u || conbine_brif_for_ptr_inc_ne
+                                                              || conbine_brif_for_ptr_inc_ne
 #  endif
 # endif
                                                               )};
@@ -15146,6 +15147,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
 
                         curr_operand_stack_value_type curr_global_type{};
+                        [[maybe_unused]] bool curr_global_mutable{};
                         if(global_index < imported_global_count)
                         {
                             auto const& imported_global_rec{curr_module.imported_global_vec_storage.index_unchecked(static_cast<::std::size_t>(global_index))};
@@ -15153,7 +15155,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             if(imported_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
-                            curr_global_type = imported_global_ptr->imports.storage.global.type;
+                            auto const& imported_global{imported_global_ptr->imports.storage.global};
+                            curr_global_type = imported_global.type;
+                            curr_global_mutable = imported_global.is_mutable;
                         }
                         else
                         {
@@ -15164,7 +15168,64 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             if(local_global_ptr == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
                             curr_global_type = local_global_ptr->type;
+                            curr_global_mutable = local_global_ptr->is_mutable;
                         }
+
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+                        // Conbine: fuse `global.get i32; i32.const imm; i32.add; global.set (same)` into `i32_add_imm_global_set_same`.
+                        if(curr_global_type == curr_operand_stack_value_type::i32 && curr_global_mutable && code_curr != code_end)
+                        {
+                            wasm1_code next_op{};  // init
+                            ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(wasm1_code));
+                            if(next_op == wasm1_code::i32_const)
+                            {
+                                wasm_i32 imm{};
+                                auto const* const const_imm_begin{code_curr + sizeof(wasm1_code)};
+                                auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(const_imm_begin),
+                                                                                         reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                         ::fast_io::mnp::leb128_get(imm))};
+                                if(imm_err == ::fast_io::parse_code::ok)
+                                {
+                                    auto const* const after_const{reinterpret_cast<::std::byte const*>(imm_next)};
+                                    if(after_const != code_end)
+                                    {
+                                        wasm1_code op_after_const{};  // init
+                                        ::std::memcpy(::std::addressof(op_after_const), after_const, sizeof(wasm1_code));
+                                        if(op_after_const == wasm1_code::i32_add)
+                                        {
+                                            auto const* const after_add{after_const + sizeof(wasm1_code)};
+                                            if(after_add != code_end)
+                                            {
+                                                wasm1_code op_after_add{};  // init
+                                                ::std::memcpy(::std::addressof(op_after_add), after_add, sizeof(wasm1_code));
+                                                if(op_after_add == wasm1_code::global_set)
+                                                {
+                                                    wasm_u32 set_global_index{};
+                                                    auto const* const set_index_begin{after_add + sizeof(wasm1_code)};
+                                                    auto const [set_index_next, set_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(set_index_begin),
+                                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                                        ::fast_io::mnp::leb128_get(set_global_index))};
+                                                    if(set_index_err == ::fast_io::parse_code::ok && set_global_index == global_index)
+                                                    {
+                                                        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                                        wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
+                                                        emit_opfunc_to(bytecode,
+                                                                       translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                                        emit_imm_to(bytecode, global_p);
+                                                        emit_imm_to(bytecode, imm);
+
+                                                        // Skip `i32.const imm; i32.add; global.set <same>`: net stack effect is 0.
+                                                        code_curr = reinterpret_cast<::std::byte const*>(set_index_next);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+#endif
 
                         operand_stack_push(curr_global_type);
                         {
