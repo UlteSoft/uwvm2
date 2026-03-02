@@ -1,4 +1,4 @@
-#include "../uwvm_int_translate_strict_common.h"
+#include "uwvm_int_translate_strict_common.h"
 
 namespace
 {
