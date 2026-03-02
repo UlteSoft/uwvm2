@@ -23016,10 +23016,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i32.wrap_i64", curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_wrap_i64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_enabled)
+
+                        if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i32) &&
+                                     !stacktop_ranges_merged_for(curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32))
                         {
-                            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32);
+                        }
+
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_wrap_i64_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i64, curr_operand_stack_value_type::i32))
+                        {
+                            if constexpr(stacktop_enabled)
+                            {
+                                if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i32); }
+                            }
+                        }
+                        else
+                        {
+                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i32);
                         }
 
                         break;
@@ -23188,10 +23202,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i64.extend_i32_s", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_extend_i32_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_enabled)
+
+                        if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                                     !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
                         {
-                            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                        }
+
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_extend_i32_s_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+                        {
+                            if constexpr(stacktop_enabled)
+                            {
+                                if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+                            }
+                        }
+                        else
+                        {
+                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
                         }
 
                         break;
@@ -23200,10 +23228,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                     {
                         validate_numeric_unary(u8"i64.extend_i32_u", curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64);
                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_extend_i32_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                        if constexpr(stacktop_enabled)
+
+                        if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                                     !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
                         {
-                            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+                            stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                        }
+
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_extend_i32_u_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+                        {
+                            if constexpr(stacktop_enabled)
+                            {
+                                if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+                            }
+                        }
+                        else
+                        {
+                            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
                         }
 
                         break;
