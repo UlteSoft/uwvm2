@@ -45,14 +45,14 @@ VALIDATE_TARGET=""
 if [[ "$#" -gt 0 ]]; then
   STRICT_TARGETS=("$@")
 else
-  for f in "${STRICT_DIR}"/*.cc; do
+  while IFS= read -r f; do
     b="$(basename -- "${f}" .cc)"
     if [[ "${b}" == "uwvm_int_validate_errors_strict" ]]; then
       VALIDATE_TARGET="${b}"
     else
       STRICT_TARGETS+=("${b}")
     fi
-  done
+  done < <(find "${STRICT_DIR}" -type f -name '*.cc' | sort)
 fi
 
 if [[ "${#STRICT_TARGETS[@]}" -eq 0 ]]; then
