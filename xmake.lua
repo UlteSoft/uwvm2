@@ -510,7 +510,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
 							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 						else
-							error("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
+							raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
 						end
 					end
 				end)
@@ -557,7 +557,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
 			add_files(file)
 		elseif not get_config("use-llvm") and test_libfuzzer then
-			error("Libfuzzer is not supported on this platform, please use llvm toolchain.")
+			raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
 		end
 	else
 		add_tests("unit", { group = "default" }) -- xmake test -g default

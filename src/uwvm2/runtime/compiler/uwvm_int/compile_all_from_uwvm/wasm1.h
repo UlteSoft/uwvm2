@@ -6801,6 +6801,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         }
                         case conbine_pending_kind::local_get2:
                         {
+                            // Extra-heavy: allow extending the pending local.get window with another local.get
+                            // so we can form 3-local fusions such as:
+                            // - `select(local.get a,b,cond)`
+                            // - `mac(acc + x*y -> acc)`
+                            if(op == wasm1_code::local_get) { return true; }
+
                             if(conbine_pending.vt == curr_operand_stack_value_type::i32)
                             {
                                 switch(op)
@@ -7110,17 +7116,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                             }
                         }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-	                        case conbine_pending_kind::local_get_const_f32: [[fallthrough]];
-	                        case conbine_pending_kind::local_get_const_f64:
-	                        {
-	                            if(conbine_pending.kind == conbine_pending_kind::local_get_const_f32)
-	                            {
-	                                return op == wasm1_code::f32_add || op == wasm1_code::f32_sub || op == wasm1_code::f32_mul || op == wasm1_code::f32_min ||
-	                                       op == wasm1_code::f32_max;
-	                            }
-	                            return op == wasm1_code::f64_add || op == wasm1_code::f64_sub || op == wasm1_code::f64_mul || op == wasm1_code::f64_min ||
-	                                   op == wasm1_code::f64_max;
-	                        }
+                        case conbine_pending_kind::local_get_const_f32: [[fallthrough]];
+                        case conbine_pending_kind::local_get_const_f64:
+                        {
+                            if(conbine_pending.kind == conbine_pending_kind::local_get_const_f32)
+                            {
+                                return op == wasm1_code::f32_add || op == wasm1_code::f32_sub || op == wasm1_code::f32_mul || op == wasm1_code::f32_min ||
+                                       op == wasm1_code::f32_max;
+                            }
+                            return op == wasm1_code::f64_add || op == wasm1_code::f64_sub || op == wasm1_code::f64_mul || op == wasm1_code::f64_min ||
+                                   op == wasm1_code::f64_max;
+                        }
                         case conbine_pending_kind::const_f32:
                         {
                             switch(op)
@@ -7226,9 +7232,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                         case conbine_pending_kind::mac_after_add:
                         {
                             // Heavy MAC fusions:
-                            // - `f32` supports local.set and local.tee.
-                            // - {i32,i64,f64} support local.set only.
-                            return op == wasm1_code::local_set || (op == wasm1_code::local_tee && conbine_pending.vt == curr_operand_stack_value_type::f32);
+                            // - `local.set acc` supports {i32,i64,f32,f64}.
+                            // - `local.tee acc` supports {i32,i64,f32,f64}. (See `case wasm1_code::local_tee`.)
+                            return op == wasm1_code::local_set || op == wasm1_code::local_tee;
                         }
                         case conbine_pending_kind::f32_add_2localget_local_set:
                         {
@@ -10612,253 +10618,254 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                                        return true;
                                                                    }};
 
-                                        auto const consume_f32_const_bits{
-                                            [&](wasm_u32 expected_bits, ::std::byte const*& p) constexpr noexcept -> bool
+                                        auto const consume_f32_const_bits{[&](wasm_u32 expected_bits, ::std::byte const*& p) constexpr noexcept -> bool
+                                                                          {
+                                                                              if(!consume_op(wasm1_code::f32_const, p)) { return false; }
+                                                                              if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
+                                                                              wasm_u32 bits;  // no init
+                                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
+                                                                              p += 4;
+                                                                              return bits == expected_bits;
+                                                                          }};
+
+                                        constexpr wasm_u32 f32_one_bits{0x3f800000u};
+                                        constexpr wasm_u32 f32_half_bits{0x3f000000u};
+
+                                        wasm_u32 fused_sum_idx{};   // init
+                                        wasm_u32 fused_i_idx{};     // init
+                                        wasm_u32 fused_prod_idx{};  // init
+                                        wasm_u32 fused_ip4_idx{};   // init
+                                        wasm_i32 fused_end{};       // init
+
+                                        enum class test9_loop_kind : unsigned
+                                        {
+                                            none,
+                                            f32_inv_square_sum,
+                                            f32_mul_chain_sum,
+                                            f32_inv_cube_sum,
+                                        };
+                                        test9_loop_kind fused_kind{test9_loop_kind::none};
+
+                                        auto const try_match_inv_square{
+                                            [&]() constexpr noexcept -> bool
                                             {
-                                                if(!consume_op(wasm1_code::f32_const, p)) { return false; }
-                                                if(static_cast<::std::size_t>(endp - p) < 4uz) [[unlikely]] { return false; }
-                                                wasm_u32 bits;  // no init
-                                                ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
-                                                p += 4;
-                                                return bits == expected_bits;
+                                                auto p{startp};
+                                                wasm_u32 sum_idx{};  // init
+                                                wasm_u32 i_idx{};    // init
+                                                wasm_u32 tmp_idx{};  // init
+                                                wasm_i32 end_i{};    // init
+                                                wasm_u32 tmp_u32{};  // init
+                                                wasm_i32 tmp_i32{};  // init
+
+                                                bool ok =
+                                                    consume_f32_const_bits(f32_one_bits, p) && consume_op(wasm1_code::local_get, p) &&
+                                                    consume_u32_leb(i_idx, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
+                                                    tmp_u32 == i_idx && consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
+                                                    consume_op(wasm1_code::f32_div, p) && consume_f32_const_bits(f32_one_bits, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{-1} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_idx, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == tmp_idx &&
+                                                    consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
+                                                    consume_op(wasm1_code::f32_div, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) &&
+                                                    consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
+                                                    consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_u32, p) &&
+                                                    tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) && consume_i32_leb(end_i, p) &&
+                                                    consume_op(wasm1_code::i32_ne, p) && (p == endp);
+
+                                                if(!ok) { return false; }
+
+                                                fused_sum_idx = sum_idx;
+                                                fused_i_idx = i_idx;
+                                                fused_end = end_i;
+                                                fused_kind = test9_loop_kind::f32_inv_square_sum;
+                                                return true;
                                             }};
 
-                                    constexpr wasm_u32 f32_one_bits{0x3f800000u};
-                                    constexpr wasm_u32 f32_half_bits{0x3f000000u};
-
-                                    wasm_u32 fused_sum_idx{};   // init
-                                    wasm_u32 fused_i_idx{};     // init
-                                    wasm_u32 fused_prod_idx{};  // init
-                                    wasm_u32 fused_ip4_idx{};   // init
-                                    wasm_i32 fused_end{};       // init
-
-                                    enum class test9_loop_kind : unsigned
-                                    {
-                                        none,
-                                        f32_inv_square_sum,
-                                        f32_mul_chain_sum,
-                                        f32_inv_cube_sum,
-                                    };
-                                    test9_loop_kind fused_kind{test9_loop_kind::none};
-
-                                    auto const try_match_inv_square{
-                                        [&]() constexpr noexcept -> bool
-                                        {
-                                            auto p{startp};
-                                            wasm_u32 sum_idx{};  // init
-                                            wasm_u32 i_idx{};    // init
-                                            wasm_u32 tmp_idx{};  // init
-                                            wasm_i32 end_i{};    // init
-                                            wasm_u32 tmp_u32{};  // init
-                                            wasm_i32 tmp_i32{};  // init
-
-                                            bool ok = consume_f32_const_bits(f32_one_bits, p) && consume_op(wasm1_code::local_get, p) &&
-                                                      consume_u32_leb(i_idx, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
-                                                      tmp_u32 == i_idx && consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                      consume_op(wasm1_code::f32_div, p) && consume_f32_const_bits(f32_one_bits, p) &&
-                                                      consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                      consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{-1} &&
-                                                      consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) &&
-                                                      consume_u32_leb(tmp_idx, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
-                                                      tmp_u32 == tmp_idx && consume_op(wasm1_code::i32_mul, p) &&
-                                                      consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_div, p) &&
-                                                      consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) &&
-                                                      consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
-                                                      consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
-                                                      consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                      consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
-                                                      consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) &&
-                                                      consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) &&
-                                                      consume_i32_leb(end_i, p) && consume_op(wasm1_code::i32_ne, p) && (p == endp);
-
-                                            if(!ok) { return false; }
-
-                                            fused_sum_idx = sum_idx;
-                                            fused_i_idx = i_idx;
-                                            fused_end = end_i;
-                                            fused_kind = test9_loop_kind::f32_inv_square_sum;
-                                            return true;
-                                        }};
-
-                                    auto const try_match_inv_cube{
-                                        [&]() constexpr noexcept -> bool
-                                        {
-                                            auto p{startp};
-                                            wasm_u32 sum_idx{};  // init
-                                            wasm_u32 i_idx{};    // init
-                                            wasm_u32 tmp_idx{};  // init
-                                            wasm_i32 end_i{};    // init
-                                            wasm_u32 tmp_u32{};  // init
-                                            wasm_i32 tmp_i32{};  // init
-
-                                            bool ok =
-                                                consume_f32_const_bits(f32_one_bits, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(i_idx, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
-                                                tmp_u32 == i_idx && consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                consume_op(wasm1_code::f32_div, p) && consume_f32_const_bits(f32_one_bits, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{-1} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_idx, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == tmp_idx &&
-                                                consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
-                                                tmp_u32 == tmp_idx && consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                consume_op(wasm1_code::f32_div, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) &&
-                                                consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
-                                                consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_u32, p) &&
-                                                tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) && consume_i32_leb(end_i, p) &&
-                                                consume_op(wasm1_code::i32_ne, p) && (p == endp);
-
-                                            if(!ok) { return false; }
-
-                                            fused_sum_idx = sum_idx;
-                                            fused_i_idx = i_idx;
-                                            fused_end = end_i;
-                                            fused_kind = test9_loop_kind::f32_inv_cube_sum;
-                                            return true;
-                                        }};
-
-                                    auto const try_match_mul_chain{
-                                        [&]() constexpr noexcept -> bool
-                                        {
-                                            auto p{startp};
-                                            wasm_u32 sum_idx{};   // init
-                                            wasm_u32 i_idx{};     // init
-                                            wasm_u32 prod_idx{};  // init
-                                            wasm_u32 ip4_idx{};   // init
-                                            wasm_u32 t5{};        // init
-                                            wasm_u32 t6{};        // init
-                                            wasm_u32 t7{};        // init
-                                            wasm_u32 t8{};        // init
-                                            wasm_i32 end_i{};     // init
-                                            wasm_u32 tmp_u32{};   // init
-                                            wasm_i32 tmp_i32{};   // init
-
-                                            bool ok =
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(prod_idx, p) &&
-                                                consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(i_idx, p) &&
-                                                consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t5, p) && consume_f32_const_bits(f32_half_bits, p) &&
-                                                consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
-                                                tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) &&
-                                                tmp_i32 == wasm_i32{1} && consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t6, p) &&
-                                                consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t7, p) &&
-                                                consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{3} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
-                                                consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t8, p) &&
-                                                consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{4} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(ip4_idx, p) &&
-                                                consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_mul, p) &&
-                                                consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == prod_idx &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t8 &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t7 &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t6 &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t5 &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) && consume_op(wasm1_code::f32_add, p) &&
-                                                consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
-                                                consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
-                                                consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
-                                                consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{5} &&
-                                                consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) &&
-                                                tmp_u32 == i_idx && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == ip4_idx &&
-                                                consume_op(wasm1_code::i32_const, p) && consume_i32_leb(end_i, p) && consume_op(wasm1_code::i32_ne, p) &&
-                                                (p == endp);
-
-                                            if(!ok) { return false; }
-
-                                            fused_sum_idx = sum_idx;
-                                            fused_i_idx = i_idx;
-                                            fused_prod_idx = prod_idx;
-                                            fused_ip4_idx = ip4_idx;
-                                            fused_end = end_i;
-                                            fused_kind = test9_loop_kind::f32_mul_chain_sum;
-                                            return true;
-                                        }};
-
-                                    // Try match in descending "signature uniqueness" order.
-                                    if(!try_match_mul_chain())
-                                    {
-                                        if(!try_match_inv_square()) { (void)try_match_inv_cube(); }
-                                    }
-
-                                    if(fused_kind != test9_loop_kind::none)
-                                    {
-                                        auto const target_label_id{get_branch_target_label_id(target_frame)};
-                                        auto const& loop_lbl{labels.index_unchecked(target_label_id)};
-                                        if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
-                                        {
-                                            while(!ptr_fixups.empty())
+                                        auto const try_match_inv_cube{
+                                            [&]() constexpr noexcept -> bool
                                             {
-                                                auto const& fx{ptr_fixups.back_unchecked()};
-                                                if(fx.in_thunk || fx.site < loop_lbl.offset) { break; }
-                                                ptr_fixups.pop_back_unchecked();
-                                            }
+                                                auto p{startp};
+                                                wasm_u32 sum_idx{};  // init
+                                                wasm_u32 i_idx{};    // init
+                                                wasm_u32 tmp_idx{};  // init
+                                                wasm_i32 end_i{};    // init
+                                                wasm_u32 tmp_u32{};  // init
+                                                wasm_i32 tmp_i32{};  // init
 
-                                            bytecode.resize(loop_lbl.offset);
+                                                bool ok = consume_f32_const_bits(f32_one_bits, p) && consume_op(wasm1_code::local_get, p) &&
+                                                          consume_u32_leb(i_idx, p) && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
+                                                          tmp_u32 == i_idx && consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::local_get, p) &&
+                                                          consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx && consume_op(wasm1_code::i32_mul, p) &&
+                                                          consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_div, p) &&
+                                                          consume_f32_const_bits(f32_one_bits, p) && consume_op(wasm1_code::local_get, p) &&
+                                                          consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) &&
+                                                          consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{-1} && consume_op(wasm1_code::i32_add, p) &&
+                                                          consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_idx, p) &&
+                                                          consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == tmp_idx &&
+                                                          consume_op(wasm1_code::i32_mul, p) && consume_op(wasm1_code::local_get, p) &&
+                                                          consume_u32_leb(tmp_u32, p) && tmp_u32 == tmp_idx && consume_op(wasm1_code::i32_mul, p) &&
+                                                          consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_div, p) &&
+                                                          consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) &&
+                                                          consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
+                                                          consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
+                                                          consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                          consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
+                                                          consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) &&
+                                                          consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx && consume_op(wasm1_code::i32_const, p) &&
+                                                          consume_i32_leb(end_i, p) && consume_op(wasm1_code::i32_ne, p) && (p == endp);
 
-                                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                                            switch(fused_kind)
+                                                if(!ok) { return false; }
+
+                                                fused_sum_idx = sum_idx;
+                                                fused_i_idx = i_idx;
+                                                fused_end = end_i;
+                                                fused_kind = test9_loop_kind::f32_inv_cube_sum;
+                                                return true;
+                                            }};
+
+                                        auto const try_match_mul_chain{
+                                            [&]() constexpr noexcept -> bool
                                             {
-                                                case test9_loop_kind::f32_inv_square_sum:
+                                                auto p{startp};
+                                                wasm_u32 sum_idx{};   // init
+                                                wasm_u32 i_idx{};     // init
+                                                wasm_u32 prod_idx{};  // init
+                                                wasm_u32 ip4_idx{};   // init
+                                                wasm_u32 t5{};        // init
+                                                wasm_u32 t6{};        // init
+                                                wasm_u32 t7{};        // init
+                                                wasm_u32 t8{};        // init
+                                                wasm_i32 end_i{};     // init
+                                                wasm_u32 tmp_u32{};   // init
+                                                wasm_i32 tmp_i32{};   // init
+
+                                                bool ok =
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(prod_idx, p) &&
+                                                    consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(i_idx, p) &&
+                                                    consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t5, p) &&
+                                                    consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{1} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
+                                                    consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t6, p) &&
+                                                    consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{2} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
+                                                    consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t7, p) &&
+                                                    consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{3} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::f32_convert_i32_u, p) &&
+                                                    consume_op(wasm1_code::f32_mul, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(t8, p) &&
+                                                    consume_f32_const_bits(f32_half_bits, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{4} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_tee, p) && consume_u32_leb(ip4_idx, p) &&
+                                                    consume_op(wasm1_code::f32_convert_i32_u, p) && consume_op(wasm1_code::f32_mul, p) &&
+                                                    consume_op(wasm1_code::local_tee, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == prod_idx &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t8 &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t7 &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t6 &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == t5 &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(sum_idx, p) && consume_op(wasm1_code::f32_add, p) &&
+                                                    consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
+                                                    consume_op(wasm1_code::f32_add, p) && consume_op(wasm1_code::f32_add, p) &&
+                                                    consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == sum_idx &&
+                                                    consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) && tmp_u32 == i_idx &&
+                                                    consume_op(wasm1_code::i32_const, p) && consume_i32_leb(tmp_i32, p) && tmp_i32 == wasm_i32{5} &&
+                                                    consume_op(wasm1_code::i32_add, p) && consume_op(wasm1_code::local_set, p) && consume_u32_leb(tmp_u32, p) &&
+                                                    tmp_u32 == i_idx && consume_op(wasm1_code::local_get, p) && consume_u32_leb(tmp_u32, p) &&
+                                                    tmp_u32 == ip4_idx && consume_op(wasm1_code::i32_const, p) && consume_i32_leb(end_i, p) &&
+                                                    consume_op(wasm1_code::i32_ne, p) && (p == endp);
+
+                                                if(!ok) { return false; }
+
+                                                fused_sum_idx = sum_idx;
+                                                fused_i_idx = i_idx;
+                                                fused_prod_idx = prod_idx;
+                                                fused_ip4_idx = ip4_idx;
+                                                fused_end = end_i;
+                                                fused_kind = test9_loop_kind::f32_mul_chain_sum;
+                                                return true;
+                                            }};
+
+                                        // Try match in descending "signature uniqueness" order.
+                                        if(!try_match_mul_chain())
+                                        {
+                                            if(!try_match_inv_square()) { (void)try_match_inv_cube(); }
+                                        }
+
+                                        if(fused_kind != test9_loop_kind::none)
+                                        {
+                                            auto const target_label_id{get_branch_target_label_id(target_frame)};
+                                            auto const& loop_lbl{labels.index_unchecked(target_label_id)};
+                                            if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
+                                            {
+                                                while(!ptr_fixups.empty())
                                                 {
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_f32_inv_square_sum_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                          interpreter_tuple));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
-                                                    emit_imm_to(bytecode, fused_end);
-                                                    fused_extra_heavy_loop_run = true;
-                                                    break;
+                                                    auto const& fx{ptr_fixups.back_unchecked()};
+                                                    if(fx.in_thunk || fx.site < loop_lbl.offset) { break; }
+                                                    ptr_fixups.pop_back_unchecked();
                                                 }
-                                                case test9_loop_kind::f32_inv_cube_sum:
+
+                                                bytecode.resize(loop_lbl.offset);
+
+                                                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                                switch(fused_kind)
                                                 {
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_f32_inv_cube_sum_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                        interpreter_tuple));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
-                                                    emit_imm_to(bytecode, fused_end);
-                                                    fused_extra_heavy_loop_run = true;
-                                                    break;
+                                                    case test9_loop_kind::f32_inv_square_sum:
+                                                    {
+                                                        emit_opfunc_to(bytecode,
+                                                                       translate::get_uwvmint_f32_inv_square_sum_loop_run_fptr_from_tuple<CompileOption>(
+                                                                           curr_stacktop,
+                                                                           interpreter_tuple));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
+                                                        emit_imm_to(bytecode, fused_end);
+                                                        fused_extra_heavy_loop_run = true;
+                                                        break;
+                                                    }
+                                                    case test9_loop_kind::f32_inv_cube_sum:
+                                                    {
+                                                        emit_opfunc_to(
+                                                            bytecode,
+                                                            translate::get_uwvmint_f32_inv_cube_sum_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                                            interpreter_tuple));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
+                                                        emit_imm_to(bytecode, fused_end);
+                                                        fused_extra_heavy_loop_run = true;
+                                                        break;
+                                                    }
+                                                    case test9_loop_kind::f32_mul_chain_sum:
+                                                    {
+                                                        emit_opfunc_to(bytecode,
+                                                                       translate::get_uwvmint_f32_mul_chain_sum_loop_run_fptr_from_tuple<CompileOption>(
+                                                                           curr_stacktop,
+                                                                           interpreter_tuple));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_prod_idx));
+                                                        emit_imm_to(bytecode, local_offset_from_index(fused_ip4_idx));
+                                                        emit_imm_to(bytecode, fused_end);
+                                                        fused_extra_heavy_loop_run = true;
+                                                        break;
+                                                    }
+                                                    case test9_loop_kind::none:
+                                                        [[fallthrough]];
+                                                    [[unlikely]] default:
+                                                        break;
                                                 }
-                                                case test9_loop_kind::f32_mul_chain_sum:
-                                                {
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_f32_mul_chain_sum_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                         interpreter_tuple));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_sum_idx));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_i_idx));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_prod_idx));
-                                                    emit_imm_to(bytecode, local_offset_from_index(fused_ip4_idx));
-                                                    emit_imm_to(bytecode, fused_end);
-                                                    fused_extra_heavy_loop_run = true;
-                                                    break;
-                                                }
-                                                case test9_loop_kind::none:
-                                                    [[fallthrough]];
-                                                [[unlikely]] default:
-                                                    break;
                                             }
                                         }
                                     }
-                                }
 
                                     if(fused_extra_heavy_loop_run)
                                     {
@@ -12323,38 +12330,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         // f32 -> f64 stacktop fast-path requires merged fp ranges.
                                         // Note: `use_stacktop_call_fast` already checks this constraint (via `res_ok`), but we
                                         // must also guard template instantiation here so split f32/f64 layouts remain buildable.
-                                        constexpr bool fp_ranges_merged_for_call_stacktop{stacktop_f32_enabled && stacktop_f64_enabled &&
-                                                                                           CompileOption.f32_stack_top_begin_pos ==
-                                                                                               CompileOption.f64_stack_top_begin_pos &&
-                                                                                           CompileOption.f32_stack_top_end_pos ==
-                                                                                               CompileOption.f64_stack_top_end_pos};
+                                        constexpr bool fp_ranges_merged_for_call_stacktop{
+                                            stacktop_f32_enabled && stacktop_f64_enabled &&
+                                            CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                            CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
                                         if constexpr(fp_ranges_merged_for_call_stacktop)
                                         {
                                             switch(param_count)
                                             {
                                                 case 1uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 1uz, wasm_f64>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 1uz, wasm_f64>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 2uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 2uz, wasm_f64>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 2uz, wasm_f64>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 3uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 3uz, wasm_f64>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 3uz, wasm_f64>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 4uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 4uz, wasm_f64>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f32_fptr_from_tuple<CompileOption, 4uz, wasm_f64>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 [[unlikely]] default:
                                                     ::fast_io::fast_terminate();
@@ -12441,38 +12447,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         // f64 -> f32 stacktop fast-path requires merged fp ranges.
                                         // Note: `use_stacktop_call_fast` already checks this constraint (via `res_ok`), but we
                                         // must also guard template instantiation here so split f32/f64 layouts remain buildable.
-                                        constexpr bool fp_ranges_merged_for_call_stacktop{stacktop_f32_enabled && stacktop_f64_enabled &&
-                                                                                           CompileOption.f32_stack_top_begin_pos ==
-                                                                                               CompileOption.f64_stack_top_begin_pos &&
-                                                                                           CompileOption.f32_stack_top_end_pos ==
-                                                                                               CompileOption.f64_stack_top_end_pos};
+                                        constexpr bool fp_ranges_merged_for_call_stacktop{
+                                            stacktop_f32_enabled && stacktop_f64_enabled &&
+                                            CompileOption.f32_stack_top_begin_pos == CompileOption.f64_stack_top_begin_pos &&
+                                            CompileOption.f32_stack_top_end_pos == CompileOption.f64_stack_top_end_pos};
                                         if constexpr(fp_ranges_merged_for_call_stacktop)
                                         {
                                             switch(param_count)
                                             {
                                                 case 1uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 1uz, wasm_f32>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 1uz, wasm_f32>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 2uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 2uz, wasm_f32>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 2uz, wasm_f32>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 3uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 3uz, wasm_f32>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 3uz, wasm_f32>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 case 4uz:
-                                                    emit_opfunc_to(
-                                                        bytecode,
-                                                        translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 4uz, wasm_f32>(curr_stacktop,
-                                                                                                                                               interpreter_tuple));
+                                                    emit_opfunc_to(bytecode,
+                                                                   translate::get_uwvmint_call_stacktop_f64_fptr_from_tuple<CompileOption, 4uz, wasm_f32>(
+                                                                       curr_stacktop,
+                                                                       interpreter_tuple));
                                                     break;
                                                 [[unlikely]] default:
                                                     ::fast_io::fast_terminate();
@@ -13820,18 +13825,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                         wasm1_code next_op{};  // init
                                         if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
                                         if(next_op == wasm1_code::i32_store)
-	                                        {
-	                                            conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
-	                                            conbine_pending.off2 = local_off;
-	                                            break;
-	                                        }
-	                                    }
-	                                    // Conbine: for two consecutive same-type `local.get`, try heavy fusions first, then form either a 2-local pending window
-	                                    // (extra-heavy) or keep only one delayed local.get (heavy/soft).
-	#  ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-	                                    // Heavy: `local.get acc; local.get x; f.unop; f.add; local.set acc` -> one mega-op (`acc += unop(x)`).
-	                                    // This is a big win for local-heavy kernels (e.g. round_f32/round_f64 dense loops) without enabling a generic 2-local
-	                                    // pending window.
+                                        {
+                                            conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
+                                            conbine_pending.off2 = local_off;
+                                            break;
+                                        }
+                                    }
+                                    // Conbine: for two consecutive same-type `local.get`, try heavy fusions first, then form either a 2-local pending window
+                                    // (extra-heavy) or keep only one delayed local.get (heavy/soft).
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+                                    // Heavy: `local.get acc; local.get x; f.unop; f.add; local.set acc` -> one mega-op (`acc += unop(x)`).
+                                    // This is a big win for local-heavy kernels (e.g. round_f32/round_f64 dense loops) without enabling a generic 2-local
+                                    // pending window.
                                     if(!is_polymorphic &&
                                        (curr_local_type == curr_operand_stack_value_type::f32 || curr_local_type == curr_operand_stack_value_type::f64) &&
                                        code_curr != code_end)
@@ -13968,25 +13973,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                     break;
                                                 }
                                             }
-	                                        }
-	                                    }
-	#  endif
-	# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
-	                                    // Extra-heavy: allow forming a 2-local pending window for 2-local fusions.
-	                                    conbine_pending.kind = conbine_pending_kind::local_get2;
-	                                    conbine_pending.off2 = local_off;
-	# else
-	                                    // Heavy/soft: keep only a single delayed local.get so delay-local can fuse it into the first use site.
-	                                    // This compiles `local.get a; local.get b; binop` into:
-	                                    // - `local.get a`
-	                                    // - `delay-local(b)+binop`
-	                                    // instead of materializing both locals or relying on 2-local mega fusions (code-size heavy).
-	                                    flush_conbine_pending();
-	                                    conbine_pending.kind = conbine_pending_kind::local_get;
-	                                    conbine_pending.vt = curr_local_type;
-	                                    conbine_pending.off1 = local_off;
-	# endif
-	                                }
+                                        }
+                                    }
+# endif
+# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+                                    // Extra-heavy: allow forming a 2-local pending window for 2-local fusions.
+                                    conbine_pending.kind = conbine_pending_kind::local_get2;
+                                    conbine_pending.off2 = local_off;
+# else
+                                    // Heavy/soft: keep only a single delayed local.get so delay-local can fuse it into the first use site.
+                                    // This compiles `local.get a; local.get b; binop` into:
+                                    // - `local.get a`
+                                    // - `delay-local(b)+binop`
+                                    // instead of materializing both locals or relying on 2-local mega fusions (code-size heavy).
+                                    flush_conbine_pending();
+                                    conbine_pending.kind = conbine_pending_kind::local_get;
+                                    conbine_pending.vt = curr_local_type;
+                                    conbine_pending.off1 = local_off;
+# endif
+                                }
                                 else
                                 {
                                     if(!is_polymorphic && conbine_pending.vt == curr_operand_stack_value_type::i32 &&
@@ -15182,8 +15187,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                 wasm_i32 imm{};
                                 auto const* const const_imm_begin{code_curr + sizeof(wasm1_code)};
                                 auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(const_imm_begin),
-                                                                                         reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                                         ::fast_io::mnp::leb128_get(imm))};
+                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                        ::fast_io::mnp::leb128_get(imm))};
                                 if(imm_err == ::fast_io::parse_code::ok)
                                 {
                                     auto const* const after_const{reinterpret_cast<::std::byte const*>(imm_next)};
@@ -15202,15 +15207,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_fro
                                                 {
                                                     wasm_u32 set_global_index{};
                                                     auto const* const set_index_begin{after_add + sizeof(wasm1_code)};
-                                                    auto const [set_index_next, set_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(set_index_begin),
-                                                                                                                        reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                                                                        ::fast_io::mnp::leb128_get(set_global_index))};
+                                                    auto const [set_index_next, set_index_err]{
+                                                        ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(set_index_begin),
+                                                                                 reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                 ::fast_io::mnp::leb128_get(set_global_index))};
                                                     if(set_index_err == ::fast_io::parse_code::ok && set_global_index == global_index)
                                                     {
                                                         namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                                                         wasm_global_storage_t* const global_p{resolve_global_storage_ptr(global_index)};
                                                         emit_opfunc_to(bytecode,
-                                                                       translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                                                       translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<CompileOption>(
+                                                                           curr_stacktop,
+                                                                           interpreter_tuple));
                                                         emit_imm_to(bytecode, global_p);
                                                         emit_imm_to(bytecode, imm);
 
