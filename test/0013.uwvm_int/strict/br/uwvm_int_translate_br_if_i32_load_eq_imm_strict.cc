@@ -122,10 +122,12 @@ namespace
         auto wasm = build_br_if_i32_load_eq_imm_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_br_if_i32_load_eq_imm");
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
-        runtime_module_t const& rt = *prep.mod;
+        auto& rt_mut = const_cast<runtime_module_t&>(*prep.mod);
+        runtime_module_t const& rt = rt_mut;
 
-        UWVM2TEST_REQUIRE(!rt.local_defined_memory_vec_storage.empty());
-        [[maybe_unused]] auto const& mem = rt.local_defined_memory_vec_storage.index_unchecked(0).memory;
+        UWVM2TEST_REQUIRE(!rt_mut.local_defined_memory_vec_storage.empty());
+        [[maybe_unused]] auto& mem_mut = rt_mut.local_defined_memory_vec_storage.index_unchecked(0).memory;
+        [[maybe_unused]] auto const& mem = mem_mut;
 
         // Tailcall mode: strict bytecode assertions for mega-op when enabled.
         {
@@ -144,6 +146,55 @@ namespace
                 optable::translate::get_uwvmint_br_if_i32_load_localget_off_eq_imm_fptr_from_tuple<opt>(curr, mem, tuple);
 
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_brif_load_eq_imm));
+
+#if defined(UWVM_SUPPORT_MMAP)
+            // Cover mmap bounds-check variants used by the translator's bytecode back-scan:
+            // - full: wasm32 full protection (default)
+            // - path: wasm64 partial protection
+            // - judge: dynamic-size determination required
+            //
+            // These variants must be consistent between the original `i32.load` opfunc and the fused mega-op.
+            {
+                using mmap_status_t = ::uwvm2::object::memory::linear::mmap_memory_status_t;
+
+                auto const old_status{mem_mut.status};
+                auto const old_need_dyn{mem_mut.require_dynamic_determination_memory_size_cached};
+
+                auto restore = [&]() noexcept
+                {
+                    mem_mut.status = old_status;
+                    mem_mut.require_dynamic_determination_memory_size_cached = old_need_dyn;
+                };
+
+                // path variant (wasm64)
+                mem_mut.require_dynamic_determination_memory_size_cached = false;
+                mem_mut.status = mmap_status_t::wasm64;
+                {
+                    ::uwvm2::validation::error::code_validation_error_impl err2{};
+                    optable::compile_option cop2{};
+                    auto cm2 = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop2, err2);
+                    UWVM2TEST_REQUIRE(err2.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+                    auto const exp_path =
+                        optable::translate::get_uwvmint_br_if_i32_load_localget_off_eq_imm_fptr_from_tuple<opt>(curr, mem, tuple);
+                    UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm2.local_funcs.index_unchecked(0).op.operands, exp_path));
+                }
+
+                // judge variant (dynamic-size determination)
+                mem_mut.status = old_status;  // doesn't matter, judge wins
+                mem_mut.require_dynamic_determination_memory_size_cached = true;
+                {
+                    ::uwvm2::validation::error::code_validation_error_impl err3{};
+                    optable::compile_option cop3{};
+                    auto cm3 = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop3, err3);
+                    UWVM2TEST_REQUIRE(err3.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+                    auto const exp_judge =
+                        optable::translate::get_uwvmint_br_if_i32_load_localget_off_eq_imm_fptr_from_tuple<opt>(curr, mem, tuple);
+                    UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm3.local_funcs.index_unchecked(0).op.operands, exp_judge));
+                }
+
+                restore();
+            }
+#endif
 #endif
 
             UWVM2TEST_REQUIRE(run_br_if_i32_load_eq_imm_suite<opt>(cm, rt) == 0);

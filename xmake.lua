@@ -407,6 +407,8 @@ end
 for _, file in ipairs(os.files("test/**.cc")) do
 	local name = path.basename(file)
 	target(name)
+	local group = path.directory(file):gsub("\\\\", "/")
+	set_group(group)
 	set_kind("binary")
 	def_build()
 

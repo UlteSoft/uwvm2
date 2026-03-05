@@ -36,56 +36,79 @@ COMMON_F_FLAGS=(
 )
 
 SAN_POLICIES_FLAGS=(
-  --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined
+  # Note: `-fsanitize=leak` (LSan) is not supported on macOS (Darwin).
+  # Keep ASan+UBSan for strict tests there.
+  --policies=build.sanitizer.address,build.sanitizer.undefined
 )
 
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  SAN_POLICIES_FLAGS=(
+    --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined
+  )
+fi
+
 STRICT_TARGETS=()
-VALIDATE_TARGET=""
+VALIDATE_TARGETS=()
 
 if [[ "$#" -gt 0 ]]; then
-  STRICT_TARGETS=("$@")
+  for t in "$@"; do
+    if [[ "${t}" == uwvm_int_validate_* ]]; then
+      VALIDATE_TARGETS+=("${t}")
+    else
+      STRICT_TARGETS+=("${t}")
+    fi
+  done
 else
   while IFS= read -r f; do
     b="$(basename -- "${f}" .cc)"
-    if [[ "${b}" == "uwvm_int_validate_errors_strict" ]]; then
-      VALIDATE_TARGET="${b}"
+    if [[ "${f}" == *"/validate/"* || "${b}" == uwvm_int_validate_* ]]; then
+      VALIDATE_TARGETS+=("${b}")
     else
       STRICT_TARGETS+=("${b}")
     fi
   done < <(find "${STRICT_DIR}" -type f -name '*.cc' | sort)
 fi
 
-if [[ "${#STRICT_TARGETS[@]}" -eq 0 ]]; then
-  echo "ERR: no strict targets found." >&2
+if [[ "${#STRICT_TARGETS[@]}" -eq 0 && "${#VALIDATE_TARGETS[@]}" -eq 0 ]]; then
+  echo "ERR: no strict/validate targets found." >&2
   exit 3
 fi
 
 COMBINE_MODES=(none soft heavy extra)
 DELAY_MODES=(none soft heavy)
 
-for combine in "${COMBINE_MODES[@]}"; do
-  for delay in "${DELAY_MODES[@]}"; do
-    echo "=== uwvm_int strict matrix: combine=${combine}, delay=${delay} (sanitizers) ==="
-    xmake f -c
-    xmake f "${COMMON_F_FLAGS[@]}" \
-      "--enable-uwvm-int-combine-ops=${combine}" \
-      "--enable-uwvm-int-delay-local=${delay}" \
-      "${SAN_POLICIES_FLAGS[@]}"
-    xmake -v
-    for t in "${STRICT_TARGETS[@]}"; do
-      xmake b -v "${t}"
-      xmake r "${t}"
+if [[ "${#STRICT_TARGETS[@]}" -gt 0 ]]; then
+  for combine in "${COMBINE_MODES[@]}"; do
+    for delay in "${DELAY_MODES[@]}"; do
+      echo "=== uwvm_int strict matrix: combine=${combine}, delay=${delay} (sanitizers) ==="
+      xmake f -c
+      xmake f "${COMMON_F_FLAGS[@]}" \
+        "--enable-uwvm-int-combine-ops=${combine}" \
+        "--enable-uwvm-int-delay-local=${delay}" \
+        "${SAN_POLICIES_FLAGS[@]}"
+      if [[ "$#" -gt 0 ]]; then
+        for t in "${STRICT_TARGETS[@]}"; do
+          xmake b -v "${t}"
+        done
+      else
+        xmake b -v -g "${STRICT_DIR}/*"
+      fi
+      for t in "${STRICT_TARGETS[@]}"; do
+        xmake r "${t}"
+      done
     done
   done
-done
+fi
 
-if [[ -n "${VALIDATE_TARGET}" ]]; then
-  echo "=== uwvm_int strict: run ${VALIDATE_TARGET} (no sanitizer policies; for catching C++ exceptions on macOS) ==="
+if [[ "${#VALIDATE_TARGETS[@]}" -gt 0 ]]; then
+  echo "=== uwvm_int strict: run validate targets (no sanitizer policies; for catching C++ exceptions on macOS) ==="
   xmake f -c
   xmake f "${COMMON_F_FLAGS[@]}" \
     --enable-uwvm-int-combine-ops=heavy \
     --enable-uwvm-int-delay-local=heavy
   xmake -v
-  xmake b -v "${VALIDATE_TARGET}"
-  xmake r "${VALIDATE_TARGET}"
+  for t in "${VALIDATE_TARGETS[@]}"; do
+    xmake b -v "${t}"
+    xmake r "${t}"
+  done
 fi

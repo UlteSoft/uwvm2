@@ -1,5 +1,7 @@
 #include "../uwvm_int_translate_strict_common.h"
 
+#include <cstdlib>
+
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
@@ -66,6 +68,13 @@ namespace
     };
 
     using program = ::std::vector<inst>;
+
+    [[nodiscard]] bool is_coverage_run() noexcept
+    {
+        // `run_strict_coverage.sh` sets LLVM_PROFILE_FILE.
+        // Use it to increase random exploration only for coverage runs.
+        return ::std::getenv("LLVM_PROFILE_FILE") != nullptr;
+    }
 
     [[nodiscard]] constexpr ::std::uint32_t rotl32(::std::uint32_t x, ::std::uint32_t r) noexcept
     {
@@ -322,12 +331,13 @@ namespace
         return st.back();
     }
 
-    [[nodiscard]] program make_program(::std::uint32_t seed)
+    [[nodiscard]] program make_program(::std::uint32_t seed, int steps)
     {
         xorshift32 rng{seed == 0u ? 0x1234abcdU : seed};
 
+        if(steps < 1) { steps = 1; }
         program p{};
-        p.reserve(96uz);
+        p.reserve(static_cast<::std::size_t>(steps) + 64uz);
 
         auto emit = [&](inst_kind k, ::std::uint32_t imm = 0u) { p.push_back(inst{k, imm}); };
 
@@ -382,8 +392,7 @@ namespace
         push_local(3u);                  // depth: 2
 
         // Random-ish body.
-        constexpr int k_steps = 64;
-        for(int i = 0; i < k_steps; ++i)
+        for(int i = 0; i < steps; ++i)
         {
             if(depth == 0)
             {
@@ -677,14 +686,17 @@ namespace
         optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
 
         ::std::vector<func_spec> funcs{};
-        funcs.reserve(24uz);
+        bool const coverage = is_coverage_run();
+        ::std::uint32_t const program_count = coverage ? 120u : 24u;
+        int const steps = coverage ? 128 : 64;
+        funcs.reserve(program_count);
 
-        for(::std::uint32_t i = 0; i < 24u; ++i)
+        for(::std::uint32_t i = 0; i < program_count; ++i)
         {
             ::std::uint32_t const seed = 0xC0DE0000u ^ (i * 0x9E37'79B9u);
 
             func_spec fs{};
-            fs.prog = make_program(seed);
+            fs.prog = make_program(seed, steps);
 
             xorshift32 prng{seed ^ 0xA5A5A5A5u};
             fs.params[0] = {static_cast<::std::int32_t>(seed),
