@@ -131,6 +131,26 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        // f5: update_local f32: x = x - 1.0 ; return x
+        {
+            func_type ty{{k_val_f32}, {k_val_f32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::f32_const);
+            f32(c, 1.0f);
+            op(c, wasm_op::f32_sub);
+            op(c, wasm_op::local_set);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -184,6 +204,14 @@ namespace
                                               nullptr)
                                        .results) == 21.5);
 
+        // f5: x-1
+        UWVM2TEST_REQUIRE(load_f32(Runner::run(cm.local_funcs.index_unchecked(5),
+                                              rt.local_defined_function_vec_storage.index_unchecked(5),
+                                              pack_f32(1.5f),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 0.5f);
+
         return 0;
     }
 
@@ -222,12 +250,14 @@ namespace
                 optable::translate::get_uwvmint_f32_acc_add_floor_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
             constexpr auto exp_f64_acc_add_floor =
                 optable::translate::get_uwvmint_f64_acc_add_floor_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
+            constexpr auto exp_f32_sub_set_same = optable::translate::get_uwvmint_f32_sub_imm_local_set_same_fptr_from_tuple<opt>(curr, tuple);
 
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_f32_add_set_same));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_f32_mul_set_same));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_f64_sub_set_same));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_f32_acc_add_floor));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_f64_acc_add_floor));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_f32_sub_set_same));
 #endif
 
             UWVM2TEST_REQUIRE(run_heavy_float_update_local_suite<opt>(rt) == 0);
@@ -247,4 +277,3 @@ int main()
 {
     return test_translate_conbine_heavy_float_update_local();
 }
-

@@ -73,6 +73,17 @@ namespace
                 u32(c, t);
             }
 
+            // Pre-loop: force at least one main-bytecode label placeholder fixup in `ptr_fixups`.
+            // This makes the test9 mega-fusion path exercise the ptr-fixup pruning loop
+            // (the `while(!ptr_fixups.empty()) { ... }` block around wasm1.h#L10834).
+            op(c, wasm_op::block);
+            append_u8(c, k_block_empty);
+            op(c, wasm_op::i32_const);
+            i32(c, 0);
+            op(c, wasm_op::br_if);
+            u32(c, 0u);
+            op(c, wasm_op::end);
+
             op(c, wasm_op::block);
             append_u8(c, k_block_empty);
             op(c, wasm_op::loop);
@@ -341,4 +352,3 @@ int main()
 {
     return test_translate_f32_mul_chain_sum_loop_run();
 }
-

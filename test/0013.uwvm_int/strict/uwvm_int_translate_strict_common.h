@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <tuple>
 #include <utility>
@@ -20,6 +21,7 @@
 # include <uwvm2/runtime/compiler/uwvm_int/optable/storage.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/runtime/initializer/init.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/loader/load_and_check_modules.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
@@ -168,8 +170,8 @@ namespace uwvm2test::uwvm_int_strict
     struct export_entry
     {
         byte_vec name_utf8{};
-        ::std::uint8_t kind{};      // 0=func, 2=mem
-        ::std::uint32_t index{};    // funcidx/memidx
+        ::std::uint8_t kind{};      // 0=func, 1=table, 2=mem, 3=global
+        ::std::uint32_t index{};    // funcidx/tableidx/memidx/globalidx
     };
 
     struct global_entry
@@ -177,6 +179,40 @@ namespace uwvm2test::uwvm_int_strict
         ::std::uint8_t valtype{};
         bool mut{};
         byte_vec init_expr{};  // ends with 0x0b
+    };
+
+    struct import_func_entry
+    {
+        byte_vec module_utf8{};
+        byte_vec name_utf8{};
+        ::std::uint32_t type_index{};
+    };
+
+    struct import_table_entry
+    {
+        byte_vec module_utf8{};
+        byte_vec name_utf8{};
+        ::std::uint8_t elem_type{k_ref_funcref};
+        ::std::uint32_t min{};
+        ::std::uint32_t max{};
+        bool has_max{};
+    };
+
+    struct import_memory_entry
+    {
+        byte_vec module_utf8{};
+        byte_vec name_utf8{};
+        ::std::uint32_t min{};
+        ::std::uint32_t max{};
+        bool has_max{};
+    };
+
+    struct import_global_entry
+    {
+        byte_vec module_utf8{};
+        byte_vec name_utf8{};
+        ::std::uint8_t valtype{};
+        bool mut{};
     };
 
     struct element_segment
@@ -189,6 +225,11 @@ namespace uwvm2test::uwvm_int_strict
     struct module_builder
     {
         ::std::vector<func_type> types{};
+        ::std::vector<import_func_entry> import_funcs{};
+        ::std::vector<import_table_entry> import_tables{};
+        ::std::vector<import_memory_entry> import_memories{};
+        ::std::vector<import_global_entry> import_globals{};
+
         ::std::vector<::std::uint32_t> function_type_indices{};
         ::std::vector<func_body> function_bodies{};
         ::std::vector<export_entry> exports{};
@@ -207,6 +248,60 @@ namespace uwvm2test::uwvm_int_strict
         ::std::vector<global_entry> globals{};
         ::std::vector<element_segment> elements{};
 
+        static void encode_name_utf8(byte_vec& out, char const* ascii)
+        {
+            auto const len = ::std::strlen(ascii);
+            append_u32_leb(out, static_cast<::std::uint32_t>(len));
+            for(::std::size_t i = 0; i < len; ++i) { append_u8(out, static_cast<::std::uint8_t>(ascii[i])); }
+        }
+
+        void add_import_func(char const* module_ascii, char const* name_ascii, ::std::uint32_t type_index)
+        {
+            import_func_entry im{};
+            encode_name_utf8(im.module_utf8, module_ascii);
+            encode_name_utf8(im.name_utf8, name_ascii);
+            im.type_index = type_index;
+            import_funcs.push_back(::std::move(im));
+        }
+
+        void add_import_table(char const* module_ascii,
+                              char const* name_ascii,
+                              ::std::uint32_t min,
+                              ::std::uint32_t max,
+                              bool has_max,
+                              ::std::uint8_t elem_type = k_ref_funcref)
+        {
+            import_table_entry im{};
+            encode_name_utf8(im.module_utf8, module_ascii);
+            encode_name_utf8(im.name_utf8, name_ascii);
+            im.elem_type = elem_type;
+            im.min = min;
+            im.max = max;
+            im.has_max = has_max;
+            import_tables.push_back(::std::move(im));
+        }
+
+        void add_import_memory(char const* module_ascii, char const* name_ascii, ::std::uint32_t min, ::std::uint32_t max, bool has_max)
+        {
+            import_memory_entry im{};
+            encode_name_utf8(im.module_utf8, module_ascii);
+            encode_name_utf8(im.name_utf8, name_ascii);
+            im.min = min;
+            im.max = max;
+            im.has_max = has_max;
+            import_memories.push_back(::std::move(im));
+        }
+
+        void add_import_global(char const* module_ascii, char const* name_ascii, ::std::uint8_t valtype, bool mut)
+        {
+            import_global_entry im{};
+            encode_name_utf8(im.module_utf8, module_ascii);
+            encode_name_utf8(im.name_utf8, name_ascii);
+            im.valtype = valtype;
+            im.mut = mut;
+            import_globals.push_back(::std::move(im));
+        }
+
         ::std::uint32_t add_func(func_type ty, func_body body)
         {
             auto const type_index = static_cast<::std::uint32_t>(types.size());
@@ -221,22 +316,36 @@ namespace uwvm2test::uwvm_int_strict
         void add_export_func(::std::uint32_t func_index, char const* name_ascii)
         {
             export_entry ex{};
-            auto const len = ::std::strlen(name_ascii);
-            append_u32_leb(ex.name_utf8, static_cast<::std::uint32_t>(len));
-            for(::std::size_t i = 0; i < len; ++i) { append_u8(ex.name_utf8, static_cast<::std::uint8_t>(name_ascii[i])); }
+            encode_name_utf8(ex.name_utf8, name_ascii);
             ex.kind = 0u;
             ex.index = func_index;
+            exports.push_back(::std::move(ex));
+        }
+
+        void add_export_table(::std::uint32_t table_index, char const* name_ascii)
+        {
+            export_entry ex{};
+            encode_name_utf8(ex.name_utf8, name_ascii);
+            ex.kind = 1u;
+            ex.index = table_index;
             exports.push_back(::std::move(ex));
         }
 
         void add_export_memory(char const* name_ascii)
         {
             export_entry ex{};
-            auto const len = ::std::strlen(name_ascii);
-            append_u32_leb(ex.name_utf8, static_cast<::std::uint32_t>(len));
-            for(::std::size_t i = 0; i < len; ++i) { append_u8(ex.name_utf8, static_cast<::std::uint8_t>(name_ascii[i])); }
+            encode_name_utf8(ex.name_utf8, name_ascii);
             ex.kind = 2u;
             ex.index = 0u;
+            exports.push_back(::std::move(ex));
+        }
+
+        void add_export_global(::std::uint32_t global_index, char const* name_ascii)
+        {
+            export_entry ex{};
+            encode_name_utf8(ex.name_utf8, name_ascii);
+            ex.kind = 3u;
+            ex.index = global_index;
             exports.push_back(::std::move(ex));
         }
 
@@ -274,6 +383,56 @@ namespace uwvm2test::uwvm_int_strict
                     for(auto const r : ty.results) { append_u8(sec, r); }
                 }
                 emit_section(1u, sec);
+            }
+
+            // import section (2)
+            if(!import_funcs.empty() || !import_tables.empty() || !import_memories.empty() || !import_globals.empty())
+            {
+                byte_vec sec{};
+                auto const total = static_cast<::std::uint32_t>(import_funcs.size() + import_tables.size() + import_memories.size() + import_globals.size());
+                append_u32_leb(sec, total);
+
+                for(auto const& im : import_funcs)
+                {
+                    append_bytes(sec, im.module_utf8);
+                    append_bytes(sec, im.name_utf8);
+                    append_u8(sec, 0x00u);  // kind: func
+                    append_u32_leb(sec, im.type_index);
+                }
+
+                for(auto const& im : import_tables)
+                {
+                    append_bytes(sec, im.module_utf8);
+                    append_bytes(sec, im.name_utf8);
+                    append_u8(sec, 0x01u);  // kind: table
+                    append_u8(sec, im.elem_type);
+                    ::std::uint8_t flags = im.has_max ? 0x01u : 0x00u;
+                    append_u8(sec, flags);
+                    append_u32_leb(sec, im.min);
+                    if(im.has_max) { append_u32_leb(sec, im.max); }
+                }
+
+                for(auto const& im : import_memories)
+                {
+                    append_bytes(sec, im.module_utf8);
+                    append_bytes(sec, im.name_utf8);
+                    append_u8(sec, 0x02u);  // kind: mem
+                    ::std::uint8_t flags = im.has_max ? 0x01u : 0x00u;
+                    append_u8(sec, flags);
+                    append_u32_leb(sec, im.min);
+                    if(im.has_max) { append_u32_leb(sec, im.max); }
+                }
+
+                for(auto const& im : import_globals)
+                {
+                    append_bytes(sec, im.module_utf8);
+                    append_bytes(sec, im.name_utf8);
+                    append_u8(sec, 0x03u);  // kind: global
+                    append_u8(sec, im.valtype);
+                    append_u8(sec, im.mut ? 0x01u : 0x00u);
+                }
+
+                emit_section(2u, sec);
             }
 
             // function section (3)
@@ -414,7 +573,16 @@ namespace uwvm2test::uwvm_int_strict
         runtime_module_t const* mod{};
     };
 
-    [[nodiscard]] inline prepared_runtime prepare_runtime_from_wasm(byte_vec const& wasm_bytes, ::uwvm2::utils::container::u8string_view module_name)
+    struct preloaded_wasm_module
+    {
+        byte_vec const* wasm_bytes{};
+        ::uwvm2::utils::container::u8string_view module_name{};
+    };
+
+    [[nodiscard]] inline prepared_runtime prepare_runtime_from_wasm(
+        byte_vec const& wasm_bytes,
+        ::uwvm2::utils::container::u8string_view module_name,
+        ::std::initializer_list<preloaded_wasm_module> preloaded = {})
     {
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
@@ -430,6 +598,38 @@ namespace uwvm2test::uwvm_int_strict
         ::uwvm2::uwvm::wasm::storage::weak_symbol.clear();
 #endif
         ::uwvm2::uwvm::wasm::storage::preload_local_imported.clear();
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1)
+        // Allow tests to load WASI-Preview1 importing modules (e.g. reference workloads) without depending on the CLI loader.
+        ::uwvm2::uwvm::wasm::storage::preload_local_imported.emplace_back(
+            ::uwvm2::uwvm::imported::wasi::wasip1::local_imported::wasip1_local_imported_module);
+#endif
+
+        if(preloaded.size() != 0uz)
+        {
+            ::uwvm2::uwvm::wasm::storage::preloaded_wasm.reserve(preloaded.size());
+            for(auto const& pl : preloaded)
+            {
+                if(pl.wasm_bytes == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                ::uwvm2::parser::wasm::base::error_impl pre_err{};
+                auto const* pre_begin = pl.wasm_bytes->data();
+                auto const* pre_end = pl.wasm_bytes->data() + pl.wasm_bytes->size();
+
+                ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t pre_storage{};
+                pre_storage = ::uwvm2::uwvm::wasm::feature::binfmt_ver1_handler(
+                    pre_begin,
+                    pre_end,
+                    pre_err,
+                    ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_feature_parameter_storage_t{});
+
+                ::uwvm2::uwvm::wasm::type::wasm_file_t wf{1u};
+                wf.file_name = u8"uwvm2test_preloaded.wasm";
+                wf.module_name = pl.module_name;
+                wf.binfmt_ver = 1u;
+                wf.wasm_module_storage.wasm_binfmt_ver1_storage = ::std::move(pre_storage);
+                ::uwvm2::uwvm::wasm::storage::preloaded_wasm.emplace_back(::std::move(wf));
+            }
+        }
 
         ::uwvm2::parser::wasm::base::error_impl parse_err{};
         auto const* begin = wasm_bytes.data();
@@ -456,15 +656,9 @@ namespace uwvm2test::uwvm_int_strict
             ::fast_io::fast_terminate();
         }
 
-        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
-        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(1uz);
-        ::uwvm2::uwvm::runtime::initializer::details::import_alias_sanity_checked = false;
-
-        runtime_module_t rt{};
-        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = module_name;
-        ::uwvm2::uwvm::runtime::initializer::details::initialize_from_wasm_file(::uwvm2::uwvm::wasm::storage::execute_wasm, rt);
-        ::uwvm2::uwvm::runtime::initializer::details::current_initializing_module_name = {};
-        ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.try_emplace(module_name, ::std::move(rt));
+        // Fully initialize runtime storage (preloaded modules + execute module) so imported refs (func/table/mem/global)
+        // are properly linked. This matches the normal uwvm initialization pipeline.
+        ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
 
         auto it = ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(module_name);
         if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) { ::fast_io::fast_terminate(); }

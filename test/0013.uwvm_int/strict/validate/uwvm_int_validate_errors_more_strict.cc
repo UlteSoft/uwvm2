@@ -263,6 +263,39 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_illegal_if_block_type_module()
+    {
+        module_builder mb{};
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        // if <illegal blocktype byte> ... end
+        // Triggers wasm1.h `if` blocktype switch default => illegal_block_type.
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, 0x00u);  // illegal blocktype byte
+        op(fb.code, wasm_op::end);  // end if
+        op(fb.code, wasm_op::end);  // end func
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_if_cond_underflow_module()
+    {
+        module_builder mb{};
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        // if (no condition on stack) => operand_stack_underflow at wasm1.h `if` validation.
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::end);  // end if
+        op(fb.code, wasm_op::end);  // end func
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_if_then_result_mismatch_module()
     {
         module_builder mb{};
@@ -332,6 +365,25 @@ namespace
         func_body fb{};
         op(fb.code, wasm_op::i64_const);
         i64(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_end_result_mismatch_polymorphic_overflow_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+
+        // Polymorphic stack: unreachable makes the operand stack polymorphic, but we still forbid
+        // *overflowing* the expected result count at `end`.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
         return mb.build();
@@ -838,6 +890,13 @@ namespace
         UWVM2TEST_REQUIRE(
             compile_expect(build_select_cond_type_not_i32_module(), u8"uwvm2test_validate_select_cond", errc::select_cond_type_not_i32) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_else_module(), u8"uwvm2test_validate_illegal_else", errc::illegal_else) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_if_cond_underflow_module(),
+                                                           u8"uwvm2test_validate_if_missing_block_type",
+                                                           errc::missing_block_type,
+                                                           1uz) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect(build_illegal_if_block_type_module(), u8"uwvm2test_validate_illegal_if_block_type", errc::illegal_block_type) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_cond_underflow_module(), u8"uwvm2test_validate_if_underflow", errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_if_then_result_mismatch_module(), u8"uwvm2test_validate_if_then_mismatch", errc::if_then_result_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_if_missing_else_module(), u8"uwvm2test_validate_if_missing_else", errc::if_missing_else) == 0);
@@ -845,6 +904,9 @@ namespace
             compile_expect(build_end_result_mismatch_count_module(), u8"uwvm2test_validate_end_res_mismatch_count", errc::end_result_mismatch) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_end_result_mismatch_type_module(), u8"uwvm2test_validate_end_res_mismatch_type", errc::end_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_end_result_mismatch_polymorphic_overflow_module(),
+                                         u8"uwvm2test_validate_end_res_mismatch_poly_overflow",
+                                         errc::end_result_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_label_index_module(),
                                                            u8"uwvm2test_validate_invalid_label",
                                                            errc::invalid_label_index,

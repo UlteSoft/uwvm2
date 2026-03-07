@@ -371,6 +371,122 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        // 18: xor_i32 pattern D -> local.get 0/1 ; local.get 1/0 ; i32.xor ; local.get 2 ; i32.xor ; end
+        // Covers the "extra local default-zero" trivial matcher path in wasm1.h.
+        {
+            func_type ty{{k_val_i32, k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i32});  // local index 2 (zero-initialized)
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 1u);
+            op(fb.code, wasm_op::i32_xor);
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 2u);
+            op(fb.code, wasm_op::i32_xor);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // More negative cases: match a kind by byte pattern, but fail the signature preconditions used by call_info.
+
+        // 19: xor_const_i32 shape but (no params) -> (i32), using local0.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 0x1234);
+            op(fb.code, wasm_op::i32_xor);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // 20: mul_const_i32 shape but (no params) -> (i32), using local0.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 7);
+            op(fb.code, wasm_op::i32_mul);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // 21: mul_add_const_i32 shape but (no params) -> (i32), using local0.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 11);  // mul
+            op(fb.code, wasm_op::i32_mul);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 13);  // add
+            op(fb.code, wasm_op::i32_add);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // 22: rotr_add_const_i32 shape but (no params) -> (i32), using local0.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({1u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 5);  // rotr amount
+            op(fb.code, wasm_op::i32_rotr);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 17);  // add const
+            op(fb.code, wasm_op::i32_add);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // 23: xor_add_const_i32 (pattern C') shape but (no params) -> (i32), using local0/local1.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({2u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 1u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 0x6c);
+            op(fb.code, wasm_op::i32_xor);
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::i32_add);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // 24: sub_or_const_i32 shape but (no params) -> (i32), using local0/local1.
+        {
+            func_type ty{{}, {k_val_i32}};
+            func_body fb{};
+            fb.locals.push_back({2u, k_val_i32});
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 0u);
+            op(fb.code, wasm_op::local_get);
+            u32(fb.code, 1u);
+            op(fb.code, wasm_op::i32_const);
+            i32(fb.code, 0x0f0f);
+            op(fb.code, wasm_op::i32_or);
+            op(fb.code, wasm_op::i32_sub);
+            op(fb.code, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -395,7 +511,12 @@ namespace
         auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
-        UWVM2TEST_REQUIRE(cm.local_defined_call_info.size() == 18uz);
+        UWVM2TEST_REQUIRE(cm.local_defined_call_info.size() == 25uz);
+
+        auto match_kind = [&](::std::size_t idx) noexcept -> kind_t
+        {
+            return compiler::details::match_trivial_call_inline_body(rt.local_defined_function_vec_storage.index_unchecked(idx).wasm_code_ptr).kind;
+        };
 
         auto expect = [&](::std::size_t idx, kind_t k, ::std::int32_t imm, ::std::int32_t imm2) noexcept -> int
         {
@@ -419,6 +540,7 @@ namespace
         UWVM2TEST_REQUIRE(expect(10uz, kind_t::sub_or_const_i32, 0x0f0f, 0) == 0);
         UWVM2TEST_REQUIRE(expect(11uz, kind_t::sum8_xor_const_i32, 0x13579bdf, 0) == 0);
         UWVM2TEST_REQUIRE(expect(12uz, kind_t::xorshift32_i32, 0, 0) == 0);
+        UWVM2TEST_REQUIRE(expect(18uz, kind_t::xor_i32, 0, 0) == 0);
 
         auto expect_none = [&](::std::size_t idx) noexcept -> int
         {
@@ -433,6 +555,27 @@ namespace
         UWVM2TEST_REQUIRE(expect_none(15uz) == 0);
         UWVM2TEST_REQUIRE(expect_none(16uz) == 0);
         UWVM2TEST_REQUIRE(expect_none(17uz) == 0);
+
+        // Ensure the matcher still recognizes these patterns (byte-shape match), but call_info rejects them.
+        UWVM2TEST_REQUIRE(match_kind(13uz) == kind_t::param0_i32);
+        UWVM2TEST_REQUIRE(match_kind(14uz) == kind_t::add_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(15uz) == kind_t::xor_i32);
+        UWVM2TEST_REQUIRE(match_kind(16uz) == kind_t::sum8_xor_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(17uz) == kind_t::xorshift32_i32);
+
+        UWVM2TEST_REQUIRE(expect_none(19uz) == 0);
+        UWVM2TEST_REQUIRE(expect_none(20uz) == 0);
+        UWVM2TEST_REQUIRE(expect_none(21uz) == 0);
+        UWVM2TEST_REQUIRE(expect_none(22uz) == 0);
+        UWVM2TEST_REQUIRE(expect_none(23uz) == 0);
+        UWVM2TEST_REQUIRE(expect_none(24uz) == 0);
+
+        UWVM2TEST_REQUIRE(match_kind(19uz) == kind_t::xor_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(20uz) == kind_t::mul_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(21uz) == kind_t::mul_add_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(22uz) == kind_t::rotr_add_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(23uz) == kind_t::xor_add_const_i32);
+        UWVM2TEST_REQUIRE(match_kind(24uz) == kind_t::sub_or_const_i32);
 
         // Cover overlong LEB error paths in the trivial matcher (non-wasm-valid byte streams).
         {

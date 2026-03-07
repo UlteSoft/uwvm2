@@ -13,6 +13,19 @@ if [[ -z "${SYSROOT:-}" ]]; then
   exit 2
 fi
 
+# Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
+# Example: export UWVM_XMAKE_JOBS=4
+XMAKE_JOBS_ARGS=()
+if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
+  if [[ "${UWVM_XMAKE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+    XMAKE_JOBS_ARGS=(-j "${UWVM_XMAKE_JOBS}")
+    echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
+  else
+    echo "ERR: UWVM_XMAKE_JOBS must be a positive integer, got: ${UWVM_XMAKE_JOBS}" >&2
+    exit 2
+  fi
+fi
+
 TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
 LLVM_BIN="${TOOLCHAIN_ROOT}/llvm/bin"
 LLVM_PROFDATA="${LLVM_BIN}/llvm-profdata"
@@ -81,10 +94,10 @@ export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
 echo "=== uwvm_int strict coverage: build+run strict targets (profile) ==="
 if [[ "$#" -gt 0 ]]; then
   for t in "${STRICT_TARGETS[@]}"; do
-    xmake b -v "${t}"
+    xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
   done
 else
-  xmake b -v -g "${STRICT_DIR}/*"
+  xmake b -v "${XMAKE_JOBS_ARGS[@]}" -g "${STRICT_DIR}/*"
 fi
 for t in "${STRICT_TARGETS[@]}"; do
   xmake r "${t}"
@@ -125,3 +138,11 @@ done
   "${OBJECT_ARGS[@]}" >/dev/null
 
 echo "OK: coverage html written to: ${HTML_DIR}"
+
+echo "=== uwvm_int strict coverage: export json for wasm1.h ==="
+"${LLVM_COV}" export \
+  -instr-profile="${PROFDATA_FILE}" \
+  --include-filename-regex='.*compile_all_from_uwvm/wasm1[.]h$' \
+  "${OBJECT_ARGS[@]}" > "${COVER_DIR}/wasm1_export.json"
+
+echo "OK: coverage json written to: ${COVER_DIR}/wasm1_export.json"

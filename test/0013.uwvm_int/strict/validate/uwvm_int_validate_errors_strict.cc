@@ -57,6 +57,27 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_illegal_loop_blocktype_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // f0: () -> () : loop <illegal blocktype byte> ... end
+        // wasm1.h's loop parser only accepts 0x40 and {i32,i64,f32,f64} value-type bytes.
+        {
+            func_type ty{{}, {}};
+            func_body fb{};
+            op(fb.code, wasm_op::loop);
+            append_u8(fb.code, 0x00u);  // illegal blocktype byte
+            op(fb.code, wasm_op::end);  // end loop
+            op(fb.code, wasm_op::end);  // end func
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_illegal_label_module()
     {
         module_builder mb{};
@@ -298,6 +319,7 @@ namespace
 
         UWVM2TEST_REQUIRE(compile_expect(build_stack_underflow_module(), u8"uwvm2test_validate_underflow", errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_if_cond_type_not_i32_module(), u8"uwvm2test_validate_ifcond", errc::if_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_illegal_loop_blocktype_module(), u8"uwvm2test_validate_loop_blocktype", errc::illegal_block_type) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_label_module(), u8"uwvm2test_validate_illegal_label", errc::illegal_label_index) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_local_index_module(), u8"uwvm2test_validate_illegal_local", errc::illegal_local_index) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_no_memory_load_module(), u8"uwvm2test_validate_no_memory", errc::no_memory) == 0);

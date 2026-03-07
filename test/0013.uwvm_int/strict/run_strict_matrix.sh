@@ -12,6 +12,19 @@ if [[ -z "${SYSROOT:-}" ]]; then
   exit 2
 fi
 
+# Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
+# Example: export UWVM_XMAKE_JOBS=4
+XMAKE_JOBS_ARGS=()
+if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
+  if [[ "${UWVM_XMAKE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+    XMAKE_JOBS_ARGS=(-j "${UWVM_XMAKE_JOBS}")
+    echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
+  else
+    echo "ERR: UWVM_XMAKE_JOBS must be a positive integer, got: ${UWVM_XMAKE_JOBS}" >&2
+    exit 2
+  fi
+fi
+
 # macOS: when using a custom clang toolchain + sanitizer policies, dyld may not find
 # `libclang_rt.{asan,lsan,ubsan}_osx_dynamic.dylib` unless we point it at clang's runtime dir.
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -88,10 +101,10 @@ if [[ "${#STRICT_TARGETS[@]}" -gt 0 ]]; then
         "${SAN_POLICIES_FLAGS[@]}"
       if [[ "$#" -gt 0 ]]; then
         for t in "${STRICT_TARGETS[@]}"; do
-          xmake b -v "${t}"
+          xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
         done
       else
-        xmake b -v -g "${STRICT_DIR}/*"
+        xmake b -v "${XMAKE_JOBS_ARGS[@]}" -g "${STRICT_DIR}/*"
       fi
       for t in "${STRICT_TARGETS[@]}"; do
         xmake r "${t}"
@@ -108,7 +121,7 @@ if [[ "${#VALIDATE_TARGETS[@]}" -gt 0 ]]; then
     --enable-uwvm-int-delay-local=heavy
   xmake -v
   for t in "${VALIDATE_TARGETS[@]}"; do
-    xmake b -v "${t}"
+    xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
     xmake r "${t}"
   done
 fi
