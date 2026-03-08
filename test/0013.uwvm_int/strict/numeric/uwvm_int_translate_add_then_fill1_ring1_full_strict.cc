@@ -15,11 +15,9 @@ namespace
         auto f32 = [&](byte_vec& c, float v) { append_f32_ieee(c, v); };
         auto f64 = [&](byte_vec& c, double v) { append_f64_ieee(c, v); };
 
-        // Goal: make `stacktop_memory_count > 1` at the first add, so we execute the `vt1`/ring1-full check:
-        //   i32: wasm1.h#L19536
-        //   i64: wasm1.h#L20679
-        //   f32: wasm1.h#L21803
-        //   f64: wasm1.h#L22736
+        // Goal: make `stacktop_memory_count > 1` at the first add, so we execute the
+        // `vt1`/ring1-full fast path in `translate/opcode/int_numeric_cases.h / translate/opcode/float_numeric_convert_cases.h`
+        // for i32/i64/f32/f64.
         //
         // Technique:
         // - Fill+spill a different type first (vt1), keeping its ring full.

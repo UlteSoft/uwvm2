@@ -75,7 +75,7 @@ namespace
 
             // Pre-loop: force at least one main-bytecode label placeholder fixup in `ptr_fixups`.
             // This makes the test9 mega-fusion path exercise the ptr-fixup pruning loop
-            // (the `while(!ptr_fixups.empty()) { ... }` block around wasm1.h#L10834).
+            // in `translate/opcode/branch_cases.h`.
             op(c, wasm_op::block);
             append_u8(c, k_block_empty);
             op(c, wasm_op::i32_const);
@@ -89,7 +89,7 @@ namespace
             op(c, wasm_op::loop);
             append_u8(c, k_block_empty);
 
-            // Canonical loop body (must match wasm1.h pattern exactly).
+            // Canonical loop body (must match the translator pattern exactly).
             op(c, wasm_op::local_get);
             u32(c, k_prod);
             op(c, wasm_op::f32_const);

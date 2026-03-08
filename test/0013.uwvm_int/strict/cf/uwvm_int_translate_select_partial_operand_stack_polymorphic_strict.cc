@@ -4,7 +4,7 @@ namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
 
-    // Covers wasm1.h `select` stack modeling branch:
+    // Covers translate.h `select` stack modeling branch:
     //   if(!v1_from_stack && v2_from_stack) { operand_stack_push(v2_type); }
     // by placing `select` in a polymorphic (unreachable) region after an unconditional `br 0`
     // inside a block whose base stack height is 2.

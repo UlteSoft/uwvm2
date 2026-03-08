@@ -115,7 +115,7 @@ namespace
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
-                // wasm1.h requires all scalar ranges enabled together.
+                // translate.h requires all scalar ranges enabled together.
                 .i32_stack_top_begin_pos = 3uz,
                 .i32_stack_top_end_pos = 5uz,  // int ring size=2: enough for (value,selector)
                 .i64_stack_top_begin_pos = 3uz,

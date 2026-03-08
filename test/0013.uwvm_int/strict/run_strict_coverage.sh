@@ -6,7 +6,7 @@ ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
-WASM1_H="src/uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h"
+TRANSLATE_H="src/uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h"
 
 if [[ -z "${SYSROOT:-}" ]]; then
   echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
@@ -111,7 +111,7 @@ fi
 echo "=== uwvm_int strict coverage: merge profraw -> profdata ==="
 "${LLVM_PROFDATA}" merge -sparse "${PROFRAW_DIR}"/*.profraw -o "${PROFDATA_FILE}"
 
-echo "=== uwvm_int strict coverage: generate html for wasm1.h ==="
+echo "=== uwvm_int strict coverage: generate html for translate.h ==="
 mkdir -p -- "${HTML_DIR}"
 
 OBJECT_ARGS=()
@@ -134,15 +134,15 @@ done
   --output-dir="${HTML_DIR}" \
   --show-region-summary \
   --show-branch-summary \
-  --include-filename-regex='.*compile_all_from_uwvm/wasm1[.]h$' \
+  --include-filename-regex='.*compile_all_from_uwvm/translate[.]h$' \
   "${OBJECT_ARGS[@]}" >/dev/null
 
 echo "OK: coverage html written to: ${HTML_DIR}"
 
-echo "=== uwvm_int strict coverage: export json for wasm1.h ==="
+echo "=== uwvm_int strict coverage: export json for translate.h ==="
 "${LLVM_COV}" export \
   -instr-profile="${PROFDATA_FILE}" \
-  --include-filename-regex='.*compile_all_from_uwvm/wasm1[.]h$' \
-  "${OBJECT_ARGS[@]}" > "${COVER_DIR}/wasm1_export.json"
+  --include-filename-regex='.*compile_all_from_uwvm/translate[.]h$' \
+  "${OBJECT_ARGS[@]}" > "${COVER_DIR}/translate_export.json"
 
-echo "OK: coverage json written to: ${COVER_DIR}/wasm1_export.json"
+echo "OK: coverage json written to: ${COVER_DIR}/translate_export.json"

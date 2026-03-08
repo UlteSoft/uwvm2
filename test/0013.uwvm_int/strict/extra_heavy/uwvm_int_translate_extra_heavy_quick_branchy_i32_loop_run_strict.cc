@@ -54,7 +54,7 @@ namespace
             op(c, wasm_op::loop);
             append_u8(c, k_block_empty);
 
-            // Canonical loop body (must match wasm1.h pattern exactly).
+            // Canonical loop body (must match translate.h pattern exactly).
             op(c, wasm_op::local_get);
             u32(c, k_s);
             op(c, wasm_op::i32_const);

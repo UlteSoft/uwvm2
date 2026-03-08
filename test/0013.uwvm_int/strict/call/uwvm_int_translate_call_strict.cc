@@ -674,7 +674,7 @@ namespace
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
-                // Fully merged scalar4 range (required by wasm1.h for mixed-typed operand stack correctness).
+                // Fully merged scalar4 range (required by translate.h for mixed-typed operand stack correctness).
                 .i32_stack_top_begin_pos = 3uz,
                 .i32_stack_top_end_pos = 7uz,
                 .i64_stack_top_begin_pos = 3uz,

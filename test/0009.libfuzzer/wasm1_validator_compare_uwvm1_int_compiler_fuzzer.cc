@@ -30,7 +30,7 @@
 # include <uwvm2/validation/error/error.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 
-# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h>
+# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
 
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/runtime/initializer/init.h>
