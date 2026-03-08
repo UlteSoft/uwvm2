@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2026-03-08
  * @copyright   APL-2.0 License
  */
 
@@ -22,24 +23,16 @@
 module;
 
 // std
-#include <cstdint>
-#include <cstddef>
+#include <memory>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 
-export module uwvm2.uwvm.wasm.type:weak_symbol;
+export module uwvm2.uwvm.cmdline.params:wasm_set_preload_module_attribute;
 
 import fast_io;
 import uwvm2.utils.container;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm_custom.customs;
-import uwvm2.uwvm.wasm.base;
-import uwvm2.uwvm.wasm.feature;
-import :para;
-import :cwrapper;
-import :dl;
-import :preload_module_attribute;
+import uwvm2.utils.cmdline;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -48,4 +41,4 @@ import :preload_module_attribute;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "weak_symbol.h"
+#include "wasm_set_preload_module_attribute.h"

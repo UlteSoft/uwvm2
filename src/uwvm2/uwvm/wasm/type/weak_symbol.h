@@ -38,6 +38,7 @@
 # include "para.h"
 # include "cwrapper.h"
 # include "dl.h"
+# include "preload_module_attribute.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -56,6 +57,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         wasm_wws_storage_t wasm_wws_storage{};
         // wasm_parameter_t
         ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
+        // preload memory attribute
+        ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t preload_module_memory_attribute{};
     };
 
     // Conversion from CAPI

@@ -133,6 +133,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             [[likely]] case ::uwvm2::uwvm::wasm::loader::load_dl_rtl::ok:
             {
+                ::uwvm2::uwvm::wasm::storage::register_preloaded_dl_capi_functions(::uwvm2::uwvm::wasm::storage::preloaded_dl.size() - 1uz);
                 break;
             }
             [[unlikely]] default:

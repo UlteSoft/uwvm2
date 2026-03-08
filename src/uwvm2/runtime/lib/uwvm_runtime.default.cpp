@@ -74,9 +74,12 @@ namespace uwvm2::runtime::uwvm_int
         using runtime_local_func_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t;
         using runtime_table_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t;
         using runtime_table_elem_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t;
+        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
 
         using capi_function_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
         using local_imported_t = ::uwvm2::uwvm::wasm::type::local_imported_t;
+        using preload_module_memory_attribute_t = ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t;
+        using preload_memory_descriptor_t = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t;
 
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
         using compiled_local_func_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
@@ -186,6 +189,14 @@ namespace uwvm2::runtime::uwvm_int
             }
         };
 
+        struct preload_call_context_t
+        {
+            inline static constexpr ::std::size_t invalid_module_id{::std::numeric_limits<::std::size_t>::max()};
+
+            ::std::size_t module_id{invalid_module_id};
+            preload_module_memory_attribute_t const* preload_module_memory_attribute{};
+        };
+
 #if defined(UWVM_USE_THREAD_LOCAL)
 # if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
 #  ifdef UWVM
@@ -196,7 +207,17 @@ namespace uwvm2::runtime::uwvm_int
 # endif
         inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        inline thread_local preload_call_context_t g_preload_call_context{};  // [global] [thread_local]
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return g_call_stack; }
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return g_preload_call_context; }
 
         inline void erase_current_thread_state() noexcept {}
 #else
@@ -210,6 +231,7 @@ namespace uwvm2::runtime::uwvm_int
         struct runtime_thread_state
         {
             call_stack_tls_state call_stack{};
+            preload_call_context_t preload_call_context{};
         };
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
@@ -251,9 +273,42 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept
+        {
+            return get_thread_state().preload_call_context;
+        }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
 #endif
+
+        struct preload_call_context_guard
+        {
+            preload_call_context_t* ctx{};
+            preload_call_context_t saved{};
+
+            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute) noexcept : ctx{::std::addressof(get_preload_call_context())},
+                                                                                                                     saved{*ctx}
+            {
+                auto& call_stack{get_call_stack()};
+                if(!call_stack.frames.empty()) [[likely]]
+                {
+                    ctx->module_id = call_stack.frames.back().module_id;
+                }
+                else
+                {
+                    ctx->module_id = preload_call_context_t::invalid_module_id;
+                }
+                ctx->preload_module_memory_attribute = attribute;
+            }
+
+            inline preload_call_context_guard(preload_call_context_guard const&) noexcept = delete;
+            inline preload_call_context_guard& operator= (preload_call_context_guard const&) noexcept = delete;
+
+            inline ~preload_call_context_guard()
+            {
+                if(this->ctx != nullptr) [[likely]] { *this->ctx = this->saved; }
+            }
+        };
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -626,6 +681,7 @@ namespace uwvm2::runtime::uwvm_int
             func_sig_view sig{};
             ::std::size_t param_bytes{};
             ::std::size_t result_bytes{};
+            preload_module_memory_attribute_t const* preload_module_memory_attribute{};
 
             union
             {
@@ -725,6 +781,11 @@ namespace uwvm2::runtime::uwvm_int
                 {valtype_kind::raw_u8, f->para_type_vec_begin, f->para_type_vec_size},
                 {valtype_kind::raw_u8, f->res_type_vec_begin,  f->res_type_vec_size }
             };
+        }
+
+        [[nodiscard]] inline preload_module_memory_attribute_t const* find_preload_module_memory_attribute(capi_function_t const* f) noexcept
+        {
+            return ::uwvm2::uwvm::wasm::storage::find_loaded_preload_module_memory_attribute(f);
         }
 
         struct resolved_func
@@ -975,6 +1036,446 @@ namespace uwvm2::runtime::uwvm_int
                 const_cast<::uwvm2::object::memory::linear::native_memory_t*>(mem0);
         }
 #endif
+
+        [[nodiscard]] inline runtime_module_storage_t const* get_active_preload_runtime_module() noexcept
+        {
+            auto const& ctx{get_preload_call_context()};
+            if(ctx.module_id == preload_call_context_t::invalid_module_id) [[unlikely]] { return nullptr; }
+            if(ctx.module_id >= g_runtime.modules.size()) [[unlikely]] { return nullptr; }
+            return g_runtime.modules.index_unchecked(ctx.module_id).runtime_module;
+        }
+
+        [[nodiscard]] inline preload_module_memory_attribute_t const* get_active_preload_memory_attribute() noexcept
+        {
+            return get_preload_call_context().preload_module_memory_attribute;
+        }
+
+        [[nodiscard]] inline bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute,
+                                                                     ::std::size_t memory_index) noexcept
+        {
+            if(attribute == nullptr) [[unlikely]] { return false; }
+            if(attribute->apply_to_all_memories) [[likely]] { return true; }
+
+            return attribute->memory_index_set.find(memory_index) != attribute->memory_index_set.cend();
+        }
+
+        struct preload_memory_rights_t
+        {
+            bool allow_access{};
+            bool prefer_mmap{};
+        };
+
+        [[nodiscard]] inline constexpr preload_memory_rights_t requested_preload_memory_rights(preload_module_memory_attribute_t const* attribute,
+                                                                                                ::std::size_t memory_index) noexcept
+        {
+            using access_mode = ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t;
+
+            if(!preload_memory_index_is_selected(attribute, memory_index)) [[unlikely]] { return {}; }
+
+            switch(attribute->memory_access_mode)
+            {
+                case access_mode::copy:
+                {
+                    return {true, false};
+                }
+                case access_mode::mmap:
+                {
+                    return {true, true};
+                }
+                case access_mode::none: [[fallthrough]];
+                default:
+                {
+                    return {};
+                }
+            }
+        }
+
+        struct resolved_preload_memory_t
+        {
+            enum class target_kind : unsigned
+            {
+                native_defined,
+                local_imported
+            };
+
+            target_kind kind{target_kind::native_defined};
+            native_memory_t const* native_memory{};
+            local_imported_t* local_imported{};
+            ::std::size_t local_imported_index{};
+            ::std::byte* memory_begin{};
+            ::std::uint_least64_t page_count{};
+            ::std::uint_least64_t page_size_bytes{};
+            ::std::uint_least64_t byte_length{};
+            unsigned backend_kind{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_native_defined};
+            unsigned mmap_delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
+            ::std::uint_least64_t partial_protection_limit_bytes{};
+            void const* dynamic_length_atomic_object{};
+        };
+
+        struct preload_memory_delivery_t
+        {
+            unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
+        };
+
+        [[nodiscard]] inline constexpr bool compute_preload_byte_length(::std::uint_least64_t page_count,
+                                                                        ::std::uint_least64_t page_size_bytes,
+                                                                        ::std::uint_least64_t& byte_length) noexcept
+        {
+            if(page_size_bytes != 0u && page_count > (::std::numeric_limits<::std::uint_least64_t>::max() / page_size_bytes)) [[unlikely]] { return false; }
+            byte_length = page_count * page_size_bytes;
+            return true;
+        }
+
+        [[nodiscard]] inline constexpr ::std::uint_least64_t preload_partial_protection_limit_bytes(native_memory_t const& memory) noexcept
+        {
+#if defined(UWVM_SUPPORT_MMAP)
+            if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+            {
+                if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64)
+                {
+                    return ::uwvm2::object::memory::linear::max_partial_protection_wasm64_length;
+                }
+                return ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length;
+            }
+            else
+            {
+                static_cast<void>(memory);
+                return ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length;
+            }
+#else
+            static_cast<void>(memory);
+            return 0u;
+#endif
+        }
+
+        [[nodiscard]] inline bool resolve_defined_preload_memory(native_memory_t const& memory, resolved_preload_memory_t& resolved) noexcept
+        {
+            resolved.kind = resolved_preload_memory_t::target_kind::native_defined;
+            resolved.native_memory = ::std::addressof(memory);
+            resolved.local_imported = nullptr;
+            resolved.local_imported_index = 0uz;
+            resolved.memory_begin = memory.memory_begin;
+            resolved.page_count = static_cast<::std::uint_least64_t>(memory.get_page_size());
+            resolved.page_size_bytes = static_cast<::std::uint_least64_t>(1u) << memory.custom_page_size_log2;
+            resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_native_defined;
+            resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
+            resolved.partial_protection_limit_bytes = 0u;
+            resolved.dynamic_length_atomic_object = nullptr;
+
+            if(!compute_preload_byte_length(resolved.page_count, resolved.page_size_bytes, resolved.byte_length)) [[unlikely]] { return false; }
+            if(resolved.memory_begin == nullptr && resolved.byte_length != 0u) [[unlikely]] { return false; }
+
+#if defined(UWVM_SUPPORT_MMAP)
+            if constexpr(native_memory_t::can_mmap)
+            {
+                if(memory.require_dynamic_determination_memory_size())
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_dynamic_bounds;
+                    resolved.dynamic_length_atomic_object = memory.memory_length_p;
+                }
+                else if(memory.is_full_page_protection())
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_full_protection;
+                }
+                else
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_partial_protection;
+                    resolved.partial_protection_limit_bytes = preload_partial_protection_limit_bytes(memory);
+                }
+            }
+#endif
+
+            return true;
+        }
+
+        [[nodiscard]] inline bool resolve_local_imported_preload_memory(local_imported_t* local_imported,
+                                                                        ::std::size_t local_imported_index,
+                                                                        resolved_preload_memory_t& resolved) noexcept
+        {
+            if(local_imported == nullptr) [[unlikely]] { return false; }
+
+            resolved.kind = resolved_preload_memory_t::target_kind::local_imported;
+            resolved.native_memory = nullptr;
+            resolved.local_imported = local_imported;
+            resolved.local_imported_index = local_imported_index;
+            resolved.memory_begin = local_imported->memory_begin_from_index(local_imported_index);
+            resolved.page_count = local_imported->memory_size_from_index(local_imported_index);
+            resolved.page_size_bytes = local_imported->memory_page_size_from_index(local_imported_index);
+            resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_local_imported;
+            resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
+            resolved.partial_protection_limit_bytes = 0u;
+            resolved.dynamic_length_atomic_object = nullptr;
+
+            if(!compute_preload_byte_length(resolved.page_count, resolved.page_size_bytes, resolved.byte_length)) [[unlikely]] { return false; }
+            if(resolved.memory_begin == nullptr && resolved.byte_length != 0u) [[unlikely]] { return false; }
+
+            return true;
+        }
+
+        [[nodiscard]] inline bool resolve_preload_memory(runtime_module_storage_t const& rt,
+                                                         ::std::size_t memory_index,
+                                                         resolved_preload_memory_t& resolved) noexcept
+        {
+            using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
+            using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
+
+            auto const imported_count{rt.imported_memory_vec_storage.size()};
+            if(memory_index < imported_count)
+            {
+                constexpr ::std::size_t kMaxChain{4096uz};
+                auto const* curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(memory_index))};
+
+                for(::std::size_t steps{}; steps != kMaxChain; ++steps)
+                {
+                    if(curr == nullptr) [[unlikely]] { return false; }
+
+                    switch(curr->link_kind)
+                    {
+                        case memory_link_kind::imported:
+                        {
+                            curr = curr->target.imported_ptr;
+                            break;
+                        }
+                        case memory_link_kind::defined:
+                        {
+                            auto const* const defined{curr->target.defined_ptr};
+                            if(defined == nullptr) [[unlikely]] { return false; }
+                            return resolve_defined_preload_memory(defined->memory, resolved);
+                        }
+                        case memory_link_kind::local_imported:
+                        {
+                            return resolve_local_imported_preload_memory(curr->target.local_imported.module_ptr,
+                                                                         curr->target.local_imported.index,
+                                                                         resolved);
+                        }
+                        case memory_link_kind::unresolved: [[fallthrough]];
+                        default:
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            auto const local_index{memory_index - imported_count};
+            if(local_index >= rt.local_defined_memory_vec_storage.size()) [[unlikely]] { return false; }
+            return resolve_defined_preload_memory(rt.local_defined_memory_vec_storage.index_unchecked(local_index).memory, resolved);
+        }
+
+        [[nodiscard]] inline constexpr preload_memory_delivery_t determine_preload_memory_delivery(preload_memory_rights_t rights,
+                                                                                                    resolved_preload_memory_t const& resolved) noexcept
+        {
+            if(!rights.allow_access) [[unlikely]] { return {}; }
+
+            if(rights.prefer_mmap && resolved.mmap_delivery_state != ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none)
+            {
+                return {resolved.mmap_delivery_state};
+            }
+
+            return {::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy};
+        }
+
+        [[nodiscard]] inline constexpr bool validate_preload_copy_range(::std::uint_least64_t byte_length,
+                                                                        ::std::uint_least64_t offset,
+                                                                        ::std::size_t size,
+                                                                        ::std::size_t& offset_out) noexcept
+        {
+            if(byte_length > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
+            if(offset > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
+
+            auto const host_byte_length{static_cast<::std::size_t>(byte_length)};
+            offset_out = static_cast<::std::size_t>(offset);
+
+            if(offset_out > host_byte_length) [[unlikely]] { return false; }
+            if(size > (host_byte_length - offset_out)) [[unlikely]] { return false; }
+
+            return true;
+        }
+
+        template <typename Fn>
+        [[nodiscard]] inline bool with_native_preload_copy_access(native_memory_t const& memory, Fn&& fn) noexcept
+        {
+            static_cast<void>(memory);
+            if constexpr(native_memory_t::can_mmap)
+            {
+                return static_cast<bool>(fn());
+            }
+            else if constexpr(native_memory_t::support_multi_thread)
+            {
+#if !defined(UWVM_SUPPORT_MMAP) && defined(UWVM_USE_MULTITHREAD_ALLOCATOR) && (__cpp_lib_atomic_wait >= 201907L)
+                ::uwvm2::object::memory::linear::memory_operation_guard_t memory_guard{memory.growing_flag_p, memory.active_ops_p};
+                return static_cast<bool>(fn());
+#else
+                return static_cast<bool>(fn());
+#endif
+            }
+            else
+            {
+                return static_cast<bool>(fn());
+            }
+        }
+
+        [[nodiscard]] inline constexpr ::std::size_t active_preload_total_memory_count(runtime_module_storage_t const& rt) noexcept
+        {
+            return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size();
+        }
+
+        [[nodiscard]] inline bool try_build_preload_memory_descriptor(::std::size_t memory_index,
+                                                                      preload_memory_descriptor_t* out,
+                                                                      resolved_preload_memory_t* resolved_out,
+                                                                      preload_memory_delivery_t* delivery_out) noexcept
+        {
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!resolve_preload_memory(*rt, memory_index, resolved)) [[unlikely]] { return false; }
+
+            auto const rights{requested_preload_memory_rights(get_active_preload_memory_attribute(), memory_index)};
+            auto const delivery{determine_preload_memory_delivery(rights, resolved)};
+            if(delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none) [[unlikely]] { return false; }
+
+            if(out != nullptr)
+            {
+                *out = preload_memory_descriptor_t{
+                    .memory_index = memory_index,
+                    .delivery_state = delivery.delivery_state,
+                    .backend_kind = resolved.backend_kind,
+                    .reserved0 = 0u,
+                    .reserved1 = 0u,
+                    .page_count = resolved.page_count,
+                    .page_size_bytes = resolved.page_size_bytes,
+                    .byte_length = resolved.byte_length,
+                    .partial_protection_limit_bytes = resolved.partial_protection_limit_bytes,
+                    .mmap_view_begin = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy ? nullptr : resolved.memory_begin,
+                    .dynamic_length_atomic_object = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_dynamic_bounds
+                                                      ? resolved.dynamic_length_atomic_object
+                                                      : nullptr};
+            }
+
+            if(resolved_out != nullptr) [[likely]] { *resolved_out = resolved; }
+            if(delivery_out != nullptr) [[likely]] { *delivery_out = delivery; }
+            return true;
+        }
+
+        [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_impl() noexcept
+        {
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return 0uz; }
+
+            auto const total{active_preload_total_memory_count(*rt)};
+            ::std::size_t count{};
+            for(::std::size_t i{}; i != total; ++i)
+            {
+                count += static_cast<::std::size_t>(try_build_preload_memory_descriptor(i, nullptr, nullptr, nullptr));
+            }
+            return count;
+        }
+
+        [[nodiscard]] inline bool preload_memory_descriptor_at_impl(::std::size_t descriptor_index,
+                                                                    preload_memory_descriptor_t* out) noexcept
+        {
+            if(out == nullptr) [[unlikely]] { return false; }
+
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return false; }
+
+            auto const total{active_preload_total_memory_count(*rt)};
+            ::std::size_t current_descriptor_index{};
+            preload_memory_descriptor_t descriptor{};
+            for(::std::size_t memory_index{}; memory_index != total; ++memory_index)
+            {
+                if(!try_build_preload_memory_descriptor(memory_index, ::std::addressof(descriptor), nullptr, nullptr)) { continue; }
+                if(current_descriptor_index == descriptor_index) [[likely]]
+                {
+                    *out = descriptor;
+                    return true;
+                }
+                ++current_descriptor_index;
+            }
+
+            return false;
+        }
+
+        [[nodiscard]] inline bool preload_memory_read_impl(::std::size_t memory_index,
+                                                           ::std::uint_least64_t offset,
+                                                           void* destination,
+                                                           ::std::size_t size) noexcept
+        {
+            if(size != 0uz && destination == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
+            ::std::size_t host_offset{};
+            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+            if(size == 0uz) [[unlikely]] { return true; }
+
+            switch(resolved.kind)
+            {
+                case resolved_preload_memory_t::target_kind::native_defined:
+                {
+                    auto const* const memory{resolved.native_memory};
+                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(*memory,
+                                                           [&]() noexcept
+                                                           {
+                                                               ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
+                                                               return true;
+                                                           });
+                }
+                case resolved_preload_memory_t::target_kind::local_imported:
+                {
+                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
+                    return true;
+                }
+                default:
+                {
+                    return false;
+                }
+            }
+        }
+
+        [[nodiscard]] inline bool preload_memory_write_impl(::std::size_t memory_index,
+                                                            ::std::uint_least64_t offset,
+                                                            void const* source,
+                                                            ::std::size_t size) noexcept
+        {
+            if(size != 0uz && source == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
+            ::std::size_t host_offset{};
+            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+            if(size == 0uz) [[unlikely]] { return true; }
+
+            switch(resolved.kind)
+            {
+                case resolved_preload_memory_t::target_kind::native_defined:
+                {
+                    auto const* const memory{resolved.native_memory};
+                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(*memory,
+                                                           [&]() noexcept
+                                                           {
+                                                               ::std::memcpy(resolved.memory_begin + host_offset, source, size);
+                                                               return true;
+                                                           });
+                }
+                case resolved_preload_memory_t::target_kind::local_imported:
+                {
+                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    ::std::memcpy(resolved.memory_begin + host_offset, source, size);
+                    return true;
+                }
+                default:
+                {
+                    return false;
+                }
+            }
+        }
 
         // IMPORTANT:
         // Do NOT wrap `alloca` in a helper function that returns the pointer: `alloca` is stack-frame bound,
@@ -1615,7 +2116,11 @@ namespace uwvm2::runtime::uwvm_int
             *caller_stack_top_ptr += res_bytes;
         }
 
-        inline void invoke_capi(capi_function_t const* f, ::std::size_t para_bytes, ::std::size_t res_bytes, ::std::byte** caller_stack_top_ptr) noexcept
+        inline void invoke_capi(capi_function_t const* f,
+                                preload_module_memory_attribute_t const* preload_module_memory_attribute,
+                                ::std::size_t para_bytes,
+                                ::std::size_t res_bytes,
+                                ::std::byte** caller_stack_top_ptr) noexcept
         {
             if(f == nullptr || f->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -1631,6 +2136,7 @@ namespace uwvm2::runtime::uwvm_int
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(parbuf, para_bytes, par_guard);
             if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
 
+            preload_call_context_guard preload_guard{preload_module_memory_attribute};
             f->func_ptr(resbuf, parbuf);
 
             if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
@@ -1676,7 +2182,7 @@ namespace uwvm2::runtime::uwvm_int
                     {
                         ::fast_io::fast_terminate();
                     }
-                    invoke_capi(f, para_bytes, res_bytes, caller_stack_top_ptr);
+                    invoke_capi(f, find_preload_module_memory_attribute(f), para_bytes, res_bytes, caller_stack_top_ptr);
                     return;
                 }
                 [[unlikely]] default:
@@ -1814,14 +2320,14 @@ namespace uwvm2::runtime::uwvm_int
                     }
                     case cached_import_target::kind::dl:
                     {
-                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
-                    case cached_import_target::kind::weak_symbol:
-                    {
-                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
+                        }
+                        case cached_import_target::kind::weak_symbol:
+                        {
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
+                        }
                     [[unlikely]] default:
                     {
                         ::fast_io::fast_terminate();
@@ -1922,7 +2428,7 @@ namespace uwvm2::runtime::uwvm_int
                                 case cached_import_target::kind::dl:
                                 case cached_import_target::kind::weak_symbol:
                                 {
-                                    invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                                    invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                                     return;
                                 }
                                 [[unlikely]] default:
@@ -2099,7 +2605,7 @@ namespace uwvm2::runtime::uwvm_int
                         case cached_import_target::kind::dl:
                         case cached_import_target::kind::weak_symbol:
                         {
-                            invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                             return;
                         }
                         [[unlikely]] default:
@@ -2338,6 +2844,7 @@ namespace uwvm2::runtime::uwvm_int
                         {
                             tgt.k = cached_import_target::kind::dl;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
                             tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
                             tgt.param_bytes = total_abi_bytes(tgt.sig.params);
                             tgt.result_bytes = total_abi_bytes(tgt.sig.results);
@@ -2351,6 +2858,7 @@ namespace uwvm2::runtime::uwvm_int
                         {
                             tgt.k = cached_import_target::kind::weak_symbol;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
                             tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
                             tgt.param_bytes = total_abi_bytes(tgt.sig.params);
                             tgt.result_bytes = total_abi_bytes(tgt.sig.results);
@@ -2537,7 +3045,75 @@ namespace uwvm2::runtime::uwvm_int
         // possible thread-id reuse issues. Do NOT `clear()` here: main-thread exit does not imply other threads exit.
         erase_current_thread_state();
     }
+
+    [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_host_api() noexcept
+    {
+        return preload_memory_descriptor_count_impl();
+    }
+
+    [[nodiscard]] inline bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
+    {
+        return preload_memory_descriptor_at_impl(descriptor_index, out);
+    }
+
+    [[nodiscard]] inline bool preload_memory_read_host_api(::std::size_t memory_index,
+                                                           ::std::uint_least64_t offset,
+                                                           void* destination,
+                                                           ::std::size_t size) noexcept
+    {
+        return preload_memory_read_impl(memory_index, offset, destination, size);
+    }
+
+    [[nodiscard]] inline bool preload_memory_write_host_api(::std::size_t memory_index,
+                                                            ::std::uint_least64_t offset,
+                                                            void const* source,
+                                                            ::std::size_t size) noexcept
+    {
+        return preload_memory_write_impl(memory_index, offset, source, size);
+    }
 }  // namespace uwvm2::runtime::uwvm_int
+
+namespace uwvm2::uwvm::wasm::type
+{
+    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_count_host_api();
+    }
+
+    extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_at_host_api(descriptor_index, out);
+    }
+
+    extern "C" bool uwvm_preload_memory_read(::std::size_t memory_index,
+                                              ::std::uint_least64_t offset,
+                                              void* destination,
+                                              ::std::size_t size) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_read_host_api(memory_index, offset, destination, size);
+    }
+
+    extern "C" bool uwvm_preload_memory_write(::std::size_t memory_index,
+                                               ::std::uint_least64_t offset,
+                                               void const* source,
+                                               ::std::size_t size) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_write_host_api(memory_index, offset, source, size);
+    }
+
+    extern "C" uwvm_preload_host_api_v1 const* uwvm_get_preload_host_api_v1() noexcept
+    {
+        static uwvm_preload_host_api_v1 const preload_host_api_v1{
+            .struct_size = sizeof(uwvm_preload_host_api_v1),
+            .abi_version = preload_host_api_v1_abi_version,
+            .memory_descriptor_count = uwvm_preload_memory_descriptor_count,
+            .memory_descriptor_at = uwvm_preload_memory_descriptor_at,
+            .memory_read = uwvm_preload_memory_read,
+            .memory_write = uwvm_preload_memory_write};
+
+        return ::std::addressof(preload_host_api_v1);
+    }
+}
 
 #ifndef UWVM_MODULE
 // macro

@@ -93,7 +93,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                     u8"[warn]  ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Importing an untrusted dl may cause security issues, please make sure the dl is trusted. ",
+                                    u8"Loading an untrusted preload dl is equivalent to loading untrusted native code in the same process; it may install hooks and read or modify arbitrary process memory. Only load trusted modules. ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                     u8"(untrusted-dl)\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -1216,6 +1216,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                         continue;
                     }
                 }
+            }
+        }
+
+        wd.preload_module_memory_attribute = ::uwvm2::uwvm::wasm::storage::resolve_preload_module_memory_attribute(wd.module_name);
+
+        {
+            ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1{};
+
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                set_preload_host_api_v1 = reinterpret_cast<::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t>(
+                    ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_set_preload_host_api_v1"));
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+            }
+# endif
+
+            if(set_preload_host_api_v1 != nullptr)
+            {
+                auto const* const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
+                if(preload_host_api_v1 != nullptr) { set_preload_host_api_v1(preload_host_api_v1); }
             }
         }
 

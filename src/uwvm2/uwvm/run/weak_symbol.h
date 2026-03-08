@@ -113,6 +113,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             ::uwvm2::uwvm::wasm::loader::load_weak_symbol(tmp, *reinterpret_cast<uwvm_weak_symbol_module_c_may_alias_t>(mod_curr), para);
 
             ::uwvm2::uwvm::wasm::storage::weak_symbol.push_back_unchecked(::std::move(tmp));
+            ::uwvm2::uwvm::wasm::storage::register_weak_symbol_capi_functions(::uwvm2::uwvm::wasm::storage::weak_symbol.size() - 1uz);
         }
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);

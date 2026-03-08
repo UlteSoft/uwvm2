@@ -35,6 +35,7 @@ export import :debug_test;
 export import :wasm_set_main_module_name;
 export import :wasm_preload_library;
 export import :wasm_register_dl;
+export import :wasm_set_preload_module_attribute;
 export import :wasm_depend_recursion_limit;
 export import :wasm_set_parser_limit;
 export import :wasm_set_initializer_limit;

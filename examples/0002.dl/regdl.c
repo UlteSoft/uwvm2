@@ -5,9 +5,10 @@
  *************************************************************/
 
 /**
- * @author      GPT-5
+ * @author      MacroModel
  * @version     2.0.0
- * @copyright   MIT
+ * @date        2026-03-08
+ * @copyright   APL-2.0 License
  */
 
 /****************************************
@@ -19,68 +20,32 @@
  *                                      *
  ****************************************/
 
-// Minimal example dynamic library for UWVM2 DL loader
+/*
+    This example demonstrates four practical parts of a preload DL:
 
-#include <stddef.h>
-#include <stdint.h>
+    1. `uwvm_get_module_name()`
+       Exposes the module name that WebAssembly imports will reference.
 
-// Local C ABI definitions matching UWVM loader expectations
-typedef void (*capi_wasm_function)(unsigned char* res, unsigned char* para);
+    2. `uwvm_function()`
+       Registers ordinary imported functions such as `add_i32`.
 
-typedef struct capi_module_name_t_def
-{
-    char const* name;
-    size_t name_length;
-} capi_module_name_t;
+    3. `uwvm_get_custom_handler()`
+       Shows how to expose optional custom-section handlers.
 
-typedef void (*imported_c_handlefunc_ptr_t)(void);
+    4. `uwvm_set_preload_host_api_v1()` + `inspect_memory`
+       Demonstrates the stable preload memory API. The function reads the first four
+       bytes of `memory[0]`, returns their sum, and replaces the second byte with `Z`.
 
-typedef struct capi_custom_handler_t_def
-{
-    char const* custom_name_ptr;
-    size_t custom_name_length;
-    imported_c_handlefunc_ptr_t custom_handle_func;
-} capi_custom_handler_t;
+    See `README.md` and `main.wat` in the same directory for build and runtime commands.
+*/
 
-typedef struct capi_custom_handler_vec_t_def
-{
-    capi_custom_handler_t const* custom_handler_begin;
-    size_t custom_handler_size;
-} capi_custom_handler_vec_t;
+#include "interface.h"
 
-// Define function descriptors expected by UWVM loader (binary-compatible with uwvm2::uwvm::wasm::type::capi_function_t)
-typedef struct capi_function_t_def
-{
-    char const* func_name_ptr;
-    size_t func_name_length;
+#include <stdatomic.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
 
-    uint_least8_t const* para_type_vec_begin;
-    size_t para_type_vec_size;
-
-    uint_least8_t const* res_type_vec_begin;
-    size_t res_type_vec_size;
-
-    capi_wasm_function func_ptr;
-} capi_function_t;
-
-typedef struct capi_function_vec_t_def
-{
-    capi_function_t const* function_begin;
-    size_t function_size;
-} capi_function_vec_t;
-
-// WASM value_type encodings (wasm 1.0): i32=0x7F, i64=0x7E, f32=0x7D, f64=0x7C
-
-// c23, or you can use macro
-enum : uint_least8_t
-{
-    WASM_VALTYPE_I32 = 0x7F,
-    WASM_VALTYPE_I64 = 0x7E,
-    WASM_VALTYPE_F32 = 0x7D,
-    WASM_VALTYPE_F64 = 0x7C
-};
-
-// Packed parameter/result structs for the example function
 #if defined(_MSC_VER) && !defined(__clang__)
 # pragma pack(push, 1)
 #endif
@@ -90,8 +55,8 @@ struct
 #endif
     add_i32_para_t
 {
-    int_least32_t a;
-    int_least32_t b;
+    wasm_i32 lhs;
+    wasm_i32 rhs;
 };
 
 struct
@@ -100,39 +65,242 @@ struct
 #endif
     add_i32_res_t
 {
-    int_least32_t sum;
+    wasm_i32 value;
+};
+
+struct
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((packed))
+#endif
+    inspect_memory_res_t
+{
+    wasm_i32 sum;
 };
 #if defined(_MSC_VER) && !defined(__clang__)
 # pragma pack(pop)
 #endif
 
-static void add_i32_impl(unsigned char* res_bytes, unsigned char* para_bytes)
-{
-    struct add_i32_para_t const* const para = (struct add_i32_para_t const*)para_bytes;
-    struct add_i32_res_t* const res = (struct add_i32_res_t*)res_bytes;
-    res->sum = para->a + para->b;
-}
+static uwvm_preload_host_api_v1 const* g_preload_host_api;
 
-// Static metadata for the function
-static uint_least8_t const add_i32_para_types[] = {WASM_VALTYPE_I32, WASM_VALTYPE_I32};
-static uint_least8_t const add_i32_res_types[] = {WASM_VALTYPE_I32};
-
-static char const module_name_str[] = "example";
+static char const module_name_str[] = "dl.example";
 static char const func_add_i32_name[] = "add_i32";
 static char const func_do_nothing_name[] = "do_nothing";
+static char const func_inspect_memory_name[] = "inspect_memory";
 static char const custom_name_demo[] = "demo_custom";
 
-// void() -> void
+static uint_least8_t const add_i32_para_types[] = {WASM_VALTYPE_I32, WASM_VALTYPE_I32};
+static uint_least8_t const add_i32_res_types[] = {WASM_VALTYPE_I32};
+static uint_least8_t const inspect_memory_res_types[] = {WASM_VALTYPE_I32};
+
+static char const* delivery_state_name(unsigned state)
+{
+    switch(state)
+    {
+        case UWVM_PRELOAD_MEMORY_DELIVERY_COPY:
+            return "copy";
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_FULL_PROTECTION:
+            return "mmap_full_protection";
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_PARTIAL_PROTECTION:
+            return "mmap_partial_protection";
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_DYNAMIC_BOUNDS:
+            return "mmap_dynamic_bounds";
+        case UWVM_PRELOAD_MEMORY_DELIVERY_NONE:
+        default:
+            return "none";
+    }
+}
+
+static int range_is_valid(uint_least64_t byte_length, uint_least64_t offset, size_t size)
+{
+    uint_least64_t const size64 = (uint_least64_t)size;
+    return offset <= byte_length && size64 <= (byte_length - offset);
+}
+
+static int find_memory_descriptor(size_t memory_index, uwvm_preload_memory_descriptor_t* out)
+{
+    size_t i;
+    size_t count;
+
+    if(g_preload_host_api == 0 || out == 0) { return 0; }
+
+    count = g_preload_host_api->memory_descriptor_count();
+    for(i = 0u; i != count; ++i)
+    {
+        uwvm_preload_memory_descriptor_t curr;
+        if(!g_preload_host_api->memory_descriptor_at(i, &curr)) { continue; }
+        if(curr.memory_index == memory_index)
+        {
+            *out = curr;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int direct_range_is_valid(uwvm_preload_memory_descriptor_t const* descriptor, uint_least64_t offset, size_t size)
+{
+    if(descriptor == 0) { return 0; }
+
+    switch(descriptor->delivery_state)
+    {
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_FULL_PROTECTION:
+        {
+            return range_is_valid(descriptor->byte_length, offset, size);
+        }
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_PARTIAL_PROTECTION:
+        {
+            if(range_is_valid(descriptor->partial_protection_limit_bytes, offset, size)) { return 1; }
+            return range_is_valid(descriptor->byte_length, offset, size);
+        }
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_DYNAMIC_BOUNDS:
+        {
+            atomic_size_t const* current_length_atomic;
+            uint_least64_t current_length;
+
+            if(descriptor->dynamic_length_atomic_object == 0) { return 0; }
+            current_length_atomic = (atomic_size_t const*)descriptor->dynamic_length_atomic_object;
+            current_length = (uint_least64_t)atomic_load_explicit(current_length_atomic, memory_order_acquire);
+            return range_is_valid(current_length, offset, size);
+        }
+        default:
+        {
+            return 0;
+        }
+    }
+}
+
+static int read_memory_byte(uwvm_preload_memory_descriptor_t const* descriptor, uint_least64_t offset, uint_least8_t* out)
+{
+    if(descriptor == 0 || out == 0) { return 0; }
+
+    switch(descriptor->delivery_state)
+    {
+        case UWVM_PRELOAD_MEMORY_DELIVERY_COPY:
+        {
+            return g_preload_host_api != 0 && g_preload_host_api->memory_read(descriptor->memory_index, offset, out, sizeof(*out));
+        }
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_FULL_PROTECTION:
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_PARTIAL_PROTECTION:
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_DYNAMIC_BOUNDS:
+        {
+            if(descriptor->mmap_view_begin == 0 || !direct_range_is_valid(descriptor, offset, sizeof(*out))) { return 0; }
+            memcpy(out, (unsigned char const*)descriptor->mmap_view_begin + (size_t)offset, sizeof(*out));
+            return 1;
+        }
+        default:
+        {
+            return 0;
+        }
+    }
+}
+
+static int write_memory_byte(uwvm_preload_memory_descriptor_t const* descriptor, uint_least64_t offset, uint_least8_t value)
+{
+    if(descriptor == 0) { return 0; }
+
+    switch(descriptor->delivery_state)
+    {
+        case UWVM_PRELOAD_MEMORY_DELIVERY_COPY:
+        {
+            return g_preload_host_api != 0 && g_preload_host_api->memory_write(descriptor->memory_index, offset, &value, sizeof(value));
+        }
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_FULL_PROTECTION:
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_PARTIAL_PROTECTION:
+        case UWVM_PRELOAD_MEMORY_DELIVERY_MMAP_DYNAMIC_BOUNDS:
+        {
+            if(descriptor->mmap_view_begin == 0 || !direct_range_is_valid(descriptor, offset, sizeof(value))) { return 0; }
+            memcpy((unsigned char*)descriptor->mmap_view_begin + (size_t)offset, &value, sizeof(value));
+            return 1;
+        }
+        default:
+        {
+            return 0;
+        }
+    }
+}
+
+static void add_i32_impl(unsigned char* res_bytes, unsigned char* para_bytes)
+{
+    struct add_i32_para_t para;
+    struct add_i32_res_t res;
+
+    if(res_bytes == 0 || para_bytes == 0) { return; }
+
+    memcpy(&para, para_bytes, sizeof(para));
+    res.value = (wasm_i32)(para.lhs + para.rhs);
+    memcpy(res_bytes, &res, sizeof(res));
+}
+
 static void do_nothing_impl(unsigned char* res_bytes, unsigned char* para_bytes)
 {
     (void)res_bytes;
     (void)para_bytes;
 }
 
-// demo custom handler
+static void inspect_memory_impl(unsigned char* res_bytes, unsigned char* para_bytes)
+{
+    struct inspect_memory_res_t res;
+    uwvm_preload_memory_descriptor_t descriptor;
+    uint_least8_t b0;
+    uint_least8_t b1;
+    uint_least8_t b2;
+    uint_least8_t b3;
+
+    (void)para_bytes;
+    if(res_bytes == 0) { return; }
+
+    res.sum = -1;
+    if(!find_memory_descriptor(0u, &descriptor))
+    {
+        memcpy(res_bytes, &res, sizeof(res));
+        fprintf(stderr, "example-dl-c: unable to resolve memory[0]\n");
+        fflush(stderr);
+        return;
+    }
+
+    if(!read_memory_byte(&descriptor, 0u, &b0) || !read_memory_byte(&descriptor, 1u, &b1) || !read_memory_byte(&descriptor, 2u, &b2) ||
+       !read_memory_byte(&descriptor, 3u, &b3))
+    {
+        res.sum = -2;
+        memcpy(res_bytes, &res, sizeof(res));
+        fprintf(stderr, "example-dl-c: unable to read the first four bytes of memory[0]\n");
+        fflush(stderr);
+        return;
+    }
+
+    if(!write_memory_byte(&descriptor, 1u, (uint_least8_t)'Z'))
+    {
+        res.sum = -3;
+        memcpy(res_bytes, &res, sizeof(res));
+        fprintf(stderr, "example-dl-c: unable to write byte 1 of memory[0]\n");
+        fflush(stderr);
+        return;
+    }
+
+    res.sum = (wasm_i32)(b0 + b1 + b2 + b3);
+    memcpy(res_bytes, &res, sizeof(res));
+
+    fprintf(stderr,
+            "example-dl-c: state=%s backend=%u bytes=[%u,%u,%u,%u] sum=%d byte_length=%" PRIuLEAST64 " partial_limit=%" PRIuLEAST64 "\n",
+            delivery_state_name(descriptor.delivery_state),
+            descriptor.backend_kind,
+            (unsigned)b0,
+            (unsigned)b1,
+            (unsigned)b2,
+            (unsigned)b3,
+            (int)res.sum,
+            descriptor.byte_length,
+            descriptor.partial_protection_limit_bytes);
+    fflush(stderr);
+}
+
 static void demo_custom_handle(void) {}
 
-// Exported C symbols queried by UWVM loader
+void uwvm_set_preload_host_api_v1(uwvm_preload_host_api_v1 const* api)
+{
+    g_preload_host_api = api;
+}
+
 capi_module_name_t uwvm_get_module_name(void)
 {
     capi_module_name_t r;
@@ -144,13 +312,8 @@ capi_module_name_t uwvm_get_module_name(void)
 capi_custom_handler_vec_t uwvm_get_custom_handler(void)
 {
     static capi_custom_handler_t const handlers[] = {
-        {
-         /* custom_name_ptr */ custom_name_demo,
-         /* custom_name_length */ (size_t)(sizeof(custom_name_demo) - 1u),
-         /* custom_handle_func */ &demo_custom_handle,
-         },
+        {custom_name_demo, (size_t)(sizeof(custom_name_demo) - 1u), &demo_custom_handle},
     };
-
     capi_custom_handler_vec_t v;
     v.custom_handler_begin = handlers;
     v.custom_handler_size = (size_t)(sizeof(handlers) / sizeof(handlers[0]));
@@ -160,31 +323,24 @@ capi_custom_handler_vec_t uwvm_get_custom_handler(void)
 capi_function_vec_t uwvm_function(void)
 {
     static capi_function_t const functions[] = {
-        {
-         /* func_name_ptr */ func_add_i32_name,
-         /* func_name_length */ (size_t)(sizeof(func_add_i32_name) - 1u),
-         /* para_type_vec_begin */ add_i32_para_types,
-         /* para_type_vec_size */ (size_t)(sizeof(add_i32_para_types) / sizeof(add_i32_para_types[0])),
-         /* res_type_vec_begin */ add_i32_res_types,
-         /* res_type_vec_size */ (size_t)(sizeof(add_i32_res_types) / sizeof(add_i32_res_types[0])),
-         /* func_ptr */ (capi_wasm_function)&add_i32_impl,
-         },
-        {
-         /* func_name_ptr */ func_do_nothing_name,
-         /* func_name_length */ (size_t)(sizeof(func_do_nothing_name) - 1u),
-         /* para_type_vec_begin */ (uint_least8_t const*)0,
-         /* para_type_vec_size */ 0u,
-         /* res_type_vec_begin */ (uint_least8_t const*)0,
-         /* res_type_vec_size */ 0u,
-         /* func_ptr */ (capi_wasm_function)&do_nothing_impl,
-         },
+        {func_add_i32_name,
+         (size_t)(sizeof(func_add_i32_name) - 1u),
+         add_i32_para_types,
+         (size_t)(sizeof(add_i32_para_types) / sizeof(add_i32_para_types[0])),
+         add_i32_res_types,
+         (size_t)(sizeof(add_i32_res_types) / sizeof(add_i32_res_types[0])),
+         &add_i32_impl},
+        {func_do_nothing_name, (size_t)(sizeof(func_do_nothing_name) - 1u), 0, 0u, 0, 0u, &do_nothing_impl},
+        {func_inspect_memory_name,
+         (size_t)(sizeof(func_inspect_memory_name) - 1u),
+         0,
+         0u,
+         inspect_memory_res_types,
+         (size_t)(sizeof(inspect_memory_res_types) / sizeof(inspect_memory_res_types[0])),
+         &inspect_memory_impl},
     };
-
     capi_function_vec_t vec;
     vec.function_begin = functions;
     vec.function_size = (size_t)(sizeof(functions) / sizeof(functions[0]));
     return vec;
 }
-
-// clang -shared -o regdl regdl.c  --sysroot=$SYSROOT -fuse-ld=lld
-// gcc -shared -o regdl regdl.c

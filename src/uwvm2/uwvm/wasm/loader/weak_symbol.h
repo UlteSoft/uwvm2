@@ -901,6 +901,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             }
         }
 
+        wws.preload_module_memory_attribute = ::uwvm2::uwvm::wasm::storage::resolve_preload_module_memory_attribute(wws.module_name);
+
         return load_wws_rtl::ok;
     }
 #endif
