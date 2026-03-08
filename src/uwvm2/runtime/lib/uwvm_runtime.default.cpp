@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -1126,9 +1126,10 @@ namespace uwvm2::runtime::uwvm_int
             return true;
         }
 
+#if defined(UWVM_SUPPORT_MMAP)
         [[nodiscard]] inline constexpr ::std::uint_least64_t preload_partial_protection_limit_bytes(native_memory_t const& memory) noexcept
         {
-#if defined(UWVM_SUPPORT_MMAP)
+
             if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
             {
                 if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64)
@@ -1142,11 +1143,8 @@ namespace uwvm2::runtime::uwvm_int
                 static_cast<void>(memory);
                 return ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length;
             }
-#else
-            static_cast<void>(memory);
-            return 0u;
-#endif
         }
+#endif
 
         [[nodiscard]] inline bool resolve_defined_preload_memory(native_memory_t const& memory, resolved_preload_memory_t& resolved) noexcept
         {
