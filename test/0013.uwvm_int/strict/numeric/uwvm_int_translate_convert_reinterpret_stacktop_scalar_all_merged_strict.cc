@@ -362,20 +362,31 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Byref: minimal conbine window (no local.get->convert fusion for i32->f32) but should still execute correctly.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_convert_reinterpret_stacktop_scalar_all_merged_suite<opt>(rt) == 0);
         }
 
-        // Tailcall: enables the full conbine state machine (covers local.get->f32.convert_i32_{s,u} fused emission).
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_convert_reinterpret_stacktop_scalar_all_merged_suite<opt>(rt) == 0);
         }
 
-        // Tailcall + stacktop caching: fully merged scalar ring (i32/i64/f32/f64).
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_convert_reinterpret_stacktop_scalar_all_merged_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_convert_reinterpret_stacktop_scalar_all_merged_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

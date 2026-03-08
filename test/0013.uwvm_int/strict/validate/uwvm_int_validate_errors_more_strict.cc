@@ -683,6 +683,59 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_memory_size_no_memory_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        func_type ty{{}, {k_val_i32}};
+        func_body fb{};
+        op(fb.code, wasm_op::memory_size);
+        append_u8(fb.code, 0x00u);  // memidx 0
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_memory_grow_no_memory_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+
+        func_type ty{{}, {k_val_i32}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::memory_grow);
+        append_u8(fb.code, 0x00u);  // memidx 0
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_memory_grow_underflow_module()
+    {
+        module_builder mb{};
+        mb.has_memory = true;
+        mb.memory_min = 1u;
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        func_type ty{{}, {k_val_i32}};
+        func_body fb{};
+        op(fb.code, wasm_op::memory_grow);
+        append_u8(fb.code, 0x00u);  // memidx 0
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_invalid_const_immediate_i32_module()
     {
         module_builder mb{};
@@ -941,6 +994,12 @@ namespace
             compile_expect(build_illegal_memory_size_index_module(), u8"uwvm2test_validate_illegal_memory_size_idx", errc::illegal_memory_index) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_illegal_memory_grow_index_module(), u8"uwvm2test_validate_illegal_memory_grow_idx", errc::illegal_memory_index) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect(build_memory_size_no_memory_module(), u8"uwvm2test_validate_memory_size_no_memory", errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect(build_memory_grow_no_memory_module(), u8"uwvm2test_validate_memory_grow_no_memory", errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect(build_memory_grow_underflow_module(), u8"uwvm2test_validate_memory_grow_underflow", errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_local_set_type_mismatch_module(), u8"uwvm2test_validate_local_set_mismatch", errc::local_set_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(

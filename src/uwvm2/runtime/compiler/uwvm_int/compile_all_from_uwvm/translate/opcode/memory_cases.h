@@ -216,6 +216,12 @@ case wasm1_code::i64_load:
         }
     }
 #endif
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        // i64.load is a pop(i32)+push(i64) op; ensure the destination ring has a free slot before the opfunc writes it.
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_load_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
@@ -228,7 +234,14 @@ case wasm1_code::i64_load:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -606,6 +619,11 @@ case wasm1_code::i64_load8_s:
     wasm_u32 const offset{validate_mem_load(u8"i64.load8_s", 0u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -619,7 +637,14 @@ case wasm1_code::i64_load8_s:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -628,6 +653,11 @@ case wasm1_code::i64_load8_u:
     wasm_u32 const offset{validate_mem_load(u8"i64.load8_u", 0u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -641,7 +671,14 @@ case wasm1_code::i64_load8_u:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -650,6 +687,11 @@ case wasm1_code::i64_load16_s:
     wasm_u32 const offset{validate_mem_load(u8"i64.load16_s", 1u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -663,7 +705,14 @@ case wasm1_code::i64_load16_s:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -672,6 +721,11 @@ case wasm1_code::i64_load16_u:
     wasm_u32 const offset{validate_mem_load(u8"i64.load16_u", 1u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -685,7 +739,14 @@ case wasm1_code::i64_load16_u:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -694,6 +755,11 @@ case wasm1_code::i64_load32_s:
     wasm_u32 const offset{validate_mem_load(u8"i64.load32_s", 2u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -707,7 +773,14 @@ case wasm1_code::i64_load32_s:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }
@@ -716,6 +789,11 @@ case wasm1_code::i64_load32_u:
     wasm_u32 const offset{validate_mem_load(u8"i64.load32_u", 2u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+    if constexpr(stacktop_enabled_for_vt(curr_operand_stack_value_type::i64) &&
+                 !stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+    }
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
@@ -729,7 +807,14 @@ case wasm1_code::i64_load32_u:
     emit_imm_to(bytecode, offset);
     if constexpr(stacktop_enabled)
     {
-        if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        if constexpr(stacktop_ranges_merged_for(curr_operand_stack_value_type::i32, curr_operand_stack_value_type::i64))
+        {
+            if(!is_polymorphic) { codegen_stack_set_top(curr_operand_stack_value_type::i64); }
+        }
+        else
+        {
+            stacktop_after_pop_n_push1_typed_if_reachable(bytecode, 1uz, curr_operand_stack_value_type::i64);
+        }
     }
     break;
 }

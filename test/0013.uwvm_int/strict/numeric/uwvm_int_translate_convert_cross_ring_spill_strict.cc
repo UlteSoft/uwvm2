@@ -118,17 +118,31 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // No caching (byref + tailcall).
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            UWVM2TEST_REQUIRE(run_convert_cross_ring_spill_suite<opt>(rt) == 0);
-        }
-        {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_convert_cross_ring_spill_suite<opt>(rt) == 0);
         }
 
-        // Disjoint rings + ring size 1: conversions must spill to free an insertion slot.
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_convert_cross_ring_spill_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_convert_cross_ring_spill_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_convert_cross_ring_spill_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

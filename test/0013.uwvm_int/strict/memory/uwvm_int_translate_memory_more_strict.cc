@@ -99,6 +99,59 @@ namespace
         return mb.build();
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_memory_more_suite(runtime_module_t const& rt) noexcept
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+        using Runner = interpreter_runner<Opt>;
+
+        for(::std::uint64_t x : {0ull, 1ull, 0x0123456789abcdefull, 0xffffffffffffffffull})
+        {
+            auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
+                                   rt.local_defined_function_vec_storage.index_unchecked(0),
+                                   pack_i64(static_cast<::std::int64_t>(x)),
+                                   nullptr,
+                                   nullptr);
+            UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr0.results)) == x);
+
+            auto rr1 = Runner::run(cm.local_funcs.index_unchecked(1),
+                                   rt.local_defined_function_vec_storage.index_unchecked(1),
+                                   pack_i64(static_cast<::std::int64_t>(x)),
+                                   nullptr,
+                                   nullptr);
+            ::std::uint32_t low = static_cast<::std::uint32_t>(x);
+            ::std::int32_t s = static_cast<::std::int32_t>(low);
+            ::std::uint32_t u = low;
+            UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr1.results)) == (static_cast<::std::uint32_t>(s) + u));
+        }
+
+        for(float f : {0.0f, 1.0f, -1.0f, 3.25f, -3.25f})
+        {
+            auto rr2 = Runner::run(cm.local_funcs.index_unchecked(2),
+                                   rt.local_defined_function_vec_storage.index_unchecked(2),
+                                   pack_f32(f),
+                                   nullptr,
+                                   nullptr);
+            UWVM2TEST_REQUIRE(load_i32(rr2.results) == static_cast<::std::int32_t>(f));
+        }
+
+        for(double d : {0.0, 1.0, -1.0, 6.5, -6.5})
+        {
+            auto rr3 = Runner::run(cm.local_funcs.index_unchecked(3),
+                                   rt.local_defined_function_vec_storage.index_unchecked(3),
+                                   pack_f64(d),
+                                   nullptr,
+                                   nullptr);
+            UWVM2TEST_REQUIRE(load_i32(rr3.results) == static_cast<::std::int32_t>(d));
+        }
+
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_memory_more() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -114,58 +167,33 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Mode A: byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            using Runner = interpreter_runner<opt>;
-
-            for(::std::uint64_t x : {0ull, 1ull, 0x0123456789abcdefull, 0xffffffffffffffffull})
-            {
-                auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
-                                       rt.local_defined_function_vec_storage.index_unchecked(0),
-                                       pack_i64(static_cast<::std::int64_t>(x)),
-                                       nullptr,
-                                       nullptr);
-                UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr0.results)) == x);
-
-                auto rr1 = Runner::run(cm.local_funcs.index_unchecked(1),
-                                       rt.local_defined_function_vec_storage.index_unchecked(1),
-                                       pack_i64(static_cast<::std::int64_t>(x)),
-                                       nullptr,
-                                       nullptr);
-                ::std::uint32_t low = static_cast<::std::uint32_t>(x);
-                ::std::int32_t s = static_cast<::std::int32_t>(low);
-                ::std::uint32_t u = low;
-                UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr1.results)) == (static_cast<::std::uint32_t>(s) + u));
-            }
-
-            for(float f : {0.0f, 1.0f, -1.0f, 3.25f, -3.25f})
-            {
-                auto rr2 = Runner::run(cm.local_funcs.index_unchecked(2),
-                                       rt.local_defined_function_vec_storage.index_unchecked(2),
-                                       pack_f32(f),
-                                       nullptr,
-                                       nullptr);
-                UWVM2TEST_REQUIRE(load_i32(rr2.results) == static_cast<::std::int32_t>(f));
-            }
-
-            for(double d : {0.0, 1.0, -1.0, 6.5, -6.5})
-            {
-                auto rr3 = Runner::run(cm.local_funcs.index_unchecked(3),
-                                       rt.local_defined_function_vec_storage.index_unchecked(3),
-                                       pack_f64(d),
-                                       nullptr,
-                                       nullptr);
-                UWVM2TEST_REQUIRE(load_i32(rr3.results) == static_cast<::std::int32_t>(d));
-            }
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_memory_more_suite<opt>(rt) == 0);
         }
 
-        // Mode C: tailcall + stacktop caching (merged rings) smoke
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_memory_more_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_memory_more_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_memory_more_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -181,19 +209,7 @@ namespace
                 .v128_stack_top_end_pos = SIZE_MAX,
             };
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            using Runner = interpreter_runner<opt>;
-            auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
-                                   rt.local_defined_function_vec_storage.index_unchecked(0),
-                                   pack_i64(0x0123456789abcdefll),
-                                   nullptr,
-                                   nullptr);
-            UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr0.results)) == 0x0123456789abcdefull);
+            UWVM2TEST_REQUIRE(run_memory_more_suite<opt>(rt) == 0);
         }
 
         return 0;

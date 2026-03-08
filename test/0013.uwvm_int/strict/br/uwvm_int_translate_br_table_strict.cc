@@ -4,6 +4,31 @@ namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] bool bytecode_has_br_table_fptr(compiled_local_func_t const& lf) noexcept
+    {
+        constexpr auto tuple =
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+        if constexpr(Opt.i32_stack_top_begin_pos == SIZE_MAX || Opt.i32_stack_top_begin_pos == Opt.i32_stack_top_end_pos)
+        {
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
+            constexpr auto exp_br_table = optable::translate::get_uwvmint_br_table_fptr_from_tuple<Opt>(curr, tuple);
+            return bytecode_contains_fptr(lf.op.operands, exp_br_table);
+        }
+        else
+        {
+            for(::std::size_t pos = Opt.i32_stack_top_begin_pos; pos != Opt.i32_stack_top_end_pos; ++pos)
+            {
+                auto curr{make_initial_stacktop_currpos<Opt>()};
+                curr.i32_stack_top_curr_pos = pos;
+                auto const fptr = optable::translate::get_uwvmint_br_table_fptr_from_tuple<Opt>(curr, tuple);
+                if(bytecode_contains_fptr(lf.op.operands, fptr)) { return true; }
+            }
+            return false;
+        }
+    }
+
     [[nodiscard]] byte_vec build_br_table_module()
     {
         module_builder mb{};
@@ -77,6 +102,53 @@ namespace
         return mb.build();
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_br_table_suite(runtime_module_t const& rt) noexcept
+    {
+        if constexpr(Opt.is_tail_call) { static_assert(compiler::details::interpreter_tuple_has_no_holes<Opt>()); }
+
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+        UWVM2TEST_REQUIRE(bytecode_has_br_table_fptr<Opt>(cm.local_funcs.index_unchecked(0)));
+
+        using Runner = interpreter_runner<Opt>;
+        auto run_sel = [&](::std::int32_t selector) noexcept
+        {
+            return load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
+                                        rt.local_defined_function_vec_storage.index_unchecked(0),
+                                        pack_i32(selector),
+                                        nullptr,
+                                        nullptr)
+                                .results);
+        };
+
+        if constexpr(!Opt.is_tail_call)
+        {
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
+            constexpr auto tuple =
+                compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+            constexpr auto exp_br_table = optable::translate::get_uwvmint_br_table_fptr_from_tuple<Opt>(curr, tuple);
+            auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
+                                   rt.local_defined_function_vec_storage.index_unchecked(0),
+                                   pack_i32(2),
+                                   exp_br_table,
+                                   nullptr);
+            UWVM2TEST_REQUIRE(rr0.hit_expected0);
+            UWVM2TEST_REQUIRE(load_i32(rr0.results) == 30);
+        }
+
+        UWVM2TEST_REQUIRE(run_sel(0) == 10);
+        UWVM2TEST_REQUIRE(run_sel(1) == 20);
+        UWVM2TEST_REQUIRE(run_sel(2) == 30);
+        UWVM2TEST_REQUIRE(run_sel(3) == 40);
+        UWVM2TEST_REQUIRE(run_sel(4) == 40);
+        UWVM2TEST_REQUIRE(run_sel(100) == 40);
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_br_table() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -92,40 +164,31 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Mode A: tailcall (no stacktop caching) + strict br_table opfunc present.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-            constexpr auto exp_br_table = optable::translate::get_uwvmint_br_table_fptr_from_tuple<opt>(curr, tuple);
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_br_table));
-
-            using Runner = interpreter_runner<opt>;
-            auto run_sel = [&](::std::int32_t selector) noexcept
-            {
-                return load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                            rt.local_defined_function_vec_storage.index_unchecked(0),
-                                            pack_i32(selector),
-                                            nullptr,
-                                            nullptr)
-                                    .results);
-            };
-            UWVM2TEST_REQUIRE(run_sel(0) == 10);
-            UWVM2TEST_REQUIRE(run_sel(1) == 20);
-            UWVM2TEST_REQUIRE(run_sel(2) == 30);
-            UWVM2TEST_REQUIRE(run_sel(3) == 40);
-            UWVM2TEST_REQUIRE(run_sel(4) == 40);
-            UWVM2TEST_REQUIRE(run_sel(100) == 40);
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_br_table_suite<opt>(rt) == 0);
         }
 
-        // Mode B: tailcall + stacktop caching (exercise cached-index specialization selection).
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_br_table_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_br_table_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_br_table_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -140,70 +203,7 @@ namespace
                 .v128_stack_top_begin_pos = SIZE_MAX,
                 .v128_stack_top_end_pos = SIZE_MAX,
             };
-            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-
-            bool any_match{};
-            for(::std::size_t pos = opt.i32_stack_top_begin_pos; pos != opt.i32_stack_top_end_pos; ++pos)
-            {
-                optable::uwvm_interpreter_stacktop_currpos_t curr{
-                    .i32_stack_top_curr_pos = pos,
-                };
-                auto const fptr = optable::translate::get_uwvmint_br_table_fptr_from_tuple<opt>(curr, tuple);
-                if(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, fptr))
-                {
-                    any_match = true;
-                    break;
-                }
-            }
-            UWVM2TEST_REQUIRE(any_match);
-
-            using Runner = interpreter_runner<opt>;
-            auto run_sel = [&](::std::int32_t selector) noexcept
-            {
-                return load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                            rt.local_defined_function_vec_storage.index_unchecked(0),
-                                            pack_i32(selector),
-                                            nullptr,
-                                            nullptr)
-                                    .results);
-            };
-            UWVM2TEST_REQUIRE(run_sel(0) == 10);
-            UWVM2TEST_REQUIRE(run_sel(1) == 20);
-            UWVM2TEST_REQUIRE(run_sel(2) == 30);
-            UWVM2TEST_REQUIRE(run_sel(3) == 40);
-            UWVM2TEST_REQUIRE(run_sel(4) == 40);
-        }
-
-        // Mode C: byref mode instruments hitting `br_table`.
-        {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-            constexpr auto exp_br_table = optable::translate::get_uwvmint_br_table_fptr_from_tuple<opt>(curr, tuple);
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_br_table));
-
-            using Runner = interpreter_runner<opt>;
-            auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
-                                   rt.local_defined_function_vec_storage.index_unchecked(0),
-                                   pack_i32(2),
-                                   exp_br_table,
-                                   nullptr);
-            UWVM2TEST_REQUIRE(rr0.hit_expected0);
-            UWVM2TEST_REQUIRE(load_i32(rr0.results) == 30);
+            UWVM2TEST_REQUIRE(run_br_table_suite<opt>(rt) == 0);
         }
 
         return 0;

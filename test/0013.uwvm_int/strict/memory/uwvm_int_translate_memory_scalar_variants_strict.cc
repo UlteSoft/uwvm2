@@ -331,14 +331,33 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            auto rc = run_memory_scalar_variants<opt>(rt);
-            UWVM2TEST_REQUIRE(rc == 0);
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_memory_scalar_variants<opt>(rt) == 0);
         }
 
-        // Tailcall + merged scalar rings (exercise stacktop-aware memory ops).
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_memory_scalar_variants<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_memory_scalar_variants<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_memory_scalar_variants<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -354,9 +373,7 @@ namespace
                 .v128_stack_top_end_pos = SIZE_MAX,
             };
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-
-            auto rc = run_memory_scalar_variants<opt>(rt);
-            UWVM2TEST_REQUIRE(rc == 0);
+            UWVM2TEST_REQUIRE(run_memory_scalar_variants<opt>(rt) == 0);
         }
 
         return 0;
