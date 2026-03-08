@@ -302,33 +302,33 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Mode A: byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Mode B: tailcall (no caching)
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Mode C: tailcall + stacktop caching (merged rings) smoke.
+        if(abi_mode_enabled("tail-sysv"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 5uz,
-                .f32_stack_top_end_pos = 7uz,
-                .f64_stack_top_begin_pos = 5uz,
-                .f64_stack_top_end_pos = 7uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_hardfloat_abi_opt<2uz, 2uz>()};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }

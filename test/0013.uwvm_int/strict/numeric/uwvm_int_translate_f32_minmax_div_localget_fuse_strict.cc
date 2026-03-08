@@ -154,7 +154,7 @@ namespace
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         if constexpr(Opt.is_tail_call)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
@@ -177,9 +177,10 @@ namespace
 #endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-        if constexpr(Opt.is_tail_call)
+        if constexpr(Opt.is_tail_call && Opt.i32_stack_top_begin_pos == SIZE_MAX && Opt.i64_stack_top_begin_pos == SIZE_MAX &&
+                     Opt.f32_stack_top_begin_pos == SIZE_MAX && Opt.f64_stack_top_begin_pos == SIZE_MAX && Opt.v128_stack_top_begin_pos == SIZE_MAX)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
@@ -294,15 +295,27 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode triggers combine/delay-local state machines.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
-        // byref smoke
+        if(abi_mode_enabled("tail-sysv"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
@@ -321,4 +334,3 @@ int main()
         return ::uwvm2test::uwvm_int_strict::fail(__LINE__, "uncaught exception");
     }
 }
-

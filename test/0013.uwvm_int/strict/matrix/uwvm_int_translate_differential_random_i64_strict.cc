@@ -1,7 +1,5 @@
 #include "../uwvm_int_translate_strict_common.h"
 
-#include <cstdlib>
-
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
@@ -74,11 +72,6 @@ namespace
     };
 
     using program = ::std::vector<inst>;
-
-    [[nodiscard]] bool is_coverage_run() noexcept
-    {
-        return ::std::getenv("LLVM_PROFILE_FILE") != nullptr;
-    }
 
     [[nodiscard]] constexpr ::std::uint64_t rotl64(::std::uint64_t x, ::std::uint64_t r) noexcept
     {
@@ -685,8 +678,8 @@ namespace
     {
         ::std::uint32_t seed{};
         program prog{};
-        ::std::array<::std::array<::std::int64_t, 3uz>, 3uz> params{};
-        ::std::array<::std::uint64_t, 3uz> expected{};
+        ::std::vector<::std::array<::std::int64_t, 3uz>> params{};
+        ::std::vector<::std::uint64_t> expected{};
     };
 
     [[nodiscard]] char const* name(inst_kind k) noexcept
@@ -1230,9 +1223,9 @@ namespace
         optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
 
         ::std::vector<func_spec> funcs{};
-        bool const coverage = is_coverage_run();
-        ::std::uint32_t const program_count = coverage ? 96u : 20u;
-        int const steps = coverage ? 128 : 56;
+        ::std::uint32_t const program_count = pick_for_strict_matrix_level<::std::uint32_t>(20u, 48u, 96u);
+        int const steps = pick_for_strict_matrix_level<int>(56, 96, 128);
+        ::std::size_t const case_count = pick_for_strict_matrix_level<::std::size_t>(3uz, 5uz, 7uz);
         funcs.reserve(program_count);
 
         for(::std::uint32_t i = 0; i < program_count; ++i)
@@ -1242,23 +1235,46 @@ namespace
             func_spec fs{};
             fs.seed = seed;
             fs.prog = make_program(seed, steps);
+            fs.params.reserve(case_count);
+            fs.expected.reserve(case_count);
 
             xorshift32 prng{seed ^ 0x5A5A'5A5Au};
-            fs.params[0] = {static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed) << 32),
-                            static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed ^ 0x1357'9BDFu)),
-                            0};  // select: false path
-            fs.params[1] = {static_cast<::std::int64_t>(~static_cast<::std::uint64_t>(seed)),
-                            static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed) * 3ull + 7ull),
-                            1};  // select: true path
-            fs.params[2] = {::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
-                            ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
-                            ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next())};
+            fs.params.push_back({static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed) << 32),
+                                 static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed ^ 0x1357'9BDFu)),
+                                 0});  // select: false path
+            fs.params.push_back({static_cast<::std::int64_t>(~static_cast<::std::uint64_t>(seed)),
+                                 static_cast<::std::int64_t>(static_cast<::std::uint64_t>(seed) * 3ull + 7ull),
+                                 1});  // select: true path
+            fs.params.push_back({::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
+                                 ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
+                                 ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next())});
 
-            for(::std::size_t ci = 0; ci < fs.params.size(); ++ci)
+            if(case_count >= 4uz)
             {
-                auto const& p = fs.params[ci];
-                fs.expected[ci] = simulate(fs.prog, p[0], p[1], p[2]);
+                fs.params.push_back({::std::numeric_limits<::std::int64_t>::min(),
+                                     ::std::numeric_limits<::std::int64_t>::max(),
+                                     -1});
             }
+            if(case_count >= 5uz)
+            {
+                fs.params.push_back({0,
+                                     ::std::bit_cast<::std::int64_t>(0x7fff'0001'0000'0000ull ^ static_cast<::std::uint64_t>(seed)),
+                                     static_cast<::std::int64_t>(prng.next() & 63u)});
+            }
+            if(case_count >= 6uz)
+            {
+                fs.params.push_back({::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(seed) << 33) ^ 0x8000'0000'0000'0000ull),
+                                     ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(seed) << 17) ^ 0x7fff'ffff'ffff'ffffull),
+                                     ::std::bit_cast<::std::int64_t>(static_cast<::std::uint64_t>(prng.next() & 63u))});
+            }
+            if(case_count >= 7uz)
+            {
+                fs.params.push_back({::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
+                                     ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next()),
+                                     ::std::bit_cast<::std::int64_t>((static_cast<::std::uint64_t>(prng.next()) << 32) | prng.next())});
+            }
+
+            for(auto const& p : fs.params) { fs.expected.push_back(simulate(fs.prog, p[0], p[1], p[2])); }
 
             funcs.push_back(::std::move(fs));
         }
@@ -1268,52 +1284,53 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
         }
 
-        // tailcall (no cache)
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
         }
 
-        // tailcall + stacktop caching (small merged scalar4)
+        if(abi_mode_enabled("tail-sysv"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 3uz,
-                .f32_stack_top_end_pos = 5uz,
-                .f64_stack_top_begin_pos = 3uz,
-                .f64_stack_top_end_pos = 5uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_opt};
             UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
         }
 
-        // tailcall + stacktop caching (fully split rings)
+        if(abi_mode_enabled("tail-aapcs64"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 5uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 7uz,
-                .f32_stack_top_end_pos = 9uz,
-                .f64_stack_top_begin_pos = 9uz,
-                .f64_stack_top_end_pos = 11uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv-v128"))
+        {
+            constexpr auto opt{k_test_tail_sysv_v128_opt};
+            UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64-v128"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_v128_opt};
+            UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            {
+                constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+                UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
+            }
+
+            {
+                constexpr auto opt{make_tailcall_fully_split_opt<2uz, 2uz, 2uz, 2uz>()};
+                UWVM2TEST_REQUIRE(run_differential_suite<opt>(rt, funcs) == 0);
+            }
         }
 
         return 0;

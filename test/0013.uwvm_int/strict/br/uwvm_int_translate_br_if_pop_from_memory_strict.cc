@@ -105,21 +105,34 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Byref mode: semantics smoke.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Tailcall mode (no stacktop caching): semantics smoke.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         // Tailcall + stacktop caching with a tiny fully-merged scalar ring (1 slot).
         // This forces `i64.ne` (net stack effect -1) to leave the i32 condition in operand stack memory
         // when it is immediately followed by `br_if`, so `br_if` must pop from memory.
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

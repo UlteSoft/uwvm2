@@ -510,6 +510,45 @@ namespace
         return ok;
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_call_indirect_semantics(runtime_module_t const& rt, compiled_module_t const& cm) noexcept
+    {
+        g_cm = ::std::addressof(cm);
+
+        using Runner = interpreter_runner<Opt>;
+
+#define UWVM2TEST_RUN_EXPECT_I32(FuncIdx, Params, Expected)                                                                      \
+        do                                                                                                                       \
+        {                                                                                                                        \
+            ::std::size_t const func_idx__{(FuncIdx)};                                                                           \
+            trace_ci("[ci] exec caller func_idx=", func_idx__);                                                                  \
+            auto r__ = Runner::run(cm.local_funcs.index_unchecked(func_idx__),                                                   \
+                                   rt.local_defined_function_vec_storage.index_unchecked(func_idx__),                            \
+                                   (Params),                                                                                     \
+                                   nullptr,                                                                                      \
+                                   nullptr);                                                                                     \
+            auto const got__ = load_i32(r__.results);                                                                            \
+            trace_ci("[ci] exec caller func_idx=", func_idx__, " got=", got__, " expected=", static_cast<::std::int32_t>(Expected)); \
+            UWVM2TEST_REQUIRE(got__ == static_cast<::std::int32_t>(Expected));                                                   \
+        }                                                                                                                        \
+        while(false)
+
+        UWVM2TEST_RUN_EXPECT_I32(10uz, pack_no_params(), 11);
+        UWVM2TEST_RUN_EXPECT_I32(11uz, pack_no_params(), 123);
+        UWVM2TEST_RUN_EXPECT_I32(12uz, pack_i32(5), 12);
+        UWVM2TEST_RUN_EXPECT_I32(13uz, pack_i32(999), 55);
+        UWVM2TEST_RUN_EXPECT_I32(14uz, pack_i32x2(0x1234, 0xff00), (0x1234 ^ 0xff00));
+        UWVM2TEST_RUN_EXPECT_I32(15uz, pack_i32x3(1, 2, 3), 1);
+        UWVM2TEST_RUN_EXPECT_I32(16uz, pack_i32x4(9, 8, 7, 6), 9);
+        UWVM2TEST_RUN_EXPECT_I32(17uz, pack_i32x4(1, 2, 3, 4), 66);
+        UWVM2TEST_RUN_EXPECT_I32(18uz, pack_i32x5(42, 1, 2, 3, 4), 42);
+        UWVM2TEST_RUN_EXPECT_I32(19uz, pack_i32(123), 77);
+        UWVM2TEST_RUN_EXPECT_I32(20uz, pack_i32(5), 12);
+
+#undef UWVM2TEST_RUN_EXPECT_I32
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_call_indirect() noexcept
     {
         g_trace_ci = (::std::getenv("UWVM2TEST_TRACE_CI") != nullptr);
@@ -557,7 +596,52 @@ namespace
             }
         }
 
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr auto opt{k_test_byref_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            cop.curr_wasm_id = 0uz;
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_call_indirect_semantics<opt>(rt, cm) == 0);
+        }
+
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            cop.curr_wasm_id = 0uz;
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_call_indirect_semantics<opt>(rt, cm) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            cop.curr_wasm_id = 0uz;
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_call_indirect_semantics<opt>(rt, cm) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            cop.curr_wasm_id = 0uz;
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_call_indirect_semantics<opt>(rt, cm) == 0);
+        }
+
         // Mode C: tailcall + stacktop caching (scalar4 merged). Verify stacktop call_indirect fast paths + drop/local_set fusion.
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -579,7 +663,6 @@ namespace
             cop.curr_wasm_id = 0uz;
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
             UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-            g_cm = ::std::addressof(cm);
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
             constexpr auto tuple =
@@ -679,56 +762,7 @@ namespace
                 UWVM2TEST_REQUIRE(contains_any_stacktop_ci(cm.local_funcs.index_unchecked(20).op.operands, f3, f4, f5, f6));
             }
 #endif
-
-            using Runner = interpreter_runner<opt>;
-
-#define UWVM2TEST_RUN_EXPECT_I32(FuncIdx, Params, Expected)                                                                  \
-    do                                                                                                                       \
-    {                                                                                                                        \
-        ::std::size_t const func_idx__{(FuncIdx)};                                                                           \
-        trace_ci("[ci] exec caller func_idx=", func_idx__);                                                                  \
-        auto r__ = Runner::run(cm.local_funcs.index_unchecked(func_idx__),                                                   \
-                               rt.local_defined_function_vec_storage.index_unchecked(func_idx__),                           \
-                               (Params),                                                                                    \
-                               nullptr,                                                                                      \
-                               nullptr);                                                                                     \
-        auto const got__ = load_i32(r__.results);                                                                            \
-        trace_ci("[ci] exec caller func_idx=", func_idx__, " got=", got__, " expected=", static_cast<::std::int32_t>(Expected)); \
-        UWVM2TEST_REQUIRE(got__ == static_cast<::std::int32_t>(Expected));                                                   \
-    }                                                                                                                        \
-    while(false)
-
-            UWVM2TEST_RUN_EXPECT_I32(10uz, pack_no_params(), 11);
-            UWVM2TEST_RUN_EXPECT_I32(11uz, pack_no_params(), 123);
-            UWVM2TEST_RUN_EXPECT_I32(12uz, pack_i32(5), 12);
-            UWVM2TEST_RUN_EXPECT_I32(14uz, pack_i32x2(0x1234, 0xff00), (0x1234 ^ 0xff00));
-            UWVM2TEST_RUN_EXPECT_I32(15uz, pack_i32x3(1, 2, 3), 1);
-            UWVM2TEST_RUN_EXPECT_I32(16uz, pack_i32x4(9, 8, 7, 6), 9);
-            UWVM2TEST_RUN_EXPECT_I32(17uz, pack_i32x4(1, 2, 3, 4), 66);
-            UWVM2TEST_RUN_EXPECT_I32(18uz, pack_i32x5(42, 1, 2, 3, 4), 42);
-            UWVM2TEST_RUN_EXPECT_I32(19uz, pack_i32(123), 77);
-            UWVM2TEST_RUN_EXPECT_I32(20uz, pack_i32(5), 12);
-
-#undef UWVM2TEST_RUN_EXPECT_I32
-        }
-
-        // Mode A: byref - semantics smoke for call_indirect byref opfunc layout.
-        {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            cop.curr_wasm_id = 0uz;
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-            g_cm = ::std::addressof(cm);
-
-            using Runner = interpreter_runner<opt>;
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(12),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(12),
-                                                  pack_i32(5),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 12);
+            UWVM2TEST_REQUIRE(run_call_indirect_semantics<opt>(rt, cm) == 0);
         }
 
         return 0;

@@ -195,9 +195,11 @@ namespace
         UWVM2TEST_REQUIRE(optable::trap_invalid_conversion_to_integer_func == exit_12);
         UWVM2TEST_REQUIRE(optable::trap_integer_overflow_func == exit_11);
 
-        // Ensure f8 actually contains the expected `i32.trunc_f32_s` opfunc (helps detect unexpected fusions/layout changes).
+        // Keep bytecode shape checks to non-cached layouts. Cached ABIs can legitimately select different stacktop-specialized variants after `f32.const`.
+        if constexpr(Opt.i32_stack_top_begin_pos == SIZE_MAX && Opt.i64_stack_top_begin_pos == SIZE_MAX && Opt.f32_stack_top_begin_pos == SIZE_MAX &&
+                     Opt.f64_stack_top_begin_pos == SIZE_MAX && Opt.v128_stack_top_begin_pos == SIZE_MAX)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
             auto const exp_trunc =
@@ -258,16 +260,30 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             int const ec = compile_and_run_trunc_trap_matrix<opt>(rt);
             if(ec != 0) { return ec; }
         }
 
-        // tailcall
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            int const ec = compile_and_run_trunc_trap_matrix<opt>(rt);
+            if(ec != 0) { return ec; }
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            int const ec = compile_and_run_trunc_trap_matrix<opt>(rt);
+            if(ec != 0) { return ec; }
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             int const ec = compile_and_run_trunc_trap_matrix<opt>(rt);
             if(ec != 0) { return ec; }
         }

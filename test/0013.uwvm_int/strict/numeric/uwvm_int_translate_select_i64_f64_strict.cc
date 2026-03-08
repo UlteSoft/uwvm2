@@ -132,15 +132,15 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: assert typed `select` opfuncs exist for i64/f64 (no special fusion expected).
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             ::uwvm2::validation::error::code_validation_error_impl err{};
             optable::compile_option cop{};
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
             UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
 
@@ -151,33 +151,33 @@ namespace
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_sel_f64));
         }
 
-        // Mode A: byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_select_suite<opt>(rt) == 0);
         }
 
-        // Mode B: tailcall (no caching)
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_select_suite<opt>(rt) == 0);
         }
 
-        // Mode C: tailcall + stacktop caching (exercise select stacktop specialization paths).
+        if(abi_mode_enabled("tail-sysv"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 5uz,
-                .f32_stack_top_end_pos = 7uz,
-                .f64_stack_top_begin_pos = 5uz,
-                .f64_stack_top_end_pos = 7uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_select_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_select_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_hardfloat_abi_opt<2uz, 2uz>()};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE(run_select_suite<opt>(rt) == 0);
         }
@@ -190,4 +190,3 @@ int main()
 {
     return test_translate_select_i64_f64();
 }
-

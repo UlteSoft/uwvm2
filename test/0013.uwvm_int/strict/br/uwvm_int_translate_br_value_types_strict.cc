@@ -173,19 +173,33 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_br_value_types_suite<opt>(rt) == 0);
         }
 
-        // tailcall
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_br_value_types_suite<opt>(rt) == 0);
         }
 
-        // tailcall + stacktop caching (int/float merged rings)
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_br_value_types_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_br_value_types_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

@@ -490,25 +490,12 @@ namespace
         return mb.build();
     }
 
-    [[nodiscard]] int test_translate_trivial_call_kinds() noexcept
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
     {
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-
-        auto const wasm = build_trivial_kinds_module();
-        auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_trivial_call_kinds");
-        UWVM2TEST_REQUIRE(prep.mod != nullptr);
-        runtime_module_t const& rt = *prep.mod;
-
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
         ::uwvm2::validation::error::code_validation_error_impl err{};
         optable::compile_option cop{};
-        auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
         UWVM2TEST_REQUIRE(cm.local_defined_call_info.size() == 25uz);
@@ -616,6 +603,48 @@ namespace
             code.body.expr_begin = bad_i32_leb;
             code.body.code_end = bad_i32_leb + (sizeof(bad_i32_leb) / sizeof(bad_i32_leb[0]));
             UWVM2TEST_REQUIRE(compiler::details::match_trivial_call_inline_body(&code).kind == kind_t::none);
+        }
+
+        return 0;
+    }
+
+    [[nodiscard]] int test_translate_trivial_call_kinds() noexcept
+    {
+        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
+        optable::unreachable_func = +trap_unexpected;
+        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
+        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
+        optable::trap_integer_overflow_func = +trap_unexpected;
+        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+
+        auto const wasm = build_trivial_kinds_module();
+        auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_trivial_call_kinds");
+        UWVM2TEST_REQUIRE(prep.mod != nullptr);
+        runtime_module_t const& rt = *prep.mod;
+
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-min"))
+        {
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;

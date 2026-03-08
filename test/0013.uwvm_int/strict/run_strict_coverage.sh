@@ -6,7 +6,6 @@ ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
-TRANSLATE_H="src/uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h"
 
 if [[ -z "${SYSROOT:-}" ]]; then
   echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
@@ -60,6 +59,14 @@ COMMON_F_FLAGS=(
   --enable-uwvm-int-delay-local=heavy
 )
 
+export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
+export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-coverage}"
+COVER_INCLUDE_REGEX="${UWVM_STRICT_COVERAGE_REGEX:-.*src/uwvm2/runtime/compiler/uwvm_int/(compile_all_from_uwvm|optable)/.*}"
+
+echo "INFO: strict coverage ABI modes = ${UWVM2TEST_ABI_MODES}"
+echo "INFO: strict coverage matrix level = ${UWVM2TEST_MATRIX_LEVEL}"
+echo "INFO: strict coverage regex = ${COVER_INCLUDE_REGEX}"
+
 COVER_CXFLAGS="-fprofile-instr-generate -fcoverage-mapping"
 COVER_LDFLAGS="-fprofile-instr-generate -fcoverage-mapping"
 
@@ -111,7 +118,7 @@ fi
 echo "=== uwvm_int strict coverage: merge profraw -> profdata ==="
 "${LLVM_PROFDATA}" merge -sparse "${PROFRAW_DIR}"/*.profraw -o "${PROFDATA_FILE}"
 
-echo "=== uwvm_int strict coverage: generate html for translate.h ==="
+echo "=== uwvm_int strict coverage: generate html for compile_all_from_uwvm + optable ==="
 mkdir -p -- "${HTML_DIR}"
 
 OBJECT_ARGS=()
@@ -134,15 +141,25 @@ done
   --output-dir="${HTML_DIR}" \
   --show-region-summary \
   --show-branch-summary \
-  --include-filename-regex='.*compile_all_from_uwvm/translate[.]h$' \
+  --include-filename-regex="${COVER_INCLUDE_REGEX}" \
   "${OBJECT_ARGS[@]}" >/dev/null
 
 echo "OK: coverage html written to: ${HTML_DIR}"
 
-echo "=== uwvm_int strict coverage: export json for translate.h ==="
+echo "=== uwvm_int strict coverage: export json for compile_all_from_uwvm + optable ==="
 "${LLVM_COV}" export \
   -instr-profile="${PROFDATA_FILE}" \
-  --include-filename-regex='.*compile_all_from_uwvm/translate[.]h$' \
-  "${OBJECT_ARGS[@]}" > "${COVER_DIR}/translate_export.json"
+  --include-filename-regex="${COVER_INCLUDE_REGEX}" \
+  "${OBJECT_ARGS[@]}" > "${COVER_DIR}/uwvm_int_compiler_export.json"
 
-echo "OK: coverage json written to: ${COVER_DIR}/translate_export.json"
+echo "OK: coverage json written to: ${COVER_DIR}/uwvm_int_compiler_export.json"
+
+echo "=== uwvm_int strict coverage: text summary for compile_all_from_uwvm + optable ==="
+"${LLVM_COV}" report \
+  -instr-profile="${PROFDATA_FILE}" \
+  --ignore-filename-regex='^$' \
+  "${OBJECT_ARGS[@]}" | \
+  perl -ne 'print if m{src/uwvm2/runtime/compiler/uwvm_int/(compile_all_from_uwvm|optable)/}' \
+  > "${COVER_DIR}/uwvm_int_compiler_report.txt"
+
+echo "OK: coverage report written to: ${COVER_DIR}/uwvm_int_compiler_report.txt"

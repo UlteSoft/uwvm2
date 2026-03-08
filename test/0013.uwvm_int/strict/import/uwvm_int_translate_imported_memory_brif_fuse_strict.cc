@@ -143,7 +143,7 @@ namespace
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         if constexpr(Opt.is_tail_call)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
@@ -180,15 +180,27 @@ namespace
 
         UWVM2TEST_REQUIRE(rt.imported_memory_vec_storage.size() == 1uz);
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // tailcall (needed for memory mega-fusions)
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 

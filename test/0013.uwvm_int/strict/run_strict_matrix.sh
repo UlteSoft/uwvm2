@@ -88,7 +88,30 @@ if [[ "${#STRICT_TARGETS[@]}" -eq 0 && "${#VALIDATE_TARGETS[@]}" -eq 0 ]]; then
 fi
 
 COMBINE_MODES=(none soft heavy extra)
+if [[ -n "${UWVM_STRICT_COMBINE_MODES:-}" ]]; then
+  read -r -a COMBINE_MODES <<< "${UWVM_STRICT_COMBINE_MODES//,/ }"
+fi
+if [[ "${#COMBINE_MODES[@]}" -eq 0 ]]; then
+  echo "ERR: combine mode list is empty." >&2
+  exit 4
+fi
+
 DELAY_MODES=(none soft heavy)
+if [[ -n "${UWVM_STRICT_DELAY_MODES:-}" ]]; then
+  read -r -a DELAY_MODES <<< "${UWVM_STRICT_DELAY_MODES//,/ }"
+fi
+if [[ "${#DELAY_MODES[@]}" -eq 0 ]]; then
+  echo "ERR: delay mode list is empty." >&2
+  exit 4
+fi
+
+export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-byref,tail-min,tail-sysv,tail-aapcs64}"
+export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-default}"
+
+echo "INFO: strict ABI modes = ${UWVM2TEST_ABI_MODES}"
+echo "INFO: strict matrix level = ${UWVM2TEST_MATRIX_LEVEL}"
+echo "INFO: strict combine modes = ${COMBINE_MODES[*]}"
+echo "INFO: strict delay modes = ${DELAY_MODES[*]}"
 
 if [[ "${#STRICT_TARGETS[@]}" -gt 0 ]]; then
   for combine in "${COMBINE_MODES[@]}"; do

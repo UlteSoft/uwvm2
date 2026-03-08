@@ -4,6 +4,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
@@ -67,6 +68,191 @@ namespace uwvm2test::uwvm_int_strict
     } while(false)
 
     using byte_vec = ::std::vector<::std::byte>;
+
+    enum class strict_matrix_level : ::std::uint8_t
+    {
+        default_,
+        expanded,
+        coverage,
+    };
+
+    [[nodiscard]] inline bool env_token_list_contains(char const* env_name, char const* token) noexcept
+    {
+        auto const* env = ::std::getenv(env_name);
+        if(env == nullptr || *env == '\0') { return false; }
+
+        auto const token_len = ::std::strlen(token);
+        auto const match = [&](char const* first, char const* last) noexcept
+        {
+            while(first != last && (*first == ' ' || *first == '\t')) { ++first; }
+            while(first != last && (last[-1] == ' ' || last[-1] == '\t')) { --last; }
+
+            auto const len = static_cast<::std::size_t>(last - first);
+            return (len == 3uz && ::std::memcmp(first, "all", 3uz) == 0) || (len == token_len && ::std::memcmp(first, token, token_len) == 0);
+        };
+
+        char const* first = env;
+        for(char const* p = env;; ++p)
+        {
+            if(*p != '\0' && *p != ',' && *p != ';' && *p != '|') { continue; }
+            if(match(first, p)) { return true; }
+            if(*p == '\0') { break; }
+            first = p + 1;
+        }
+        return false;
+    }
+
+    [[nodiscard]] inline strict_matrix_level current_strict_matrix_level() noexcept
+    {
+        if(auto const* env = ::std::getenv("UWVM2TEST_MATRIX_LEVEL"); env != nullptr && *env != '\0')
+        {
+            if(::std::strcmp(env, "coverage") == 0) { return strict_matrix_level::coverage; }
+            if(::std::strcmp(env, "expanded") == 0 || ::std::strcmp(env, "wide") == 0 || ::std::strcmp(env, "full") == 0)
+            {
+                return strict_matrix_level::expanded;
+            }
+            return strict_matrix_level::default_;
+        }
+
+        if(::std::getenv("LLVM_PROFILE_FILE") != nullptr) { return strict_matrix_level::coverage; }
+        return strict_matrix_level::default_;
+    }
+
+    [[nodiscard]] inline bool strict_matrix_level_at_least(strict_matrix_level level) noexcept
+    {
+        return static_cast<::std::uint8_t>(current_strict_matrix_level()) >= static_cast<::std::uint8_t>(level);
+    }
+
+    template <typename T>
+    [[nodiscard]] inline T pick_for_strict_matrix_level(T base, T expanded, T coverage) noexcept
+    {
+        switch(current_strict_matrix_level())
+        {
+            case strict_matrix_level::coverage: return coverage;
+            case strict_matrix_level::expanded: return expanded;
+            default: return base;
+        }
+    }
+
+    template <::std::size_t IntSlots, ::std::size_t FloatSlots, bool ShareV128 = false>
+    [[nodiscard]] consteval optable::uwvm_interpreter_translate_option_t make_tailcall_hardfloat_abi_opt() noexcept
+    {
+        static_assert(IntSlots > 0uz);
+        static_assert(FloatSlots > 0uz);
+
+        constexpr ::std::size_t int_begin{3uz};
+        constexpr ::std::size_t int_end{int_begin + IntSlots};
+        constexpr ::std::size_t float_begin{int_end};
+        constexpr ::std::size_t float_end{float_begin + FloatSlots};
+
+        return optable::uwvm_interpreter_translate_option_t{
+            .is_tail_call = true,
+            .i32_stack_top_begin_pos = int_begin,
+            .i32_stack_top_end_pos = int_end,
+            .i64_stack_top_begin_pos = int_begin,
+            .i64_stack_top_end_pos = int_end,
+            .f32_stack_top_begin_pos = float_begin,
+            .f32_stack_top_end_pos = float_end,
+            .f64_stack_top_begin_pos = float_begin,
+            .f64_stack_top_end_pos = float_end,
+            .v128_stack_top_begin_pos = ShareV128 ? float_begin : SIZE_MAX,
+            .v128_stack_top_end_pos = ShareV128 ? float_end : SIZE_MAX,
+        };
+    }
+
+    template <::std::size_t ScalarSlots>
+    [[nodiscard]] consteval optable::uwvm_interpreter_translate_option_t make_tailcall_scalar4_merged_opt() noexcept
+    {
+        static_assert(ScalarSlots > 0uz);
+        constexpr ::std::size_t begin{3uz};
+        constexpr ::std::size_t end{begin + ScalarSlots};
+
+        return optable::uwvm_interpreter_translate_option_t{
+            .is_tail_call = true,
+            .i32_stack_top_begin_pos = begin,
+            .i32_stack_top_end_pos = end,
+            .i64_stack_top_begin_pos = begin,
+            .i64_stack_top_end_pos = end,
+            .f32_stack_top_begin_pos = begin,
+            .f32_stack_top_end_pos = end,
+            .f64_stack_top_begin_pos = begin,
+            .f64_stack_top_end_pos = end,
+            .v128_stack_top_begin_pos = SIZE_MAX,
+            .v128_stack_top_end_pos = SIZE_MAX,
+        };
+    }
+
+    template <::std::size_t I32Slots, ::std::size_t I64Slots, ::std::size_t F32Slots, ::std::size_t F64Slots>
+    [[nodiscard]] consteval optable::uwvm_interpreter_translate_option_t make_tailcall_fully_split_opt() noexcept
+    {
+        static_assert(I32Slots > 0uz);
+        static_assert(I64Slots > 0uz);
+        static_assert(F32Slots > 0uz);
+        static_assert(F64Slots > 0uz);
+
+        constexpr ::std::size_t i32_begin{3uz};
+        constexpr ::std::size_t i32_end{i32_begin + I32Slots};
+        constexpr ::std::size_t i64_begin{i32_end};
+        constexpr ::std::size_t i64_end{i64_begin + I64Slots};
+        constexpr ::std::size_t f32_begin{i64_end};
+        constexpr ::std::size_t f32_end{f32_begin + F32Slots};
+        constexpr ::std::size_t f64_begin{f32_end};
+        constexpr ::std::size_t f64_end{f64_begin + F64Slots};
+
+        return optable::uwvm_interpreter_translate_option_t{
+            .is_tail_call = true,
+            .i32_stack_top_begin_pos = i32_begin,
+            .i32_stack_top_end_pos = i32_end,
+            .i64_stack_top_begin_pos = i64_begin,
+            .i64_stack_top_end_pos = i64_end,
+            .f32_stack_top_begin_pos = f32_begin,
+            .f32_stack_top_end_pos = f32_end,
+            .f64_stack_top_begin_pos = f64_begin,
+            .f64_stack_top_end_pos = f64_end,
+            .v128_stack_top_begin_pos = SIZE_MAX,
+            .v128_stack_top_end_pos = SIZE_MAX,
+        };
+    }
+
+    inline constexpr optable::uwvm_interpreter_translate_option_t k_test_byref_opt{.is_tail_call = false};
+    inline constexpr optable::uwvm_interpreter_translate_option_t k_test_tail_min_opt{.is_tail_call = true};
+    inline constexpr auto k_test_tail_sysv_opt{make_tailcall_fully_split_opt<3uz, 3uz, 8uz, 8uz>()};
+    inline constexpr auto k_test_tail_aapcs64_opt{make_tailcall_fully_split_opt<5uz, 5uz, 8uz, 8uz>()};
+    inline constexpr auto k_test_tail_sysv_v128_opt{make_tailcall_hardfloat_abi_opt<3uz, 8uz, true>()};
+    inline constexpr auto k_test_tail_aapcs64_v128_opt{make_tailcall_hardfloat_abi_opt<5uz, 8uz, true>()};
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_initial_stacktop_currpos() noexcept
+    {
+        constexpr auto begin_or_disabled = [](::std::size_t begin_pos, ::std::size_t end_pos) noexcept
+        {
+            return begin_pos == SIZE_MAX || begin_pos == end_pos ? SIZE_MAX : begin_pos;
+        };
+
+        return optable::uwvm_interpreter_stacktop_currpos_t{
+            .i32_stack_top_curr_pos = begin_or_disabled(Opt.i32_stack_top_begin_pos, Opt.i32_stack_top_end_pos),
+            .i64_stack_top_curr_pos = begin_or_disabled(Opt.i64_stack_top_begin_pos, Opt.i64_stack_top_end_pos),
+            .f32_stack_top_curr_pos = begin_or_disabled(Opt.f32_stack_top_begin_pos, Opt.f32_stack_top_end_pos),
+            .f64_stack_top_curr_pos = begin_or_disabled(Opt.f64_stack_top_begin_pos, Opt.f64_stack_top_end_pos),
+            .v128_stack_top_curr_pos = begin_or_disabled(Opt.v128_stack_top_begin_pos, Opt.v128_stack_top_end_pos),
+        };
+    }
+
+    [[nodiscard]] inline bool abi_mode_enabled(char const* token) noexcept
+    {
+        auto const* env = ::std::getenv("UWVM2TEST_ABI_MODES");
+        if(env == nullptr || *env == '\0')
+        {
+            return ::std::strcmp(token, "byref") == 0 || ::std::strcmp(token, "tail-min") == 0 || ::std::strcmp(token, "tail-sysv") == 0 ||
+                   ::std::strcmp(token, "tail-aapcs64") == 0;
+        }
+        return env_token_list_contains("UWVM2TEST_ABI_MODES", token);
+    }
+
+    [[nodiscard]] inline bool legacy_layouts_enabled() noexcept
+    {
+        return strict_matrix_level_at_least(strict_matrix_level::expanded) || abi_mode_enabled("legacy-layouts");
+    }
 
     inline void append_u8(byte_vec& out, ::std::uint8_t v)
     {

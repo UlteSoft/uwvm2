@@ -92,125 +92,112 @@ namespace
 
         constexpr ::std::int32_t expected = static_cast<::std::int32_t>(1410065456);
 
-        // Tailcall (no cache).
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
-        // Byref (no cache).
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
-        // ABI/reg-ring variants (tailcall + stacktop caching).
+        if(abi_mode_enabled("tail-sysv"))
         {
-            // scalar4 fully merged, small ring [3,5)
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 3uz,
-                .f32_stack_top_end_pos = 5uz,
-                .f64_stack_top_begin_pos = 3uz,
-                .f64_stack_top_end_pos = 5uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
+        if(abi_mode_enabled("tail-aapcs64"))
         {
-            // i32/i64 merged, f32 split, f64 split.
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 5uz,
-                .f32_stack_top_end_pos = 7uz,
-                .f64_stack_top_begin_pos = 7uz,
-                .f64_stack_top_end_pos = 9uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
+        if(abi_mode_enabled("tail-sysv-v128"))
         {
-            // i32/f32 merged (shared slots), i64 split, f64 split.
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 5uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 3uz,
-                .f32_stack_top_end_pos = 5uz,
-                .f64_stack_top_begin_pos = 7uz,
-                .f64_stack_top_end_pos = 9uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_v128_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
+        if(abi_mode_enabled("tail-aapcs64-v128"))
         {
-            // Fully split per-type rings.
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 5uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 7uz,
-                .f32_stack_top_end_pos = 9uz,
-                .f64_stack_top_begin_pos = 9uz,
-                .f64_stack_top_end_pos = 11uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_aapcs64_v128_opt};
             UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
         }
 
+        if(legacy_layouts_enabled())
         {
-            // f32/f64 merged range carried by wasm_f64 slots.
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 5uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 7uz,
-                .f32_stack_top_end_pos = 11uz,
-                .f64_stack_top_begin_pos = 7uz,
-                .f64_stack_top_end_pos = 11uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
-            UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
-        }
+            {
+                constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
 
-        {
-            // int/float split: i32/i64 merged, f32/f64 merged (hard-float style).
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 7uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 7uz,
-                .f32_stack_top_end_pos = 11uz,
-                .f64_stack_top_begin_pos = 7uz,
-                .f64_stack_top_end_pos = 11uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
-            UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            {
+                // i32/i64 merged, f32 split, f64 split.
+                constexpr optable::uwvm_interpreter_translate_option_t opt{
+                    .is_tail_call = true,
+                    .i32_stack_top_begin_pos = 3uz,
+                    .i32_stack_top_end_pos = 5uz,
+                    .i64_stack_top_begin_pos = 3uz,
+                    .i64_stack_top_end_pos = 5uz,
+                    .f32_stack_top_begin_pos = 5uz,
+                    .f32_stack_top_end_pos = 7uz,
+                    .f64_stack_top_begin_pos = 7uz,
+                    .f64_stack_top_end_pos = 9uz,
+                    .v128_stack_top_begin_pos = SIZE_MAX,
+                    .v128_stack_top_end_pos = SIZE_MAX,
+                };
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
+
+            {
+                // i32/f32 merged (shared slots), i64 split, f64 split.
+                constexpr optable::uwvm_interpreter_translate_option_t opt{
+                    .is_tail_call = true,
+                    .i32_stack_top_begin_pos = 3uz,
+                    .i32_stack_top_end_pos = 5uz,
+                    .i64_stack_top_begin_pos = 5uz,
+                    .i64_stack_top_end_pos = 7uz,
+                    .f32_stack_top_begin_pos = 3uz,
+                    .f32_stack_top_end_pos = 5uz,
+                    .f64_stack_top_begin_pos = 7uz,
+                    .f64_stack_top_end_pos = 9uz,
+                    .v128_stack_top_begin_pos = SIZE_MAX,
+                    .v128_stack_top_end_pos = SIZE_MAX,
+                };
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
+
+            {
+                constexpr auto opt{make_tailcall_fully_split_opt<2uz, 2uz, 2uz, 2uz>()};
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
+
+            {
+                // f32/f64 merged range carried by wasm_f64 slots.
+                constexpr optable::uwvm_interpreter_translate_option_t opt{
+                    .is_tail_call = true,
+                    .i32_stack_top_begin_pos = 3uz,
+                    .i32_stack_top_end_pos = 5uz,
+                    .i64_stack_top_begin_pos = 5uz,
+                    .i64_stack_top_end_pos = 7uz,
+                    .f32_stack_top_begin_pos = 7uz,
+                    .f32_stack_top_end_pos = 11uz,
+                    .f64_stack_top_begin_pos = 7uz,
+                    .f64_stack_top_end_pos = 11uz,
+                    .v128_stack_top_begin_pos = SIZE_MAX,
+                    .v128_stack_top_end_pos = SIZE_MAX,
+                };
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
+
+            {
+                constexpr auto opt{make_tailcall_hardfloat_abi_opt<4uz, 4uz, false>()};
+                UWVM2TEST_REQUIRE(run_one<opt>(rt, expected) == 0);
+            }
         }
 
         return 0;
@@ -221,4 +208,3 @@ int main()
 {
     return test_translate_abi_reg_ring_matrix();
 }
-

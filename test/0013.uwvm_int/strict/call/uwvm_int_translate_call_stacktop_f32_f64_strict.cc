@@ -229,9 +229,9 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Mode A: tailcall, no stacktop caching (semantics smoke).
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             optable::call_func = +call_bridge<opt>;
             optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
 
@@ -263,9 +263,9 @@ namespace
             UWVM2TEST_REQUIRE(load_f64(rr11.results) == 7.0);
         }
 
-        // Mode B: byref (semantics smoke).
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             optable::call_func = +call_bridge<opt>;
             optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
 
@@ -297,7 +297,75 @@ namespace
             UWVM2TEST_REQUIRE(load_f64(rr11.results) == 7.0);
         }
 
-        // Mode C: tailcall + stacktop caching (scalar4 merged). Verify float stacktop-call fast paths.
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            optable::call_func = +call_bridge<opt>;
+            optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+            using Runner = interpreter_runner<opt>;
+
+            auto rr6 = Runner::run(cm.local_funcs.index_unchecked(6), rt.local_defined_function_vec_storage.index_unchecked(6), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr6.results) == 4.25f);
+
+            auto rr7 = Runner::run(cm.local_funcs.index_unchecked(7), rt.local_defined_function_vec_storage.index_unchecked(7), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr7.results) == 8.5f);
+
+            auto rr8 = Runner::run(cm.local_funcs.index_unchecked(8), rt.local_defined_function_vec_storage.index_unchecked(8), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr8.results) == 1.5);
+
+            auto rr9 = Runner::run(cm.local_funcs.index_unchecked(9), rt.local_defined_function_vec_storage.index_unchecked(9), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr9.results) == 9.25f);
+
+            auto rr10 =
+                Runner::run(cm.local_funcs.index_unchecked(10), rt.local_defined_function_vec_storage.index_unchecked(10), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr10.results) == 3.0);
+
+            auto rr11 =
+                Runner::run(cm.local_funcs.index_unchecked(11), rt.local_defined_function_vec_storage.index_unchecked(11), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr11.results) == 7.0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            optable::call_func = +call_bridge<opt>;
+            optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+            using Runner = interpreter_runner<opt>;
+
+            auto rr6 = Runner::run(cm.local_funcs.index_unchecked(6), rt.local_defined_function_vec_storage.index_unchecked(6), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr6.results) == 4.25f);
+
+            auto rr7 = Runner::run(cm.local_funcs.index_unchecked(7), rt.local_defined_function_vec_storage.index_unchecked(7), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr7.results) == 8.5f);
+
+            auto rr8 = Runner::run(cm.local_funcs.index_unchecked(8), rt.local_defined_function_vec_storage.index_unchecked(8), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr8.results) == 1.5);
+
+            auto rr9 = Runner::run(cm.local_funcs.index_unchecked(9), rt.local_defined_function_vec_storage.index_unchecked(9), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f32(rr9.results) == 9.25f);
+
+            auto rr10 =
+                Runner::run(cm.local_funcs.index_unchecked(10), rt.local_defined_function_vec_storage.index_unchecked(10), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr10.results) == 3.0);
+
+            auto rr11 =
+                Runner::run(cm.local_funcs.index_unchecked(11), rt.local_defined_function_vec_storage.index_unchecked(11), pack_no_params(), nullptr, nullptr);
+            UWVM2TEST_REQUIRE(load_f64(rr11.results) == 7.0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -433,4 +501,3 @@ int main()
 {
     return test_translate_call_stacktop_f32_f64();
 }
-

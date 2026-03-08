@@ -129,16 +129,16 @@ namespace
         [[maybe_unused]] auto& mem_mut = rt_mut.local_defined_memory_vec_storage.index_unchecked(0).memory;
         [[maybe_unused]] auto const& mem = mem_mut;
 
-        // Tailcall mode: strict bytecode assertions for mega-op when enabled.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             ::uwvm2::validation::error::code_validation_error_impl err{};
             optable::compile_option cop{};
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
             UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_initial_stacktop_currpos<opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
 
@@ -200,9 +200,9 @@ namespace
             UWVM2TEST_REQUIRE(run_br_if_i32_load_eq_imm_suite<opt>(cm, rt) == 0);
         }
 
-        // Byref mode: semantics smoke.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             ::uwvm2::validation::error::code_validation_error_impl err{};
             optable::compile_option cop{};
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
@@ -210,7 +210,27 @@ namespace
             UWVM2TEST_REQUIRE(run_br_if_i32_load_eq_imm_suite<opt>(cm, rt) == 0);
         }
 
-        // Tailcall + stacktop caching: semantics.
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_br_if_i32_load_eq_imm_suite<opt>(cm, rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_br_if_i32_load_eq_imm_suite<opt>(cm, rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

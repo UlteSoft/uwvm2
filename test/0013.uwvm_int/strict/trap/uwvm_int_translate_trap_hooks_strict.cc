@@ -142,76 +142,40 @@ namespace
         optable::trap_integer_overflow_func = fn;
     }
 
-    [[noreturn]] void child_div0_byref()
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[noreturn]] void child_div0()
     {
         set_all_traps_to(exit_90);
         optable::trap_integer_divide_by_zero_func = exit_10;
         auto const wasm = build_div0_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-        compile_and_run<opt>(wasm);
+        compile_and_run<Opt>(wasm);
     }
 
-    [[noreturn]] void child_div0_tail()
-    {
-        set_all_traps_to(exit_90);
-        optable::trap_integer_divide_by_zero_func = exit_10;
-        auto const wasm = build_div0_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-        compile_and_run<opt>(wasm);
-    }
-
-    [[noreturn]] void child_overflow_byref()
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[noreturn]] void child_overflow()
     {
         set_all_traps_to(exit_90);
         optable::trap_integer_overflow_func = exit_11;
         auto const wasm = build_overflow_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-        compile_and_run<opt>(wasm);
+        compile_and_run<Opt>(wasm);
     }
 
-    [[noreturn]] void child_overflow_tail()
-    {
-        set_all_traps_to(exit_90);
-        optable::trap_integer_overflow_func = exit_11;
-        auto const wasm = build_overflow_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-        compile_and_run<opt>(wasm);
-    }
-
-    [[noreturn]] void child_invalid_conv_byref()
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[noreturn]] void child_invalid_conv()
     {
         set_all_traps_to(exit_90);
         optable::trap_invalid_conversion_to_integer_func = exit_12;
         auto const wasm = build_invalid_conv_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-        compile_and_run<opt>(wasm);
+        compile_and_run<Opt>(wasm);
     }
 
-    [[noreturn]] void child_invalid_conv_tail()
-    {
-        set_all_traps_to(exit_90);
-        optable::trap_invalid_conversion_to_integer_func = exit_12;
-        auto const wasm = build_invalid_conv_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-        compile_and_run<opt>(wasm);
-    }
-
-    [[noreturn]] void child_unreachable_byref()
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[noreturn]] void child_unreachable()
     {
         set_all_traps_to(exit_90);
         optable::unreachable_func = exit_13;
         auto const wasm = build_unreachable_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-        compile_and_run<opt>(wasm);
-    }
-
-    [[noreturn]] void child_unreachable_tail()
-    {
-        set_all_traps_to(exit_90);
-        optable::unreachable_func = exit_13;
-        auto const wasm = build_unreachable_module();
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-        compile_and_run<opt>(wasm);
+        compile_and_run<Opt>(wasm);
     }
 
 #endif
@@ -224,25 +188,53 @@ int main()
 #else
     int ec{};
 
-    ec = run_in_child_expect_exit(10, [] { child_div0_byref(); });
-    if(ec != 0) { return ec; }
-    ec = run_in_child_expect_exit(10, [] { child_div0_tail(); });
-    if(ec != 0) { return ec; }
+    if(abi_mode_enabled("byref"))
+    {
+        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_byref_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_byref_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_byref_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_byref_opt>(); });
+        if(ec != 0) { return ec; }
+    }
 
-    ec = run_in_child_expect_exit(11, [] { child_overflow_byref(); });
-    if(ec != 0) { return ec; }
-    ec = run_in_child_expect_exit(11, [] { child_overflow_tail(); });
-    if(ec != 0) { return ec; }
+    if(abi_mode_enabled("tail-min"))
+    {
+        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_min_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_min_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_min_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_min_opt>(); });
+        if(ec != 0) { return ec; }
+    }
 
-    ec = run_in_child_expect_exit(12, [] { child_invalid_conv_byref(); });
-    if(ec != 0) { return ec; }
-    ec = run_in_child_expect_exit(12, [] { child_invalid_conv_tail(); });
-    if(ec != 0) { return ec; }
+    if(abi_mode_enabled("tail-sysv"))
+    {
+        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_sysv_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_sysv_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_sysv_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_sysv_opt>(); });
+        if(ec != 0) { return ec; }
+    }
 
-    ec = run_in_child_expect_exit(13, [] { child_unreachable_byref(); });
-    if(ec != 0) { return ec; }
-    ec = run_in_child_expect_exit(13, [] { child_unreachable_tail(); });
-    if(ec != 0) { return ec; }
+    if(abi_mode_enabled("tail-aapcs64"))
+    {
+        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_aapcs64_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_aapcs64_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_aapcs64_opt>(); });
+        if(ec != 0) { return ec; }
+        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_aapcs64_opt>(); });
+        if(ec != 0) { return ec; }
+    }
 
     return 0;
 #endif

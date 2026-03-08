@@ -363,9 +363,9 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: strict fptr assertions when heavy combine is enabled.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             ::uwvm2::validation::error::code_validation_error_impl err{};
             optable::compile_option cop{};
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
@@ -417,9 +417,9 @@ namespace
             UWVM2TEST_REQUIRE(run_localget_heavy_fusions_semantics<opt>(cm, rt) == 0);
         }
 
-        // Byref mode: semantics.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             ::uwvm2::validation::error::code_validation_error_impl err{};
             optable::compile_option cop{};
             auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
@@ -427,7 +427,31 @@ namespace
             UWVM2TEST_REQUIRE(run_localget_heavy_fusions_semantics<opt>(cm, rt) == 0);
         }
 
-        // Tailcall + stacktop caching: semantics.
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_localget_heavy_fusions_semantics<opt>(cm, rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            optable::compile_option cop{};
+            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            UWVM2TEST_REQUIRE(run_localget_heavy_fusions_semantics<opt>(cm, rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,

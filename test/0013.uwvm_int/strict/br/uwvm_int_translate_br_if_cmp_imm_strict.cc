@@ -89,6 +89,127 @@ namespace
         return mb.build();
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+        if constexpr(Opt.is_tail_call && Opt.i32_stack_top_begin_pos == SIZE_MAX && Opt.i64_stack_top_begin_pos == SIZE_MAX &&
+                     Opt.f32_stack_top_begin_pos == SIZE_MAX && Opt.f64_stack_top_begin_pos == SIZE_MAX && Opt.v128_stack_top_begin_pos == SIZE_MAX)
+        {
+            constexpr auto curr{make_initial_stacktop_currpos<Opt>()};
+            constexpr auto tuple =
+                compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+            constexpr auto exp_eq = optable::translate::get_uwvmint_br_if_i32_eq_imm_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_lt_s = optable::translate::get_uwvmint_br_if_i32_lt_s_imm_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_lt_u = optable::translate::get_uwvmint_br_if_i32_lt_u_imm_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_ge_s = optable::translate::get_uwvmint_br_if_i32_ge_s_imm_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_ge_u = optable::translate::get_uwvmint_br_if_i32_ge_u_imm_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_eqz = optable::translate::get_uwvmint_br_if_local_eqz_fptr_from_tuple<Opt>(curr, tuple);
+
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_eq));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_lt_s));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_lt_u));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_ge_s));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_ge_u));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_eqz));
+        }
+#endif
+
+        using Runner = interpreter_runner<Opt>;
+
+        // f0 eq
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
+                                              rt.local_defined_function_vec_storage.index_unchecked(0),
+                                              pack_i32(7),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 111);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
+                                              rt.local_defined_function_vec_storage.index_unchecked(0),
+                                              pack_i32(8),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 222);
+
+        // f1 lt_s 0
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
+                                              rt.local_defined_function_vec_storage.index_unchecked(1),
+                                              pack_i32(-1),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 123);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
+                                              rt.local_defined_function_vec_storage.index_unchecked(1),
+                                              pack_i32(0),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 234);
+
+        // f2 lt_u 10
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
+                                              rt.local_defined_function_vec_storage.index_unchecked(2),
+                                              pack_i32(9),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 345);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
+                                              rt.local_defined_function_vec_storage.index_unchecked(2),
+                                              pack_i32(10),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 456);
+
+        // f3 ge_s 0
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(3),
+                                              rt.local_defined_function_vec_storage.index_unchecked(3),
+                                              pack_i32(1),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 567);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(3),
+                                              rt.local_defined_function_vec_storage.index_unchecked(3),
+                                              pack_i32(-1),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 678);
+
+        // f4 ge_u 10
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(4),
+                                              rt.local_defined_function_vec_storage.index_unchecked(4),
+                                              pack_i32(10),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 789);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(4),
+                                              rt.local_defined_function_vec_storage.index_unchecked(4),
+                                              pack_i32(9),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 890);
+
+        // f5 eqz
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(5),
+                                              rt.local_defined_function_vec_storage.index_unchecked(5),
+                                              pack_i32(0),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 333);
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(5),
+                                              rt.local_defined_function_vec_storage.index_unchecked(5),
+                                              pack_i32(1),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 444);
+
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_br_if_cmp_imm() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -104,136 +225,28 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: strict assertions on fused br_if opfuncs when combine is enabled.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-
-            constexpr auto exp_eq = optable::translate::get_uwvmint_br_if_i32_eq_imm_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_lt_s = optable::translate::get_uwvmint_br_if_i32_lt_s_imm_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_lt_u = optable::translate::get_uwvmint_br_if_i32_lt_u_imm_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_ge_s = optable::translate::get_uwvmint_br_if_i32_ge_s_imm_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_ge_u = optable::translate::get_uwvmint_br_if_i32_ge_u_imm_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_eqz = optable::translate::get_uwvmint_br_if_local_eqz_fptr_from_tuple<opt>(curr, tuple);
-
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_eq));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_lt_s));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_lt_u));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_ge_s));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_ge_u));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_eqz));
-#endif
-
-            using Runner = interpreter_runner<opt>;
-
-            // f0 eq
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(0),
-                                                  pack_i32(7),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 111);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(0),
-                                                  pack_i32(8),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 222);
-
-            // f1 lt_s 0
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(1),
-                                                  pack_i32(-1),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 123);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(1),
-                                                  pack_i32(0),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 234);
-
-            // f2 lt_u 10
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(2),
-                                                  pack_i32(9),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 345);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(2),
-                                                  pack_i32(10),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 456);
-
-            // f3 ge_s 0
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(3),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(3),
-                                                  pack_i32(1),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 567);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(3),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(3),
-                                                  pack_i32(-1),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 678);
-
-            // f4 ge_u 10
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(4),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(4),
-                                                  pack_i32(10),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 789);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(4),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(4),
-                                                  pack_i32(9),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 890);
-
-            // f5 eqz
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(5),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(5),
-                                                  pack_i32(0),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 333);
-            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(5),
-                                                  rt.local_defined_function_vec_storage.index_unchecked(5),
-                                                  pack_i32(1),
-                                                  nullptr,
-                                                  nullptr)
-                                           .results) == 444);
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Byref mode: semantics smoke (fusions are not expected).
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            using Runner = interpreter_runner<opt>;
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(0),
-                                  rt.local_defined_function_vec_storage.index_unchecked(0),
-                                  pack_i32(7),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i32(rr.results) == 111);
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;
@@ -244,4 +257,3 @@ int main()
 {
     return test_translate_br_if_cmp_imm();
 }
-

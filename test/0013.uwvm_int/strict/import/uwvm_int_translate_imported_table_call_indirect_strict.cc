@@ -326,15 +326,27 @@ namespace
 
         apply_active_element_segments_any_table(rt_mut);
 
-        // Byref mode: semantics.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Tailcall mode: exercise call_indirect lowering + imported table resolution.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
@@ -353,4 +365,3 @@ int main()
         return ::uwvm2test::uwvm_int_strict::fail(__LINE__, "uncaught exception");
     }
 }
-

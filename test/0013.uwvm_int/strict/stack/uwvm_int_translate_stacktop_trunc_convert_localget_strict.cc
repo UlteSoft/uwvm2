@@ -469,48 +469,69 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Byref smoke (no stacktop caching).
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
         }
 
-        // Tailcall + stacktop caching: scalar4 disjoint rings.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 5uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 7uz,
-                .f32_stack_top_end_pos = 9uz,
-                .f64_stack_top_begin_pos = 9uz,
-                .f64_stack_top_end_pos = 11uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
         }
 
-        // Tailcall + stacktop caching: scalar4 fully merged ring.
+        if(abi_mode_enabled("tail-aapcs64"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 7uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 7uz,
-                .f32_stack_top_begin_pos = 3uz,
-                .f32_stack_top_end_pos = 7uz,
-                .f64_stack_top_begin_pos = 3uz,
-                .f64_stack_top_end_pos = 7uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_aapcs64_opt};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            {
+                constexpr optable::uwvm_interpreter_translate_option_t opt{
+                    .is_tail_call = true,
+                    .i32_stack_top_begin_pos = 3uz,
+                    .i32_stack_top_end_pos = 5uz,
+                    .i64_stack_top_begin_pos = 5uz,
+                    .i64_stack_top_end_pos = 7uz,
+                    .f32_stack_top_begin_pos = 7uz,
+                    .f32_stack_top_end_pos = 9uz,
+                    .f64_stack_top_begin_pos = 9uz,
+                    .f64_stack_top_end_pos = 11uz,
+                    .v128_stack_top_begin_pos = SIZE_MAX,
+                    .v128_stack_top_end_pos = SIZE_MAX,
+                };
+                static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+                UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
+            }
+
+            {
+                constexpr optable::uwvm_interpreter_translate_option_t opt{
+                    .is_tail_call = true,
+                    .i32_stack_top_begin_pos = 3uz,
+                    .i32_stack_top_end_pos = 7uz,
+                    .i64_stack_top_begin_pos = 3uz,
+                    .i64_stack_top_end_pos = 7uz,
+                    .f32_stack_top_begin_pos = 3uz,
+                    .f32_stack_top_end_pos = 7uz,
+                    .f64_stack_top_begin_pos = 3uz,
+                    .f64_stack_top_end_pos = 7uz,
+                    .v128_stack_top_begin_pos = SIZE_MAX,
+                    .v128_stack_top_end_pos = SIZE_MAX,
+                };
+                static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+                UWVM2TEST_REQUIRE(run_stacktop_trunc_convert_localget_suite<opt>(rt) == 0);
+            }
         }
 
         return 0;
