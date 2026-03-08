@@ -244,7 +244,7 @@ namespace
         }
 
         // Negative cases: code matches a trivial-kind pattern, but signature does not.
-        // We use locals (no params) so the body stays valid, but the type-checking in wasm1.h must reject it.
+        // We use locals (no params) so the body stays valid, but the type-checking in translate.h must reject it.
 
         // 13: param0_i32 shape but (no params) -> (i32), using a local0.
         {
@@ -372,7 +372,7 @@ namespace
         }
 
         // 18: xor_i32 pattern D -> local.get 0/1 ; local.get 1/0 ; i32.xor ; local.get 2 ; i32.xor ; end
-        // Covers the "extra local default-zero" trivial matcher path in wasm1.h.
+        // Covers the "extra local default-zero" trivial matcher path in translate.h.
         {
             func_type ty{{k_val_i32, k_val_i32}, {k_val_i32}};
             func_body fb{};

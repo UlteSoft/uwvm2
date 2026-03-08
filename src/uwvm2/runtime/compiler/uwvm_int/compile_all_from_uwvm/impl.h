@@ -23,5 +23,5 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-# include "wasm1.h"
+# include "translate.h"
 #endif

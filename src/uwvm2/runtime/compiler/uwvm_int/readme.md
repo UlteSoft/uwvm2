@@ -24,7 +24,8 @@ This document summarizes both (1) the architecture and (2) the optimization work
 ## 2. System overview
 
 ### 2.1 Components
-- **Translator**: `compile_all_from_uwvm/wasm1.h`
+- **Translator**: `compile_all_from_uwvm/translate.h`
+  - Umbrella entry for the translator, split across `translate/details.h`, `translate/single_func*.h`, and `translate/opcode/*.h`.
   - Parses Wasm bytecode and emits u2 bytecode (“code page”) per function.
   - Performs local, linear-time fusion and peepholes (no global optimizer pass).
 - **Optable (opfunc set)**: `optable/*.h`
@@ -38,7 +39,7 @@ u2 executes a pointer stream:
 2) The opfunc reads any immediates following the pointer (e.g., local offsets, memarg offsets).
 3) The opfunc tail-dispatches by loading the next opfunc pointer and `br`/`UWVM_MUSTTAIL return` to it.
 
-The translator emits opfunc pointers directly (see `emit_opfunc_to(...)` in `compile_all_from_uwvm/wasm1.h`), so runtime does not decode Wasm opcodes.
+The translator emits opfunc pointers directly (see `emit_opfunc_to(...)` in `compile_all_from_uwvm/translate.h`), so runtime does not decode Wasm opcodes.
 
 ## 3. Register-ring stack-top cache (operand-stack traffic reduction)
 
@@ -58,12 +59,12 @@ These mechanisms live in `optable/register_ring.h` and are specialized so hot pa
 
 ### 3.3 Control-flow re-entry: register-only canonicalization
 Control-flow joins (loops, if/else merges) can require a canonical cache layout. u2 supports a register-only “transform-to-begin” that rotates the ring to a canonical begin position without touching operand-stack memory:
-- emission: `compile_all_from_uwvm/wasm1.h`
+- emission: `compile_all_from_uwvm/translate.h`
 - helpers: `optable/register_ring.h`, plus control variants in `optable/conbine.h`
 
 ## 4. Translation pipeline (startup cost and translation throughput)
 
-Translation in `compile_all_from_uwvm/wasm1.h` is designed as a single-pass state machine:
+Translation in `compile_all_from_uwvm/translate.h` is designed as a single-pass state machine:
 - Track a compiler-side model of operand stack + cache residency.
 - Emit direct-threaded bytecode: opfunc pointer bytes + immediates.
 - Batch consecutive spill/fill when safe to reduce dispatch and bytecode size.
@@ -75,7 +76,7 @@ Because the runtime stream is already “decoded” into opfunc pointers, transl
 Threaded interpreters have a hard ceiling set by dispatch (`load next target + indirect jump`). Once operand-stack traffic is reduced, dispatch can become dominant. u2 therefore uses translation-time fusion to increase “work per dispatch”.
 
 ### 5.1 `conbine`: adjacent-op fusion (soft/heavy/extra)
-The translator maintains a small pending state machine (`conbine_pending_t` in `compile_all_from_uwvm/wasm1.h`). When a provider sequence can continue (`conbine_can_continue(...)`), emission is delayed and later flushed as a fused opfunc. This provides superinstruction-like wins while keeping translation local and predictable.
+The translator maintains a small pending state machine (`conbine_pending_t` in `compile_all_from_uwvm/translate.h`). When a provider sequence can continue (`conbine_can_continue(...)`), emission is delayed and later flushed as a fused opfunc. This provides superinstruction-like wins while keeping translation local and predictable.
 
 Optable implementations:
 - baseline: `optable/conbine.h`
@@ -120,17 +121,17 @@ These mechanisms are examples of u2’s “heavy but general” direction: they 
 
 ### 8.1 Dead stack traffic elimination (`const* + drop*`)
 Some modules (and microbenchmarks) contain long runs of side-effect-free providers followed by the same number of `drop`s; semantically these segments are no-ops. u2 can remove them at translation time to avoid pathological dispatch-bound loops:
-- implementation: `try_elide_const_run_with_drops()` in `compile_all_from_uwvm/wasm1.h`
+- implementation: `try_elide_const_run_with_drops()` in `compile_all_from_uwvm/translate.h`
 
 ### 8.2 Trivial local-defined call fast path
 Small local-defined callees that are semantic no-ops or constant-return functions can be recognized and executed without constructing a full call frame:
-- matcher: `match_trivial_call_inline_body()` in `compile_all_from_uwvm/wasm1.h`
+- matcher: `match_trivial_call_inline_body()` in `compile_all_from_uwvm/translate.h`
 - metadata: `trivial_defined_call_kind` and `compiled_defined_call_info` in `optable/define.h`
 
 ### 8.3 Loop skeleton fusion (“inc; cmp; br_if”)
 High-hit-rate counter-loop patterns can be emitted as a single fused opfunc to reduce per-iteration dispatch:
 - opfunc: `uwvmint_for_i32_inc_lt_u_br_if` in `optable/conbine_heavy.h`
-- translator rewrite at `br_if`: `compile_all_from_uwvm/wasm1.h`
+- translator rewrite at `br_if`: `compile_all_from_uwvm/translate.h`
 
 ## 9. Interpreting results: when u2 is “good”
 
@@ -155,7 +156,7 @@ The main engineering takeaway from these measurements is methodological: when tw
 
 ## 10. Repository map
 
-- Translation and fusion state machine: `compile_all_from_uwvm/wasm1.h`
+- Translation and fusion state machine: `compile_all_from_uwvm/translate.h`, `compile_all_from_uwvm/translate/single_func*.h`, `compile_all_from_uwvm/translate/opcode/*.h`
 - Stack-top cache ring, spill/fill, transforms: `optable/register_ring.h`
 - Adjacent fusion: `optable/conbine.h`, `optable/conbine_heavy.h`, `optable/combine_extra_heavy.h`
 - Delay-local fused opfuncs: `optable/delay_local.h`

@@ -123,7 +123,7 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // byref (non-tailcall): covers wasm1.h `CompileOption.is_tail_call == false` emission branch.
+        // byref (non-tailcall): covers translate.h `CompileOption.is_tail_call == false` emission branch.
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
             UWVM2TEST_REQUIRE(run_i32_load_add_and_imm_byref_suite<opt>(rt) == 0);

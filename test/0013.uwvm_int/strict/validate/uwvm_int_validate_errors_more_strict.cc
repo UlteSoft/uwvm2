@@ -271,7 +271,7 @@ namespace
         func_type ty{{}, {}};
         func_body fb{};
         // if <illegal blocktype byte> ... end
-        // Triggers wasm1.h `if` blocktype switch default => illegal_block_type.
+        // Triggers translate.h `if` blocktype switch default => illegal_block_type.
         op(fb.code, wasm_op::if_);
         append_u8(fb.code, 0x00u);  // illegal blocktype byte
         op(fb.code, wasm_op::end);  // end if
@@ -287,7 +287,7 @@ namespace
 
         func_type ty{{}, {}};
         func_body fb{};
-        // if (no condition on stack) => operand_stack_underflow at wasm1.h `if` validation.
+        // if (no condition on stack) => operand_stack_underflow at translate.h `if` validation.
         op(fb.code, wasm_op::if_);
         append_u8(fb.code, k_block_empty);
         op(fb.code, wasm_op::end);  // end if

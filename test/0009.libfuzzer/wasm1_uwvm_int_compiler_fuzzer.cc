@@ -26,7 +26,7 @@
 # include <fast_io.h>
 
 # include <uwvm2/parser/wasm/base/impl.h>
-# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h>
+# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
 # include <uwvm2/uwvm/cmdline/callback/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/runtime/initializer/init.h>

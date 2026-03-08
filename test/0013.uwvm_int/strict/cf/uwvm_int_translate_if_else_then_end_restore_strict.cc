@@ -17,7 +17,7 @@ namespace
         // Keep a carried i32 across the if-else, then do an i32.add after the end.
         // The else-path becomes polymorphic (unreachable) before `end`, while the then-path is reachable.
         // With stacktop caching enabled this exercises the `else_`-frame "restore from then-end snapshot" path
-        // in wasm1.h's `end` handler:
+        // in translate.h's `end` handler:
         //   frame.type == else_ && !frame.then_polymorphic_end && frame.stacktop_has_then_end_state
         {
             func_type ty{{k_val_i32}, {k_val_i32}};

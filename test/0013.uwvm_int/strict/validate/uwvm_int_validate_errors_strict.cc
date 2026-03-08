@@ -64,7 +64,7 @@ namespace
         auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
 
         // f0: () -> () : loop <illegal blocktype byte> ... end
-        // wasm1.h's loop parser only accepts 0x40 and {i32,i64,f32,f64} value-type bytes.
+        // translate.h's loop parser only accepts 0x40 and {i32,i64,f32,f64} value-type bytes.
         {
             func_type ty{{}, {}};
             func_body fb{};

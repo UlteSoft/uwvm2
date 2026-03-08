@@ -14,7 +14,7 @@
 #
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/opcode/mvp.h>
-# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/wasm1.h>
+# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/storage.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/runtime/initializer/init.h>

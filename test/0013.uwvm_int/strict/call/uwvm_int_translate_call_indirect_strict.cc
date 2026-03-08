@@ -33,7 +33,7 @@ namespace
         ::std::memcpy(p, ::std::addressof(v), sizeof(v));
     }
 
-    // Minimal trivial-call bridge (same encoding contract as wasm1.h local-defined call fast path).
+    // Minimal trivial-call bridge (same encoding contract as translate.h local-defined call fast path).
     static void call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
         if(stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
