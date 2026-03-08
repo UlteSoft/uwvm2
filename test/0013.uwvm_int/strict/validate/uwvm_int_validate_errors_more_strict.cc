@@ -1,6 +1,6 @@
 #include "../uwvm_int_translate_strict_common.h"
 
-#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__) || defined(__SANITIZE_LEAK__)
+#if defined(__APPLE__) && (defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__) || defined(__SANITIZE_LEAK__))
 // Notes:
 // - This test relies on catching `fast_io::error` thrown by the validator to early-exit invalid modules.
 // - On macOS with sanitizers enabled, C++ exception handling may be unreliable in this project configuration.
