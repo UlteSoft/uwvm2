@@ -349,18 +349,10 @@ case wasm1_code::f32_const:
 # endif
     {
         flush_conbine_pending();
-        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-        if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f32); }
-        emit_opfunc_to(bytecode, translate::get_uwvmint_f32_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-        emit_imm_to(bytecode, imm);
-        if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
+        emit_const_f32_to(bytecode, imm);
     }
 #else
-    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-    if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f32); }
-    emit_opfunc_to(bytecode, translate::get_uwvmint_f32_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-    emit_imm_to(bytecode, imm);
-    if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f32); }
+    emit_const_f32_to(bytecode, imm);
 #endif
 
     operand_stack_push(wasm_value_type_u::f32);
@@ -461,18 +453,10 @@ case wasm1_code::f64_const:
 # endif
     {
         flush_conbine_pending();
-        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-        if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64); }
-        emit_opfunc_to(bytecode, translate::get_uwvmint_f64_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-        emit_imm_to(bytecode, imm);
-        if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
+        emit_const_f64_to(bytecode, imm);
     }
 #else
-    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-    if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::f64); }
-    emit_opfunc_to(bytecode, translate::get_uwvmint_f64_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-    emit_imm_to(bytecode, imm);
-    if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::f64); }
+    emit_const_f64_to(bytecode, imm);
 #endif
 
     operand_stack_push(wasm_value_type_u::f64);

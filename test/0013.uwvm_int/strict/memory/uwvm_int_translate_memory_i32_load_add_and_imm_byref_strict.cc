@@ -73,7 +73,8 @@ namespace
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
         UWVM2TEST_REQUIRE(cm.local_funcs.size() == 2uz);
 
-        // Verify we emitted the byref (non-tailcall) fused opfunc pointers.
+        // Verify we emitted the byref (non-tailcall) fused opfunc pointers when combine ops are enabled.
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         {
             optable::uwvm_interpreter_stacktop_currpos_t curr{};
             auto const exp_add =
@@ -84,6 +85,7 @@ namespace
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_add));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_and));
         }
+#endif
 
         using Runner = interpreter_runner<Opt>;
 
