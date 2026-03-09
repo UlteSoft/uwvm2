@@ -2118,17 +2118,32 @@ auto const flush_conbine_pending{
     {
         if constexpr(!CompileOption.is_tail_call)
         {
-            // Byref/loop interpreter mode: enable only a minimal, well-tested subset of the conbine state
-            // machine. This keeps important non-tailcall combine emission paths reachable (e.g. `local.get
-            // addr; i32.load; i32.const imm; (add|and)`), while avoiding pending windows that require
-            // tailcall-only consumers (some store fusions) and could otherwise change bytecode order in
-            // hard-to-audit ways.
-            if(conbine_pending.kind == conbine_pending_kind::none) { return true; }
-            if(conbine_pending.kind == conbine_pending_kind::local_get && conbine_pending.vt == curr_operand_stack_value_type::i32)
+            // Byref/loop interpreter mode: keep the non-tailcall combine subset narrow, but still allow
+            // the memory-side chains that have explicit byref consumers in `memory_cases.h`:
+            // - `local.get addr ; <load>`
+            // - `local.get addr ; i32.const imm ; i32.add ; <load>`
+            // - `local.get addr ; i32.const imm ; i32.add ; local.get v ; <store>`
+            // This preserves bytecode-order safety while making the existing byref local-plus-imm emitters reachable.
+            switch(conbine_pending.kind)
             {
-                return op == wasm1_code::i32_load || op == wasm1_code::i64_load || op == wasm1_code::f32_load || op == wasm1_code::f64_load;
+                case conbine_pending_kind::none:
+                    return true;
+                case conbine_pending_kind::local_get:
+                    return conbine_pending.vt == curr_operand_stack_value_type::i32 &&
+                           (op == wasm1_code::i32_const || op == wasm1_code::i32_load || op == wasm1_code::i64_load || op == wasm1_code::f32_load ||
+                            op == wasm1_code::f64_load);
+                case conbine_pending_kind::local_get_const_i32:
+                    return op == wasm1_code::i32_add;
+                case conbine_pending_kind::local_get_const_i32_add:
+                    return op == wasm1_code::local_get || op == wasm1_code::i32_load || op == wasm1_code::f32_load || op == wasm1_code::f64_load;
+                case conbine_pending_kind::local_get_const_i32_add_localget:
+                    if(conbine_pending.vt == curr_operand_stack_value_type::i32) { return op == wasm1_code::i32_store; }
+                    if(conbine_pending.vt == curr_operand_stack_value_type::f32) { return op == wasm1_code::f32_store; }
+                    if(conbine_pending.vt == curr_operand_stack_value_type::f64) { return op == wasm1_code::f64_store; }
+                    return false;
+                default:
+                    return false;
             }
-            return false;
         }
 
         switch(conbine_pending.kind)
@@ -2425,7 +2440,7 @@ auto const flush_conbine_pending{
             case conbine_pending_kind::local_get_i32_localget:
             {
                 if(conbine_pending.vt == curr_operand_stack_value_type::i32) { return op == wasm1_code::i32_store; }
-                if(conbine_pending.vt == curr_operand_stack_value_type::i64) { return op == wasm1_code::i64_store; }
+                if(conbine_pending.vt == curr_operand_stack_value_type::i64) { return op == wasm1_code::i64_store || op == wasm1_code::i64_store32; }
                 return false;
             }
             case conbine_pending_kind::local_get2_const_i32:

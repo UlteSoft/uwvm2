@@ -632,16 +632,19 @@ case wasm1_code::local_get:
             }
             else
             {
-                if(!is_polymorphic && conbine_pending.vt == curr_operand_stack_value_type::i32 && curr_local_type == curr_operand_stack_value_type::i64)
+                if constexpr(CompileOption.is_tail_call)
                 {
-                    wasm1_code next_op{};  // init
-                    if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
-                    if(next_op == wasm1_code::i64_store)
+                    if(!is_polymorphic && conbine_pending.vt == curr_operand_stack_value_type::i32 && curr_local_type == curr_operand_stack_value_type::i64)
                     {
-                        conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
-                        conbine_pending.vt = curr_operand_stack_value_type::i64;
-                        conbine_pending.off2 = local_off;
-                        break;
+                        wasm1_code next_op{};  // init
+                        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
+                        if(next_op == wasm1_code::i64_store || next_op == wasm1_code::i64_store32)
+                        {
+                            conbine_pending.kind = conbine_pending_kind::local_get_i32_localget;
+                            conbine_pending.vt = curr_operand_stack_value_type::i64;
+                            conbine_pending.off2 = local_off;
+                            break;
+                        }
                     }
                 }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS

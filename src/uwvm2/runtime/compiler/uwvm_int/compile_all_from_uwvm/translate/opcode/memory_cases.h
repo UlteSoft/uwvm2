@@ -1198,6 +1198,25 @@ case wasm1_code::i64_store32:
     wasm_u32 const offset{validate_mem_store(u8"i64.store32", 2u, wasm_value_type_u::i64)};
     ensure_memory0_resolved();
     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+    if constexpr(CompileOption.is_tail_call)
+    {
+        if(conbine_pending.kind == conbine_pending_kind::local_get_i32_localget && conbine_pending.vt == curr_operand_stack_value_type::i64)
+        {
+            // Conbine: `local.get addr; local.get v; i64.store32` fused into `i64_store32_localget_off`.
+            emit_opfunc_to(
+                bytecode,
+                translate::get_uwvmint_i64_store32_localget_off_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
+            emit_imm_to(bytecode, conbine_pending.off1);
+            emit_imm_to(bytecode, conbine_pending.off2);
+            emit_imm_to(bytecode, resolved_memory0.memory_p);
+            emit_imm_to(bytecode, offset);
+            conbine_pending.kind = conbine_pending_kind::none;
+            conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+            break;
+        }
+    }
+#endif
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode,
