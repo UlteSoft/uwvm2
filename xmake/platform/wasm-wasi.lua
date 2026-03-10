@@ -6,7 +6,7 @@ end
 function wasm_wasi_target()
     set_extension(".wasm")
 
-    set_toolchains("llvm")
+    set_toolchains("clang")
     add_ldflags("-fuse-ld=lld", {force = true})
 
     local sysroot_para = get_config("sysroot")

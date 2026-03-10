@@ -7,7 +7,7 @@ function darwin_target()
 	    -- which can be incompatible with our custom SYSROOT/toolchain (and may crash while compiling).
 	    -- Use xmake's `llvm` toolchain instead so it can pick up the standalone LLVM toolchain
 	    -- from PATH/`llvm-config`.
-	    set_toolchains("llvm")
+	    set_toolchains("clang")
 	    add_ldflags("-fuse-ld=lld", {force = true})
 	end
 

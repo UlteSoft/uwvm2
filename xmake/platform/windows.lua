@@ -5,7 +5,7 @@ function windows_target()
 
     local use_llvm_toolchain = get_config("use-llvm")
     if use_llvm_toolchain then	
-        set_toolchains("llvm")
+        set_toolchains("clang")
 
         add_ldflags("-fuse-ld=lld", {force = true})
 
