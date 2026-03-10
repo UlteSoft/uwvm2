@@ -1724,6 +1724,18 @@ case wasm1_code::i64_add:
         conbine_pending.kind = conbine_pending_kind::mac_after_add;
         break;
     }
+    if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_xor_constc)
+    {
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_rot_xor_add_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+        emit_imm_to(bytecode, conbine_pending.off1);
+        emit_imm_to(bytecode, conbine_pending.off2);
+        emit_imm_to(bytecode, conbine_pending.imm_i64);
+        emit_imm_to(bytecode, conbine_pending.imm_i64_2);
+        stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
+        conbine_pending.kind = conbine_pending_kind::none;
+        break;
+    }
 # endif
     if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i64)
     {
@@ -2556,6 +2568,18 @@ case wasm1_code::i64_xor:
         break;
     }
 # endif
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+    if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_gety)
+    {
+        conbine_pending.kind = conbine_pending_kind::rot_xor_add_i64_after_xor;
+        break;
+    }
+    if(conbine_pending.kind == conbine_pending_kind::rotl_xor_local_set_i64_after_rotl)
+    {
+        conbine_pending.kind = conbine_pending_kind::rotl_xor_local_set_i64_after_xor;
+        break;
+    }
+# endif
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i64)
     {
         if(code_curr != code_end)
@@ -2915,6 +2939,32 @@ case wasm1_code::i64_rotl:
         break;
     }
 # endif
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+    if(conbine_pending.kind == conbine_pending_kind::local_get2_const_i64)
+    {
+        wasm1_code next_op{};  // init
+        if(code_curr != code_end) { ::std::memcpy(::std::addressof(next_op), code_curr, sizeof(next_op)); }
+        if(!is_polymorphic && next_op == wasm1_code::i64_xor)
+        {
+            conbine_pending.kind = conbine_pending_kind::rotl_xor_local_set_i64_after_rotl;
+            break;
+        }
+
+        emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i64, conbine_pending.off1);
+        stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+        emit_opfunc_to(
+            bytecode,
+            translate::get_uwvmint_i64_binop_imm_localget_fptr_from_tuple<CompileOption,
+                                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(
+                curr_stacktop,
+                interpreter_tuple));
+        emit_imm_to(bytecode, conbine_pending.off2);
+        emit_imm_to(bytecode, conbine_pending.imm_i64);
+        stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
+        conbine_pending.kind = conbine_pending_kind::none;
+        break;
+    }
+# endif
     if(conbine_pending.kind == conbine_pending_kind::local_get_const_i64)
     {
         if(code_curr != code_end)
@@ -2940,7 +2990,10 @@ case wasm1_code::i64_rotl:
                 }
             }
         }
-
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        conbine_pending.kind = conbine_pending_kind::rot_xor_add_i64_after_rotl;
+        break;
+# else
         stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
         emit_opfunc_to(
             bytecode,
@@ -2953,6 +3006,7 @@ case wasm1_code::i64_rotl:
         stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64);
         conbine_pending.kind = conbine_pending_kind::none;
         break;
+# endif
     }
 # ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i64)

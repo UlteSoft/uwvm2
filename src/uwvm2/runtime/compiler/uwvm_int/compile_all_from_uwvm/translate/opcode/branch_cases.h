@@ -1025,10 +1025,13 @@ case wasm1_code::br_if:
 
     // Conbine: `local.get(i32); i32.eqz; br_if` and `local.get(i32); i32.const; cmp; br_if`.
     bool conbine_brif_local_eqz{};
+    bool conbine_brif_i64_local_eqz{};
     bool conbine_brif_i32_cmp_imm{};
+    bool conbine_brif_i64_cmp_imm{};
 
     local_offset_t conbine_brif_local_off{};
     wasm_i32 conbine_brif_imm{};
+    wasm_i64 conbine_brif_imm64{};
     conbine_brif_cmp_kind conbine_brif_cmp{conbine_brif_cmp_kind::none};
 
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
@@ -1046,6 +1049,13 @@ case wasm1_code::br_if:
     if(conbine_pending.kind == conbine_pending_kind::local_get_eqz_i32)
     {
         conbine_brif_local_eqz = true;
+        conbine_brif_local_off = conbine_pending.off1;
+        conbine_pending.kind = conbine_pending_kind::none;
+        conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+    }
+    else if(conbine_pending.kind == conbine_pending_kind::local_get_eqz_i64)
+    {
+        conbine_brif_i64_local_eqz = true;
         conbine_brif_local_off = conbine_pending.off1;
         conbine_pending.kind = conbine_pending_kind::none;
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
@@ -1104,6 +1114,15 @@ case wasm1_code::br_if:
             conbine_brif_imm = conbine_pending.imm_i32;
             conbine_brif_cmp = conbine_pending.brif_cmp;
         }
+        conbine_pending.kind = conbine_pending_kind::none;
+        conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+    }
+    else if(conbine_pending.kind == conbine_pending_kind::local_get_const_i64_cmp_brif)
+    {
+        conbine_brif_i64_cmp_imm = true;
+        conbine_brif_local_off = conbine_pending.off1;
+        conbine_brif_imm64 = conbine_pending.imm_i64;
+        conbine_brif_cmp = conbine_pending.brif_cmp;
         conbine_pending.kind = conbine_pending_kind::none;
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
     }
@@ -1629,9 +1648,19 @@ case wasm1_code::br_if:
                     fused_fptr = translate::get_uwvmint_br_if_i64_eqz_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                     break;
                 }
+                case br_if_fuse_kind::i64_eq:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_eq_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
                 case br_if_fuse_kind::i64_ne:
                 {
                     fused_fptr = translate::get_uwvmint_br_if_i64_ne_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_lt_s:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_lt_s_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                     break;
                 }
                 case br_if_fuse_kind::i64_gt_u:
@@ -1642,6 +1671,31 @@ case wasm1_code::br_if:
                 case br_if_fuse_kind::i64_lt_u:
                 {
                     fused_fptr = translate::get_uwvmint_br_if_i64_lt_u_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_gt_s:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_gt_s_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_ge_s:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_ge_s_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_ge_u:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_ge_u_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_le_s:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_le_s_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
+                    break;
+                }
+                case br_if_fuse_kind::i64_le_u:
+                {
+                    fused_fptr = translate::get_uwvmint_br_if_i64_le_u_fptr_from_tuple<CompileOption>(fuse_stacktop_currpos, interpreter_tuple);
                     break;
                 }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
@@ -2051,6 +2105,14 @@ case wasm1_code::br_if:
                 return;
             }
 
+            if(conbine_brif_i64_local_eqz)
+            {
+                emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_local_eqz_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_brif_local_off);
+                emit_ptr_label_placeholder(label_id, false);
+                return;
+            }
+
             if(conbine_brif_i32_cmp_imm)
             {
                 switch(conbine_brif_cmp)
@@ -2058,6 +2120,11 @@ case wasm1_code::br_if:
                     case conbine_brif_cmp_kind::i32_eq:
                     {
                         emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_eq_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_ne:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_ne_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         break;
                     }
                     case conbine_brif_cmp_kind::i32_lt_s:
@@ -2068,6 +2135,26 @@ case wasm1_code::br_if:
                     case conbine_brif_cmp_kind::i32_lt_u:
                     {
                         emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_lt_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_gt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_gt_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_gt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_gt_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_le_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_le_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_le_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i32_le_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         break;
                     }
                     case conbine_brif_cmp_kind::i32_ge_s:
@@ -2093,6 +2180,77 @@ case wasm1_code::br_if:
 
                 emit_imm_to(bytecode, conbine_brif_local_off);
                 emit_imm_to(bytecode, conbine_brif_imm);
+                emit_ptr_label_placeholder(label_id, false);
+                return;
+            }
+
+            if(conbine_brif_i64_cmp_imm)
+            {
+                switch(conbine_brif_cmp)
+                {
+                    case conbine_brif_cmp_kind::i64_eq:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_eq_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ne:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_ne_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_lt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_lt_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_lt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_lt_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_gt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_gt_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_gt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_gt_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_le_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_le_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_le_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_le_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ge_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_ge_s_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ge_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_i64_ge_u_imm_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::none:
+                        [[fallthrough]];
+                    [[unlikely]] default:
+                    {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, conbine_brif_local_off);
+                emit_imm_to(bytecode, conbine_brif_imm64);
                 emit_ptr_label_placeholder(label_id, false);
                 return;
             }
@@ -2124,7 +2282,7 @@ case wasm1_code::br_if:
 
     auto const target_label_id{get_branch_target_label_id(target_frame)};
 
-    bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i32_cmp_imm
+    bool const brif_consumes_stack_cond{!(conbine_brif_local_eqz || conbine_brif_i64_local_eqz || conbine_brif_i32_cmp_imm || conbine_brif_i64_cmp_imm
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
                                           || conbine_brif_i32_rem_u_eqz_2localget || conbine_brif_for_i32_inc_f64_lt_u_eqz || conbine_brif_for_i32_inc_lt_u
 #  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS

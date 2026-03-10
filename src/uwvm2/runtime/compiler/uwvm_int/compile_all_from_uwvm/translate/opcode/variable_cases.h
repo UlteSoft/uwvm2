@@ -1038,6 +1038,21 @@ case wasm1_code::local_get:
             conbine_pending.off1 = local_off;
             break;
         }
+        case conbine_pending_kind::rot_xor_add_i64_after_rotl:
+        {
+            if(curr_local_type == curr_operand_stack_value_type::i64)
+            {
+                conbine_pending.kind = conbine_pending_kind::rot_xor_add_i64_after_gety;
+                conbine_pending.off2 = local_off;
+                break;
+            }
+
+            flush_conbine_pending();
+            conbine_pending.kind = conbine_pending_kind::local_get;
+            conbine_pending.vt = curr_local_type;
+            conbine_pending.off1 = local_off;
+            break;
+        }
 # endif
         [[unlikely]] default:
         {
@@ -1708,6 +1723,19 @@ case wasm1_code::local_set:
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
         break;
     }
+    if(curr_local_type == curr_operand_stack_value_type::i64 && conbine_pending.kind == conbine_pending_kind::rotl_xor_local_set_i64_after_xor)
+    {
+        if(have_set_operand) { operand_stack_pop_unchecked(); }
+        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_rotl_xor_local_set_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+        emit_imm_to(bytecode, conbine_pending.off1);
+        emit_imm_to(bytecode, conbine_pending.off2);
+        emit_imm_to(bytecode, conbine_pending.imm_i64);
+        emit_imm_to(bytecode, local_off);
+        conbine_pending.kind = conbine_pending_kind::none;
+        conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+        break;
+    }
 # endif
     if(conbine_pending.kind == conbine_pending_kind::i32_add_imm_local_settee_same ||
        conbine_pending.kind == conbine_pending_kind::i32_sub_imm_local_settee_same ||
@@ -2072,6 +2100,20 @@ case wasm1_code::local_tee:
         emit_imm_to(bytecode, conbine_pending.imm_i32);
         emit_imm_to(bytecode, local_off);
         if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+        conbine_pending.kind = conbine_pending_kind::none;
+        conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
+        break;
+    }
+    if(curr_local_type == curr_operand_stack_value_type::i64 && conbine_pending.kind == conbine_pending_kind::rotl_xor_local_set_i64_after_xor)
+    {
+        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64); }
+        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_rotl_xor_local_tee_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+        emit_imm_to(bytecode, conbine_pending.off1);
+        emit_imm_to(bytecode, conbine_pending.off2);
+        emit_imm_to(bytecode, conbine_pending.imm_i64);
+        emit_imm_to(bytecode, local_off);
+        if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
         conbine_pending.kind = conbine_pending_kind::none;
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
         break;

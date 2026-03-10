@@ -610,9 +610,16 @@ enum class br_if_fuse_kind : unsigned
     i32_and_nz,
 
     i64_eqz,
+    i64_eq,
     i64_ne,
+    i64_lt_s,
     i64_gt_u,
     i64_lt_u,
+    i64_gt_s,
+    i64_ge_s,
+    i64_ge_u,
+    i64_le_s,
+    i64_le_u,
 
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
     f32_eq,
@@ -650,6 +657,7 @@ enum class conbine_pending_kind : unsigned
     local_get2,
     local_get_i32_localget,  // off1=addr(i32), off2=value(vt)
     local_get2_const_i32,
+    local_get2_const_i64,
     local_get2_const_i32_mul,
     local_get2_const_i32_shl,
     // common: integer update_local on the shared i32/i64 scalar ring
@@ -680,11 +688,13 @@ enum class conbine_pending_kind : unsigned
     i64_rotl_imm_local_settee_same,
     i64_rotr_imm_local_settee_same,
     local_get_eqz_i32,
+    local_get_eqz_i64,
     local_get_const_i32,
     local_get_const_i64,
     const_i32,
     const_i64,
     local_get_const_i32_cmp_brif,
+    local_get_const_i64_cmp_brif,
     local_get_const_i32_add,
     local_get_const_i32_add_localget,
 
@@ -798,8 +808,16 @@ enum class conbine_pending_kind : unsigned
     rot_xor_add_after_xor,         // off1=x, off2=y, imm_i32=r
     rot_xor_add_after_xor_constc,  // off1=x, off2=y, imm_i32=r, imm_i32_2=c
 
+    rot_xor_add_i64_after_rotl,        // off1=x, imm_i64=r
+    rot_xor_add_i64_after_gety,        // off1=x, off2=y, imm_i64=r
+    rot_xor_add_i64_after_xor,         // off1=x, off2=y, imm_i64=r
+    rot_xor_add_i64_after_xor_constc,  // off1=x, off2=y, imm_i64=r, imm_i64_2=c
+
     rotl_xor_local_set_after_rotl,  // off1=y, off2=x, imm_i32=r
     rotl_xor_local_set_after_xor,   // off1=y, off2=x, imm_i32=r
+
+    rotl_xor_local_set_i64_after_rotl,  // off1=y, off2=x, imm_i64=r
+    rotl_xor_local_set_i64_after_xor,   // off1=y, off2=x, imm_i64=r
 
     // heavy: compound mem
     u16_copy_scaled_index_after_shl,  // off1=dst, off2=idx, imm_i32=sh
@@ -811,10 +829,25 @@ enum class conbine_brif_cmp_kind : unsigned
 {
     none,
     i32_eq,
+    i32_ne,
     i32_lt_s,
     i32_lt_u,
+    i32_gt_s,
+    i32_gt_u,
+    i32_le_s,
+    i32_le_u,
     i32_ge_s,
     i32_ge_u,
+    i64_eq,
+    i64_ne,
+    i64_lt_s,
+    i64_lt_u,
+    i64_gt_s,
+    i64_gt_u,
+    i64_le_s,
+    i64_le_u,
+    i64_ge_s,
+    i64_ge_u,
 };
 
 struct conbine_pending_t
@@ -831,6 +864,7 @@ struct conbine_pending_t
     wasm_u32 imm_u32{};
     wasm_u32 imm_u32_2{};
     wasm_i64 imm_i64{};
+    wasm_i64 imm_i64_2{};
 
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
     wasm_f32 imm_f32{};
@@ -860,6 +894,7 @@ auto const runtime_log_conbine_kind_name{[]([[maybe_unused]] conbine_pending_kin
                                                  case conbine_pending_kind::local_get2: return u8"local_get2";
                                                  case conbine_pending_kind::local_get_i32_localget: return u8"local_get_i32_localget";
                                                  case conbine_pending_kind::local_get2_const_i32: return u8"local_get2_const_i32";
+                                                 case conbine_pending_kind::local_get2_const_i64: return u8"local_get2_const_i64";
                                                  case conbine_pending_kind::local_get2_const_i32_mul: return u8"local_get2_const_i32_mul";
                                                  case conbine_pending_kind::local_get2_const_i32_shl: return u8"local_get2_const_i32_shl";
                                                  case conbine_pending_kind::i32_add_2localget_local_set: return u8"i32_add_2localget_local_set";
@@ -889,11 +924,13 @@ auto const runtime_log_conbine_kind_name{[]([[maybe_unused]] conbine_pending_kin
                                                  case conbine_pending_kind::i64_rotl_imm_local_settee_same: return u8"i64_rotl_imm_local_settee_same";
                                                  case conbine_pending_kind::i64_rotr_imm_local_settee_same: return u8"i64_rotr_imm_local_settee_same";
                                                  case conbine_pending_kind::local_get_eqz_i32: return u8"local_get_eqz_i32";
+                                                 case conbine_pending_kind::local_get_eqz_i64: return u8"local_get_eqz_i64";
                                                  case conbine_pending_kind::local_get_const_i32: return u8"local_get_const_i32";
                                                  case conbine_pending_kind::local_get_const_i64: return u8"local_get_const_i64";
                                                  case conbine_pending_kind::const_i32: return u8"const_i32";
                                                  case conbine_pending_kind::const_i64: return u8"const_i64";
                                                  case conbine_pending_kind::local_get_const_i32_cmp_brif: return u8"local_get_const_i32_cmp_brif";
+                                                 case conbine_pending_kind::local_get_const_i64_cmp_brif: return u8"local_get_const_i64_cmp_brif";
                                                  case conbine_pending_kind::local_get_const_i32_add: return u8"local_get_const_i32_add";
                                                  case conbine_pending_kind::local_get_const_i32_add_localget: return u8"local_get_const_i32_add_localget";
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
@@ -991,8 +1028,14 @@ auto const runtime_log_conbine_kind_name{[]([[maybe_unused]] conbine_pending_kin
                                                  case conbine_pending_kind::rot_xor_add_after_gety: return u8"rot_xor_add_after_gety";
                                                  case conbine_pending_kind::rot_xor_add_after_xor: return u8"rot_xor_add_after_xor";
                                                  case conbine_pending_kind::rot_xor_add_after_xor_constc: return u8"rot_xor_add_after_xor_constc";
+                                                 case conbine_pending_kind::rot_xor_add_i64_after_rotl: return u8"rot_xor_add_i64_after_rotl";
+                                                 case conbine_pending_kind::rot_xor_add_i64_after_gety: return u8"rot_xor_add_i64_after_gety";
+                                                 case conbine_pending_kind::rot_xor_add_i64_after_xor: return u8"rot_xor_add_i64_after_xor";
+                                                 case conbine_pending_kind::rot_xor_add_i64_after_xor_constc: return u8"rot_xor_add_i64_after_xor_constc";
                                                  case conbine_pending_kind::rotl_xor_local_set_after_rotl: return u8"rotl_xor_local_set_after_rotl";
                                                  case conbine_pending_kind::rotl_xor_local_set_after_xor: return u8"rotl_xor_local_set_after_xor";
+                                                 case conbine_pending_kind::rotl_xor_local_set_i64_after_rotl: return u8"rotl_xor_local_set_i64_after_rotl";
+                                                 case conbine_pending_kind::rotl_xor_local_set_i64_after_xor: return u8"rotl_xor_local_set_i64_after_xor";
                                                  case conbine_pending_kind::u16_copy_scaled_index_after_shl: return u8"u16_copy_scaled_index_after_shl";
                                                  case conbine_pending_kind::u16_copy_scaled_index_after_load:
                                                      return u8"u16_copy_scaled_index_after_load";
@@ -1008,11 +1051,26 @@ auto const runtime_log_conbine_brif_cmp_name{[]([[maybe_unused]] conbine_brif_cm
                                                  {
                                                      case conbine_brif_cmp_kind::none: return u8"none";
                                                      case conbine_brif_cmp_kind::i32_eq: return u8"i32_eq";
+                                                     case conbine_brif_cmp_kind::i32_ne: return u8"i32_ne";
                                                      case conbine_brif_cmp_kind::i32_lt_s: return u8"i32_lt_s";
                                                      case conbine_brif_cmp_kind::i32_lt_u: return u8"i32_lt_u";
+                                                     case conbine_brif_cmp_kind::i32_gt_s: return u8"i32_gt_s";
+                                                     case conbine_brif_cmp_kind::i32_gt_u: return u8"i32_gt_u";
+                                                     case conbine_brif_cmp_kind::i32_le_s: return u8"i32_le_s";
+                                                     case conbine_brif_cmp_kind::i32_le_u: return u8"i32_le_u";
                                                      case conbine_brif_cmp_kind::i32_ge_s: return u8"i32_ge_s";
-                                                     case conbine_brif_cmp_kind::i32_ge_u:
-                                                         return u8"i32_ge_u";
+                                                     case conbine_brif_cmp_kind::i32_ge_u: return u8"i32_ge_u";
+                                                     case conbine_brif_cmp_kind::i64_eq: return u8"i64_eq";
+                                                     case conbine_brif_cmp_kind::i64_ne: return u8"i64_ne";
+                                                     case conbine_brif_cmp_kind::i64_lt_s: return u8"i64_lt_s";
+                                                     case conbine_brif_cmp_kind::i64_lt_u: return u8"i64_lt_u";
+                                                     case conbine_brif_cmp_kind::i64_gt_s: return u8"i64_gt_s";
+                                                     case conbine_brif_cmp_kind::i64_gt_u: return u8"i64_gt_u";
+                                                     case conbine_brif_cmp_kind::i64_le_s: return u8"i64_le_s";
+                                                     case conbine_brif_cmp_kind::i64_le_u: return u8"i64_le_u";
+                                                     case conbine_brif_cmp_kind::i64_ge_s: return u8"i64_ge_s";
+                                                     case conbine_brif_cmp_kind::i64_ge_u:
+                                                         return u8"i64_ge_u";
                                                      [[unlikely]] default:
                                                          return u8"?";
                                                  }
@@ -1146,6 +1204,13 @@ auto const flush_conbine_pending{
                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off2);
                 emit_const_i32_to(bytecode, conbine_pending.imm_i32);
+                break;
+            }
+            case conbine_pending_kind::local_get2_const_i64:
+            {
+                emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i64, conbine_pending.off1);
+                emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i64, conbine_pending.off2);
+                emit_const_i64_to(bytecode, conbine_pending.imm_i64);
                 break;
             }
             case conbine_pending_kind::local_get2_const_i32_mul:
@@ -1432,6 +1497,14 @@ auto const flush_conbine_pending{
                 if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
                 break;
             }
+            case conbine_pending_kind::local_get_eqz_i64:
+            {
+                if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
+                emit_opfunc_to(bytecode, translate::get_uwvmint_i64_eqz_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_pending.off1);
+                if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+                break;
+            }
             case conbine_pending_kind::local_get_const_i32:
             {
                 emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i32, conbine_pending.off1);
@@ -1471,6 +1544,11 @@ auto const flush_conbine_pending{
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_eq_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         break;
                     }
+                    case conbine_brif_cmp_kind::i32_ne:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_ne_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
                     case conbine_brif_cmp_kind::i32_lt_s:
                     {
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_lt_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
@@ -1479,6 +1557,26 @@ auto const flush_conbine_pending{
                     case conbine_brif_cmp_kind::i32_lt_u:
                     {
                         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_lt_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_gt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_gt_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_gt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_gt_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_le_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_le_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i32_le_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i32_le_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         break;
                     }
                     case conbine_brif_cmp_kind::i32_ge_s:
@@ -1506,6 +1604,80 @@ auto const flush_conbine_pending{
 
                 emit_imm_to(bytecode, conbine_pending.off1);
                 emit_imm_to(bytecode, conbine_pending.imm_i32);
+                if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
+
+                break;
+            }
+            case conbine_pending_kind::local_get_const_i64_cmp_brif:
+            {
+                if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i32); }
+                switch(conbine_pending.brif_cmp)
+                {
+                    case conbine_brif_cmp_kind::i64_eq:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_eq_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ne:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_ne_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_lt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_lt_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_lt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_lt_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_gt_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_gt_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_gt_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_gt_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_le_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_le_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_le_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_le_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ge_s:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_ge_s_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::i64_ge_u:
+                    {
+                        emit_opfunc_to(bytecode, translate::get_uwvmint_i64_ge_u_imm_localget_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        break;
+                    }
+                    case conbine_brif_cmp_kind::none:
+                    {
+                        [[fallthrough]];
+                    }
+                    [[unlikely]] default:
+                    {
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#  endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+
+                emit_imm_to(bytecode, conbine_pending.off1);
+                emit_imm_to(bytecode, conbine_pending.imm_i64);
                 if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
 
                 break;
@@ -2328,6 +2500,31 @@ auto const flush_conbine_pending{
                 if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
                 break;
             }
+            case conbine_pending_kind::rot_xor_add_i64_after_rotl: [[fallthrough]];
+            case conbine_pending_kind::rot_xor_add_i64_after_gety: [[fallthrough]];
+            case conbine_pending_kind::rot_xor_add_i64_after_xor: [[fallthrough]];
+            case conbine_pending_kind::rot_xor_add_i64_after_xor_constc:
+            {
+                if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64); }
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_i64_binop_imm_localget_fptr_from_tuple<
+                                   CompileOption,
+                                   ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_pending.off1);
+                emit_imm_to(bytecode, conbine_pending.imm_i64);
+                if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
+                if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_rotl) { break; }
+                emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i64, conbine_pending.off2);
+                if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_gety) { break; }
+                emit_opfunc_to(bytecode, translate::get_uwvmint_i64_xor_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                stacktop_after_pop_n_if_reachable(bytecode, 1uz);
+                if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_xor) { break; }
+                stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64);
+                emit_opfunc_to(bytecode, translate::get_uwvmint_i64_const_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_pending.imm_i64_2);
+                if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
+                break;
+            }
             case conbine_pending_kind::rotl_xor_local_set_after_rotl: [[fallthrough]];
             case conbine_pending_kind::rotl_xor_local_set_after_xor:
             {
@@ -2339,6 +2536,23 @@ auto const flush_conbine_pending{
                 if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i32); }
                 if(conbine_pending.kind == conbine_pending_kind::rotl_xor_local_set_after_rotl) { break; }
                 emit_opfunc_to(bytecode, translate::get_uwvmint_i32_xor_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                stacktop_after_pop_n_if_reachable(bytecode, 1uz);
+                break;
+            }
+            case conbine_pending_kind::rotl_xor_local_set_i64_after_rotl: [[fallthrough]];
+            case conbine_pending_kind::rotl_xor_local_set_i64_after_xor:
+            {
+                emit_local_get_typed_to(bytecode, curr_operand_stack_value_type::i64, conbine_pending.off1);
+                if constexpr(stacktop_enabled) { stacktop_prepare_push1_if_reachable(bytecode, curr_operand_stack_value_type::i64); }
+                emit_opfunc_to(bytecode,
+                               translate::get_uwvmint_i64_binop_imm_localget_fptr_from_tuple<
+                                   CompileOption,
+                                   ::uwvm2::runtime::compiler::uwvm_int::optable::numeric_details::int_binop::rotl>(curr_stacktop, interpreter_tuple));
+                emit_imm_to(bytecode, conbine_pending.off2);
+                emit_imm_to(bytecode, conbine_pending.imm_i64);
+                if constexpr(stacktop_enabled) { stacktop_commit_push1_typed_if_reachable(curr_operand_stack_value_type::i64); }
+                if(conbine_pending.kind == conbine_pending_kind::rotl_xor_local_set_i64_after_rotl) { break; }
+                emit_opfunc_to(bytecode, translate::get_uwvmint_i64_xor_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                 stacktop_after_pop_n_if_reachable(bytecode, 1uz);
                 break;
             }
@@ -2539,7 +2753,7 @@ auto const flush_conbine_pending{
                 }
                 if(conbine_pending.vt == curr_operand_stack_value_type::i64)
                 {
-                    return op == wasm1_code::i64_const
+                    return op == wasm1_code::i64_const || op == wasm1_code::i64_eqz
 # ifdef UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT
                            || op == wasm1_code::i64_add || op == wasm1_code::i64_xor
 # endif
@@ -2762,6 +2976,10 @@ auto const flush_conbine_pending{
 # endif
                     ;
             }
+            case conbine_pending_kind::local_get2_const_i64:
+            {
+                return op == wasm1_code::i64_rotl;
+            }
             case conbine_pending_kind::local_get2_const_i32_mul: [[fallthrough]];
             case conbine_pending_kind::local_get2_const_i32_shl:
             {
@@ -2905,7 +3123,9 @@ auto const flush_conbine_pending{
             }
 # endif
             case conbine_pending_kind::local_get_eqz_i32: [[fallthrough]];
-            case conbine_pending_kind::local_get_const_i32_cmp_brif:
+            case conbine_pending_kind::local_get_eqz_i64: [[fallthrough]];
+            case conbine_pending_kind::local_get_const_i32_cmp_brif: [[fallthrough]];
+            case conbine_pending_kind::local_get_const_i64_cmp_brif:
             {
                 return op == wasm1_code::br_if;
             }
@@ -2926,6 +3146,10 @@ auto const flush_conbine_pending{
                     case wasm1_code::i32_ne: [[fallthrough]];
                     case wasm1_code::i32_lt_s: [[fallthrough]];
                     case wasm1_code::i32_lt_u: [[fallthrough]];
+                    case wasm1_code::i32_gt_s: [[fallthrough]];
+                    case wasm1_code::i32_gt_u: [[fallthrough]];
+                    case wasm1_code::i32_le_s: [[fallthrough]];
+                    case wasm1_code::i32_le_u: [[fallthrough]];
                     case wasm1_code::i32_ge_s: [[fallthrough]];
                     case wasm1_code::i32_ge_u: [[fallthrough]];
                     case wasm1_code::i32_store: [[fallthrough]];
@@ -2968,6 +3192,16 @@ auto const flush_conbine_pending{
             {
                 switch(op)
                 {
+                    case wasm1_code::i64_eq: [[fallthrough]];
+                    case wasm1_code::i64_ne: [[fallthrough]];
+                    case wasm1_code::i64_lt_s: [[fallthrough]];
+                    case wasm1_code::i64_lt_u: [[fallthrough]];
+                    case wasm1_code::i64_gt_s: [[fallthrough]];
+                    case wasm1_code::i64_gt_u: [[fallthrough]];
+                    case wasm1_code::i64_le_s: [[fallthrough]];
+                    case wasm1_code::i64_le_u: [[fallthrough]];
+                    case wasm1_code::i64_ge_s: [[fallthrough]];
+                    case wasm1_code::i64_ge_u: [[fallthrough]];
                     case wasm1_code::i64_add: [[fallthrough]];
                     case wasm1_code::i64_sub: [[fallthrough]];
                     case wasm1_code::i64_mul: [[fallthrough]];
@@ -3227,11 +3461,35 @@ auto const flush_conbine_pending{
             {
                 return op == wasm1_code::i32_add;
             }
+            case conbine_pending_kind::rot_xor_add_i64_after_rotl:
+            {
+                return op == wasm1_code::local_get;
+            }
+            case conbine_pending_kind::rot_xor_add_i64_after_gety:
+            {
+                return op == wasm1_code::i64_xor;
+            }
+            case conbine_pending_kind::rot_xor_add_i64_after_xor:
+            {
+                return op == wasm1_code::i64_const;
+            }
+            case conbine_pending_kind::rot_xor_add_i64_after_xor_constc:
+            {
+                return op == wasm1_code::i64_add;
+            }
             case conbine_pending_kind::rotl_xor_local_set_after_rotl:
             {
                 return op == wasm1_code::i32_xor;
             }
             case conbine_pending_kind::rotl_xor_local_set_after_xor:
+            {
+                return op == wasm1_code::local_set || op == wasm1_code::local_tee;
+            }
+            case conbine_pending_kind::rotl_xor_local_set_i64_after_rotl:
+            {
+                return op == wasm1_code::i64_xor;
+            }
+            case conbine_pending_kind::rotl_xor_local_set_i64_after_xor:
             {
                 return op == wasm1_code::local_set || op == wasm1_code::local_tee;
             }
