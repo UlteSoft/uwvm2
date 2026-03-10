@@ -1,8 +1,55 @@
 #include "../uwvm_int_translate_strict_common.h"
 
+#include <string>
+#include <string_view>
+
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
+
+    [[nodiscard]] std::string read_text_file(char const* path)
+    {
+        ::std::FILE* fp{::std::fopen(path, "rb")};
+        if(fp == nullptr) { return {}; }
+
+        if(::std::fseek(fp, 0, SEEK_END) != 0)
+        {
+            ::std::fclose(fp);
+            return {};
+        }
+
+        long const sz{::std::ftell(fp)};
+        if(sz < 0)
+        {
+            ::std::fclose(fp);
+            return {};
+        }
+
+        if(::std::fseek(fp, 0, SEEK_SET) != 0)
+        {
+            ::std::fclose(fp);
+            return {};
+        }
+
+        std::string text(static_cast<::std::size_t>(sz), '\0');
+        if(sz != 0)
+        {
+            auto const nread{::std::fread(text.data(), 1uz, static_cast<::std::size_t>(sz), fp)};
+            text.resize(nread);
+        }
+
+        ::std::fclose(fp);
+        return text;
+    }
+
+    [[nodiscard]] bool log_contains_kind(std::string_view log_text, std::string_view kind) noexcept
+    {
+        std::string needle;
+        needle.reserve(kind.size() + 5uz);
+        needle.append("kind=");
+        needle.append(kind.data(), kind.size());
+        return log_text.find(needle) != std::string_view::npos;
+    }
 
     [[nodiscard]] byte_vec build_runtime_log_conbine_missing_kinds_module()
     {
@@ -496,25 +543,122 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Enable translator runtime-log and discard output to avoid spam.
+        constexpr char kLogPath[]{"/tmp/uwvm_int_translate_runtime_log_conbine_missing_kinds_strict.log"};
+        (void)::std::remove(kLogPath);
+
+        // Enable translator runtime-log and capture output for explicit kind-name assertions.
 #if defined(_WIN32) || defined(_WIN64)
-        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"NUL", ::fast_io::open_mode::out);
+        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"uwvm_int_translate_runtime_log_conbine_missing_kinds_strict.log",
+                                                       ::fast_io::open_mode::out);
 #else
-        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"/dev/null", ::fast_io::open_mode::out);
+        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"/tmp/uwvm_int_translate_runtime_log_conbine_missing_kinds_strict.log",
+                                                       ::fast_io::open_mode::out);
 #endif
         ::uwvm2::uwvm::io::enable_runtime_log = true;
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
             UWVM2TEST_REQUIRE((compile_only_with_runtime_log<opt>(rt)) == 0);
         }
 
-        // tailcall (required by some extra-heavy combine paths)
+        if(abi_mode_enabled("tail-min"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
             UWVM2TEST_REQUIRE((compile_only_with_runtime_log<opt>(rt)) == 0);
         }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            UWVM2TEST_REQUIRE((compile_only_with_runtime_log<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            UWVM2TEST_REQUIRE((compile_only_with_runtime_log<opt>(rt)) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            UWVM2TEST_REQUIRE((compile_only_with_runtime_log<opt>(rt)) == 0);
+        }
+
+        ::uwvm2::uwvm::io::enable_runtime_log = false;
+#if defined(_WIN32) || defined(_WIN64)
+        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"NUL", ::fast_io::open_mode::out);
+#else
+        ::uwvm2::uwvm::io::u8runtime_log_output.reopen(u8"/dev/null", ::fast_io::open_mode::out);
+#endif
+
+        auto const log_text{read_text_file(kLogPath)};
+        UWVM2TEST_REQUIRE(!log_text.empty());
+
+        for(char const* kind : {
+                "const_f32_localget",
+                "f32_div_from_imm_localtee_wait",
+                "const_f64_localget",
+                "f64_div_from_imm_localtee_wait",
+#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+                "float_mul_2localget",
+                "float_mul_2localget_local3",
+                "float_2mul_wait_second_mul",
+                "float_2mul_after_second_mul",
+                "select_localget3",
+                "select_after_select",
+                "mac_localget3",
+                "mac_after_mul",
+                "mac_after_add",
+                "f32_add_2localget_local_set",
+                "f32_add_2localget_local_tee",
+                "f64_add_2localget_local_set",
+                "f64_add_2localget_local_tee",
+                "i32_rem_u_2localget_wait_eqz",
+                "i32_rem_u_eqz_2localget_wait_brif",
+                "for_i32_inc_f64_lt_u_eqz_after_gets",
+                "for_i32_inc_f64_lt_u_eqz_after_step_const",
+                "for_i32_inc_f64_lt_u_eqz_after_add",
+                "for_i32_inc_f64_lt_u_eqz_after_tee",
+                "for_i32_inc_f64_lt_u_eqz_after_convert",
+                "for_i32_inc_f64_lt_u_eqz_after_cmp",
+                "for_i32_inc_f64_lt_u_eqz_after_eqz",
+                "xorshift_pre_shr",
+                "xorshift_after_shr",
+                "xorshift_after_xor1",
+                "xorshift_after_xor1_getx",
+                "xorshift_after_xor1_getx_constb",
+                "xorshift_after_shl",
+                "rotl_xor_local_set_after_rotl",
+                "rotl_xor_local_set_after_xor",
+                "u16_copy_scaled_index_after_shl",
+                "u16_copy_scaled_index_after_load",
+#endif
+                "f32_acc_add_ceil_localget_wait_add",
+                "f32_acc_add_trunc_localget_wait_add",
+                "f32_acc_add_nearest_localget_wait_add",
+                "f32_acc_add_abs_localget_wait_add",
+                "f32_acc_add_ceil_localget_set_acc",
+                "f32_acc_add_trunc_localget_set_acc",
+                "f32_acc_add_nearest_localget_set_acc",
+                "f32_acc_add_abs_localget_set_acc",
+                "f64_acc_add_floor_localget_wait_add",
+                "f64_acc_add_ceil_localget_wait_add",
+                "f64_acc_add_trunc_localget_wait_add",
+                "f64_acc_add_nearest_localget_wait_add",
+                "f64_acc_add_abs_localget_wait_add",
+                "f64_acc_add_floor_localget_set_acc",
+                "f64_acc_add_ceil_localget_set_acc",
+                "f64_acc_add_trunc_localget_set_acc",
+                "f64_acc_add_nearest_localget_set_acc",
+                "f64_acc_add_abs_localget_set_acc",
+            })
+        {
+            UWVM2TEST_REQUIRE(log_contains_kind(log_text, kind));
+        }
+
+        (void)::std::remove(kLogPath);
 
         return 0;
     }

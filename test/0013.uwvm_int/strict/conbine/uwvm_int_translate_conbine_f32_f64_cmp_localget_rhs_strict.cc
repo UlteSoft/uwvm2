@@ -97,9 +97,9 @@ namespace
         using Runner = interpreter_runner<Opt>;
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-        if constexpr(Opt.is_tail_call)
+        if constexpr(Opt.is_tail_call && Opt.i32_stack_top_begin_pos == Opt.i32_stack_top_end_pos)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            constexpr auto curr{make_entry_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
@@ -211,15 +211,36 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // tailcall: strict fptr assertions when enabled + semantics.
+        if(abi_mode_enabled("tail-min"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
-        // byref smoke
+        if(abi_mode_enabled("byref"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
@@ -238,4 +259,3 @@ int main()
         return ::uwvm2test::uwvm_int_strict::fail(__LINE__, "uncaught exception");
     }
 }
-

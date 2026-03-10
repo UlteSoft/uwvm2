@@ -218,6 +218,448 @@ case wasm1_code::br:
                 }
             }
 
+            // Extra-heavy: mega-fuse `micro/loop_i64.wasm` hot loop into one opfunc dispatch.
+            if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+               target_frame.wasm_code_curr_at_start_label != nullptr)
+            {
+                using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+
+                bool match_ok{true};
+                if constexpr(stacktop_enabled) { match_ok = (stacktop_cache_count == 0uz); }
+
+                if(match_ok)
+                {
+                    auto p{target_frame.wasm_code_curr_at_start_label};
+                    auto const endp{op_begin};
+
+                    auto const consume_op{[&](wasm1_code expected) constexpr noexcept -> bool
+                                          {
+                                              if(p >= endp) [[unlikely]] { return false; }
+                                              wasm1_code op;  // no init
+                                              ::std::memcpy(::std::addressof(op), p, sizeof(op));
+                                              if(op != expected) { return false; }
+                                              ++p;
+                                              return true;
+                                          }};
+
+                    auto const consume_u32_leb{[&](wasm_u32& v) constexpr noexcept -> bool
+                                               {
+                                                   using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                   auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                   ::fast_io::mnp::leb128_get(v))};
+                                                   if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   p = reinterpret_cast<::std::byte const*>(next);
+                                                   return true;
+                                               }};
+
+                    auto const consume_i32_leb{[&](wasm_i32& v) constexpr noexcept -> bool
+                                               {
+                                                   using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                   auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                   ::fast_io::mnp::leb128_get(v))};
+                                                   if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   p = reinterpret_cast<::std::byte const*>(next);
+                                                   return true;
+                                               }};
+
+                    auto const consume_i64_leb{[&](wasm_i64& v) constexpr noexcept -> bool
+                                               {
+                                                   using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                   auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                   ::fast_io::mnp::leb128_get(v))};
+                                                   if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                   p = reinterpret_cast<::std::byte const*>(next);
+                                                   return true;
+                                               }};
+
+                    wasm_u32 i_local_idx{};    // init
+                    wasm_u32 x_local_idx{};    // init
+                    wasm_u32 tmp_local_idx{};  // init
+                    wasm_u32 break_lbl_idx{};  // init
+                    wasm_i32 end_i{};          // init
+                    wasm_i32 one_i32{};        // init
+                    wasm_i64 one_i64{};        // init
+                    wasm_i64 mul_i64{};        // init
+                    wasm_i64 rot_i64{};        // init
+
+                    // Header: `local.get i; i32.const end; i32.ge_u; br_if 1`
+                    match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(i_local_idx) && consume_op(wasm1_code::i32_const) &&
+                               consume_i32_leb(end_i) && consume_op(wasm1_code::i32_ge_u) && consume_op(wasm1_code::br_if) && consume_u32_leb(break_lbl_idx) &&
+                               break_lbl_idx == 1u;
+
+                    // x = x + 1
+                    if(match_ok)
+                    {
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(x_local_idx) && consume_op(wasm1_code::i64_const) &&
+                                   consume_i64_leb(one_i64) && one_i64 == wasm_i64{1} && consume_op(wasm1_code::i64_add) && consume_op(wasm1_code::local_set) &&
+                                   consume_u32_leb(tmp_local_idx) && tmp_local_idx == x_local_idx;
+                    }
+
+                    // x = x * 6364136223846793005
+                    if(match_ok)
+                    {
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == x_local_idx &&
+                                   consume_op(wasm1_code::i64_const) && consume_i64_leb(mul_i64) && mul_i64 == static_cast<wasm_i64>(6364136223846793005ll) &&
+                                   consume_op(wasm1_code::i64_mul) && consume_op(wasm1_code::local_set) && consume_u32_leb(tmp_local_idx) &&
+                                   tmp_local_idx == x_local_idx;
+                    }
+
+                    // x = x ^ i64.extend_i32_u(i)
+                    if(match_ok)
+                    {
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == x_local_idx &&
+                                   consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == i_local_idx &&
+                                   consume_op(wasm1_code::i64_extend_i32_u) && consume_op(wasm1_code::i64_xor) && consume_op(wasm1_code::local_set) &&
+                                   consume_u32_leb(tmp_local_idx) && tmp_local_idx == x_local_idx;
+                    }
+
+                    // x = rotr(x, 17)
+                    if(match_ok)
+                    {
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == x_local_idx &&
+                                   consume_op(wasm1_code::i64_const) && consume_i64_leb(rot_i64) && rot_i64 == wasm_i64{17} &&
+                                   consume_op(wasm1_code::i64_rotr) && consume_op(wasm1_code::local_set) && consume_u32_leb(tmp_local_idx) &&
+                                   tmp_local_idx == x_local_idx;
+                    }
+
+                    // i = i + 1
+                    if(match_ok)
+                    {
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == i_local_idx &&
+                                   consume_op(wasm1_code::i32_const) && consume_i32_leb(one_i32) && one_i32 == wasm_i32{1} && consume_op(wasm1_code::i32_add) &&
+                                   consume_op(wasm1_code::local_set) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == i_local_idx;
+                    }
+
+                    if(match_ok) { match_ok = (p == endp); }
+
+                    if(match_ok)
+                    {
+                        auto const& loop_lbl{labels.index_unchecked(target_label_id)};
+                        if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
+                        {
+                            while(!ptr_fixups.empty())
+                            {
+                                auto const& fx{ptr_fixups.back_unchecked()};
+                                if(fx.in_thunk || fx.site < loop_lbl.offset) { break; }
+                                ptr_fixups.pop_back_unchecked();
+                            }
+
+                            bytecode.resize(loop_lbl.offset);
+
+                            namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                            emit_opfunc_to(bytecode, translate::get_uwvmint_loop_i64_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                            emit_imm_to(bytecode, local_offset_from_index(i_local_idx));
+                            emit_imm_to(bytecode, local_offset_from_index(x_local_idx));
+                            emit_imm_to(bytecode, end_i);
+
+                            fused_extra_heavy_loop_run = true;
+                        }
+                    }
+                }
+            }
+
+            if constexpr(CompileOption.is_tail_call)
+            {
+                // Extra-heavy: mega-fuse `micro/round_f64_dense.wasm` hot loop into one opfunc dispatch.
+                if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                {
+                    using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+                    using wasm_u64 = ::std::uint_least64_t;
+
+                    bool match_ok{true};
+                    if constexpr(stacktop_enabled) { match_ok = (stacktop_cache_count == 0uz); }
+
+                    if(match_ok)
+                    {
+                        auto p{target_frame.wasm_code_curr_at_start_label};
+                        auto const endp{op_begin};
+
+                        auto const consume_op{[&](wasm1_code expected) constexpr noexcept -> bool
+                                              {
+                                                  if(p >= endp) [[unlikely]] { return false; }
+                                                  wasm1_code op;  // no init
+                                                  ::std::memcpy(::std::addressof(op), p, sizeof(op));
+                                                  if(op != expected) { return false; }
+                                                  ++p;
+                                                  return true;
+                                              }};
+
+                        auto const consume_u32_leb{[&](wasm_u32& v) constexpr noexcept -> bool
+                                                   {
+                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                       auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                       ::fast_io::mnp::leb128_get(v))};
+                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                       return true;
+                                                   }};
+
+                        auto const consume_i32_leb{[&](wasm_i32& v) constexpr noexcept -> bool
+                                                   {
+                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                       auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                       ::fast_io::mnp::leb128_get(v))};
+                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                       return true;
+                                                   }};
+
+                        auto const consume_f64_const_bits{[&](wasm_u64 expected_bits) constexpr noexcept -> bool
+                                                          {
+                                                              if(!consume_op(wasm1_code::f64_const)) { return false; }
+                                                              if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
+                                                              wasm_u64 bits{};  // init
+                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
+                                                              p += sizeof(bits);
+                                                              return bits == expected_bits;
+                                                          }};
+
+                        constexpr wasm_u64 f64_add_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(0.000001))};
+                        constexpr wasm_u64 f64_mul_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(1.0000001))};
+                        constexpr wasm_u64 f64_sub_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(0.5))};
+                        constexpr wasm_u64 f64_negone_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(-1.0))};
+
+                        wasm_u32 i_local_idx{};    // init
+                        wasm_u32 x_local_idx{};    // init
+                        wasm_u32 acc_local_idx{};  // init
+                        wasm_u32 tmp_local_idx{};  // init
+                        wasm_u32 break_lbl_idx{};  // init
+                        wasm_i32 end_i{};          // init
+                        wasm_i32 one_i32{};        // init
+
+                        auto const consume_local_get{
+                            [&](wasm_u32 expected) constexpr noexcept -> bool
+                            { return consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == expected; }};
+
+                        auto const consume_local_set{
+                            [&](wasm_u32 expected) constexpr noexcept -> bool
+                            { return consume_op(wasm1_code::local_set) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == expected; }};
+
+                        auto const consume_acc_add_unop{[&](wasm1_code unop) constexpr noexcept -> bool
+                                                        {
+                                                            return consume_local_get(acc_local_idx) && consume_local_get(x_local_idx) && consume_op(unop) &&
+                                                                   consume_op(wasm1_code::f64_add) && consume_local_set(acc_local_idx);
+                                                        }};
+
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(i_local_idx) && consume_op(wasm1_code::i32_const) &&
+                                   consume_i32_leb(end_i) && consume_op(wasm1_code::i32_ge_u) && consume_op(wasm1_code::br_if) &&
+                                   consume_u32_leb(break_lbl_idx) && break_lbl_idx == 1u;
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(x_local_idx) && consume_f64_const_bits(f64_add_bits) &&
+                                       consume_op(wasm1_code::f64_add) && consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(x_local_idx) && consume_f64_const_bits(f64_mul_bits) && consume_op(wasm1_code::f64_mul) &&
+                                       consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(x_local_idx) && consume_f64_const_bits(f64_sub_bits) && consume_op(wasm1_code::f64_sub) &&
+                                       consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(acc_local_idx) && consume_local_get(x_local_idx) &&
+                                       consume_op(wasm1_code::f64_floor) && consume_op(wasm1_code::f64_add) && consume_local_set(acc_local_idx);
+                        }
+
+                        if(match_ok) { match_ok = consume_acc_add_unop(wasm1_code::f64_ceil); }
+                        if(match_ok) { match_ok = consume_acc_add_unop(wasm1_code::f64_trunc); }
+                        if(match_ok) { match_ok = consume_acc_add_unop(wasm1_code::f64_nearest); }
+                        if(match_ok) { match_ok = consume_acc_add_unop(wasm1_code::f64_abs); }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(acc_local_idx) && consume_local_get(x_local_idx) && consume_f64_const_bits(f64_negone_bits) &&
+                                       consume_op(wasm1_code::f64_copysign) && consume_op(wasm1_code::f64_add) && consume_local_set(acc_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(i_local_idx) && consume_op(wasm1_code::i32_const) && consume_i32_leb(one_i32) &&
+                                       one_i32 == wasm_i32{1} && consume_op(wasm1_code::i32_add) && consume_local_set(i_local_idx);
+                        }
+
+                        if(match_ok) { match_ok = (p == endp); }
+
+                        if(match_ok)
+                        {
+                            auto const& loop_lbl{labels.index_unchecked(target_label_id)};
+                            if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
+                            {
+                                while(!ptr_fixups.empty())
+                                {
+                                    auto const& fx{ptr_fixups.back_unchecked()};
+                                    if(fx.in_thunk || fx.site < loop_lbl.offset) { break; }
+                                    ptr_fixups.pop_back_unchecked();
+                                }
+
+                                bytecode.resize(loop_lbl.offset);
+
+                                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                emit_opfunc_to(
+                                    bytecode,
+                                    translate::get_uwvmint_round_f64_dense_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                emit_imm_to(bytecode, local_offset_from_index(i_local_idx));
+                                emit_imm_to(bytecode, local_offset_from_index(x_local_idx));
+                                emit_imm_to(bytecode, local_offset_from_index(acc_local_idx));
+                                emit_imm_to(bytecode, end_i);
+
+                                fused_extra_heavy_loop_run = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if constexpr(CompileOption.is_tail_call)
+            {
+                // Extra-heavy: mega-fuse `micro/loop_f64.wasm` hot loop into one opfunc dispatch.
+                if(!fused_extra_heavy_loop_run && target_frame.type == block_type::loop && label_index_uz == 0uz && curr_size == target_base &&
+                   target_frame.wasm_code_curr_at_start_label != nullptr)
+                {
+                    using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+                    using wasm_u64 = ::std::uint_least64_t;
+
+                    bool match_ok{true};
+                    if constexpr(stacktop_enabled) { match_ok = (stacktop_cache_count == 0uz); }
+
+                    if(match_ok)
+                    {
+                        auto p{target_frame.wasm_code_curr_at_start_label};
+                        auto const endp{op_begin};
+
+                        auto const consume_op{[&](wasm1_code expected) constexpr noexcept -> bool
+                                              {
+                                                  if(p >= endp) [[unlikely]] { return false; }
+                                                  wasm1_code op;  // no init
+                                                  ::std::memcpy(::std::addressof(op), p, sizeof(op));
+                                                  if(op != expected) { return false; }
+                                                  ++p;
+                                                  return true;
+                                              }};
+
+                        auto const consume_u32_leb{[&](wasm_u32& v) constexpr noexcept -> bool
+                                                   {
+                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                       auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                       ::fast_io::mnp::leb128_get(v))};
+                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                       return true;
+                                                   }};
+
+                        auto const consume_i32_leb{[&](wasm_i32& v) constexpr noexcept -> bool
+                                                   {
+                                                       using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                       auto const [next, err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(p),
+                                                                                                       reinterpret_cast<char8_t_const_may_alias_ptr>(endp),
+                                                                                                       ::fast_io::mnp::leb128_get(v))};
+                                                       if(err != ::fast_io::parse_code::ok) [[unlikely]] { return false; }
+                                                       p = reinterpret_cast<::std::byte const*>(next);
+                                                       return true;
+                                                   }};
+
+                        auto const consume_f64_const_bits{[&](wasm_u64 expected_bits) constexpr noexcept -> bool
+                                                          {
+                                                              if(!consume_op(wasm1_code::f64_const)) { return false; }
+                                                              if(static_cast<::std::size_t>(endp - p) < sizeof(wasm_f64)) [[unlikely]] { return false; }
+                                                              wasm_u64 bits{};  // init
+                                                              ::std::memcpy(::std::addressof(bits), p, sizeof(bits));
+                                                              p += sizeof(bits);
+                                                              return bits == expected_bits;
+                                                          }};
+
+                        constexpr wasm_u64 f64_add_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(1.0))};
+                        constexpr wasm_u64 f64_mul_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(1.0000001))};
+                        constexpr wasm_u64 f64_sub_bits{::std::bit_cast<wasm_u64>(static_cast<wasm_f64>(0.5))};
+
+                        wasm_u32 i_local_idx{};    // init
+                        wasm_u32 x_local_idx{};    // init
+                        wasm_u32 tmp_local_idx{};  // init
+                        wasm_u32 break_lbl_idx{};  // init
+                        wasm_i32 end_i{};          // init
+                        wasm_i32 one_i32{};        // init
+
+                        auto const consume_local_get{
+                            [&](wasm_u32 expected) constexpr noexcept -> bool
+                            { return consume_op(wasm1_code::local_get) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == expected; }};
+
+                        auto const consume_local_set{
+                            [&](wasm_u32 expected) constexpr noexcept -> bool
+                            { return consume_op(wasm1_code::local_set) && consume_u32_leb(tmp_local_idx) && tmp_local_idx == expected; }};
+
+                        match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(i_local_idx) && consume_op(wasm1_code::i32_const) &&
+                                   consume_i32_leb(end_i) && consume_op(wasm1_code::i32_ge_u) && consume_op(wasm1_code::br_if) &&
+                                   consume_u32_leb(break_lbl_idx) && break_lbl_idx == 1u;
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_op(wasm1_code::local_get) && consume_u32_leb(x_local_idx) && consume_f64_const_bits(f64_add_bits) &&
+                                       consume_op(wasm1_code::f64_add) && consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(x_local_idx) && consume_f64_const_bits(f64_mul_bits) && consume_op(wasm1_code::f64_mul) &&
+                                       consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(x_local_idx) && consume_f64_const_bits(f64_sub_bits) && consume_op(wasm1_code::f64_sub) &&
+                                       consume_local_set(x_local_idx);
+                        }
+
+                        if(match_ok)
+                        {
+                            match_ok = consume_local_get(i_local_idx) && consume_op(wasm1_code::i32_const) && consume_i32_leb(one_i32) &&
+                                       one_i32 == wasm_i32{1} && consume_op(wasm1_code::i32_add) && consume_local_set(i_local_idx);
+                        }
+
+                        if(match_ok) { match_ok = (p == endp); }
+
+                        if(match_ok)
+                        {
+                            auto const& loop_lbl{labels.index_unchecked(target_label_id)};
+                            if(!loop_lbl.in_thunk && loop_lbl.offset != SIZE_MAX)
+                            {
+                                while(!ptr_fixups.empty())
+                                {
+                                    auto const& fx{ptr_fixups.back_unchecked()};
+                                    if(fx.in_thunk || fx.site < loop_lbl.offset) { break; }
+                                    ptr_fixups.pop_back_unchecked();
+                                }
+
+                                bytecode.resize(loop_lbl.offset);
+
+                                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                emit_opfunc_to(bytecode,
+                                               translate::get_uwvmint_loop_f64_loop_run_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                                emit_imm_to(bytecode, local_offset_from_index(i_local_idx));
+                                emit_imm_to(bytecode, local_offset_from_index(x_local_idx));
+                                emit_imm_to(bytecode, end_i);
+
+                                fused_extra_heavy_loop_run = true;
+                            }
+                        }
+                    }
+                }
+            }
+
             // Extra-heavy: mega-fuse `test10` hot affine inv-square f32 loop.
             if constexpr(CompileOption.is_tail_call)
             {

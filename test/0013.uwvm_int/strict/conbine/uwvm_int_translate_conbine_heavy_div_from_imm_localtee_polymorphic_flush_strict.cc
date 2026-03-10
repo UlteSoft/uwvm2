@@ -74,12 +74,32 @@ namespace
         return mb.build();
     }
 
-    [[nodiscard]] inline ::std::int32_t load_i32(byte_vec const& bytes) noexcept
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
     {
-        if(bytes.size() != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-        ::std::int32_t v{};
-        ::std::memcpy(::std::addressof(v), bytes.data(), 4);
-        return v;
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        cop.curr_wasm_id = 0uz;
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+        using Runner = interpreter_runner<Opt>;
+
+        auto r0 = Runner::run(cm.local_funcs.index_unchecked(0uz),
+                              rt.local_defined_function_vec_storage.index_unchecked(0uz),
+                              pack_no_params(),
+                              nullptr,
+                              nullptr);
+        UWVM2TEST_REQUIRE(load_i32(r0.results) == 0);
+
+        auto r1 = Runner::run(cm.local_funcs.index_unchecked(1uz),
+                              rt.local_defined_function_vec_storage.index_unchecked(1uz),
+                              pack_no_params(),
+                              nullptr,
+                              nullptr);
+        UWVM2TEST_REQUIRE(load_i32(r1.results) == 0);
+
+        return 0;
     }
 
     [[nodiscard]] int test_translate_div_from_imm_localtee_polymorphic_flush() noexcept
@@ -89,44 +109,49 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        constexpr optable::uwvm_interpreter_translate_option_t opt{
-            .is_tail_call = true,
-            .i32_stack_top_begin_pos = 3uz,
-            .i32_stack_top_end_pos = 7uz,
-            .i64_stack_top_begin_pos = 3uz,
-            .i64_stack_top_end_pos = 7uz,
-            .f32_stack_top_begin_pos = 3uz,
-            .f32_stack_top_end_pos = 7uz,
-            .f64_stack_top_begin_pos = 3uz,
-            .f64_stack_top_end_pos = 7uz,
-            .v128_stack_top_begin_pos = SIZE_MAX,
-            .v128_stack_top_end_pos = SIZE_MAX,
-        };
-        static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-
-        ::uwvm2::validation::error::code_validation_error_impl err{};
-        optable::compile_option cop{};
-        cop.curr_wasm_id = 0uz;
-        auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-        using Runner = interpreter_runner<opt>;
-
-        // Both funcs take else branch at runtime; return 0. The then branch exists only to stress compile-time polymorphic combine flush.
+        if(abi_mode_enabled("tail-min"))
         {
-            auto r0 = Runner::run(cm.local_funcs.index_unchecked(0uz),
-                                  rt.local_defined_function_vec_storage.index_unchecked(0uz),
-                                  pack_no_params(),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i32(r0.results) == 0);
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            auto r1 = Runner::run(cm.local_funcs.index_unchecked(1uz),
-                                  rt.local_defined_function_vec_storage.index_unchecked(1uz),
-                                  pack_no_params(),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i32(r1.results) == 0);
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr optable::uwvm_interpreter_translate_option_t opt{
+                .is_tail_call = true,
+                .i32_stack_top_begin_pos = 3uz,
+                .i32_stack_top_end_pos = 7uz,
+                .i64_stack_top_begin_pos = 3uz,
+                .i64_stack_top_end_pos = 7uz,
+                .f32_stack_top_begin_pos = 3uz,
+                .f32_stack_top_end_pos = 7uz,
+                .f64_stack_top_begin_pos = 3uz,
+                .f64_stack_top_end_pos = 7uz,
+                .v128_stack_top_begin_pos = SIZE_MAX,
+                .v128_stack_top_end_pos = SIZE_MAX,
+            };
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;
@@ -137,4 +162,3 @@ int main()
 {
     return test_translate_div_from_imm_localtee_polymorphic_flush();
 }
-

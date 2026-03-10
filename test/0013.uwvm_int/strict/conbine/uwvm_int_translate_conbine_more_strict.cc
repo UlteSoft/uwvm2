@@ -228,78 +228,176 @@ namespace
         return mb.build();
     }
 
-    [[nodiscard]] int test_translate_conbine_more() noexcept
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
     {
-        // Install optable hooks (unexpected traps/calls should terminate the test process).
-        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
-        optable::unreachable_func = +trap_unexpected;
-        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
-        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
-        optable::trap_integer_overflow_func = +trap_unexpected;
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
 
-        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
-        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i32_stack_top_begin_pos}; pos < Opt.i32_stack_top_end_pos; ++pos)
+            {
+                curr.i32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
 
-        auto wasm = build_conbine_more_module();
-        auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_conbine_more");
-        UWVM2TEST_REQUIRE(prep.mod != nullptr);
+        return false;
+    }
 
-        runtime_module_t const& rt = *prep.mod;
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_f32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
 
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+        if constexpr(Opt.f32_stack_top_begin_pos != SIZE_MAX && Opt.f32_stack_top_begin_pos != Opt.f32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.f32_stack_top_begin_pos}; pos < Opt.f32_stack_top_end_pos; ++pos)
+            {
+                curr.f32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_f64_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.f64_stack_top_begin_pos != SIZE_MAX && Opt.f64_stack_top_begin_pos != Opt.f64_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.f64_stack_top_begin_pos}; pos < Opt.f64_stack_top_end_pos; ++pos)
+            {
+                curr.f64_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
+    {
         ::uwvm2::validation::error::code_validation_error_impl err{};
         optable::compile_option cop{};
-        auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
-        using Runner = interpreter_runner<opt>;
-        [[maybe_unused]] constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+        using Runner = interpreter_runner<Opt>;
+        [[maybe_unused]] auto const curr{make_entry_stacktop_currpos<Opt>()};
         [[maybe_unused]] constexpr auto tuple =
-            compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
+        if constexpr(Opt.is_tail_call)
+        {
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-        constexpr auto exp_add_imm_local_tee_same =
-            optable::translate::get_uwvmint_i32_add_imm_local_tee_same_fptr_from_tuple<opt>(curr, tuple);
-# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-        constexpr auto exp_rotl_imm_stack_local_tee =
-            optable::translate::get_uwvmint_i32_binop_imm_stack_local_tee_fptr_from_tuple<
-                opt,
-                optable::numeric_details::int_binop::rotl>(curr, tuple);
-        constexpr auto exp_f32_div_from_imm_localtee =
-            optable::translate::get_uwvmint_f32_div_from_imm_localtee_fptr_from_tuple<opt>(curr, tuple);
-        constexpr auto exp_f64_div_from_imm_localtee =
-            optable::translate::get_uwvmint_f64_div_from_imm_localtee_fptr_from_tuple<opt>(curr, tuple);
-# endif
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_add_imm_local_tee_same_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+            bool ok{};
 # if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-        constexpr auto exp_add_2localget_local_tee =
-            optable::translate::get_uwvmint_i32_add_2localget_local_tee_fptr_from_tuple<opt>(curr, tuple);
-        constexpr auto exp_sub_2localget =
-            optable::translate::get_uwvmint_i32_sub_2localget_fptr_from_tuple<opt>(curr, tuple);
-        constexpr auto exp_add_mul_imm_2localget =
-            optable::translate::get_uwvmint_i32_add_mul_imm_2localget_fptr_from_tuple<opt>(curr, tuple);
-        constexpr auto exp_add_shl_imm_2localget =
-            optable::translate::get_uwvmint_i32_add_shl_imm_2localget_fptr_from_tuple<opt>(curr, tuple);
+            ok = ok || bytecode_contains_i32_variant<Opt>(
+                           cm.local_funcs.index_unchecked(1).op.operands,
+                           [&](auto const& curr_variant) constexpr noexcept
+                           { return optable::translate::get_uwvmint_i32_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
+# else
+            ok = ok || bytecode_contains_i32_variant<Opt>(
+                           cm.local_funcs.index_unchecked(1).op.operands,
+                           [&](auto const& curr_variant) constexpr noexcept
+                           {
+                               return optable::translate::get_uwvmint_i32_add_2localget_local_tee_common_fptr_from_tuple<Opt>(
+                                   curr_variant, tuple);
+                           });
 # endif
-# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-        constexpr auto exp_i32_rot_xor_add = optable::translate::get_uwvmint_i32_rot_xor_add_fptr_from_tuple<opt>(curr, tuple);
+# if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
+            ok = ok || bytecode_contains_i32_variant<Opt>(
+                           cm.local_funcs.index_unchecked(1).op.operands,
+                           [&](auto const& curr_variant) constexpr noexcept
+                           {
+                               return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                                   Opt,
+                                   optable::numeric_details::int_binop::add>(curr_variant, tuple);
+                           });
 # endif
-# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-        constexpr auto exp_i32_xorshift_mix = optable::translate::get_uwvmint_i32_xorshift_mix_fptr_from_tuple<opt>(curr, tuple);
+            UWVM2TEST_REQUIRE(ok);
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && (defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) || defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY))
+            bool ok_sub{};
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            ok_sub = ok_sub || bytecode_contains_i32_variant<Opt>(
+                           cm.local_funcs.index_unchecked(2).op.operands,
+                           [&](auto const& curr_variant) constexpr noexcept
+                           { return optable::translate::get_uwvmint_i32_sub_2localget_fptr_from_tuple<Opt>(curr_variant, tuple); });
 # endif
+# if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
+            ok_sub = ok_sub || bytecode_contains_i32_variant<Opt>(
+                           cm.local_funcs.index_unchecked(2).op.operands,
+                           [&](auto const& curr_variant) constexpr noexcept
+                           {
+                               return optable::translate::get_uwvmint_i32_binop_localget_rhs_fptr_from_tuple<
+                                   Opt,
+                                   optable::numeric_details::int_binop::sub>(curr_variant, tuple);
+                           });
+# endif
+            UWVM2TEST_REQUIRE(ok_sub);
 #endif
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
-        constexpr auto exp_delay_add_tee =
-            optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
-                opt,
-                optable::numeric_details::int_binop::add>(curr, tuple);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(3).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_imm_stack_local_tee_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::rotl>(curr_variant, tuple);
+                }));
 #endif
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-        constexpr auto exp_delay_sub =
-            optable::translate::get_uwvmint_i32_binop_localget_rhs_fptr_from_tuple<
-                opt,
-                optable::numeric_details::int_binop::sub>(curr, tuple);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_f32_variant<Opt>(
+                cm.local_funcs.index_unchecked(4).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_f32_div_from_imm_localtee_fptr_from_tuple<Opt>(curr_variant, tuple); }));
 #endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_f64_variant<Opt>(
+                cm.local_funcs.index_unchecked(5).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_f64_div_from_imm_localtee_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(6).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_add_mul_imm_2localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(7).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_add_shl_imm_2localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(8).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_rot_xor_add_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(9).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_xorshift_mix_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+        }
 
         // f0: x -> x+7, should use a combined opcode when enabled.
         {
@@ -307,33 +405,18 @@ namespace
                                   rt.local_defined_function_vec_storage.index_unchecked(0),
                                   pack_i32(5),
                                   nullptr,
-                                  nullptr
-            );
+                                  nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 12);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_add_imm_local_tee_same));
-#endif
         }
 
-        // f1: a+b, should hit either the direct 2localget fusion or delay_local (depending on build).
+        // f1: a+b, should hit either the direct 2localget update fusion or delay_local (depending on build).
         {
             auto rr = Runner::run(cm.local_funcs.index_unchecked(1),
                                   rt.local_defined_function_vec_storage.index_unchecked(1),
                                   pack_i32x2(3, 4),
                                   nullptr,
-                                  nullptr
-            );
+                                  nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 7);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && (defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) || defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT))
-            bool ok{};
-# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            ok = ok || bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_add_2localget_local_tee);
-# endif
-# if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
-            ok = ok || bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_delay_add_tee);
-# endif
-            UWVM2TEST_REQUIRE(ok);
-#endif
         }
 
         // f2: a-b, should hit either sub_2localget or delay_local (depending on build).
@@ -342,19 +425,8 @@ namespace
                                   rt.local_defined_function_vec_storage.index_unchecked(2),
                                   pack_i32x2(10, 3),
                                   nullptr,
-                                  nullptr
-            );
+                                  nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 7);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && (defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) || defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY))
-            bool ok{};
-# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            ok = ok || bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_sub_2localget);
-# endif
-# if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-            ok = ok || bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_delay_sub);
-# endif
-            UWVM2TEST_REQUIRE(ok);
-#endif
         }
 
         // f3: rotl(x, 13) stored via local.tee, should hit i32_binop_imm_stack_local_tee when enabled.
@@ -365,9 +437,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == (1 << 13));
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_rotl_imm_stack_local_tee));
-#endif
         }
 
         // f4: f32 div-from-imm local.tee (8 / x)
@@ -378,9 +447,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(load_f32(rr.results) == 4.0f);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_f32_div_from_imm_localtee));
-#endif
         }
 
         // f5: f64 div-from-imm local.tee (9 / x)
@@ -391,9 +457,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(load_f64(rr.results) == 3.0);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_f64_div_from_imm_localtee));
-#endif
         }
 
         // f6: a + (b * 7)
@@ -404,9 +467,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 31);
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_add_mul_imm_2localget));
-#endif
         }
 
         // f7: a + (b << 5)
@@ -417,9 +477,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 106);
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_add_shl_imm_2localget));
-#endif
         }
 
         // f8: (rotl(x, 5) ^ y) + 11
@@ -434,9 +491,6 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == expected);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_i32_rot_xor_add));
-#endif
         }
 
         // f9: x ^ (x >> 13) ^ (x << 7)
@@ -450,101 +504,58 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == expected);
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_i32_xorshift_mix));
-#endif
         }
 
-        // Byref mode: semantics smoke (combine/delay pending is not expected to persist across opcodes).
+        return 0;
+    }
+
+    [[nodiscard]] int test_translate_conbine_more() noexcept
+    {
+        static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
+        optable::unreachable_func = +trap_unexpected;
+        optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
+        optable::trap_integer_divide_by_zero_func = +trap_unexpected;
+        optable::trap_integer_overflow_func = +trap_unexpected;
+
+        optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+
+        auto wasm = build_conbine_more_module();
+        auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_conbine_more");
+        UWVM2TEST_REQUIRE(prep.mod != nullptr);
+        runtime_module_t const& rt = *prep.mod;
+
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt_byref{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err2{};
-            optable::compile_option cop2{};
-            auto cm2 = compiler::compile_all_from_uwvm_single_func<opt_byref>(rt, cop2, err2);
-            UWVM2TEST_REQUIRE(err2.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            using Runner2 = interpreter_runner<opt_byref>;
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(0),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(0),
-                                                   pack_i32(5),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 12);
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(1),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(1),
-                                                   pack_i32x2(3, 4),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 7);
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(2),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(2),
-                                                   pack_i32x2(10, 3),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 7);
-
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(3),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(3),
-                                                   pack_i32(1),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == (1 << 13));
-
-            UWVM2TEST_REQUIRE(load_f32(Runner2::run(cm2.local_funcs.index_unchecked(4),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(4),
-                                                   pack_f32(2.0f),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 4.0f);
-
-            UWVM2TEST_REQUIRE(load_f64(Runner2::run(cm2.local_funcs.index_unchecked(5),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(5),
-                                                   pack_f64(3.0),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 3.0);
-
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(6),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(6),
-                                                   pack_i32x2(10, 3),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 31);
-
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(7),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(7),
-                                                   pack_i32x2(10, 3),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 106);
-
-            {
-                ::std::uint32_t const x = 0x12345678u;
-                ::std::uint32_t const y = 0x9abcdef0u;
-                ::std::uint32_t const expected = static_cast<::std::uint32_t>(::std::rotl(x, 5) ^ y) + 11u;
-                UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(
-                                     load_i32(Runner2::run(cm2.local_funcs.index_unchecked(8),
-                                                           rt.local_defined_function_vec_storage.index_unchecked(8),
-                                                           pack_i32x2(static_cast<::std::int32_t>(x), static_cast<::std::int32_t>(y)),
-                                                           nullptr,
-                                                           nullptr)
-                                                  .results)) == expected);
-            }
-
-            {
-                ::std::uint32_t const x = 0x12345678u;
-                ::std::uint32_t const expected = (x ^ (x >> 13u)) ^ (x << 7u);
-                UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(
-                                     load_i32(Runner2::run(cm2.local_funcs.index_unchecked(9),
-                                                           rt.local_defined_function_vec_storage.index_unchecked(9),
-                                                           pack_i32(static_cast<::std::int32_t>(x)),
-                                                           nullptr,
-                                                           nullptr)
-                                                  .results)) == expected);
-            }
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;

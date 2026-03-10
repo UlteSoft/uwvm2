@@ -133,6 +133,73 @@ namespace
         return 0;
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i32_stack_top_begin_pos}; pos < Opt.i32_stack_top_end_pos; ++pos)
+            {
+                curr.i32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int assert_conbine_update_local_global_i32_bytecode(runtime_module_t const& rt) noexcept
+    {
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+        auto const curr{make_entry_stacktop_currpos<Opt>()};
+        [[maybe_unused]] constexpr auto tuple =
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+        UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+            cm.local_funcs.index_unchecked(0).op.operands,
+            [&](auto const& curr_variant) constexpr noexcept
+            {
+                return optable::translate::get_uwvmint_i32_add_imm_local_set_same_fptr_from_tuple<Opt>(curr_variant, tuple);
+            }));
+        UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+            cm.local_funcs.index_unchecked(1).op.operands,
+            [&](auto const& curr_variant) constexpr noexcept
+            {
+                return optable::translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<Opt>(curr_variant, tuple);
+            }));
+
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+        UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+            cm.local_funcs.index_unchecked(2).op.operands,
+            [&](auto const& curr_variant) constexpr noexcept
+            {
+                return optable::translate::get_uwvmint_i32_add_2localget_local_set_fptr_from_tuple<Opt>(curr_variant, tuple);
+            }));
+# else
+        UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+            cm.local_funcs.index_unchecked(2).op.operands,
+            [&](auto const& curr_variant) constexpr noexcept
+            {
+                return optable::translate::get_uwvmint_i32_add_2localget_local_set_common_fptr_from_tuple<Opt>(curr_variant, tuple);
+            }));
+# endif
+
+        (void)curr;
+#else
+        (void)rt;
+#endif
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_conbine_update_local_global_i32() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -148,59 +215,40 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: strict bytecode assertions for conbine fusions when enabled.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-
-            constexpr auto exp_local_set_same =
-                optable::translate::get_uwvmint_i32_add_imm_local_set_same_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_global_set_same =
-                optable::translate::get_uwvmint_i32_add_imm_global_set_same_fptr_from_tuple<opt>(curr, tuple);
-
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_local_set_same));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_global_set_same));
-
-# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) && !defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT) && !defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-            constexpr auto exp_add_2localget_local_set =
-                optable::translate::get_uwvmint_i32_add_2localget_local_set_fptr_from_tuple<opt>(curr, tuple);
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_add_2localget_local_set));
-# endif
-#endif
-
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(assert_conbine_update_local_global_i32_bytecode<opt>(rt) == 0);
             UWVM2TEST_REQUIRE(run_conbine_update_local_global_i32_suite<opt>(rt) == 0);
         }
 
-        // Byref mode: semantics smoke.
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE(run_conbine_update_local_global_i32_suite<opt>(rt) == 0);
         }
 
-        // Tailcall + stacktop caching: semantics.
+        if(abi_mode_enabled("tail-sysv"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{
-                .is_tail_call = true,
-                .i32_stack_top_begin_pos = 3uz,
-                .i32_stack_top_end_pos = 5uz,
-                .i64_stack_top_begin_pos = 3uz,
-                .i64_stack_top_end_pos = 5uz,
-                .f32_stack_top_begin_pos = 3uz,
-                .f32_stack_top_end_pos = 5uz,
-                .f64_stack_top_begin_pos = 3uz,
-                .f64_stack_top_end_pos = 5uz,
-                .v128_stack_top_begin_pos = SIZE_MAX,
-                .v128_stack_top_end_pos = SIZE_MAX,
-            };
+            constexpr auto opt{k_test_tail_sysv_opt};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(assert_conbine_update_local_global_i32_bytecode<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(run_conbine_update_local_global_i32_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(assert_conbine_update_local_global_i32_bytecode<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(run_conbine_update_local_global_i32_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(assert_conbine_update_local_global_i32_bytecode<opt>(rt) == 0);
             UWVM2TEST_REQUIRE(run_conbine_update_local_global_i32_suite<opt>(rt) == 0);
         }
 

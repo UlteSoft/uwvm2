@@ -358,6 +358,61 @@ namespace
         return 0;
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_conbine_heavy_float_acc_more_suite(runtime_module_t const& rt) noexcept
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        if constexpr(Opt.is_tail_call)
+        {
+            constexpr auto curr{make_entry_stacktop_currpos<Opt>()};
+            constexpr auto tuple =
+                compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+            constexpr auto exp_f32_ceil =
+                optable::translate::get_uwvmint_f32_acc_add_ceil_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f32_trunc =
+                optable::translate::get_uwvmint_f32_acc_add_trunc_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f32_nearest =
+                optable::translate::get_uwvmint_f32_acc_add_nearest_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f32_abs =
+                optable::translate::get_uwvmint_f32_acc_add_abs_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f32_negabs =
+                optable::translate::get_uwvmint_f32_acc_add_negabs_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+
+            constexpr auto exp_f64_ceil =
+                optable::translate::get_uwvmint_f64_acc_add_ceil_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f64_trunc =
+                optable::translate::get_uwvmint_f64_acc_add_trunc_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f64_nearest =
+                optable::translate::get_uwvmint_f64_acc_add_nearest_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f64_abs =
+                optable::translate::get_uwvmint_f64_acc_add_abs_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+            constexpr auto exp_f64_negabs =
+                optable::translate::get_uwvmint_f64_acc_add_negabs_localget_set_acc_fptr_from_tuple<Opt>(curr, tuple);
+
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_f32_ceil));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_f32_trunc));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_f32_nearest));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_f32_abs));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_f32_negabs));
+
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_f64_ceil));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_f64_trunc));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_f64_nearest));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_f64_abs));
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_f64_negabs));
+        }
+#endif
+
+        UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_semantics<Opt>(cm, rt) == 0);
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_conbine_heavy_float_acc_more() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -373,68 +428,33 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: strict assertions on heavy combined opfuncs.
+        if(abi_mode_enabled("tail-min"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-
-            constexpr auto exp_f32_ceil =
-                optable::translate::get_uwvmint_f32_acc_add_ceil_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f32_trunc =
-                optable::translate::get_uwvmint_f32_acc_add_trunc_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f32_nearest =
-                optable::translate::get_uwvmint_f32_acc_add_nearest_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f32_abs =
-                optable::translate::get_uwvmint_f32_acc_add_abs_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f32_negabs =
-                optable::translate::get_uwvmint_f32_acc_add_negabs_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-
-            constexpr auto exp_f64_ceil =
-                optable::translate::get_uwvmint_f64_acc_add_ceil_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f64_trunc =
-                optable::translate::get_uwvmint_f64_acc_add_trunc_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f64_nearest =
-                optable::translate::get_uwvmint_f64_acc_add_nearest_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f64_abs =
-                optable::translate::get_uwvmint_f64_acc_add_abs_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_f64_negabs =
-                optable::translate::get_uwvmint_f64_acc_add_negabs_localget_set_acc_fptr_from_tuple<opt>(curr, tuple);
-
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_f32_ceil));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_f32_trunc));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_f32_nearest));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_f32_abs));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_f32_negabs));
-
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_f64_ceil));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_f64_trunc));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_f64_nearest));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_f64_abs));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_f64_negabs));
-#endif
-
-            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_semantics<opt>(cm, rt) == 0);
+            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_suite<opt>(rt) == 0);
         }
 
-        // Byref mode: semantics.
+        if(abi_mode_enabled("byref"))
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_semantics<opt>(cm, rt) == 0);
+            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_suite<opt>(rt) == 0);
         }
 
-        // Tailcall + stacktop caching: semantics.
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
         {
             constexpr optable::uwvm_interpreter_translate_option_t opt{
                 .is_tail_call = true,
@@ -450,11 +470,7 @@ namespace
                 .v128_stack_top_end_pos = SIZE_MAX,
             };
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_semantics<opt>(cm, rt) == 0);
+            UWVM2TEST_REQUIRE(run_conbine_heavy_float_acc_more_suite<opt>(rt) == 0);
         }
 
         return 0;
@@ -465,4 +481,3 @@ int main()
 {
     return test_translate_conbine_heavy_float_acc_more();
 }
-

@@ -169,6 +169,137 @@ namespace
 #endif
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i32_stack_top_begin_pos}; pos < Opt.i32_stack_top_end_pos; ++pos)
+            {
+                curr.i32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i64_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i64_stack_top_begin_pos}; pos < Opt.i64_stack_top_end_pos; ++pos)
+            {
+                curr.i64_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 6uz);
+
+        using Runner = interpreter_runner<Opt>;
+
+        if constexpr(Opt.is_tail_call)
+        {
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+            [[maybe_unused]] constexpr auto tuple =
+                compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_popcnt_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(1).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_clz_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(2).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i32_ctz_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+            UWVM2TEST_REQUIRE(bytecode_contains_i64_variant<Opt>(
+                cm.local_funcs.index_unchecked(3).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i64_popcnt_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+            UWVM2TEST_REQUIRE(bytecode_contains_i64_variant<Opt>(
+                cm.local_funcs.index_unchecked(4).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i64_clz_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+            UWVM2TEST_REQUIRE(bytecode_contains_i64_variant<Opt>(
+                cm.local_funcs.index_unchecked(5).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_i64_ctz_localget_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+        }
+
+        for(::std::int32_t v : {0, 1, 2, 3, 7, 8, -1, static_cast<::std::int32_t>(0x80000000u), 0x12345678})
+        {
+            ::std::uint32_t const u = static_cast<::std::uint32_t>(v);
+
+            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(0),
+                                                  pack_i32(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == popcnt32(u));
+            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(1),
+                                                  pack_i32(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == clz32(u));
+            UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(2),
+                                                  pack_i32(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == ctz32(u));
+        }
+
+        for(::std::int64_t v : {0ll, 1ll, 2ll, 3ll, 7ll, 8ll, -1ll, static_cast<::std::int64_t>(0x8000000000000000ull), 0x0123456789abcdefll})
+        {
+            ::std::uint64_t const u = static_cast<::std::uint64_t>(v);
+
+            UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(3),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(3),
+                                                  pack_i64(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == popcnt64(u));
+            UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(4),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(4),
+                                                  pack_i64(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == clz64(u));
+            UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(5),
+                                                  rt.local_defined_function_vec_storage.index_unchecked(5),
+                                                  pack_i64(v),
+                                                  nullptr,
+                                                  nullptr)
+                                           .results) == ctz64(u));
+        }
+
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_conbine_heavy_unary_localget_bitops() noexcept
     {
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
@@ -185,84 +316,37 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Combine state machine only exists in tailcall mode.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            ::uwvm2::validation::error::code_validation_error_impl err{};
-            optable::compile_option cop{};
-            auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-            UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-            UWVM2TEST_REQUIRE(cm.local_funcs.size() == 6uz);
+        if(abi_mode_enabled("byref"))
+        {
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            using Runner = interpreter_runner<opt>;
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-            [[maybe_unused]] constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-            [[maybe_unused]] constexpr auto tuple =
-                compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
 
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands,
-                                                    optable::translate::get_uwvmint_i32_popcnt_localget_fptr_from_tuple<opt>(curr, tuple)));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands,
-                                                    optable::translate::get_uwvmint_i32_clz_localget_fptr_from_tuple<opt>(curr, tuple)));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands,
-                                                    optable::translate::get_uwvmint_i32_ctz_localget_fptr_from_tuple<opt>(curr, tuple)));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands,
-                                                    optable::translate::get_uwvmint_i64_popcnt_localget_fptr_from_tuple<opt>(curr, tuple)));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands,
-                                                    optable::translate::get_uwvmint_i64_clz_localget_fptr_from_tuple<opt>(curr, tuple)));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands,
-                                                    optable::translate::get_uwvmint_i64_ctz_localget_fptr_from_tuple<opt>(curr, tuple)));
-#endif
-
-            for(::std::int32_t v : {0, 1, 2, 3, 7, 8, -1, static_cast<::std::int32_t>(0x80000000u), 0x12345678})
-            {
-                ::std::uint32_t const u = static_cast<::std::uint32_t>(v);
-
-                UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(0),
-                                                      pack_i32(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == popcnt32(u));
-                UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(1),
-                                                      pack_i32(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == clz32(u));
-                UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(2),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(2),
-                                                      pack_i32(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == ctz32(u));
-            }
-
-            for(::std::int64_t v : {0ll, 1ll, 2ll, 3ll, 7ll, 8ll, -1ll, static_cast<::std::int64_t>(0x8000000000000000ull), 0x0123456789abcdefll})
-            {
-                ::std::uint64_t const u = static_cast<::std::uint64_t>(v);
-
-                UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(3),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(3),
-                                                      pack_i64(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == popcnt64(u));
-                UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(4),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(4),
-                                                      pack_i64(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == clz64(u));
-                UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(5),
-                                                      rt.local_defined_function_vec_storage.index_unchecked(5),
-                                                      pack_i64(v),
-                                                      nullptr,
-                                                      nullptr)
-                                               .results) == ctz64(u));
-            }
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;
@@ -273,4 +357,3 @@ int main()
 {
     return test_translate_conbine_heavy_unary_localget_bitops();
 }
-

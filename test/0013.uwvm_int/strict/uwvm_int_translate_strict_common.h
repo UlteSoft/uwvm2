@@ -238,6 +238,25 @@ namespace uwvm2test::uwvm_int_strict
         };
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_entry_stacktop_currpos() noexcept
+    {
+        constexpr bool i32_enabled{Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos};
+        constexpr bool i64_enabled{Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos};
+        constexpr bool f32_enabled{Opt.f32_stack_top_begin_pos != SIZE_MAX && Opt.f32_stack_top_begin_pos != Opt.f32_stack_top_end_pos};
+        constexpr bool f64_enabled{Opt.f64_stack_top_begin_pos != SIZE_MAX && Opt.f64_stack_top_begin_pos != Opt.f64_stack_top_end_pos};
+        constexpr bool v128_enabled{Opt.v128_stack_top_begin_pos != SIZE_MAX && Opt.v128_stack_top_begin_pos != Opt.v128_stack_top_end_pos};
+
+        if constexpr(i32_enabled || i64_enabled || f32_enabled || f64_enabled || v128_enabled)
+        {
+            return make_initial_stacktop_currpos<Opt>();
+        }
+        else
+        {
+            return {};
+        }
+    }
+
     [[nodiscard]] inline bool abi_mode_enabled(char const* token) noexcept
     {
         auto const* env = ::std::getenv("UWVM2TEST_ABI_MODES");

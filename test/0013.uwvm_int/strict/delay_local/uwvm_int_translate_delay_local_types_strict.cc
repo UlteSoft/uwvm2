@@ -155,9 +155,255 @@ namespace
         return mb.build();
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i32_stack_top_begin_pos}; pos < Opt.i32_stack_top_end_pos; ++pos)
+            {
+                curr.i32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_i64_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.i64_stack_top_begin_pos}; pos < Opt.i64_stack_top_end_pos; ++pos)
+            {
+                curr.i64_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_f32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.f32_stack_top_begin_pos != SIZE_MAX && Opt.f32_stack_top_begin_pos != Opt.f32_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.f32_stack_top_begin_pos}; pos < Opt.f32_stack_top_end_pos; ++pos)
+            {
+                curr.f32_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
+    [[nodiscard]] bool bytecode_contains_f64_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
+    {
+        auto curr{make_entry_stacktop_currpos<Opt>()};
+        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+        if constexpr(Opt.f64_stack_top_begin_pos != SIZE_MAX && Opt.f64_stack_top_begin_pos != Opt.f64_stack_top_end_pos)
+        {
+            for(::std::size_t pos{Opt.f64_stack_top_begin_pos}; pos < Opt.f64_stack_top_end_pos; ++pos)
+            {
+                curr.f64_stack_top_curr_pos = pos;
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] int run_suite(runtime_module_t const& rt) noexcept
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        optable::compile_option cop{};
+        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
+
+        using Runner = interpreter_runner<Opt>;
+        [[maybe_unused]] auto const curr{make_entry_stacktop_currpos<Opt>()};
+        [[maybe_unused]] constexpr auto tuple =
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+        if constexpr(Opt.is_tail_call)
+        {
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+            UWVM2TEST_REQUIRE(bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_br_if_local_tee_nz_fptr_from_tuple<Opt>(curr_variant, tuple); }));
+#endif
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && (defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT) || defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY))
+            bool ok_i32{};
+            ok_i32 = ok_i32 || bytecode_contains_i32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(1).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                                         Opt,
+                                         optable::numeric_details::int_binop::add>(curr_variant, tuple);
+                                 });
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            ok_i32 = ok_i32 || bytecode_contains_i32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(1).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 { return optable::translate::get_uwvmint_i32_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
+# else
+            ok_i32 = ok_i32 || bytecode_contains_i32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(1).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_i32_add_2localget_local_tee_common_fptr_from_tuple<Opt>(
+                                         curr_variant, tuple);
+                                 });
+# endif
+            UWVM2TEST_REQUIRE(ok_i32);
+
+            bool ok_i64{};
+            ok_i64 = ok_i64 || bytecode_contains_i64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(2).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_i64_binop_localget_rhs_local_tee_fptr_from_tuple<
+                                         Opt,
+                                         optable::numeric_details::int_binop::add>(curr_variant, tuple);
+                                 });
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            ok_i64 = ok_i64 || bytecode_contains_i64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(2).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 { return optable::translate::get_uwvmint_i64_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
+# else
+            ok_i64 = ok_i64 || bytecode_contains_i64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(2).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_i64_add_2localget_local_tee_common_fptr_from_tuple<Opt>(
+                                         curr_variant, tuple);
+                                 });
+# endif
+            UWVM2TEST_REQUIRE(ok_i64);
+
+            bool ok_f32{};
+            ok_f32 = ok_f32 || bytecode_contains_f32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(3).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_f32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                                         Opt,
+                                         optable::numeric_details::float_binop::add>(curr_variant, tuple);
+                                 });
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            ok_f32 = ok_f32 || bytecode_contains_f32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(3).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 { return optable::translate::get_uwvmint_f32_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
+# else
+            ok_f32 = ok_f32 || bytecode_contains_f32_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(3).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_f32_add_2localget_local_tee_common_fptr_from_tuple<Opt>(
+                                         curr_variant, tuple);
+                                 });
+# endif
+            UWVM2TEST_REQUIRE(ok_f32);
+
+            bool ok_f64{};
+            ok_f64 = ok_f64 || bytecode_contains_f64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(4).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_f64_binop_localget_rhs_local_tee_fptr_from_tuple<
+                                         Opt,
+                                         optable::numeric_details::float_binop::add>(curr_variant, tuple);
+                                 });
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+            ok_f64 = ok_f64 || bytecode_contains_f64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(4).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 { return optable::translate::get_uwvmint_f64_add_2localget_local_tee_fptr_from_tuple<Opt>(curr_variant, tuple); });
+# else
+            ok_f64 = ok_f64 || bytecode_contains_f64_variant<Opt>(
+                                 cm.local_funcs.index_unchecked(4).op.operands,
+                                 [&](auto const& curr_variant) constexpr noexcept
+                                 {
+                                     return optable::translate::get_uwvmint_f64_add_2localget_local_tee_common_fptr_from_tuple<Opt>(
+                                         curr_variant, tuple);
+                                 });
+# endif
+            UWVM2TEST_REQUIRE(ok_f64);
+
+            UWVM2TEST_REQUIRE(!bytecode_contains_i32_variant<Opt>(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::add>(curr_variant, tuple);
+                }));
+#endif
+        }
+
+        for(int v : {1, 2, 3, 100})
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(0),
+                                  rt.local_defined_function_vec_storage.index_unchecked(0),
+                                  pack_i32(v),
+                                  nullptr,
+                                  nullptr);
+            UWVM2TEST_REQUIRE(load_i32(rr.results) == 0);
+        }
+
+        UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(1),
+                                              rt.local_defined_function_vec_storage.index_unchecked(1),
+                                              pack_i32x2(3, 4),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 7);
+
+        UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(2),
+                                              rt.local_defined_function_vec_storage.index_unchecked(2),
+                                              pack_i64x2(0x123456789ll, 1001ll),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 0x123456b72ll);
+
+        UWVM2TEST_REQUIRE(load_f32(Runner::run(cm.local_funcs.index_unchecked(3),
+                                              rt.local_defined_function_vec_storage.index_unchecked(3),
+                                              pack_f32x2(1.5f, 2.25f),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 3.75f);
+
+        UWVM2TEST_REQUIRE(load_f64(Runner::run(cm.local_funcs.index_unchecked(4),
+                                              rt.local_defined_function_vec_storage.index_unchecked(4),
+                                              pack_f64x2(6.5, 8.25),
+                                              nullptr,
+                                              nullptr)
+                                       .results) == 14.75);
+
+        return 0;
+    }
+
     [[nodiscard]] int test_translate_delay_local_types() noexcept
     {
-        // Install optable hooks (unexpected traps/calls should terminate the test process).
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
         optable::unreachable_func = +trap_unexpected;
         optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
@@ -170,156 +416,39 @@ namespace
         auto wasm = build_delay_local_types_module();
         auto prep = prepare_runtime_from_wasm(wasm, u8"uwvm2test_delay_local_types");
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
-
         runtime_module_t const& rt = *prep.mod;
 
-        constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
-        ::uwvm2::validation::error::code_validation_error_impl err{};
-        optable::compile_option cop{};
-        auto cm = compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
-        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-        using Runner = interpreter_runner<opt>;
-        [[maybe_unused]] constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
-        [[maybe_unused]] constexpr auto tuple =
-            compiler::details::make_interpreter_tuple<opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<opt>()>{});
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-        constexpr auto exp_br_if_local_tee =
-            optable::translate::get_uwvmint_br_if_local_tee_nz_fptr_from_tuple<opt>(curr, tuple);
-#endif
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && (defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT) || defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY))
-        constexpr auto exp_delay_i32_add_tee =
-            optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
-                opt,
-                optable::numeric_details::int_binop::add>(curr, tuple);
-        constexpr auto exp_delay_i64_add =
-            optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
-                opt,
-                optable::numeric_details::int_binop::add>(curr, tuple);
-        constexpr auto exp_delay_f32_add =
-            optable::translate::get_uwvmint_f32_binop_localget_rhs_fptr_from_tuple<
-                opt,
-                optable::numeric_details::float_binop::add>(curr, tuple);
-        constexpr auto exp_delay_f64_add =
-            optable::translate::get_uwvmint_f64_binop_localget_rhs_fptr_from_tuple<
-                opt,
-                optable::numeric_details::float_binop::add>(curr, tuple);
-
-        // Sanity: bytecode should actually contain the expected mega-op pointer in the simple positive cases.
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_delay_i32_add_tee));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_delay_i64_add));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_delay_f32_add));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_delay_f64_add));
-
-        // Regress: ensure delay_local *_local_tee is not used when local.tee is followed by br_if (local.tee+br_if may fuse).
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_delay_i32_add_tee));
-#endif
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-        // Regress: local.tee + br_if should fuse.
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_br_if_local_tee));
-#endif
-
-        // f0: i32 loop => 0
-        for(int v : {1, 2, 3, 100})
+        if(abi_mode_enabled("tail-min"))
         {
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(0),
-                                  rt.local_defined_function_vec_storage.index_unchecked(0),
-                                  pack_i32(v),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i32(rr.results) == 0);
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // f1: i32 delay_local positive => a+b and must hit delay_local mega-op when enabled.
+        if(abi_mode_enabled("byref"))
         {
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(1),
-                                  rt.local_defined_function_vec_storage.index_unchecked(1),
-                                  pack_i32x2(3, 4),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i32(rr.results) == 7);
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // f2: i64 delay_local positive => a+b and must hit delay_local mega-op when enabled.
+        if(abi_mode_enabled("tail-sysv"))
         {
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(2),
-                                  rt.local_defined_function_vec_storage.index_unchecked(2),
-                                  pack_i64x2(0x123456789ll, 1001ll),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_i64(rr.results) == 0x123456b72ll);
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // f3: f32 delay_local positive => a+b and must hit delay_local mega-op when enabled.
+        if(abi_mode_enabled("tail-aapcs64"))
         {
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(3),
-                                  rt.local_defined_function_vec_storage.index_unchecked(3),
-                                  pack_f32x2(1.5f, 2.25f),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_f32(rr.results) == 3.75f);
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // f4: f64 delay_local positive => a+b and must hit delay_local mega-op when enabled.
+        if(legacy_layouts_enabled())
         {
-            auto rr = Runner::run(cm.local_funcs.index_unchecked(4),
-                                  rt.local_defined_function_vec_storage.index_unchecked(4),
-                                  pack_f64x2(6.5, 8.25),
-                                  nullptr,
-                                  nullptr);
-            UWVM2TEST_REQUIRE(load_f64(rr.results) == 14.75);
-        }
-
-        // Byref mode: semantics smoke (delay_local/combine mega-ops are not expected to persist across opcodes).
-        {
-            constexpr optable::uwvm_interpreter_translate_option_t opt2{.is_tail_call = false};
-            ::uwvm2::validation::error::code_validation_error_impl err2{};
-            optable::compile_option cop2{};
-            auto cm2 = compiler::compile_all_from_uwvm_single_func<opt2>(rt, cop2, err2);
-            UWVM2TEST_REQUIRE(err2.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-
-            using Runner2 = interpreter_runner<opt2>;
-
-            for(int v : {1, 2, 3, 100})
-            {
-                auto rr = Runner2::run(cm2.local_funcs.index_unchecked(0),
-                                       rt.local_defined_function_vec_storage.index_unchecked(0),
-                                       pack_i32(v),
-                                       nullptr,
-                                       nullptr);
-                UWVM2TEST_REQUIRE(load_i32(rr.results) == 0);
-            }
-
-            UWVM2TEST_REQUIRE(load_i32(Runner2::run(cm2.local_funcs.index_unchecked(1),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(1),
-                                                   pack_i32x2(3, 4),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 7);
-
-            UWVM2TEST_REQUIRE(load_i64(Runner2::run(cm2.local_funcs.index_unchecked(2),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(2),
-                                                   pack_i64x2(0x123456789ll, 1001ll),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 0x123456b72ll);
-
-            UWVM2TEST_REQUIRE(load_f32(Runner2::run(cm2.local_funcs.index_unchecked(3),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(3),
-                                                   pack_f32x2(1.5f, 2.25f),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 3.75f);
-
-            UWVM2TEST_REQUIRE(load_f64(Runner2::run(cm2.local_funcs.index_unchecked(4),
-                                                   rt.local_defined_function_vec_storage.index_unchecked(4),
-                                                   pack_f64x2(6.5, 8.25),
-                                                   nullptr,
-                                                   nullptr)
-                                            .results) == 14.75);
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
         return 0;

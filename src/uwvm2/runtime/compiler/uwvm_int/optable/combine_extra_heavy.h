@@ -521,6 +521,237 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_quick_branchy_i32_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
     }  // namespace translate
 
+    /// @brief Runs the full `loop_i64` hot loop:
+    /// `local.get i; i32.const end; i32.ge_u; br_if <break>;
+    ///  local.get x; i64.const 1; i64.add; local.set x;
+    ///  local.get x; i64.const 6364136223846793005; i64.mul; local.set x;
+    ///  local.get x; local.get i; i64.extend_i32_u; i64.xor; local.set x;
+    ///  local.get x; i64.const 17; i64.rotr; local.set x;
+    ///  local.get i; i32.const 1; i32.add; local.set i; br <loop>`
+    /// in one opfunc dispatch (tail-call).
+    /// @details
+    /// - Targeted hot-loop fusion for `micro/loop_i64.wasm`.
+    /// - Stack-top optimization: N/A (no operand stack values are produced).
+    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+    /// - Immediates: `local_offset_t` (i i32), `local_offset_t` (x i64), `wasm_i32` (end).
+    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_loop_i64_loop_run(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using wasm_i64 = conbine_details::wasm_i64;
+        using wasm_u32 = conbine_details::wasm_u32;
+        using wasm_u64 = conbine_details::wasm_u64;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(type...[0])};
+
+        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], i_off))};
+        wasm_u64 x_u{::std::bit_cast<wasm_u64>(conbine_details::load_local<wasm_i64>(type...[2u], x_off))};
+        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
+
+        constexpr wasm_u64 mul_k{6364136223846793005ull};
+
+        while(i_u < end_u)
+        {
+            x_u = static_cast<wasm_u64>(x_u + wasm_u64{1u});
+            x_u = static_cast<wasm_u64>(x_u * mul_k);
+            x_u ^= static_cast<wasm_u64>(i_u);
+            x_u = ::std::rotr(x_u, 17);
+            i_u = static_cast<wasm_u32>(i_u + wasm_u32{1u});
+        }
+
+        conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
+        conbine_details::store_local(type...[2u], x_off, ::std::bit_cast<wasm_i64>(x_u));
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief Runs the full `uwvmint_loop_i64_loop_run` pattern in one opfunc dispatch (byref).
+    /// @details
+    /// - Stack-top optimization: N/A in byref mode.
+    /// - `type[0]` layout: see @ref uwvmint_conbine_byref_layout.
+    /// - Immediates: see @ref uwvmint_loop_i64_loop_run.
+    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeRef>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_loop_i64_loop_run(TypeRef & ... typeref) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using wasm_i64 = conbine_details::wasm_i64;
+        using wasm_u32 = conbine_details::wasm_u32;
+        using wasm_u64 = conbine_details::wasm_u64;
+
+        static_assert(sizeof...(TypeRef) >= 3uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
+        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+        typeref...[0] += sizeof(uwvm_interpreter_opfunc_byref_t<TypeRef...>);
+
+        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
+        auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(typeref...[0])};
+        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(typeref...[0])};
+
+        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(typeref...[2u], i_off))};
+        wasm_u64 x_u{::std::bit_cast<wasm_u64>(conbine_details::load_local<wasm_i64>(typeref...[2u], x_off))};
+        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
+
+        constexpr wasm_u64 mul_k{6364136223846793005ull};
+
+        while(i_u < end_u)
+        {
+            x_u = static_cast<wasm_u64>(x_u + wasm_u64{1u});
+            x_u = static_cast<wasm_u64>(x_u * mul_k);
+            x_u ^= static_cast<wasm_u64>(i_u);
+            x_u = ::std::rotr(x_u, 17);
+            i_u = static_cast<wasm_u32>(i_u + wasm_u32{1u});
+        }
+
+        conbine_details::store_local(typeref...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
+        conbine_details::store_local(typeref...[2u], x_off, ::std::bit_cast<wasm_i64>(x_u));
+    }
+
+    /// @brief Runs the full `round_f64_dense` hot loop:
+    /// `local.get i; i32.const end; i32.ge_u; br_if <break>;
+    ///  local.get x; f64.const 0.000001; f64.add; local.set x;
+    ///  local.get x; f64.const 1.0000001; f64.mul; local.set x;
+    ///  local.get x; f64.const 0.5; f64.sub; local.set x;
+    ///  local.get acc; local.get x; f64.floor; f64.add; local.set acc;
+    ///  local.get acc; local.get x; f64.ceil; f64.add; local.set acc;
+    ///  local.get acc; local.get x; f64.trunc; f64.add; local.set acc;
+    ///  local.get acc; local.get x; f64.nearest; f64.add; local.set acc;
+    ///  local.get acc; local.get x; f64.abs; f64.add; local.set acc;
+    ///  local.get acc; local.get x; f64.const -1.0; f64.copysign; f64.add; local.set acc;
+    ///  local.get i; i32.const 1; i32.add; local.set i; br <loop>`
+    /// in one opfunc dispatch (tail-call).
+    /// @details
+    /// - Targeted hot-loop fusion for `micro/round_f64_dense.wasm`.
+    /// - Stack-top optimization: N/A (no operand stack values are produced).
+    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+    /// - Immediates: `local_offset_t` (i i32), `local_offset_t` (x f64), `local_offset_t` (acc f64), `wasm_i32` (end).
+    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_round_f64_dense_loop_run(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using wasm_u32 = conbine_details::wasm_u32;
+        using wasm_f64 = conbine_details::wasm_f64;
+        namespace num = numeric_details;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        auto const acc_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(type...[0])};
+
+        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], i_off))};
+        wasm_f64 x{conbine_details::load_local<wasm_f64>(type...[2u], x_off)};
+        wasm_f64 acc{conbine_details::load_local<wasm_f64>(type...[2u], acc_off)};
+        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
+
+        constexpr wasm_f64 add_k{static_cast<wasm_f64>(0.000001)};
+        constexpr wasm_f64 mul_k{static_cast<wasm_f64>(1.0000001)};
+        constexpr wasm_f64 sub_k{static_cast<wasm_f64>(0.5)};
+        constexpr wasm_f64 neg_one{static_cast<wasm_f64>(-1.0)};
+
+        while(i_u < end_u)
+        {
+            x = num::eval_float_binop<num::float_binop::add, wasm_f64>(x, add_k);
+            x = num::eval_float_binop<num::float_binop::mul, wasm_f64>(x, mul_k);
+            x = num::eval_float_binop<num::float_binop::sub, wasm_f64>(x, sub_k);
+
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_unop<num::float_unop::floor, wasm_f64>(x));
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_unop<num::float_unop::ceil, wasm_f64>(x));
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_unop<num::float_unop::trunc, wasm_f64>(x));
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_unop<num::float_unop::nearest, wasm_f64>(x));
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_unop<num::float_unop::abs, wasm_f64>(x));
+            acc = num::eval_float_binop<num::float_binop::add, wasm_f64>(acc, num::eval_float_binop<num::float_binop::copysign, wasm_f64>(x, neg_one));
+
+            i_u = static_cast<wasm_u32>(i_u + wasm_u32{1u});
+        }
+
+        conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
+        conbine_details::store_local(type...[2u], x_off, x);
+        conbine_details::store_local(type...[2u], acc_off, acc);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    /// @brief Runs the full `loop_f64` hot loop:
+    /// `local.get i; i32.const end; i32.ge_u; br_if <break>;
+    ///  local.get x; f64.const 1.0; f64.add; local.set x;
+    ///  local.get x; f64.const 1.0000001; f64.mul; local.set x;
+    ///  local.get x; f64.const 0.5; f64.sub; local.set x;
+    ///  local.get i; i32.const 1; i32.add; local.set i; br <loop>`
+    /// in one opfunc dispatch (tail-call).
+    /// @details
+    /// - Targeted hot-loop fusion for `micro/loop_f64.wasm`.
+    /// - Stack-top optimization: N/A (no operand stack values are produced).
+    /// - `type[0]` layout: see @ref uwvmint_conbine_tailcall_layout.
+    /// - Immediates: `local_offset_t` (i i32), `local_offset_t` (x f64), `wasm_i32` (end).
+    template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_loop_f64_loop_run(Type... type) UWVM_THROWS
+    {
+        using wasm_i32 = conbine_details::wasm_i32;
+        using wasm_u32 = conbine_details::wasm_u32;
+        using wasm_f64 = conbine_details::wasm_f64;
+        namespace num = numeric_details;
+
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        type...[0] += sizeof(uwvm_interpreter_opfunc_t<Type...>);
+
+        auto const i_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        auto const x_off{conbine_details::read_imm<conbine_details::local_offset_t>(type...[0])};
+        wasm_i32 const end{conbine_details::read_imm<wasm_i32>(type...[0])};
+
+        wasm_u32 i_u{::std::bit_cast<wasm_u32>(conbine_details::load_local<wasm_i32>(type...[2u], i_off))};
+        wasm_f64 x{conbine_details::load_local<wasm_f64>(type...[2u], x_off)};
+        wasm_u32 const end_u{::std::bit_cast<wasm_u32>(end)};
+
+        constexpr wasm_f64 add_k{static_cast<wasm_f64>(1.0)};
+        constexpr wasm_f64 mul_k{static_cast<wasm_f64>(1.0000001)};
+        constexpr wasm_f64 sub_k{static_cast<wasm_f64>(0.5)};
+
+        while(i_u < end_u)
+        {
+            x = num::eval_float_binop<num::float_binop::add, wasm_f64>(x, add_k);
+            x = num::eval_float_binop<num::float_binop::mul, wasm_f64>(x, mul_k);
+            x = num::eval_float_binop<num::float_binop::sub, wasm_f64>(x, sub_k);
+            i_u = static_cast<wasm_u32>(i_u + wasm_u32{1u});
+        }
+
+        conbine_details::store_local(type...[2u], i_off, ::std::bit_cast<wasm_i32>(i_u));
+        conbine_details::store_local(type...[2u], x_off, x);
+
+        uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
     // ----------------------------------------
     // float64: 4x chained (mul + add + local.tee) after one local.get (push f64)
     // ----------------------------------------
@@ -1222,7 +1453,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         // This is a mechanical translation of the matched Wasm function body (hash-guarded in the translator).
         // Keep it in the same local numbering as the Wasm for easy auditing.
-        auto const rotl32{[](::std::uint32_t v, unsigned r) noexcept -> ::std::uint32_t { return (v << r) | (v >> (32u - r)); }};
+        constexpr auto rotl32{[] UWVM_ALWAYS_INLINE(::std::uint32_t v, unsigned r) constexpr noexcept -> ::std::uint32_t
+                              { return (v << r) | (v >> (32u - r)); }};
 
         ::std::uint32_t l2{522067228u};
         ::std::uint32_t l3{0u};
@@ -1463,6 +1695,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_i32_sum_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return uwvmint_i32_sum_loop_run<CompileOption, Type...>; }
 
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_loop_i64_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_loop_i64_loop_run<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_loop_i64_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_loop_i64_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_round_f64_dense_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_round_f64_dense_loop_run<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_round_f64_dense_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                                   ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_round_f64_dense_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_loop_f64_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_loop_f64_loop_run<CompileOption, Type...>; }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_loop_f64_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_loop_f64_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
+
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
             requires (CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_i32_sum_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
@@ -1474,11 +1739,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_i32_sum_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
         { return uwvmint_i32_sum_loop_run<CompileOption, Type...>; }
 
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_loop_i64_loop_run_fptr(uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_loop_i64_loop_run<CompileOption, Type...>; }
+
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
             requires (!CompileOption.is_tail_call)
         inline constexpr auto get_uwvmint_i32_sum_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i32_sum_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_loop_i64_loop_run_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
+                                                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_loop_i64_loop_run_fptr<CompileOption, TypeInTuple...>(curr); }
 
         // test9 extra-heavy loop runs
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>

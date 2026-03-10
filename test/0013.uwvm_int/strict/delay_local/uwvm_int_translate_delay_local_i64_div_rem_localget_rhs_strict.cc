@@ -60,27 +60,59 @@ namespace
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
         if constexpr(Opt.is_tail_call)
         {
-            constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+            auto const curr{make_entry_stacktop_currpos<Opt>()};
             constexpr auto tuple =
                 compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+            auto const contains_i64_variant{
+                [&](auto const& bc, auto make_fptr) constexpr noexcept
+                {
+                    if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
 
-            constexpr auto exp_div_u = optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
-                Opt,
-                optable::numeric_details::int_binop::div_u>(curr, tuple);
-            constexpr auto exp_div_s = optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
-                Opt,
-                optable::numeric_details::int_binop::div_s>(curr, tuple);
-            constexpr auto exp_rem_u = optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
-                Opt,
-                optable::numeric_details::int_binop::rem_u>(curr, tuple);
-            constexpr auto exp_rem_s = optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
-                Opt,
-                optable::numeric_details::int_binop::rem_s>(curr, tuple);
+                    if constexpr(Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos)
+                    {
+                        auto curr_variant{curr};
+                        for(::std::size_t pos{Opt.i64_stack_top_begin_pos}; pos < Opt.i64_stack_top_end_pos; ++pos)
+                        {
+                            curr_variant.i64_stack_top_curr_pos = pos;
+                            if(bytecode_contains_fptr(bc, make_fptr(curr_variant))) { return true; }
+                        }
+                    }
 
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_div_u));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_div_s));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_rem_u));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_rem_s));
+                    return false;
+                }};
+
+            UWVM2TEST_REQUIRE(contains_i64_variant(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::div_u>(curr_variant, tuple);
+                }));
+            UWVM2TEST_REQUIRE(contains_i64_variant(
+                cm.local_funcs.index_unchecked(1).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::div_s>(curr_variant, tuple);
+                }));
+            UWVM2TEST_REQUIRE(contains_i64_variant(
+                cm.local_funcs.index_unchecked(2).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::rem_u>(curr_variant, tuple);
+                }));
+            UWVM2TEST_REQUIRE(contains_i64_variant(
+                cm.local_funcs.index_unchecked(3).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::rem_s>(curr_variant, tuple);
+                }));
         }
 #endif
 
@@ -130,15 +162,36 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // byref
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
-        // tailcall
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE((run_suite<opt>(rt)) == 0);
         }
 
@@ -157,4 +210,3 @@ int main()
         return ::uwvm2test::uwvm_int_strict::fail(__LINE__, "uncaught exception");
     }
 }
-

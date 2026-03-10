@@ -132,38 +132,71 @@ namespace
         UWVM2TEST_REQUIRE(cm.local_funcs.size() == 4uz);
 
         using Runner = interpreter_runner<Opt>;
-        [[maybe_unused]] constexpr optable::uwvm_interpreter_stacktop_currpos_t curr{};
+        [[maybe_unused]] auto const curr{make_entry_stacktop_currpos<Opt>()};
         [[maybe_unused]] constexpr auto tuple =
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+        auto const contains_i32_variant{
+            [&](auto const& bc, auto make_fptr) constexpr noexcept
+            {
+                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
+
+                if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+                {
+                    auto curr_variant{curr};
+                    for(::std::size_t pos{Opt.i32_stack_top_begin_pos}; pos < Opt.i32_stack_top_end_pos; ++pos)
+                    {
+                        curr_variant.i32_stack_top_curr_pos = pos;
+                        if(bytecode_contains_fptr(bc, make_fptr(curr_variant))) { return true; }
+                    }
+                }
+
+                return false;
+            }};
 
         if constexpr(Opt.is_tail_call)
         {
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-            constexpr auto exp_br_if_local_tee =
-                optable::translate::get_uwvmint_br_if_local_tee_nz_fptr_from_tuple<Opt>(curr, tuple);
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_br_if_local_tee));
+            UWVM2TEST_REQUIRE(contains_i32_variant(
+                cm.local_funcs.index_unchecked(2).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                { return optable::translate::get_uwvmint_br_if_local_tee_nz_fptr_from_tuple<Opt>(curr_variant, tuple); }));
 #endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
-            constexpr auto exp_delay_i32_add_set =
-                optable::translate::get_uwvmint_i32_binop_localget_rhs_local_set_fptr_from_tuple<
-                    Opt,
-                    optable::numeric_details::int_binop::add>(curr, tuple);
-            constexpr auto exp_delay_i32_xor_set =
-                optable::translate::get_uwvmint_i32_binop_localget_rhs_local_set_fptr_from_tuple<
-                    Opt,
-                    optable::numeric_details::int_binop::xor_>(curr, tuple);
-            constexpr auto exp_delay_i32_xor_tee =
-                optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
-                    Opt,
-                    optable::numeric_details::int_binop::xor_>(curr, tuple);
-
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_delay_i32_add_set));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_delay_i32_xor_set));
-            UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_delay_i32_xor_tee));
+            UWVM2TEST_REQUIRE(contains_i32_variant(
+                cm.local_funcs.index_unchecked(0).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_set_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::add>(curr_variant, tuple);
+                }));
+            UWVM2TEST_REQUIRE(contains_i32_variant(
+                cm.local_funcs.index_unchecked(1).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_set_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::xor_>(curr_variant, tuple);
+                }));
+            UWVM2TEST_REQUIRE(contains_i32_variant(
+                cm.local_funcs.index_unchecked(3).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::xor_>(curr_variant, tuple);
+                }));
 
             // Regress: delay_local *_local_tee must not be used when local.tee is followed by br_if (local.tee+br_if may fuse).
-            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_delay_i32_xor_tee));
+            UWVM2TEST_REQUIRE(!contains_i32_variant(
+                cm.local_funcs.index_unchecked(2).op.operands,
+                [&](auto const& curr_variant) constexpr noexcept
+                {
+                    return optable::translate::get_uwvmint_i32_binop_localget_rhs_local_tee_fptr_from_tuple<
+                        Opt,
+                        optable::numeric_details::int_binop::xor_>(curr_variant, tuple);
+                }));
 #endif
         }
 
@@ -230,15 +263,36 @@ namespace
         UWVM2TEST_REQUIRE(prep.mod != nullptr);
         runtime_module_t const& rt = *prep.mod;
 
-        // Tailcall mode: strict assertions (when delay-local/combine are enabled) + semantics.
+        if(abi_mode_enabled("tail-min"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            constexpr auto opt{k_test_tail_min_opt};
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
-        // Byref mode: semantics smoke (delay-local/combine mega-ops are not expected to persist across opcodes).
+        if(abi_mode_enabled("byref"))
         {
-            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = false};
+            constexpr auto opt{k_test_byref_opt};
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-sysv"))
+        {
+            constexpr auto opt{k_test_tail_sysv_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(abi_mode_enabled("tail-aapcs64"))
+        {
+            constexpr auto opt{k_test_tail_aapcs64_opt};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
+            UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
+        }
+
+        if(legacy_layouts_enabled())
+        {
+            constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
+            static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
             UWVM2TEST_REQUIRE(run_suite<opt>(rt) == 0);
         }
 
