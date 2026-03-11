@@ -684,13 +684,6 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
 // Default to stripping custom sections to avoid noise from toolchain-specific custom sections
 // (e.g. reloc/linking/name), and to focus on core Wasm validity.
-#if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
-# ifdef UWVM
-    [[__gnu__::__tls_model__("local-exec")]]
-# else
-    [[__gnu__::__tls_model__("local-dynamic")]]
-# endif
-#endif
     static thread_local ::std::vector<::std::uint8_t> stripped{};
     if(!strict)
     {
