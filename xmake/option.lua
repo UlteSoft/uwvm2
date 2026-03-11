@@ -381,6 +381,17 @@ option("test-libfuzzer", function()
     set_default(false)
 end)
 
+option("enable-test-uwvm-int", function()
+    set_description
+    (
+        "Register slow `test/0013.uwvm_int/**` targets for strict uwvm-int validation/coverage workflows.",
+        "default = false",
+        [[    true: register 0013.uwvm_int test targets.]],
+        [[    false: skip registering 0013.uwvm_int test targets.]]
+    )
+    set_default(false)
+end)
+
 -- uwvm Debug Option
 
 option("debug-timer", function()

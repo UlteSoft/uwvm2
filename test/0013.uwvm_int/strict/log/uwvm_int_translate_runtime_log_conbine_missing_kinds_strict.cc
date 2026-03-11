@@ -456,7 +456,7 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
-        // f17-f20: acc += f32.unop(local.get x) chains (ceil/trunc/nearest/abs)
+        // f17-f21: acc += f32.unop(local.get x) chains (floor/ceil/trunc/nearest/abs)
         // These drive the heavy conbine state machine through the missing `f32_acc_add_*` kinds under runtime-log.
         {
             auto add_f32_acc_unop = [&](wasm_op unop) {
@@ -479,13 +479,14 @@ namespace
                 (void)mb.add_func(::std::move(ty), ::std::move(fb));
             };
 
+            add_f32_acc_unop(wasm_op::f32_floor);
             add_f32_acc_unop(wasm_op::f32_ceil);
             add_f32_acc_unop(wasm_op::f32_trunc);
             add_f32_acc_unop(wasm_op::f32_nearest);
             add_f32_acc_unop(wasm_op::f32_abs);
         }
 
-        // f21-f25: acc += f64.unop(local.get x) chains (floor/ceil/trunc/nearest/abs)
+        // f22-f26: acc += f64.unop(local.get x) chains (floor/ceil/trunc/nearest/abs)
         // These drive the heavy conbine state machine through the missing `f64_acc_add_*` kinds under runtime-log.
         {
             auto add_f64_acc_unop = [&](wasm_op unop) {
@@ -513,6 +514,220 @@ namespace
             add_f64_acc_unop(wasm_op::f64_trunc);
             add_f64_acc_unop(wasm_op::f64_nearest);
             add_f64_acc_unop(wasm_op::f64_abs);
+        }
+
+        // f27: acc += -abs(x) (f32) via copysign(x, -1.0)
+        {
+            func_type ty{{k_val_f32, k_val_f32}, {k_val_f32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::f32_const);
+            f32(c, -1.0f);
+            op(c, wasm_op::f32_copysign);
+            op(c, wasm_op::f32_add);
+            op(c, wasm_op::local_set);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f28: acc += -abs(x) (f64) via copysign(x, -1.0)
+        {
+            func_type ty{{k_val_f64, k_val_f64}, {k_val_f64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::f64_const);
+            f64(c, -1.0);
+            op(c, wasm_op::f64_copysign);
+            op(c, wasm_op::f64_add);
+            op(c, wasm_op::local_set);
+            u32(c, 0u);
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f29: rot_xor_add_after_rotl flush on mismatched const/add (i32)
+        {
+            func_type ty{{k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i32_const);
+            i32(c, 5);
+            op(c, wasm_op::i32_rotl);
+            op(c, wasm_op::i32_const);
+            i32(c, 3);
+            op(c, wasm_op::i32_add);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f30: rot_xor_add_after_gety flush on mismatched add (i32)
+        {
+            func_type ty{{k_val_i32, k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i32_const);
+            i32(c, 5);
+            op(c, wasm_op::i32_rotl);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i32_add);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f31: rot_xor_add_after_xor flush on mismatched const/sub (i32)
+        {
+            func_type ty{{k_val_i32, k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i32_const);
+            i32(c, 5);
+            op(c, wasm_op::i32_rotl);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i32_xor);
+            op(c, wasm_op::i32_const);
+            i32(c, 3);
+            op(c, wasm_op::i32_sub);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f32: rot_xor_add_i64_after_rotl flush on mismatched const/add (i64)
+        {
+            func_type ty{{k_val_i64}, {k_val_i64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i64_const);
+            append_i64_leb(c, 5);
+            op(c, wasm_op::i64_rotl);
+            op(c, wasm_op::i64_const);
+            append_i64_leb(c, 3);
+            op(c, wasm_op::i64_add);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f33: rot_xor_add_i64_after_gety flush on mismatched add (i64)
+        {
+            func_type ty{{k_val_i64, k_val_i64}, {k_val_i64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i64_const);
+            append_i64_leb(c, 5);
+            op(c, wasm_op::i64_rotl);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i64_add);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f34: rot_xor_add_i64_after_xor flush on mismatched const/sub (i64)
+        {
+            func_type ty{{k_val_i64, k_val_i64}, {k_val_i64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get);
+            u32(c, 0u);
+            op(c, wasm_op::i64_const);
+            append_i64_leb(c, 5);
+            op(c, wasm_op::i64_rotl);
+            op(c, wasm_op::local_get);
+            u32(c, 1u);
+            op(c, wasm_op::i64_xor);
+            op(c, wasm_op::i64_const);
+            append_i64_leb(c, 3);
+            op(c, wasm_op::i64_sub);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f35-f37: local.tee(x = x op imm) for f32
+        {
+            auto add_f32_update_local_tee = [&](wasm_op binop, float imm) {
+                func_type ty{{k_val_f32}, {k_val_f32}};
+                func_body fb{};
+                auto& c = fb.code;
+
+                op(c, wasm_op::local_get);
+                u32(c, 0u);
+                op(c, wasm_op::f32_const);
+                f32(c, imm);
+                op(c, binop);
+                op(c, wasm_op::local_tee);
+                u32(c, 0u);
+                op(c, wasm_op::end);
+
+                (void)mb.add_func(::std::move(ty), ::std::move(fb));
+            };
+
+            add_f32_update_local_tee(wasm_op::f32_add, 1.5f);
+            add_f32_update_local_tee(wasm_op::f32_mul, 2.0f);
+            add_f32_update_local_tee(wasm_op::f32_sub, 0.25f);
+        }
+
+        // f38-f40: local.tee(x = x op imm) for f64
+        {
+            auto add_f64_update_local_tee = [&](wasm_op binop, double imm) {
+                func_type ty{{k_val_f64}, {k_val_f64}};
+                func_body fb{};
+                auto& c = fb.code;
+
+                op(c, wasm_op::local_get);
+                u32(c, 0u);
+                op(c, wasm_op::f64_const);
+                f64(c, imm);
+                op(c, binop);
+                op(c, wasm_op::local_tee);
+                u32(c, 0u);
+                op(c, wasm_op::end);
+
+                (void)mb.add_func(::std::move(ty), ::std::move(fb));
+            };
+
+            add_f64_update_local_tee(wasm_op::f64_add, 1.125);
+            add_f64_update_local_tee(wasm_op::f64_mul, 3.0);
+            add_f64_update_local_tee(wasm_op::f64_sub, 0.5);
         }
 
         return mb.build();
@@ -636,13 +851,24 @@ namespace
                 "u16_copy_scaled_index_after_load",
 #endif
                 "f32_acc_add_ceil_localget_wait_add",
+                "f32_acc_add_floor_localget_wait_add",
                 "f32_acc_add_trunc_localget_wait_add",
                 "f32_acc_add_nearest_localget_wait_add",
                 "f32_acc_add_abs_localget_wait_add",
                 "f32_acc_add_ceil_localget_set_acc",
+                "f32_acc_add_floor_localget_set_acc",
                 "f32_acc_add_trunc_localget_set_acc",
                 "f32_acc_add_nearest_localget_set_acc",
                 "f32_acc_add_abs_localget_set_acc",
+                "f32_acc_add_negabs_localget_wait_add",
+                "f32_acc_add_negabs_localget_wait_copysign",
+                "f32_acc_add_negabs_localget_set_acc",
+                "rot_xor_add_after_rotl",
+                "rot_xor_add_after_gety",
+                "rot_xor_add_after_xor",
+                "f32_add_imm_local_settee_same",
+                "f32_mul_imm_local_settee_same",
+                "f32_sub_imm_local_settee_same",
                 "f64_acc_add_floor_localget_wait_add",
                 "f64_acc_add_ceil_localget_wait_add",
                 "f64_acc_add_trunc_localget_wait_add",
@@ -653,6 +879,15 @@ namespace
                 "f64_acc_add_trunc_localget_set_acc",
                 "f64_acc_add_nearest_localget_set_acc",
                 "f64_acc_add_abs_localget_set_acc",
+                "f64_acc_add_negabs_localget_wait_add",
+                "f64_acc_add_negabs_localget_wait_copysign",
+                "f64_acc_add_negabs_localget_set_acc",
+                "rot_xor_add_i64_after_rotl",
+                "rot_xor_add_i64_after_gety",
+                "rot_xor_add_i64_after_xor",
+                "f64_add_imm_local_settee_same",
+                "f64_mul_imm_local_settee_same",
+                "f64_sub_imm_local_settee_same",
             })
         {
             UWVM2TEST_REQUIRE(log_contains_kind(log_text, kind));

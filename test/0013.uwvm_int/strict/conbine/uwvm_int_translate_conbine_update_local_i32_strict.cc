@@ -259,6 +259,37 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        // f14: return (local.tee x = x * 5)
+        {
+            func_type ty{{k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::i32_const); i32(c, 5);
+            op(c, wasm_op::i32_mul);
+            op(c, wasm_op::local_tee); u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f15: x = rotr(x, 19) ; return x
+        {
+            func_type ty{{k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::i32_const); i32(c, 19);
+            op(c, wasm_op::i32_rotr);
+            op(c, wasm_op::local_set); u32(c, 0u);
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -285,6 +316,10 @@ namespace
             optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::sub>(curr, tuple);
         constexpr auto exp_mul_local_set_same =
             optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::mul>(curr, tuple);
+        constexpr auto exp_mul_local_tee_same =
+            optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::mul>(curr, tuple);
+        constexpr auto exp_rotr_local_set_same =
+            optable::translate::get_uwvmint_i32_binop_imm_local_set_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
         constexpr auto exp_rotr_local_tee_same =
             optable::translate::get_uwvmint_i32_binop_imm_local_tee_same_fptr_from_tuple<Opt, optable::numeric_details::int_binop::rotr>(curr, tuple);
         constexpr auto exp_xor_local_tee_same =
@@ -314,6 +349,8 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(11).op.operands, exp_and_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(12).op.operands, exp_or_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(13).op.operands, exp_shr_s_local_set_same));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(14).op.operands, exp_mul_local_tee_same));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(15).op.operands, exp_rotr_local_set_same));
 
 # if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
         constexpr auto exp_add_2localget_local_set =
@@ -467,6 +504,26 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == shr_s32(x, 13u));
+        }
+
+        for(::std::uint32_t x : {0u, 1u, 7u, 0x12345678u})
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(14),
+                                  rt.local_defined_function_vec_storage.index_unchecked(14),
+                                  pack_i32(static_cast<::std::int32_t>(x)),
+                                  nullptr,
+                                  nullptr);
+            UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == (x * 5u));
+        }
+
+        for(::std::uint32_t x : {0u, 1u, 0xffffffffu, 0x01234567u})
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(15),
+                                  rt.local_defined_function_vec_storage.index_unchecked(15),
+                                  pack_i32(static_cast<::std::int32_t>(x)),
+                                  nullptr,
+                                  nullptr);
+            UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == rotr32(x, 19u));
         }
 
         return 0;

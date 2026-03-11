@@ -405,166 +405,170 @@ end
 
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
-	local name = path.basename(file)
-	target(name)
-	local group = path.directory(file):gsub("\\\\", "/")
-	set_group(group)
-	set_kind("binary")
-	def_build()
+	local is_0013_uwvm_int = (string.find(file, "test/0013.uwvm_int/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\", 1, true) ~= nil)
 
-	-- uwvm uses precise floating-point model to ensure determinism.
-	set_fpmodels("precise") 
+	if not (is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) then
+		local name = path.basename(file)
+		target(name)
+		local group = path.directory(file):gsub("\\\\", "/")
+		set_group(group)
+		set_kind("binary")
+		def_build()
 
-	set_default(false)
+		-- uwvm uses precise floating-point model to ensure determinism.
+		set_fpmodels("precise")
 
-	local enable_cxx_module = get_config("use-cxx-module")
+		set_default(false)
 
-	-- third-parties/fast_io
-	add_includedirs("third-parties/fast_io/include")
+		local enable_cxx_module = get_config("use-cxx-module")
 
-	if enable_cxx_module then
-		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-	end
-	-- third-parties/bizwen
-	add_includedirs("third-parties/bizwen/include")
+		-- third-parties/fast_io
+		add_includedirs("third-parties/fast_io/include")
 
-	-- third-parties/boost
-	add_includedirs("third-parties/boost_unordered/include")
+		if enable_cxx_module then
+			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+		end
+		-- third-parties/bizwen
+		add_includedirs("third-parties/bizwen/include")
 
-	-- uwvm
-	add_defines("UWVM=2")
-	-- uwvm test
-	add_defines("UWVM_TEST=2")
-
-	-- src
-	add_includedirs("src/")
-
-	if enable_cxx_module then
-		-- uwvm predefine
-		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-		-- utils
-		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-		-- object
-		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-		-- imported
-		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-		-- wasm parser
-		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+		-- third-parties/boost
+		add_includedirs("third-parties/boost_unordered/include")
 
 		-- uwvm
-		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-	end
+		add_defines("UWVM=2")
+		-- uwvm test
+		add_defines("UWVM_TEST=2")
 
-	set_warnings("all", "extra", "error")
+		-- src
+		add_includedirs("src/")
 
-	local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
-	(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
-	local test_libfuzzer = get_config("test-libfuzzer")
+		if enable_cxx_module then
+			-- uwvm predefine
+			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
 
-	if is_libfuzzer then
-		if get_config("use-llvm") and test_libfuzzer then
-			local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
-			if need_wabt then
-				before_build(function(target)
-					local function has_wabt(wabt_root)
-						local wabt_include = path.join(wabt_root, "include")
-						local wabt_build = path.join(wabt_root, "build")
-						local wabt_config = path.join(wabt_build, "include/wabt/config.h")
-						local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
-							os.isfile(path.join(wabt_build, "libwabt.so")) or
-							os.isfile(path.join(wabt_build, "libwabt.dylib")) or
-							os.isfile(path.join(wabt_build, "wabt.lib"))
+			-- utils
+			add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
 
-						return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib
-					end
+			-- object
+			add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
 
-					if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
-						local wabt_root = "build/test/third-parties/wabt"
-						-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
-						if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
-							print("wabt source not found or incomplete. Attempting to pull...")
-							if not os.isdir(wabt_root) then
-								os.mkdir(wabt_root)
-							end
-							-- Use git clone/pull instead of submodule
-							if not os.isdir(path.join(wabt_root, ".git")) then
-								os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", wabt_root, "--recursive"})
-							else
-								os.vrunv("git", {"-C", wabt_root, "pull"})
-								os.vrunv("git", {"-C", wabt_root, "submodule", "update", "--init", "--recursive"})
-							end
-						end
+			-- imported
+			add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
 
-						if not os.isdir(wabt_root) then
-							wabt_root = "wabt"
-						end
+			-- wasm parser
+			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
 
-						if os.isdir(wabt_root) then
-							print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
-							local build_dir = path.join(wabt_root, "build")
-							-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
-							-- when fed malformed inputs (important for fuzzing/differential validation).
-							os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
-							os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
-						else
-							raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
-						end
-					end
-				end)
-
-				on_load(function(target)
-					local function try_add_wabt(wabt_root, force)
-						local wabt_include = path.join(wabt_root, "include")
-						local wabt_build = path.join(wabt_root, "build")
-						local wabt_config = path.join(wabt_build, "include/wabt/config.h")
-						local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
-							os.isfile(path.join(wabt_build, "libwabt.so")) or
-							os.isfile(path.join(wabt_build, "libwabt.dylib")) or
-							os.isfile(path.join(wabt_build, "wabt.lib"))
-
-						if force or (os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib) then
-							target:add("includedirs", wabt_include, path.join(wabt_build, "include"))
-							target:add("linkdirs", wabt_build)
-							target:add("links", "wabt")
-							-- libwabt may depend on OpenSSL's libcrypto (e.g. SHA256)
-							if not is_plat("windows") then
-								target:add("syslinks", "crypto")
-							end
-							return true
-						end
-
-						return false
-					end
-
-					-- Try to find existing wabt, if not found, force configure build/third-parties/wabt
-					-- assuming before_build will handle the build.
-					if not try_add_wabt("build/test/third-parties/wabt", false) and not try_add_wabt("wabt", false) then
-						try_add_wabt("build/test/third-parties/wabt", true)
-					end
-				end)
-			end
-
-			add_cxflags("-fsanitize=fuzzer", { force = true })
-			add_ldflags("-fsanitize=fuzzer", { force = true })
-			-- change the env variables in ci to change the default values
-			local rss     = os.getenv("FUZZ_RSS") or "512"
-			local maxtime = os.getenv("FUZZ_MAX_TIME") or "10"
-			local maxlen  = os.getenv("FUZZ_MAX_LEN") or "1024"
-			add_tests("fuzz",
-				{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
-			add_files(file)
-		elseif not get_config("use-llvm") and test_libfuzzer then
-			raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
+			-- uwvm
+			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
 		end
-	else
-		add_tests("unit", { group = "default" }) -- xmake test -g default
-		add_files(file)
-	end
 
-	target_end()
+		set_warnings("all", "extra", "error")
+
+		local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
+			(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
+		local test_libfuzzer = get_config("test-libfuzzer")
+
+		if is_libfuzzer then
+			if get_config("use-llvm") and test_libfuzzer then
+				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
+				if need_wabt then
+					before_build(function(target)
+						local function has_wabt(wabt_root)
+							local wabt_include = path.join(wabt_root, "include")
+							local wabt_build = path.join(wabt_root, "build")
+							local wabt_config = path.join(wabt_build, "include/wabt/config.h")
+							local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
+								os.isfile(path.join(wabt_build, "libwabt.so")) or
+								os.isfile(path.join(wabt_build, "libwabt.dylib")) or
+								os.isfile(path.join(wabt_build, "wabt.lib"))
+
+							return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib
+						end
+
+						if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
+							local wabt_root = "build/test/third-parties/wabt"
+							-- Check if directory exists AND contains CMakeLists.txt to ensure it's not just an empty placeholder
+							if not os.isdir(wabt_root) or not os.isfile(path.join(wabt_root, "CMakeLists.txt")) then
+								print("wabt source not found or incomplete. Attempting to pull...")
+								if not os.isdir(wabt_root) then
+									os.mkdir(wabt_root)
+								end
+								-- Use git clone/pull instead of submodule
+								if not os.isdir(path.join(wabt_root, ".git")) then
+									os.vrunv("git", {"clone", "https://github.com/WebAssembly/wabt.git", wabt_root, "--recursive"})
+								else
+									os.vrunv("git", {"-C", wabt_root, "pull"})
+									os.vrunv("git", {"-C", wabt_root, "submodule", "update", "--init", "--recursive"})
+								end
+							end
+
+							if not os.isdir(wabt_root) then
+								wabt_root = "wabt"
+							end
+
+							if os.isdir(wabt_root) then
+								print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
+								local build_dir = path.join(wabt_root, "build")
+								-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
+								-- when fed malformed inputs (important for fuzzing/differential validation).
+								os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
+								os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
+							else
+								raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
+							end
+						end
+					end)
+
+					on_load(function(target)
+						local function try_add_wabt(wabt_root, force)
+							local wabt_include = path.join(wabt_root, "include")
+							local wabt_build = path.join(wabt_root, "build")
+							local wabt_config = path.join(wabt_build, "include/wabt/config.h")
+							local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
+								os.isfile(path.join(wabt_build, "libwabt.so")) or
+								os.isfile(path.join(wabt_build, "libwabt.dylib")) or
+								os.isfile(path.join(wabt_build, "wabt.lib"))
+
+							if force or (os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib) then
+								target:add("includedirs", wabt_include, path.join(wabt_build, "include"))
+								target:add("linkdirs", wabt_build)
+								target:add("links", "wabt")
+								-- libwabt may depend on OpenSSL's libcrypto (e.g. SHA256)
+								if not is_plat("windows") then
+									target:add("syslinks", "crypto")
+								end
+								return true
+							end
+
+							return false
+						end
+
+						-- Try to find existing wabt, if not found, force configure build/third-parties/wabt
+						-- assuming before_build will handle the build.
+						if not try_add_wabt("build/test/third-parties/wabt", false) and not try_add_wabt("wabt", false) then
+							try_add_wabt("build/test/third-parties/wabt", true)
+						end
+					end)
+				end
+
+				add_cxflags("-fsanitize=fuzzer", { force = true })
+				add_ldflags("-fsanitize=fuzzer", { force = true })
+				-- change the env variables in ci to change the default values
+				local rss     = os.getenv("FUZZ_RSS") or "512"
+				local maxtime = os.getenv("FUZZ_MAX_TIME") or "10"
+				local maxlen  = os.getenv("FUZZ_MAX_LEN") or "1024"
+				add_tests("fuzz",
+					{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
+				add_files(file)
+			elseif not get_config("use-llvm") and test_libfuzzer then
+				raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
+			end
+		else
+			add_tests("unit", { group = "default" }) -- xmake test -g default
+			add_files(file)
+		end
+
+		target_end()
+	end
 end

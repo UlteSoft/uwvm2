@@ -43,6 +43,7 @@ COMMON_F_FLAGS=(
   --use-llvm=y
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
+  --enable-test-0013-uwvm-int=y
   --use-cxx-module=n
   --static=n
   --enable-int=uwvm-int

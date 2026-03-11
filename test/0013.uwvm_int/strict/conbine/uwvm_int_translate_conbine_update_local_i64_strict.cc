@@ -259,6 +259,37 @@ namespace
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
 
+        // f14: return (local.tee x = x * 5)
+        {
+            func_type ty{{k_val_i64}, {k_val_i64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::i64_const); i64(c, 5);
+            op(c, wasm_op::i64_mul);
+            op(c, wasm_op::local_tee); u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
+        // f15: x = rotr(x, 19) ; return x
+        {
+            func_type ty{{k_val_i64}, {k_val_i64}};
+            func_body fb{};
+            auto& c = fb.code;
+
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::i64_const); i64(c, 19);
+            op(c, wasm_op::i64_rotr);
+            op(c, wasm_op::local_set); u32(c, 0u);
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::end);
+
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
+
         return mb.build();
     }
 
@@ -283,6 +314,10 @@ namespace
             optable::translate::get_uwvmint_i64_add_imm_local_tee_same_fptr_from_tuple<Opt>(curr, tuple);
         constexpr auto exp_mul_local_set_same =
             optable::translate::get_uwvmint_i64_mul_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple);
+        constexpr auto exp_mul_local_tee_same =
+            optable::translate::get_uwvmint_i64_mul_imm_local_tee_same_fptr_from_tuple<Opt>(curr, tuple);
+        constexpr auto exp_rotr_local_set_same =
+            optable::translate::get_uwvmint_i64_rotr_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple);
         constexpr auto exp_rotr_local_tee_same =
             optable::translate::get_uwvmint_i64_rotr_imm_local_tee_same_fptr_from_tuple<Opt>(curr, tuple);
         constexpr auto exp_sub_local_set_same =
@@ -314,6 +349,8 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(11).op.operands, exp_and_local_set_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(12).op.operands, exp_or_local_tee_same));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(13).op.operands, exp_shr_s_local_set_same));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(14).op.operands, exp_mul_local_tee_same));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(15).op.operands, exp_rotr_local_set_same));
 
 # if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
         constexpr auto exp_add_2localget_local_set =
@@ -467,6 +504,26 @@ namespace
                                   nullptr,
                                   nullptr);
             UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr.results)) == shr_s64(x, 13u));
+        }
+
+        for(::std::uint64_t x : {0ull, 1ull, 7ull, 0x123456789abcdef0ull})
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(14),
+                                  rt.local_defined_function_vec_storage.index_unchecked(14),
+                                  pack_i64(static_cast<::std::int64_t>(x)),
+                                  nullptr,
+                                  nullptr);
+            UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr.results)) == (x * 5ull));
+        }
+
+        for(::std::uint64_t x : {0ull, 1ull, 0xffffffffffffffffull, 0x0123456789abcdefull})
+        {
+            auto rr = Runner::run(cm.local_funcs.index_unchecked(15),
+                                  rt.local_defined_function_vec_storage.index_unchecked(15),
+                                  pack_i64(static_cast<::std::int64_t>(x)),
+                                  nullptr,
+                                  nullptr);
+            UWVM2TEST_REQUIRE(static_cast<::std::uint64_t>(load_i64(rr.results)) == rotr64(x, 19u));
         }
 
         return 0;

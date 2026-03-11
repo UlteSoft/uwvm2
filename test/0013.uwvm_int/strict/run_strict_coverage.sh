@@ -52,11 +52,12 @@ COMMON_F_FLAGS=(
   --ccache=n
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
+  --enable-test-0013-uwvm-int=y
   --use-cxx-module=n
   --static=n
   --enable-int=uwvm-int
-  --enable-uwvm-int-combine-ops=extra
-  --enable-uwvm-int-delay-local=heavy
+  "--enable-uwvm-int-combine-ops=${UWVM_STRICT_COVERAGE_COMBINE_MODE:-heavy}"
+  "--enable-uwvm-int-delay-local=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}"
 )
 
 export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
@@ -69,6 +70,12 @@ echo "INFO: strict coverage regex = ${COVER_INCLUDE_REGEX}"
 
 COVER_CXFLAGS="-fprofile-instr-generate -fcoverage-mapping"
 COVER_LDFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+
+COVER_BATCH_SIZE="${UWVM_STRICT_COVERAGE_BATCH_SIZE:-8}"
+if [[ ! "${COVER_BATCH_SIZE}" =~ ^[0-9]+$ ]]; then
+  echo "ERR: UWVM_STRICT_COVERAGE_BATCH_SIZE must be a non-negative integer, got: ${COVER_BATCH_SIZE}" >&2
+  exit 4
+fi
 
 STRICT_TARGETS=()
 if [[ "$#" -gt 0 ]]; then
@@ -84,7 +91,9 @@ if [[ "${#STRICT_TARGETS[@]}" -eq 0 ]]; then
   exit 4
 fi
 
-COVER_DIR="${ROOT_DIR}/build/uwvm_int_strict_coverage"
+echo "INFO: strict coverage batch size = ${COVER_BATCH_SIZE}"
+
+COVER_DIR="${UWVM_STRICT_COVERAGE_DIR:-${ROOT_DIR}/build/uwvm_int_strict_coverage}"
 PROFRAW_DIR="${COVER_DIR}/profraw"
 HTML_DIR="${COVER_DIR}/html"
 PROFDATA_FILE="${COVER_DIR}/merged.profdata"
@@ -92,19 +101,27 @@ PROFDATA_FILE="${COVER_DIR}/merged.profdata"
 rm -rf -- "${COVER_DIR}"
 mkdir -p -- "${PROFRAW_DIR}"
 
-echo "=== uwvm_int strict coverage: configure (combine=extra, delay=heavy) ==="
+echo "=== uwvm_int strict coverage: configure (combine=${UWVM_STRICT_COVERAGE_COMBINE_MODE:-heavy}, delay=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}) ==="
 xmake f -c
 xmake f "${COMMON_F_FLAGS[@]}" --cxflags="${COVER_CXFLAGS}" --ldflags="${COVER_LDFLAGS}"
 
 export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
 
 echo "=== uwvm_int strict coverage: build+run strict targets (profile) ==="
-if [[ "$#" -gt 0 ]]; then
+if [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
   for t in "${STRICT_TARGETS[@]}"; do
     xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
   done
 else
-  xmake b -v "${XMAKE_JOBS_ARGS[@]}" -g "${STRICT_DIR}/*"
+  batch_idx=0
+  for ((i = 0; i < ${#STRICT_TARGETS[@]}; i += COVER_BATCH_SIZE)); do
+    batch_idx=$((batch_idx + 1))
+    batch=("${STRICT_TARGETS[@]:i:COVER_BATCH_SIZE}")
+    echo "--- strict coverage build batch ${batch_idx}: ${#batch[@]} targets ---"
+    for t in "${batch[@]}"; do
+      xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+    done
+  done
 fi
 for t in "${STRICT_TARGETS[@]}"; do
   xmake r "${t}"
