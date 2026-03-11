@@ -682,8 +682,8 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
     ::std::uint8_t const* test_data{data};
     ::std::size_t test_size{size};
 
-    // Default to stripping custom sections to avoid noise from toolchain-specific custom sections
-    // (e.g. reloc/linking/name), and to focus on core Wasm validity.
+// Default to stripping custom sections to avoid noise from toolchain-specific custom sections
+// (e.g. reloc/linking/name), and to focus on core Wasm validity.
     static thread_local ::std::vector<::std::uint8_t> stripped{};
     if(!strict)
     {

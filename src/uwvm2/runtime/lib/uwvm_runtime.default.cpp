@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -74,9 +74,12 @@ namespace uwvm2::runtime::uwvm_int
         using runtime_local_func_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t;
         using runtime_table_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t;
         using runtime_table_elem_storage_t = ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t;
+        using native_memory_t = ::uwvm2::object::memory::linear::native_memory_t;
 
         using capi_function_t = ::uwvm2::uwvm::wasm::type::capi_function_t;
         using local_imported_t = ::uwvm2::uwvm::wasm::type::local_imported_t;
+        using preload_module_memory_attribute_t = ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t;
+        using preload_memory_descriptor_t = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t;
 
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
         using compiled_local_func_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
@@ -99,6 +102,10 @@ namespace uwvm2::runtime::uwvm_int
             ::uwvm2::utils::container::u8string_view module_name{};
             runtime_module_storage_t const* runtime_module{};
             compiled_module_t compiled{};
+
+            // Canonical type-index table for fast call_indirect signature checks.
+            // Maps each type index to its canonical representative (deduplicated by {params, results}).
+            ::uwvm2::utils::container::vector<::std::size_t> type_canon_index{};
         };
 
         struct defined_func_ptr_range
@@ -126,6 +133,8 @@ namespace uwvm2::runtime::uwvm_int
 
         inline runtime_global_state g_runtime{};  // [global]
 
+        struct cached_import_target;
+
         struct call_stack_frame
         {
             ::std::size_t module_id{};
@@ -135,18 +144,57 @@ namespace uwvm2::runtime::uwvm_int
         struct call_stack_tls_state
         {
             inline static constexpr ::std::size_t kCallStackMaxDepth{4096uz};
+            inline static constexpr ::std::size_t kCallIndirectCacheEntries{8uz};
 
             using thread_local_allocator = ::fast_io::native_thread_local_allocator;
             ::uwvm2::utils::container::vector<call_stack_frame, thread_local_allocator> frames{};
 
-            inline call_stack_tls_state() noexcept { frames.reserve(kCallStackMaxDepth); }
+            struct call_indirect_cache_entry
+            {
+                runtime_table_storage_t const* table{};
+                void const* elems_data{};
+                ::std::uint_least32_t selector{};
+                ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* expected_ft_ptr{};
 
-            inline void push(call_stack_frame fr) noexcept { frames.push_back(fr); }
+                ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t elem_type{};
+                void const* target_ptr{};
+
+                ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const* defined_info{};
+                cached_import_target const* imported_tgt{};
+            };
+
+            static_assert((kCallIndirectCacheEntries & (kCallIndirectCacheEntries - 1uz)) == 0uz, "cache size must be power-of-two.");
+            ::uwvm2::utils::container::array<call_indirect_cache_entry, kCallIndirectCacheEntries> call_indirect_cache{};
+
+            inline call_stack_tls_state() noexcept
+            {
+                frames.reserve(kCallStackMaxDepth);
+            }
+
+            inline void push(call_stack_frame fr) noexcept
+            {
+                if(frames.size() < frames.capacity()) [[likely]]
+                {
+                    frames.push_back_unchecked(fr);
+                }
+                else
+                {
+                    frames.push_back(fr);
+                }
+            }
 
             inline void pop() noexcept
             {
                 if(!frames.empty()) [[likely]] { frames.pop_back_unchecked(); }
             }
+        };
+
+        struct preload_call_context_t
+        {
+            inline static constexpr ::std::size_t invalid_module_id{::std::numeric_limits<::std::size_t>::max()};
+
+            ::std::size_t module_id{invalid_module_id};
+            preload_module_memory_attribute_t const* preload_module_memory_attribute{};
         };
 
 #if defined(UWVM_USE_THREAD_LOCAL)
@@ -159,7 +207,17 @@ namespace uwvm2::runtime::uwvm_int
 # endif
         inline thread_local call_stack_tls_state g_call_stack{};  // [global] [thread_local]
 
+# if UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__tls_model__)
+#  ifdef UWVM
+        [[__gnu__::__tls_model__("local-exec")]]
+#  else
+        [[__gnu__::__tls_model__("local-dynamic")]]
+#  endif
+# endif
+        inline thread_local preload_call_context_t g_preload_call_context{};  // [global] [thread_local]
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return g_call_stack; }
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return g_preload_call_context; }
 
         inline void erase_current_thread_state() noexcept {}
 #else
@@ -173,6 +231,7 @@ namespace uwvm2::runtime::uwvm_int
         struct runtime_thread_state
         {
             call_stack_tls_state call_stack{};
+            preload_call_context_t preload_call_context{};
         };
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline os_thread_id_t current_thread_id() noexcept
@@ -184,7 +243,7 @@ namespace uwvm2::runtime::uwvm_int
 # endif
         }
 
-        inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};
+        inline ::uwvm2::utils::container::concurrent_node_map<os_thread_id_t, runtime_thread_state> g_thread_states{};  // [global]
 
         /// @warning `g_thread_states` entries MUST be cleaned up on thread exit.
         ///          Currently only the main thread is used; we clear `g_thread_states` at the end of
@@ -214,9 +273,42 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept
+        {
+            return get_thread_state().preload_call_context;
+        }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
 #endif
+
+        struct preload_call_context_guard
+        {
+            preload_call_context_t* ctx{};
+            preload_call_context_t saved{};
+
+            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute) noexcept : ctx{::std::addressof(get_preload_call_context())},
+                                                                                                                     saved{*ctx}
+            {
+                auto& call_stack{get_call_stack()};
+                if(!call_stack.frames.empty()) [[likely]]
+                {
+                    ctx->module_id = call_stack.frames.back().module_id;
+                }
+                else
+                {
+                    ctx->module_id = preload_call_context_t::invalid_module_id;
+                }
+                ctx->preload_module_memory_attribute = attribute;
+            }
+
+            inline preload_call_context_guard(preload_call_context_guard const&) noexcept = delete;
+            inline preload_call_context_guard& operator= (preload_call_context_guard const&) noexcept = delete;
+
+            inline ~preload_call_context_guard()
+            {
+                if(this->ctx != nullptr) [[likely]] { *this->ctx = this->saved; }
+            }
+        };
 
         [[nodiscard]] inline compiled_defined_func_info const* find_defined_func_info(runtime_local_func_storage_t const* f) noexcept
         {
@@ -589,6 +681,7 @@ namespace uwvm2::runtime::uwvm_int
             func_sig_view sig{};
             ::std::size_t param_bytes{};
             ::std::size_t result_bytes{};
+            preload_module_memory_attribute_t const* preload_module_memory_attribute{};
 
             union
             {
@@ -688,6 +781,11 @@ namespace uwvm2::runtime::uwvm_int
                 {valtype_kind::raw_u8, f->para_type_vec_begin, f->para_type_vec_size},
                 {valtype_kind::raw_u8, f->res_type_vec_begin,  f->res_type_vec_size }
             };
+        }
+
+        [[nodiscard]] inline preload_module_memory_attribute_t const* find_preload_module_memory_attribute(capi_function_t const* f) noexcept
+        {
+            return ::uwvm2::uwvm::wasm::storage::find_loaded_preload_module_memory_attribute(f);
         }
 
         struct resolved_func
@@ -939,6 +1037,444 @@ namespace uwvm2::runtime::uwvm_int
         }
 #endif
 
+        [[nodiscard]] inline runtime_module_storage_t const* get_active_preload_runtime_module() noexcept
+        {
+            auto const& ctx{get_preload_call_context()};
+            if(ctx.module_id == preload_call_context_t::invalid_module_id) [[unlikely]] { return nullptr; }
+            if(ctx.module_id >= g_runtime.modules.size()) [[unlikely]] { return nullptr; }
+            return g_runtime.modules.index_unchecked(ctx.module_id).runtime_module;
+        }
+
+        [[nodiscard]] inline preload_module_memory_attribute_t const* get_active_preload_memory_attribute() noexcept
+        {
+            return get_preload_call_context().preload_module_memory_attribute;
+        }
+
+        [[nodiscard]] inline bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute,
+                                                                     ::std::size_t memory_index) noexcept
+        {
+            if(attribute == nullptr) [[unlikely]] { return false; }
+            if(attribute->apply_to_all_memories) [[likely]] { return true; }
+
+            return attribute->memory_index_set.find(memory_index) != attribute->memory_index_set.cend();
+        }
+
+        struct preload_memory_rights_t
+        {
+            bool allow_access{};
+            bool prefer_mmap{};
+        };
+
+        [[nodiscard]] inline constexpr preload_memory_rights_t requested_preload_memory_rights(preload_module_memory_attribute_t const* attribute,
+                                                                                                ::std::size_t memory_index) noexcept
+        {
+            using access_mode = ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t;
+
+            if(!preload_memory_index_is_selected(attribute, memory_index)) [[unlikely]] { return {}; }
+
+            switch(attribute->memory_access_mode)
+            {
+                case access_mode::copy:
+                {
+                    return {true, false};
+                }
+                case access_mode::mmap:
+                {
+                    return {true, true};
+                }
+                case access_mode::none: [[fallthrough]];
+                default:
+                {
+                    return {};
+                }
+            }
+        }
+
+        struct resolved_preload_memory_t
+        {
+            enum class target_kind : unsigned
+            {
+                native_defined,
+                local_imported
+            };
+
+            target_kind kind{target_kind::native_defined};
+            native_memory_t const* native_memory{};
+            local_imported_t* local_imported{};
+            ::std::size_t local_imported_index{};
+            ::std::byte* memory_begin{};
+            ::std::uint_least64_t page_count{};
+            ::std::uint_least64_t page_size_bytes{};
+            ::std::uint_least64_t byte_length{};
+            unsigned backend_kind{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_native_defined};
+            unsigned mmap_delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
+            ::std::uint_least64_t partial_protection_limit_bytes{};
+            void const* dynamic_length_atomic_object{};
+        };
+
+        struct preload_memory_delivery_t
+        {
+            unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
+        };
+
+        [[nodiscard]] inline constexpr bool compute_preload_byte_length(::std::uint_least64_t page_count,
+                                                                        ::std::uint_least64_t page_size_bytes,
+                                                                        ::std::uint_least64_t& byte_length) noexcept
+        {
+            if(page_size_bytes != 0u && page_count > (::std::numeric_limits<::std::uint_least64_t>::max() / page_size_bytes)) [[unlikely]] { return false; }
+            byte_length = page_count * page_size_bytes;
+            return true;
+        }
+
+#if defined(UWVM_SUPPORT_MMAP)
+        [[nodiscard]] inline constexpr ::std::uint_least64_t preload_partial_protection_limit_bytes(native_memory_t const& memory) noexcept
+        {
+
+            if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+            {
+                if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64)
+                {
+                    return ::uwvm2::object::memory::linear::max_partial_protection_wasm64_length;
+                }
+                return ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length;
+            }
+            else
+            {
+                static_cast<void>(memory);
+                return ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length;
+            }
+        }
+#endif
+
+        [[nodiscard]] inline bool resolve_defined_preload_memory(native_memory_t const& memory, resolved_preload_memory_t& resolved) noexcept
+        {
+            resolved.kind = resolved_preload_memory_t::target_kind::native_defined;
+            resolved.native_memory = ::std::addressof(memory);
+            resolved.local_imported = nullptr;
+            resolved.local_imported_index = 0uz;
+            resolved.memory_begin = memory.memory_begin;
+            resolved.page_count = static_cast<::std::uint_least64_t>(memory.get_page_size());
+            resolved.page_size_bytes = static_cast<::std::uint_least64_t>(1u) << memory.custom_page_size_log2;
+            resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_native_defined;
+            resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
+            resolved.partial_protection_limit_bytes = 0u;
+            resolved.dynamic_length_atomic_object = nullptr;
+
+            if(!compute_preload_byte_length(resolved.page_count, resolved.page_size_bytes, resolved.byte_length)) [[unlikely]] { return false; }
+            if(resolved.memory_begin == nullptr && resolved.byte_length != 0u) [[unlikely]] { return false; }
+
+#if defined(UWVM_SUPPORT_MMAP)
+            if constexpr(native_memory_t::can_mmap)
+            {
+                if(memory.require_dynamic_determination_memory_size())
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_dynamic_bounds;
+                    resolved.dynamic_length_atomic_object = memory.memory_length_p;
+                }
+                else if(memory.is_full_page_protection())
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_full_protection;
+                }
+                else
+                {
+                    resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_partial_protection;
+                    resolved.partial_protection_limit_bytes = preload_partial_protection_limit_bytes(memory);
+                }
+            }
+#endif
+
+            return true;
+        }
+
+        [[nodiscard]] inline bool resolve_local_imported_preload_memory(local_imported_t* local_imported,
+                                                                        ::std::size_t local_imported_index,
+                                                                        resolved_preload_memory_t& resolved) noexcept
+        {
+            if(local_imported == nullptr) [[unlikely]] { return false; }
+
+            resolved.kind = resolved_preload_memory_t::target_kind::local_imported;
+            resolved.native_memory = nullptr;
+            resolved.local_imported = local_imported;
+            resolved.local_imported_index = local_imported_index;
+            resolved.memory_begin = local_imported->memory_begin_from_index(local_imported_index);
+            resolved.page_count = local_imported->memory_size_from_index(local_imported_index);
+            resolved.page_size_bytes = local_imported->memory_page_size_from_index(local_imported_index);
+            resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_local_imported;
+            resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
+            resolved.partial_protection_limit_bytes = 0u;
+            resolved.dynamic_length_atomic_object = nullptr;
+
+            if(!compute_preload_byte_length(resolved.page_count, resolved.page_size_bytes, resolved.byte_length)) [[unlikely]] { return false; }
+            if(resolved.memory_begin == nullptr && resolved.byte_length != 0u) [[unlikely]] { return false; }
+
+            return true;
+        }
+
+        [[nodiscard]] inline bool resolve_preload_memory(runtime_module_storage_t const& rt,
+                                                         ::std::size_t memory_index,
+                                                         resolved_preload_memory_t& resolved) noexcept
+        {
+            using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
+            using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
+
+            auto const imported_count{rt.imported_memory_vec_storage.size()};
+            if(memory_index < imported_count)
+            {
+                constexpr ::std::size_t kMaxChain{4096uz};
+                auto const* curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(memory_index))};
+
+                for(::std::size_t steps{}; steps != kMaxChain; ++steps)
+                {
+                    if(curr == nullptr) [[unlikely]] { return false; }
+
+                    switch(curr->link_kind)
+                    {
+                        case memory_link_kind::imported:
+                        {
+                            curr = curr->target.imported_ptr;
+                            break;
+                        }
+                        case memory_link_kind::defined:
+                        {
+                            auto const* const defined{curr->target.defined_ptr};
+                            if(defined == nullptr) [[unlikely]] { return false; }
+                            return resolve_defined_preload_memory(defined->memory, resolved);
+                        }
+                        case memory_link_kind::local_imported:
+                        {
+                            return resolve_local_imported_preload_memory(curr->target.local_imported.module_ptr,
+                                                                         curr->target.local_imported.index,
+                                                                         resolved);
+                        }
+                        case memory_link_kind::unresolved: [[fallthrough]];
+                        default:
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
+            }
+
+            auto const local_index{memory_index - imported_count};
+            if(local_index >= rt.local_defined_memory_vec_storage.size()) [[unlikely]] { return false; }
+            return resolve_defined_preload_memory(rt.local_defined_memory_vec_storage.index_unchecked(local_index).memory, resolved);
+        }
+
+        [[nodiscard]] inline constexpr preload_memory_delivery_t determine_preload_memory_delivery(preload_memory_rights_t rights,
+                                                                                                    resolved_preload_memory_t const& resolved) noexcept
+        {
+            if(!rights.allow_access) [[unlikely]] { return {}; }
+
+            if(rights.prefer_mmap && resolved.mmap_delivery_state != ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none)
+            {
+                return {resolved.mmap_delivery_state};
+            }
+
+            return {::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy};
+        }
+
+        [[nodiscard]] inline constexpr bool validate_preload_copy_range(::std::uint_least64_t byte_length,
+                                                                        ::std::uint_least64_t offset,
+                                                                        ::std::size_t size,
+                                                                        ::std::size_t& offset_out) noexcept
+        {
+            if(byte_length > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
+            if(offset > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
+
+            auto const host_byte_length{static_cast<::std::size_t>(byte_length)};
+            offset_out = static_cast<::std::size_t>(offset);
+
+            if(offset_out > host_byte_length) [[unlikely]] { return false; }
+            if(size > (host_byte_length - offset_out)) [[unlikely]] { return false; }
+
+            return true;
+        }
+
+        template <typename Fn>
+        [[nodiscard]] inline bool with_native_preload_copy_access(native_memory_t const& memory, Fn&& fn) noexcept
+        {
+            static_cast<void>(memory);
+            if constexpr(native_memory_t::can_mmap)
+            {
+                return static_cast<bool>(fn());
+            }
+            else if constexpr(native_memory_t::support_multi_thread)
+            {
+#if !defined(UWVM_SUPPORT_MMAP) && defined(UWVM_USE_MULTITHREAD_ALLOCATOR) && (__cpp_lib_atomic_wait >= 201907L)
+                ::uwvm2::object::memory::linear::memory_operation_guard_t memory_guard{memory.growing_flag_p, memory.active_ops_p};
+                return static_cast<bool>(fn());
+#else
+                return static_cast<bool>(fn());
+#endif
+            }
+            else
+            {
+                return static_cast<bool>(fn());
+            }
+        }
+
+        [[nodiscard]] inline constexpr ::std::size_t active_preload_total_memory_count(runtime_module_storage_t const& rt) noexcept
+        {
+            return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size();
+        }
+
+        [[nodiscard]] inline bool try_build_preload_memory_descriptor(::std::size_t memory_index,
+                                                                      preload_memory_descriptor_t* out,
+                                                                      resolved_preload_memory_t* resolved_out,
+                                                                      preload_memory_delivery_t* delivery_out) noexcept
+        {
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!resolve_preload_memory(*rt, memory_index, resolved)) [[unlikely]] { return false; }
+
+            auto const rights{requested_preload_memory_rights(get_active_preload_memory_attribute(), memory_index)};
+            auto const delivery{determine_preload_memory_delivery(rights, resolved)};
+            if(delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none) [[unlikely]] { return false; }
+
+            if(out != nullptr)
+            {
+                *out = preload_memory_descriptor_t{
+                    .memory_index = memory_index,
+                    .delivery_state = delivery.delivery_state,
+                    .backend_kind = resolved.backend_kind,
+                    .reserved0 = 0u,
+                    .reserved1 = 0u,
+                    .page_count = resolved.page_count,
+                    .page_size_bytes = resolved.page_size_bytes,
+                    .byte_length = resolved.byte_length,
+                    .partial_protection_limit_bytes = resolved.partial_protection_limit_bytes,
+                    .mmap_view_begin = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy ? nullptr : resolved.memory_begin,
+                    .dynamic_length_atomic_object = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_dynamic_bounds
+                                                      ? resolved.dynamic_length_atomic_object
+                                                      : nullptr};
+            }
+
+            if(resolved_out != nullptr) [[likely]] { *resolved_out = resolved; }
+            if(delivery_out != nullptr) [[likely]] { *delivery_out = delivery; }
+            return true;
+        }
+
+        [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_impl() noexcept
+        {
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return 0uz; }
+
+            auto const total{active_preload_total_memory_count(*rt)};
+            ::std::size_t count{};
+            for(::std::size_t i{}; i != total; ++i)
+            {
+                count += static_cast<::std::size_t>(try_build_preload_memory_descriptor(i, nullptr, nullptr, nullptr));
+            }
+            return count;
+        }
+
+        [[nodiscard]] inline bool preload_memory_descriptor_at_impl(::std::size_t descriptor_index,
+                                                                    preload_memory_descriptor_t* out) noexcept
+        {
+            if(out == nullptr) [[unlikely]] { return false; }
+
+            auto const* const rt{get_active_preload_runtime_module()};
+            if(rt == nullptr) [[unlikely]] { return false; }
+
+            auto const total{active_preload_total_memory_count(*rt)};
+            ::std::size_t current_descriptor_index{};
+            preload_memory_descriptor_t descriptor{};
+            for(::std::size_t memory_index{}; memory_index != total; ++memory_index)
+            {
+                if(!try_build_preload_memory_descriptor(memory_index, ::std::addressof(descriptor), nullptr, nullptr)) { continue; }
+                if(current_descriptor_index == descriptor_index) [[likely]]
+                {
+                    *out = descriptor;
+                    return true;
+                }
+                ++current_descriptor_index;
+            }
+
+            return false;
+        }
+
+        [[nodiscard]] inline bool preload_memory_read_impl(::std::size_t memory_index,
+                                                           ::std::uint_least64_t offset,
+                                                           void* destination,
+                                                           ::std::size_t size) noexcept
+        {
+            if(size != 0uz && destination == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
+            ::std::size_t host_offset{};
+            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+            if(size == 0uz) [[unlikely]] { return true; }
+
+            switch(resolved.kind)
+            {
+                case resolved_preload_memory_t::target_kind::native_defined:
+                {
+                    auto const* const memory{resolved.native_memory};
+                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(*memory,
+                                                           [&]() noexcept
+                                                           {
+                                                               ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
+                                                               return true;
+                                                           });
+                }
+                case resolved_preload_memory_t::target_kind::local_imported:
+                {
+                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
+                    return true;
+                }
+                default:
+                {
+                    return false;
+                }
+            }
+        }
+
+        [[nodiscard]] inline bool preload_memory_write_impl(::std::size_t memory_index,
+                                                            ::std::uint_least64_t offset,
+                                                            void const* source,
+                                                            ::std::size_t size) noexcept
+        {
+            if(size != 0uz && source == nullptr) [[unlikely]] { return false; }
+
+            resolved_preload_memory_t resolved{};
+            if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
+            ::std::size_t host_offset{};
+            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+            if(size == 0uz) [[unlikely]] { return true; }
+
+            switch(resolved.kind)
+            {
+                case resolved_preload_memory_t::target_kind::native_defined:
+                {
+                    auto const* const memory{resolved.native_memory};
+                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(*memory,
+                                                           [&]() noexcept
+                                                           {
+                                                               ::std::memcpy(resolved.memory_begin + host_offset, source, size);
+                                                               return true;
+                                                           });
+                }
+                case resolved_preload_memory_t::target_kind::local_imported:
+                {
+                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
+                    ::std::memcpy(resolved.memory_begin + host_offset, source, size);
+                    return true;
+                }
+                default:
+                {
+                    return false;
+                }
+            }
+        }
+
         // IMPORTANT:
         // Do NOT wrap `alloca` in a helper function that returns the pointer: `alloca` is stack-frame bound,
         // so allocating in a callee and returning the pointer is a dangling pointer unless the compiler inlines it.
@@ -1179,6 +1715,58 @@ namespace uwvm2::runtime::uwvm_int
             return reinterpret_cast<::std::byte*>((v + (a - 1uz)) & ~(a - 1uz));
         }
 
+        [[nodiscard]] inline ::uwvm2::utils::container::vector<::std::size_t>
+            build_type_canon_index(runtime_module_storage_t const& module) noexcept
+        {
+            using ft_t = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t;
+
+            auto const type_begin{module.type_section_storage.type_section_begin};
+            auto const type_end{module.type_section_storage.type_section_end};
+            if(type_begin == nullptr || type_end == nullptr) [[unlikely]] { return {}; }
+
+            auto const total{static_cast<::std::size_t>(type_end - type_begin)};
+            ::uwvm2::utils::container::vector<::std::size_t> canon{};
+            canon.resize(total);
+
+            auto const sig_equal{[](ft_t const& a, ft_t const& b) constexpr noexcept -> bool
+                                 {
+                                     auto const a_params{static_cast<::std::size_t>(a.parameter.end - a.parameter.begin)};
+                                     auto const b_params{static_cast<::std::size_t>(b.parameter.end - b.parameter.begin)};
+                                     if(a_params != b_params) { return false; }
+
+                                     auto const a_res{static_cast<::std::size_t>(a.result.end - a.result.begin)};
+                                     auto const b_res{static_cast<::std::size_t>(b.result.end - b.result.begin)};
+                                     if(a_res != b_res) { return false; }
+
+                                     for(::std::size_t i{}; i != a_params; ++i)
+                                     {
+                                         if(a.parameter.begin[i] != b.parameter.begin[i]) { return false; }
+                                     }
+
+                                     for(::std::size_t i{}; i != a_res; ++i)
+                                     {
+                                         if(a.result.begin[i] != b.result.begin[i]) { return false; }
+                                     }
+
+                                     return true;
+                                 }};
+
+            for(::std::size_t i{}; i != total; ++i)
+            {
+                canon.index_unchecked(i) = i;
+                for(::std::size_t j{}; j != i; ++j)
+                {
+                    if(sig_equal(type_begin[i], type_begin[j]))
+                    {
+                        canon.index_unchecked(i) = canon.index_unchecked(j);
+                        break;
+                    }
+                }
+            }
+
+            return canon;
+        }
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline bool
             try_execute_trivial_defined_call(::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
                                              ::std::byte** stack_top_ptr) noexcept
@@ -1262,6 +1850,18 @@ namespace uwvm2::runtime::uwvm_int
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }
+                case trivial_kind_t::xorshift32_i32:
+                {
+                    if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    if(info.param_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uint_least32_t x{load_u32(args_begin)};
+                    x ^= static_cast<::std::uint_least32_t>(x << 13u);
+                    x ^= static_cast<::std::uint_least32_t>(x >> 17u);
+                    x ^= static_cast<::std::uint_least32_t>(x << 5u);
+                    store_u32(args_begin, x);
+                    *stack_top_ptr = args_begin + 4uz;
+                    return true;
+                }
                 case trivial_kind_t::mul_add_const_i32:
                 {
                     if(info.result_bytes != 4uz) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1337,16 +1937,39 @@ namespace uwvm2::runtime::uwvm_int
             if(zeroinit_end_raw < param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
             if(zeroinit_end_raw > wasm_locals_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const zero_n{zeroinit_end_raw - param_bytes};
-            constexpr ::std::size_t kAllocaMaxBytesPerRegion{4096uz};
+            constexpr ::std::size_t kFrameAlign{16uz};
+            constexpr ::std::size_t kFrameAlignPad{kFrameAlign - 1uz};
+            bool const align_wasm_locals_start{zero_n >= 64uz};
+
+            // Frame layout:
+            // - locals region (with optional padding for aligning the Wasm-locals start after params)
+            // - operand stack region (16-byte aligned)
+            ::std::size_t local_alloc_n{local_bytes_raw};
+            if(local_alloc_n == 0uz) [[unlikely]] { local_alloc_n = 1uz; }
+            if(align_wasm_locals_start)
+            {
+                if(local_alloc_n > (::std::numeric_limits<::std::size_t>::max() - kFrameAlignPad)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                local_alloc_n += kFrameAlignPad;
+            }
+
+            ::std::size_t frame_alloc_n{local_alloc_n};
+            if(stack_cap_raw != 0uz) [[likely]]
+            {
+                if(frame_alloc_n > (::std::numeric_limits<::std::size_t>::max() - (kFrameAlignPad + stack_cap_raw))) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
+                frame_alloc_n += kFrameAlignPad + stack_cap_raw;
+            }
+
+            constexpr ::std::size_t kAllocaMaxBytesPerFrame{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
 #if defined(UWVM_USE_THREAD_LOCAL)
-            bool const use_scratch{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
-                                   call_stack.frames.size() > kAllocaMaxCallDepth};
+            bool const use_scratch{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
             ::std::size_t scratch_mark{};
             if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
 #else
-            bool const use_heap{local_bytes_raw > kAllocaMaxBytesPerRegion || stack_cap_raw > kAllocaMaxBytesPerRegion ||
-                                call_stack.frames.size() > kAllocaMaxCallDepth};
+            bool const use_heap{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
 
             auto const heap_alloc_aligned{[](::std::size_t n, ::std::size_t align, heap_buf_guard& g) noexcept -> ::std::byte*
                                           {
@@ -1368,32 +1991,22 @@ namespace uwvm2::runtime::uwvm_int
             // Pop params from the caller stack first (so nested calls can't see them).
             *caller_stack_top_ptr = caller_args_begin;
 
-            // Allocate locals as a packed byte buffer (i32/f32=4, i64/f64=8, plus the internal temp local).
-            ::std::byte* local_base{};
-            constexpr ::std::size_t kFrameAlign{16uz};
-            constexpr ::std::size_t kFrameAlignPad{kFrameAlign - 1uz};
-            bool const align_wasm_locals_start{zero_n >= 64uz};
-            ::std::size_t local_alloc_n{local_bytes_raw};
-            if(local_alloc_n == 0uz) [[unlikely]] { local_alloc_n = 1uz; }
-            if(align_wasm_locals_start)
-            {
-                if(local_alloc_n > (::std::numeric_limits<::std::size_t>::max() - kFrameAlignPad)) [[unlikely]] { ::fast_io::fast_terminate(); }
-                local_alloc_n += kFrameAlignPad;
-            }
-            ::std::byte* local_alloc{};
-
+            ::std::byte* frame_alloc{};
 #if defined(UWVM_USE_THREAD_LOCAL)
-            if(use_scratch) { local_alloc = g_call_scratch.allocate_bytes(local_alloc_n, kFrameAlign); }
+            if(use_scratch) { frame_alloc = g_call_scratch.allocate_bytes(frame_alloc_n, kFrameAlign); }
             else
 #else
-            heap_buf_guard local_heap_guard{};
-            if(use_heap) { local_alloc = heap_alloc_aligned(local_alloc_n, kFrameAlign, local_heap_guard); }
+            heap_buf_guard frame_heap_guard{};
+            if(use_heap) { frame_alloc = heap_alloc_aligned(frame_alloc_n, kFrameAlign, frame_heap_guard); }
             else
 #endif
             {
-                local_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(local_alloc_n));
+                frame_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(frame_alloc_n));
             }
 
+            // Allocate locals as a packed byte buffer (i32/f32=4, i64/f64=8, plus the internal temp local).
+            ::std::byte* const local_alloc{frame_alloc};
+            ::std::byte* local_base{};
             if(align_wasm_locals_start)
             {
                 // Align the start of the Wasm locals region (after params). This can improve bulk-zero performance on some libc `memset`s.
@@ -1426,19 +2039,14 @@ namespace uwvm2::runtime::uwvm_int
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
-
-#if defined(UWVM_USE_THREAD_LOCAL)
-            if(use_scratch) { operand_base = g_call_scratch.allocate_bytes(stack_cap_raw, kFrameAlign); }
-            else
-#else
-            heap_buf_guard operand_heap_guard{};
-            if(use_heap) { operand_base = heap_alloc_aligned(stack_cap_raw, kFrameAlign, operand_heap_guard); }
-            else
-#endif
+            ::std::byte operand_dummy{};
+            if(stack_cap_raw == 0uz) [[unlikely]]
             {
-                ::std::size_t op_n{stack_cap_raw};
-                if(op_n == 0uz) [[unlikely]] { op_n = 1uz; }
-                operand_base = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(op_n));
+                operand_base = ::std::addressof(operand_dummy);
+            }
+            else
+            {
+                operand_base = align_ptr_up(frame_alloc + local_alloc_n, kFrameAlign);
             }
 
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -1506,7 +2114,11 @@ namespace uwvm2::runtime::uwvm_int
             *caller_stack_top_ptr += res_bytes;
         }
 
-        inline void invoke_capi(capi_function_t const* f, ::std::size_t para_bytes, ::std::size_t res_bytes, ::std::byte** caller_stack_top_ptr) noexcept
+        inline void invoke_capi(capi_function_t const* f,
+                                preload_module_memory_attribute_t const* preload_module_memory_attribute,
+                                ::std::size_t para_bytes,
+                                ::std::size_t res_bytes,
+                                ::std::byte** caller_stack_top_ptr) noexcept
         {
             if(f == nullptr || f->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -1522,6 +2134,7 @@ namespace uwvm2::runtime::uwvm_int
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(parbuf, para_bytes, par_guard);
             if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
 
+            preload_call_context_guard preload_guard{preload_module_memory_attribute};
             f->func_ptr(resbuf, parbuf);
 
             if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
@@ -1567,7 +2180,7 @@ namespace uwvm2::runtime::uwvm_int
                     {
                         ::fast_io::fast_terminate();
                     }
-                    invoke_capi(f, para_bytes, res_bytes, caller_stack_top_ptr);
+                    invoke_capi(f, find_preload_module_memory_attribute(f), para_bytes, res_bytes, caller_stack_top_ptr);
                     return;
                 }
                 [[unlikely]] default:
@@ -1705,14 +2318,14 @@ namespace uwvm2::runtime::uwvm_int
                     }
                     case cached_import_target::kind::dl:
                     {
-                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
-                    case cached_import_target::kind::weak_symbol:
-                    {
-                        invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                        return;
-                    }
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
+                        }
+                        case cached_import_target::kind::weak_symbol:
+                        {
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            return;
+                        }
                     [[unlikely]] default:
                     {
                         ::fast_io::fast_terminate();
@@ -1740,9 +2353,10 @@ namespace uwvm2::runtime::uwvm_int
             if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
+            auto& call_stack{get_call_stack()};
 
             // Pop selector index (i32).
-            wasm_i32 selector_i32{};
+            wasm_i32 selector_i32;  // no init
             *stack_top_ptr -= sizeof(selector_i32);
             ::std::memcpy(::std::addressof(selector_i32), *stack_top_ptr, sizeof(selector_i32));
             auto const selector_u32{::std::bit_cast<::std::uint_least32_t>(selector_i32)};
@@ -1752,13 +2366,6 @@ namespace uwvm2::runtime::uwvm_int
             if(selector_u32 >= table->elems.size()) [[unlikely]] { trap_fatal(trap_kind::call_indirect_table_out_of_bounds); }
 
             auto const& elem{table->elems.index_unchecked(static_cast<::std::size_t>(selector_u32))};
-            auto const sig_from_ft{[](::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* ft) constexpr noexcept -> func_sig_view
-                                   {
-                                       return {
-                                           {valtype_kind::wasm_enum, ft->parameter.begin, static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
-                                           {valtype_kind::wasm_enum, ft->result.begin,    static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
-                                       };
-                                   }};
 
             auto const type_begin{module.type_section_storage.type_section_begin};
             auto const type_end{module.type_section_storage.type_section_end};
@@ -1768,7 +2375,85 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const* const expected_ft_ptr{type_begin + type_index};
             if(expected_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-            auto const expected_sig{sig_from_ft(expected_ft_ptr)};
+
+            // Inline cache: the common hot case is a stable (table, selector, expected-type) triple inside a loop.
+            // Cache the resolved call target to avoid repeating signature checks, pointer arithmetic and cache lookups.
+            void const* const elems_data{table->elems.data()};
+            auto const cache_index{static_cast<::std::size_t>(selector_u32) & (call_stack_tls_state::kCallIndirectCacheEntries - 1uz)};
+            {
+                auto& ic{call_stack.call_indirect_cache[cache_index]};
+                if(ic.table == table && ic.elems_data == elems_data && ic.selector == selector_u32 && ic.expected_ft_ptr == expected_ft_ptr &&
+                   ic.elem_type == elem.type && ic.target_ptr != nullptr)
+                {
+                    if(elem.type == ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_defined)
+                    {
+                        auto const def_ptr{elem.storage.defined_ptr};
+                        if(def_ptr != nullptr && ic.target_ptr == static_cast<void const*>(def_ptr) && ic.defined_info != nullptr)
+                        {
+                            auto const& info{*ic.defined_info};
+                            if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
+                            call_stack_guard g{call_stack, info.module_id, info.function_index};
+                            auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
+                            if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                            execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
+                            return;
+                        }
+                    }
+                    else if(elem.type == ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported)
+                    {
+                        auto const imp_ptr{elem.storage.imported_ptr};
+                        if(imp_ptr != nullptr && ic.target_ptr == static_cast<void const*>(imp_ptr) && ic.imported_tgt != nullptr)
+                        {
+                            auto const& tgt{*ic.imported_tgt};
+                            call_stack_guard g{call_stack, tgt.frame.module_id, tgt.frame.function_index};
+                            switch(tgt.k)
+                            {
+                                case cached_import_target::kind::defined:
+                                {
+                                    execute_compiled_defined(call_stack,
+                                                             tgt.u.defined.runtime_func,
+                                                             tgt.u.defined.compiled_func,
+                                                             tgt.param_bytes,
+                                                             tgt.result_bytes,
+                                                             stack_top_ptr);
+                                    return;
+                                }
+                                case cached_import_target::kind::local_imported:
+                                {
+                                    invoke_local_imported(tgt.u.local_imported, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                                    return;
+                                }
+                                case cached_import_target::kind::dl:
+                                case cached_import_target::kind::weak_symbol:
+                                {
+                                    invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                                    return;
+                                }
+                                [[unlikely]] default:
+                                {
+                                    ::fast_io::fast_terminate();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Fast signature check (miss path): compare canonical type indices (deduplicated by signature) to avoid scanning long param lists.
+            auto const& canon{module_rec.type_canon_index};
+            bool const canon_ok{canon.size() == type_total};
+            auto const expected_canon{canon_ok ? canon.index_unchecked(type_index) : type_index};
+            auto const type_begin_addr{reinterpret_cast<::std::uintptr_t>(type_begin)};
+            auto const type_end_addr{reinterpret_cast<::std::uintptr_t>(type_end)};
+            constexpr ::std::size_t kFTSize{sizeof(*type_begin)};
+
+            auto const sig_from_ft{[](::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* ft) constexpr noexcept -> func_sig_view
+                                   {
+                                       return {
+                                           {valtype_kind::wasm_enum, ft->parameter.begin, static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)},
+                                           {valtype_kind::wasm_enum, ft->result.begin,    static_cast<::std::size_t>(ft->result.end - ft->result.begin)      }
+                                       };
+                                   }};
 
             switch(elem.type)
             {
@@ -1782,7 +2467,29 @@ namespace uwvm2::runtime::uwvm_int
 
                     if(actual_ft_ptr != expected_ft_ptr)
                     {
-                        if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                        bool match{};
+                        if(canon_ok)
+                        {
+                            auto const actual_addr{reinterpret_cast<::std::uintptr_t>(actual_ft_ptr)};
+                            if(actual_addr >= type_begin_addr && actual_addr < type_end_addr)
+                            {
+                                auto const diff{static_cast<::std::size_t>(actual_addr - type_begin_addr)};
+                                if(diff % kFTSize == 0uz)
+                                {
+                                    auto const actual_index{diff / kFTSize};
+                                    match = (canon.index_unchecked(actual_index) == expected_canon);
+                                }
+                            }
+                        }
+
+                        if(!match)
+                        {
+                            auto const expected_sig{sig_from_ft(expected_ft_ptr)};
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
+                            {
+                                trap_fatal(trap_kind::call_indirect_type_mismatch);
+                            }
+                        }
                     }
 
                     auto const base{module.local_defined_function_vec_storage.data()};
@@ -1793,9 +2500,22 @@ namespace uwvm2::runtime::uwvm_int
                     if(local_idx >= module_rec.compiled.local_defined_call_info.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const& info{module_rec.compiled.local_defined_call_info.index_unchecked(local_idx)};
                     if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    // Update inline cache.
+                    {
+                        auto& ic{call_stack.call_indirect_cache[cache_index]};
+                        ic.table = table;
+                        ic.elems_data = table->elems.data();
+                        ic.selector = selector_u32;
+                        ic.expected_ft_ptr = expected_ft_ptr;
+                        ic.elem_type = elem.type;
+                        ic.target_ptr = static_cast<void const*>(def_ptr);
+                        ic.defined_info = ::std::addressof(info);
+                        ic.imported_tgt = nullptr;
+                    }
+
                     if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
 
-                    auto& call_stack{get_call_stack()};
                     call_stack_guard g{call_stack, info.module_id, info.function_index};
                     auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1814,7 +2534,29 @@ namespace uwvm2::runtime::uwvm_int
 
                     if(actual_ft_ptr != expected_ft_ptr)
                     {
-                        if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
+                        bool match{};
+                        if(canon_ok)
+                        {
+                            auto const actual_addr{reinterpret_cast<::std::uintptr_t>(actual_ft_ptr)};
+                            if(actual_addr >= type_begin_addr && actual_addr < type_end_addr)
+                            {
+                                auto const diff{static_cast<::std::size_t>(actual_addr - type_begin_addr)};
+                                if(diff % kFTSize == 0uz)
+                                {
+                                    auto const actual_index{diff / kFTSize};
+                                    match = (canon.index_unchecked(actual_index) == expected_canon);
+                                }
+                            }
+                        }
+
+                        if(!match)
+                        {
+                            auto const expected_sig{sig_from_ft(expected_ft_ptr)};
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
+                            {
+                                trap_fatal(trap_kind::call_indirect_type_mismatch);
+                            }
+                        }
                     }
 
                     auto const base{module.imported_function_vec_storage.data()};
@@ -1827,7 +2569,19 @@ namespace uwvm2::runtime::uwvm_int
                     if(idx >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const& tgt{cache.index_unchecked(idx)};
 
-                    auto& call_stack{get_call_stack()};
+                    // Update inline cache.
+                    {
+                        auto& ic{call_stack.call_indirect_cache[cache_index]};
+                        ic.table = table;
+                        ic.elems_data = table->elems.data();
+                        ic.selector = selector_u32;
+                        ic.expected_ft_ptr = expected_ft_ptr;
+                        ic.elem_type = elem.type;
+                        ic.target_ptr = static_cast<void const*>(imp_ptr);
+                        ic.defined_info = nullptr;
+                        ic.imported_tgt = ::std::addressof(tgt);
+                    }
+
                     call_stack_guard g{call_stack, tgt.frame.module_id, tgt.frame.function_index};
                     switch(tgt.k)
                     {
@@ -1849,7 +2603,7 @@ namespace uwvm2::runtime::uwvm_int
                         case cached_import_target::kind::dl:
                         case cached_import_target::kind::weak_symbol:
                         {
-                            invoke_capi(tgt.u.capi_ptr, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
                             return;
                         }
                         [[unlikely]] default:
@@ -1979,6 +2733,8 @@ namespace uwvm2::runtime::uwvm_int
                 }
 #endif
 
+                rec.type_canon_index = build_type_canon_index(*rec.runtime_module);
+
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
                 if(local_n != rec.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -2086,6 +2842,7 @@ namespace uwvm2::runtime::uwvm_int
                         {
                             tgt.k = cached_import_target::kind::dl;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
                             tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
                             tgt.param_bytes = total_abi_bytes(tgt.sig.params);
                             tgt.result_bytes = total_abi_bytes(tgt.sig.results);
@@ -2099,6 +2856,7 @@ namespace uwvm2::runtime::uwvm_int
                         {
                             tgt.k = cached_import_target::kind::weak_symbol;
                             tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
                             tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
                             tgt.param_bytes = total_abi_bytes(tgt.sig.params);
                             tgt.result_bytes = total_abi_bytes(tgt.sig.results);
@@ -2285,7 +3043,75 @@ namespace uwvm2::runtime::uwvm_int
         // possible thread-id reuse issues. Do NOT `clear()` here: main-thread exit does not imply other threads exit.
         erase_current_thread_state();
     }
+
+    [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_host_api() noexcept
+    {
+        return preload_memory_descriptor_count_impl();
+    }
+
+    [[nodiscard]] inline bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
+    {
+        return preload_memory_descriptor_at_impl(descriptor_index, out);
+    }
+
+    [[nodiscard]] inline bool preload_memory_read_host_api(::std::size_t memory_index,
+                                                           ::std::uint_least64_t offset,
+                                                           void* destination,
+                                                           ::std::size_t size) noexcept
+    {
+        return preload_memory_read_impl(memory_index, offset, destination, size);
+    }
+
+    [[nodiscard]] inline bool preload_memory_write_host_api(::std::size_t memory_index,
+                                                            ::std::uint_least64_t offset,
+                                                            void const* source,
+                                                            ::std::size_t size) noexcept
+    {
+        return preload_memory_write_impl(memory_index, offset, source, size);
+    }
 }  // namespace uwvm2::runtime::uwvm_int
+
+namespace uwvm2::uwvm::wasm::type
+{
+    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_count_host_api();
+    }
+
+    extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_at_host_api(descriptor_index, out);
+    }
+
+    extern "C" bool uwvm_preload_memory_read(::std::size_t memory_index,
+                                              ::std::uint_least64_t offset,
+                                              void* destination,
+                                              ::std::size_t size) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_read_host_api(memory_index, offset, destination, size);
+    }
+
+    extern "C" bool uwvm_preload_memory_write(::std::size_t memory_index,
+                                               ::std::uint_least64_t offset,
+                                               void const* source,
+                                               ::std::size_t size) noexcept
+    {
+        return ::uwvm2::runtime::uwvm_int::preload_memory_write_host_api(memory_index, offset, source, size);
+    }
+
+    extern "C" uwvm_preload_host_api_v1 const* uwvm_get_preload_host_api_v1() noexcept
+    {
+        static uwvm_preload_host_api_v1 const preload_host_api_v1{
+            .struct_size = sizeof(uwvm_preload_host_api_v1),
+            .abi_version = preload_host_api_v1_abi_version,
+            .memory_descriptor_count = uwvm_preload_memory_descriptor_count,
+            .memory_descriptor_at = uwvm_preload_memory_descriptor_at,
+            .memory_read = uwvm_preload_memory_read,
+            .memory_write = uwvm_preload_memory_write};
+
+        return ::std::addressof(preload_host_api_v1);
+    }
+}
 
 #ifndef UWVM_MODULE
 // macro

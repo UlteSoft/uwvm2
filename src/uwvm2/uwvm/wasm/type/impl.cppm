@@ -27,6 +27,8 @@ export import :cwrapper;
 export import :para;
 export import :file;
 export import :local_imported;
+export import :preload_module_attribute;
+export import :preload_api;
 export import :dl;
 export import :weak_symbol;
 export import :all_module;

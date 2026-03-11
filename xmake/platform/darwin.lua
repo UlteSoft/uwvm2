@@ -1,11 +1,15 @@
 
 function darwin_target()
 
-    local use_llvm_toolchain = get_config("use-llvm")
-    if use_llvm_toolchain then	
-        set_toolchains("clang")
-        add_ldflags("-fuse-ld=lld", {force = true})
-    end
+	local use_llvm_toolchain = get_config("use-llvm")
+	if use_llvm_toolchain then	
+	    -- On macOS, xmake's `clang` toolchain typically resolves to Apple clang in `/usr/bin/clang`,
+	    -- which can be incompatible with our custom SYSROOT/toolchain (and may crash while compiling).
+	    -- Use xmake's `llvm` toolchain instead so it can pick up the standalone LLVM toolchain
+	    -- from PATH/`llvm-config`.
+	    set_toolchains("clang")
+	    add_ldflags("-fuse-ld=lld", {force = true})
+	end
 
     local sysroot_para = get_config("sysroot")
     if sysroot_para ~= "detect" and sysroot_para then

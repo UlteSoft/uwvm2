@@ -30,5 +30,6 @@
 # include "local_imported.h"
 # include "preloaded_dl.h"
 # include "weak_symbol.h"
+# include "preload_module_attribute.h"
 # include "all_module.h"
 #endif

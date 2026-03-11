@@ -1320,7 +1320,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             #endif
 
             #if defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_HEAVY)
-            ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Heay\n");
+            ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Heavy\n");
             #elif defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
             ::fast_io::io::perr(u8log_output_ul, u8"    - Local Delay: Soft\n");
             #else

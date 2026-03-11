@@ -35,6 +35,7 @@
 # include "wasm_set_main_module_name.h"
 # include "wasm_preload_library.h"
 # include "wasm_register_dl.h"
+# include "wasm_set_preload_module_attribute.h"
 # include "wasm_depend_recursion_limit.h"
 # include "wasm_set_parser_limit.h"
 # include "wasm_set_initializer_limit.h"

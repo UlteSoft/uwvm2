@@ -39,6 +39,7 @@ import uwvm2.uwvm.wasm.feature;
 import :para;
 import :cwrapper;
 import :dl;
+import :preload_module_attribute;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

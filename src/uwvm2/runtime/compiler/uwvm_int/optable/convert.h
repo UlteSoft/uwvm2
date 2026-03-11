@@ -186,6 +186,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::fast_io::fast_terminate();
         }
 
+        /// @brief Trap helper used by float-to-int truncation when the conversion overflows the destination integer range.
+        /// @details This is the implementation for Wasm's "integer overflow" trap (distinct from NaN invalid conversion).
+        /// @note There's no need for `noreturn`; let the calling function handle it.
+        /// @note `trap_integer_overflow_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a
+        ///       safe fallback.
+        UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_integer_overflow() noexcept
+        {
+            if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+
+                ::fast_io::fast_terminate();
+            }
+
+            ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func();
+
+            // Unreachable must not continue execution. If the embedding callback returns, terminate as a safety net.
+            ::fast_io::fast_terminate();
+        }
+
         // Why this wrapper exists:
         // - In the threaded interpreter, opfuncs aim to keep the hot path leaf and dispatch via `br` without building frames.
         // - A direct trap call typically compiles to `bl ...` and may force a frame setup on AArch64 even though the trap path is cold.
@@ -194,6 +216,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void trap_invalid_conversion_to_integer_tail(Type... /*type*/) UWVM_THROWS
         { trap_invalid_conversion_to_integer(); }
+
+        template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void trap_integer_overflow_tail(Type... /*type*/) UWVM_THROWS
+        { trap_integer_overflow(); }
 
         /// @brief Reinterprets a Wasm i32 value as unsigned bits.
         /// @details This preserves the original bit pattern (two's-complement) via `bit_cast`.
@@ -244,7 +271,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             // Avoid UB even if the trap handler returns.
-            trap_invalid_conversion_to_integer();
+            if(x != x) [[unlikely]] { trap_invalid_conversion_to_integer(); }  // NaN
+            trap_integer_overflow();
             return IntOut{};
         }
 
@@ -259,7 +287,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             }
 
             // Avoid UB even if the trap handler returns.
-            trap_invalid_conversion_to_integer();
+            if(x != x) [[unlikely]] { trap_invalid_conversion_to_integer(); }  // NaN
+            trap_integer_overflow();
             return UIntOut{};
         }
 
@@ -838,7 +867,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i32_t const out32{static_cast<out_i32_t>(v)};
@@ -871,7 +901,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i32_t const out32{static_cast<out_i32_t>(v)};
@@ -929,7 +960,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
             if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u32_t const u32{static_cast<out_u32_t>(v)};
@@ -962,7 +994,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u32_t const u32{static_cast<out_u32_t>(v)};
@@ -1021,7 +1054,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i32_t const out32{static_cast<out_i32_t>(v)};
@@ -1054,7 +1088,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i32_t const out32{static_cast<out_i32_t>(v)};
@@ -1112,7 +1147,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u32_t const u32{static_cast<out_u32_t>(v)};
@@ -1145,7 +1181,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u32_t const u32{static_cast<out_u32_t>(v)};
@@ -1206,7 +1243,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i64_t const out64{static_cast<out_i64_t>(v)};
@@ -1239,7 +1277,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i64_t const out64{static_cast<out_i64_t>(v)};
@@ -1297,7 +1336,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f32, curr_f32_stack_top>(type...)};
             if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u64_t const u64{static_cast<out_u64_t>(v)};
@@ -1330,7 +1370,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f32 const v{get_curr_val_from_operand_stack_cache<wasm_f32>(type...)};
             if(!(v >= static_cast<wasm_f32>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u64_t const u64{static_cast<out_u64_t>(v)};
@@ -1389,7 +1430,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i64_t const out64{static_cast<out_i64_t>(v)};
@@ -1422,7 +1464,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             if(!(v >= min_v && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_i64_t const out64{static_cast<out_i64_t>(v)};
@@ -1480,7 +1523,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_top<CompileOption, wasm_f64, curr_f64_stack_top>(type...)};
             if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u64_t const u64{static_cast<out_u64_t>(v)};
@@ -1513,7 +1557,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             wasm_f64 const v{get_curr_val_from_operand_stack_cache<wasm_f64>(type...)};
             if(!(v >= static_cast<wasm_f64>(0) && v < max_plus_one)) [[unlikely]]
             {
-                UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...);
+                if(v != v) [[unlikely]] { UWVM_MUSTTAIL return details::trap_invalid_conversion_to_integer_tail<CompileOption>(type...); }
+                UWVM_MUSTTAIL return details::trap_integer_overflow_tail<CompileOption>(type...);
             }
 
             out_u64_t const u64{static_cast<out_u64_t>(v)};

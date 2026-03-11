@@ -388,7 +388,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 make_v128_slot_low_from_scalar(Scalar v) noexcept
         {
             using wasm_v128 = ::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128;
+            using wasm_f32 [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+            using wasm_f64 [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
             static_assert(sizeof(Scalar) <= sizeof(wasm_v128));
+
+#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+# if UWVM_HAS_BUILTIN(__builtin_shufflevector)
+            if constexpr(::std::endian::native != ::std::endian::big)
+            {
+                if constexpr(::std::same_as<Scalar, wasm_f32>)
+                {
+                    details::float32x4_t const vv{v, v, v, v};
+                    constexpr details::float32x4_t zero{};
+                    details::float32x4_t const out{__builtin_shufflevector(vv, zero, 0, 5, 6, 7)};
+                    return ::std::bit_cast<wasm_v128>(out);
+                }
+                else if constexpr(::std::same_as<Scalar, wasm_f64>)
+                {
+                    details::float64x2_t const vv{v, v};
+                    constexpr details::float64x2_t zero{};
+                    details::float64x2_t const out{__builtin_shufflevector(vv, zero, 0, 3)};
+                    return ::std::bit_cast<wasm_v128>(out);
+                }
+            }
+# endif
+#endif
 
             wasm_v128 out{};  // zero
             if constexpr(::std::endian::native == ::std::endian::big)

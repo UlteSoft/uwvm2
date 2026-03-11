@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -37,6 +37,7 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include "para.h"
 # include "cwrapper.h"
+# include "preload_module_attribute.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -78,28 +79,74 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         using capi_wasm_function = void (*)(::std::byte* res, ::std::byte* para);
 
         /*
-            capi_wasm_function example: (must use packed or aligned(1))
+            `capi_wasm_function` ABI and preload-DL authoring example:
+            the parameter/result structs must use `packed` or `aligned(1)`.
 
-            ```c
-            typedef struct __attribute__((packed)) para_d
+            ```cpp
+            #include <cstddef>
+            #include <cstdint>
+            #include "dl.h"
+            #include "preload_api.h"
+
+            using namespace uwvm2::uwvm::wasm::type;
+
+            struct __attribute__((packed)) add_para
             {
-                uint_least32_t p0;
-                uint_least64_t p1;
-                _Float32 p2;
-                _Float32 p3;
-            } para;
+                ::std::uint_least32_t lhs;
+                ::std::uint_least32_t rhs;
+            };
 
-            typedef struct __attribute__((packed)) res_d
+            struct __attribute__((packed)) add_res
             {
-                uint_least32_t p0;
-                uint_least32_t p1;
-            } res;
+                ::std::uint_least32_t value;
+            };
 
-            void test(res* r, para* p)
+            static uwvm_preload_host_api_v1 const* g_preload_host_api{};
+            static char const module_name[] = "demo";
+            static char const function_name[] = "add_i32";
+            static ::std::uint_least8_t const para_types[] = {WASM_VALTYPE_I32, WASM_VALTYPE_I32};
+            static ::std::uint_least8_t const res_types[] = {WASM_VALTYPE_I32};
+
+            extern "C" void uwvm_set_preload_host_api_v1(uwvm_preload_host_api_v1 const* api) noexcept
             {
+                g_preload_host_api = api;
+            }
 
+            extern "C" capi_module_name_t uwvm_get_module_name() noexcept
+            {
+                return capi_module_name_t{module_name, sizeof(module_name) - 1u};
+            }
+
+            extern "C" void add_i32(add_res* result, add_para const* para) noexcept
+            {
+                result->value = para->lhs + para->rhs;
+            }
+
+            extern "C" capi_function_vec_t uwvm_function() noexcept
+            {
+                static capi_function_t const functions[] = {
+                    {function_name,
+                     sizeof(function_name) - 1u,
+                     para_types,
+                     sizeof(para_types) / sizeof(para_types[0]),
+                     res_types,
+                     sizeof(res_types) / sizeof(res_types[0]),
+                     reinterpret_cast<capi_wasm_function>(&add_i32)},
+                };
+                return capi_function_vec_t{functions, sizeof(functions) / sizeof(functions[0])};
             }
             ```
+
+            Recommended plugin authoring workflow:
+            - export `uwvm_get_module_name()`;
+            - export `uwvm_function()`;
+            - export `uwvm_get_custom_handler()` only when you actually provide custom sections;
+            - export `uwvm_set_preload_host_api_v1()` when the plugin wants the stable host API;
+            - keep wasm-facing ABI structs trivial, packed, and byte-layout stable;
+            - route all memory interaction through the delivery-state contract documented in `preload_api.h`.
+
+            If memory access is required, prefer the stable preload host API from `preload_api.h`
+            instead of relying on internal hooks or runtime-private layouts.
         */
 
         struct capi_function_t
@@ -151,6 +198,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         wasm_dl_storage_t wasm_dl_storage{};
         // wasm_parameter_t
         ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
+        // preload memory attribute
+        ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t preload_module_memory_attribute{};
     };
 #endif
 }  // namespace uwvm2::uwvm::wasm::storage

@@ -83,7 +83,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         sum8_xor_const_i32,
         xor_const_i32,
         mul_const_i32,
-        rotr_add_const_i32
+        rotr_add_const_i32,
+        xorshift32_i32
     };
 
     struct compiled_defined_call_info
@@ -134,7 +135,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     namespace details
     {
-#if defined(__ARM_NEON) & UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
 # if defined(__clang__)
         using float64x1_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
         using float64x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
@@ -158,7 +159,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
             get_f32_low_from_f64_slot(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 v) noexcept
         {
-#if defined(__ARM_NEON) & UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
 # if UWVM_HAS_BUILTIN(__builtin_neon_vget_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float32x2_t s2{::std::bit_cast<float32x2_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)
@@ -192,7 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
             get_f32_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
         {
-#if defined(__ARM_NEON) & UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
 # if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float32x4_t s4{::std::bit_cast<float32x4_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)
@@ -237,7 +238,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64
             get_f64_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
         {
-#if defined(__ARM_NEON) & UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
 # if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f64) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float64x2_t d2{::std::bit_cast<float64x2_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)

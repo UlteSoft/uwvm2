@@ -42,7 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 {
-    extern "C" using imported_c_handlefunc_ptr_t =
+    using imported_c_handlefunc_ptr_t =
         void (*)(::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte const*, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte const*);
 }
 
