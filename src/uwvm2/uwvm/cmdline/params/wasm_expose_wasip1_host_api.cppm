@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
+ * @date        2026-03-12
  * @copyright   APL-2.0 License
  */
 
@@ -22,17 +22,20 @@
 
 module;
 
-export module uwvm2.uwvm.wasm.type;
-export import :cwrapper;
-export import :para;
-export import :file;
-export import :local_imported;
-export import :preload_module_attribute;
-export import :preload_api;
-export import :wasip1_api;
-export import :dl;
-export import :weak_symbol;
-export import :all_module;
+// std
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+#endif
+
+export module uwvm2.uwvm.cmdline.params:wasm_expose_wasip1_host_api;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.cmdline;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -41,4 +44,4 @@ export import :all_module;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "wasm_expose_wasip1_host_api.h"

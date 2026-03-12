@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-04-05
  * @copyright   APL-2.0 License
  */
 
@@ -20,25 +19,10 @@
  *                                      *
  ****************************************/
 
-module;
+import uwvm2.imported.wasi.wasip1;
+import uwvm2.runtime;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
+import uwvm2.uwvm.wasm.storage;
+import uwvm2.uwvm.wasm.type;
 
-export module uwvm2.uwvm.wasm.type;
-export import :cwrapper;
-export import :para;
-export import :file;
-export import :local_imported;
-export import :preload_module_attribute;
-export import :preload_api;
-export import :wasip1_api;
-export import :dl;
-export import :weak_symbol;
-export import :all_module;
-
-#ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
-#endif
-
-#include "impl.h"
+#include "host_api.default.cpp"

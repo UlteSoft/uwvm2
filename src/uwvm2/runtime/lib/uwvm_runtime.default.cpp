@@ -166,17 +166,11 @@ namespace uwvm2::runtime::uwvm_int
             static_assert((kCallIndirectCacheEntries & (kCallIndirectCacheEntries - 1uz)) == 0uz, "cache size must be power-of-two.");
             ::uwvm2::utils::container::array<call_indirect_cache_entry, kCallIndirectCacheEntries> call_indirect_cache{};
 
-            inline call_stack_tls_state() noexcept
-            {
-                frames.reserve(kCallStackMaxDepth);
-            }
+            inline call_stack_tls_state() noexcept { frames.reserve(kCallStackMaxDepth); }
 
             inline void push(call_stack_frame fr) noexcept
             {
-                if(frames.size() < frames.capacity()) [[likely]]
-                {
-                    frames.push_back_unchecked(fr);
-                }
+                if(frames.size() < frames.capacity()) [[likely]] { frames.push_back_unchecked(fr); }
                 else
                 {
                     frames.push_back(fr);
@@ -217,6 +211,7 @@ namespace uwvm2::runtime::uwvm_int
         inline thread_local preload_call_context_t g_preload_call_context{};  // [global] [thread_local]
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return g_call_stack; }
+
         [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return g_preload_call_context; }
 
         inline void erase_current_thread_state() noexcept {}
@@ -273,10 +268,8 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] UWVM_ALWAYS_INLINE inline call_stack_tls_state& get_call_stack() noexcept { return get_thread_state().call_stack; }
-        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept
-        {
-            return get_thread_state().preload_call_context;
-        }
+
+        [[nodiscard]] UWVM_ALWAYS_INLINE inline preload_call_context_t& get_preload_call_context() noexcept { return get_thread_state().preload_call_context; }
 
         inline void erase_current_thread_state() noexcept { g_thread_states.erase(current_thread_id()); }
 #endif
@@ -286,14 +279,11 @@ namespace uwvm2::runtime::uwvm_int
             preload_call_context_t* ctx{};
             preload_call_context_t saved{};
 
-            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute) noexcept : ctx{::std::addressof(get_preload_call_context())},
-                                                                                                                     saved{*ctx}
+            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute) noexcept :
+                ctx{::std::addressof(get_preload_call_context())}, saved{*ctx}
             {
                 auto& call_stack{get_call_stack()};
-                if(!call_stack.frames.empty()) [[likely]]
-                {
-                    ctx->module_id = call_stack.frames.back().module_id;
-                }
+                if(!call_stack.frames.empty()) [[likely]] { ctx->module_id = call_stack.frames.back().module_id; }
                 else
                 {
                     ctx->module_id = preload_call_context_t::invalid_module_id;
@@ -784,9 +774,7 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] inline preload_module_memory_attribute_t const* find_preload_module_memory_attribute(capi_function_t const* f) noexcept
-        {
-            return ::uwvm2::uwvm::wasm::storage::find_loaded_preload_module_memory_attribute(f);
-        }
+        { return ::uwvm2::uwvm::wasm::storage::find_loaded_preload_module_memory_attribute(f); }
 
         struct resolved_func
         {
@@ -1046,12 +1034,9 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] inline preload_module_memory_attribute_t const* get_active_preload_memory_attribute() noexcept
-        {
-            return get_preload_call_context().preload_module_memory_attribute;
-        }
+        { return get_preload_call_context().preload_module_memory_attribute; }
 
-        [[nodiscard]] inline bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute,
-                                                                     ::std::size_t memory_index) noexcept
+        [[nodiscard]] inline bool preload_memory_index_is_selected(preload_module_memory_attribute_t const* attribute, ::std::size_t memory_index) noexcept
         {
             if(attribute == nullptr) [[unlikely]] { return false; }
             if(attribute->apply_to_all_memories) [[likely]] { return true; }
@@ -1066,7 +1051,7 @@ namespace uwvm2::runtime::uwvm_int
         };
 
         [[nodiscard]] inline constexpr preload_memory_rights_t requested_preload_memory_rights(preload_module_memory_attribute_t const* attribute,
-                                                                                                ::std::size_t memory_index) noexcept
+                                                                                               ::std::size_t memory_index) noexcept
         {
             using access_mode = ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t;
 
@@ -1117,9 +1102,8 @@ namespace uwvm2::runtime::uwvm_int
             unsigned delivery_state{::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none};
         };
 
-        [[nodiscard]] inline constexpr bool compute_preload_byte_length(::std::uint_least64_t page_count,
-                                                                        ::std::uint_least64_t page_size_bytes,
-                                                                        ::std::uint_least64_t& byte_length) noexcept
+        [[nodiscard]] inline constexpr bool
+            compute_preload_byte_length(::std::uint_least64_t page_count, ::std::uint_least64_t page_size_bytes, ::std::uint_least64_t& byte_length) noexcept
         {
             if(page_size_bytes != 0u && page_count > (::std::numeric_limits<::std::uint_least64_t>::max() / page_size_bytes)) [[unlikely]] { return false; }
             byte_length = page_count * page_size_bytes;
@@ -1210,9 +1194,8 @@ namespace uwvm2::runtime::uwvm_int
             return true;
         }
 
-        [[nodiscard]] inline bool resolve_preload_memory(runtime_module_storage_t const& rt,
-                                                         ::std::size_t memory_index,
-                                                         resolved_preload_memory_t& resolved) noexcept
+        [[nodiscard]] inline bool
+            resolve_preload_memory(runtime_module_storage_t const& rt, ::std::size_t memory_index, resolved_preload_memory_t& resolved) noexcept
         {
             using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
             using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
@@ -1242,9 +1225,7 @@ namespace uwvm2::runtime::uwvm_int
                         }
                         case memory_link_kind::local_imported:
                         {
-                            return resolve_local_imported_preload_memory(curr->target.local_imported.module_ptr,
-                                                                         curr->target.local_imported.index,
-                                                                         resolved);
+                            return resolve_local_imported_preload_memory(curr->target.local_imported.module_ptr, curr->target.local_imported.index, resolved);
                         }
                         case memory_link_kind::unresolved: [[fallthrough]];
                         default:
@@ -1263,7 +1244,7 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] inline constexpr preload_memory_delivery_t determine_preload_memory_delivery(preload_memory_rights_t rights,
-                                                                                                    resolved_preload_memory_t const& resolved) noexcept
+                                                                                                   resolved_preload_memory_t const& resolved) noexcept
         {
             if(!rights.allow_access) [[unlikely]] { return {}; }
 
@@ -1275,10 +1256,8 @@ namespace uwvm2::runtime::uwvm_int
             return {::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy};
         }
 
-        [[nodiscard]] inline constexpr bool validate_preload_copy_range(::std::uint_least64_t byte_length,
-                                                                        ::std::uint_least64_t offset,
-                                                                        ::std::size_t size,
-                                                                        ::std::size_t& offset_out) noexcept
+        [[nodiscard]] inline constexpr bool
+            validate_preload_copy_range(::std::uint_least64_t byte_length, ::std::uint_least64_t offset, ::std::size_t size, ::std::size_t& offset_out) noexcept
         {
             if(byte_length > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
             if(offset > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return false; }
@@ -1296,10 +1275,7 @@ namespace uwvm2::runtime::uwvm_int
         [[nodiscard]] inline bool with_native_preload_copy_access(native_memory_t const& memory, Fn&& fn) noexcept
         {
             static_cast<void>(memory);
-            if constexpr(native_memory_t::can_mmap)
-            {
-                return static_cast<bool>(fn());
-            }
+            if constexpr(native_memory_t::can_mmap) { return static_cast<bool>(fn()); }
             else if constexpr(native_memory_t::support_multi_thread)
             {
 #if !defined(UWVM_SUPPORT_MMAP) && defined(UWVM_USE_MULTITHREAD_ALLOCATOR) && (__cpp_lib_atomic_wait >= 201907L)
@@ -1316,9 +1292,7 @@ namespace uwvm2::runtime::uwvm_int
         }
 
         [[nodiscard]] inline constexpr ::std::size_t active_preload_total_memory_count(runtime_module_storage_t const& rt) noexcept
-        {
-            return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size();
-        }
+        { return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size(); }
 
         [[nodiscard]] inline bool try_build_preload_memory_descriptor(::std::size_t memory_index,
                                                                       preload_memory_descriptor_t* out,
@@ -1347,10 +1321,11 @@ namespace uwvm2::runtime::uwvm_int
                     .page_size_bytes = resolved.page_size_bytes,
                     .byte_length = resolved.byte_length,
                     .partial_protection_limit_bytes = resolved.partial_protection_limit_bytes,
-                    .mmap_view_begin = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy ? nullptr : resolved.memory_begin,
+                    .mmap_view_begin =
+                        delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_copy ? nullptr : resolved.memory_begin,
                     .dynamic_length_atomic_object = delivery.delivery_state == ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_mmap_dynamic_bounds
-                                                      ? resolved.dynamic_length_atomic_object
-                                                      : nullptr};
+                                                        ? resolved.dynamic_length_atomic_object
+                                                        : nullptr};
             }
 
             if(resolved_out != nullptr) [[likely]] { *resolved_out = resolved; }
@@ -1365,15 +1340,11 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const total{active_preload_total_memory_count(*rt)};
             ::std::size_t count{};
-            for(::std::size_t i{}; i != total; ++i)
-            {
-                count += static_cast<::std::size_t>(try_build_preload_memory_descriptor(i, nullptr, nullptr, nullptr));
-            }
+            for(::std::size_t i{}; i != total; ++i) { count += static_cast<::std::size_t>(try_build_preload_memory_descriptor(i, nullptr, nullptr, nullptr)); }
             return count;
         }
 
-        [[nodiscard]] inline bool preload_memory_descriptor_at_impl(::std::size_t descriptor_index,
-                                                                    preload_memory_descriptor_t* out) noexcept
+        [[nodiscard]] inline bool preload_memory_descriptor_at_impl(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
         {
             if(out == nullptr) [[unlikely]] { return false; }
 
@@ -1397,10 +1368,8 @@ namespace uwvm2::runtime::uwvm_int
             return false;
         }
 
-        [[nodiscard]] inline bool preload_memory_read_impl(::std::size_t memory_index,
-                                                           ::std::uint_least64_t offset,
-                                                           void* destination,
-                                                           ::std::size_t size) noexcept
+        [[nodiscard]] inline bool
+            preload_memory_read_impl(::std::size_t memory_index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
         {
             if(size != 0uz && destination == nullptr) [[unlikely]] { return false; }
 
@@ -1436,10 +1405,8 @@ namespace uwvm2::runtime::uwvm_int
             }
         }
 
-        [[nodiscard]] inline bool preload_memory_write_impl(::std::size_t memory_index,
-                                                            ::std::uint_least64_t offset,
-                                                            void const* source,
-                                                            ::std::size_t size) noexcept
+        [[nodiscard]] inline bool
+            preload_memory_write_impl(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
         {
             if(size != 0uz && source == nullptr) [[unlikely]] { return false; }
 
@@ -1715,8 +1682,7 @@ namespace uwvm2::runtime::uwvm_int
             return reinterpret_cast<::std::byte*>((v + (a - 1uz)) & ~(a - 1uz));
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::container::vector<::std::size_t>
-            build_type_canon_index(runtime_module_storage_t const& module) noexcept
+        [[nodiscard]] inline ::uwvm2::utils::container::vector<::std::size_t> build_type_canon_index(runtime_module_storage_t const& module) noexcept
         {
             using ft_t = ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t;
 
@@ -2040,10 +2006,7 @@ namespace uwvm2::runtime::uwvm_int
 
             ::std::byte* operand_base{};
             ::std::byte operand_dummy{};
-            if(stack_cap_raw == 0uz) [[unlikely]]
-            {
-                operand_base = ::std::addressof(operand_dummy);
-            }
+            if(stack_cap_raw == 0uz) [[unlikely]] { operand_base = ::std::addressof(operand_dummy); }
             else
             {
                 operand_base = align_ptr_up(frame_alloc + local_alloc_n, kFrameAlign);
@@ -2318,14 +2281,14 @@ namespace uwvm2::runtime::uwvm_int
                     }
                     case cached_import_target::kind::dl:
                     {
-                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                            return;
-                        }
-                        case cached_import_target::kind::weak_symbol:
-                        {
-                            invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
-                            return;
-                        }
+                        invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        return;
+                    }
+                    case cached_import_target::kind::weak_symbol:
+                    {
+                        invoke_capi(tgt.u.capi_ptr, tgt.preload_module_memory_attribute, tgt.param_bytes, tgt.result_bytes, stack_top_ptr);
+                        return;
+                    }
                     [[unlikely]] default:
                     {
                         ::fast_io::fast_terminate();
@@ -2485,10 +2448,7 @@ namespace uwvm2::runtime::uwvm_int
                         if(!match)
                         {
                             auto const expected_sig{sig_from_ft(expected_ft_ptr)};
-                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
-                            {
-                                trap_fatal(trap_kind::call_indirect_type_mismatch);
-                            }
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
                         }
                     }
 
@@ -2552,10 +2512,7 @@ namespace uwvm2::runtime::uwvm_int
                         if(!match)
                         {
                             auto const expected_sig{sig_from_ft(expected_ft_ptr)};
-                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]]
-                            {
-                                trap_fatal(trap_kind::call_indirect_type_mismatch);
-                            }
+                            if(!func_sig_equal(expected_sig, sig_from_ft(actual_ft_ptr))) [[unlikely]] { trap_fatal(trap_kind::call_indirect_type_mismatch); }
                         }
                     }
 
@@ -3044,74 +3001,18 @@ namespace uwvm2::runtime::uwvm_int
         erase_current_thread_state();
     }
 
-    [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_host_api() noexcept
-    {
-        return preload_memory_descriptor_count_impl();
-    }
+    [[nodiscard]] ::std::size_t preload_memory_descriptor_count_host_api() noexcept { return preload_memory_descriptor_count_impl(); }
 
-    [[nodiscard]] inline bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
-    {
-        return preload_memory_descriptor_at_impl(descriptor_index, out);
-    }
+    [[nodiscard]] bool preload_memory_descriptor_at_host_api(::std::size_t descriptor_index, preload_memory_descriptor_t* out) noexcept
+    { return preload_memory_descriptor_at_impl(descriptor_index, out); }
 
-    [[nodiscard]] inline bool preload_memory_read_host_api(::std::size_t memory_index,
-                                                           ::std::uint_least64_t offset,
-                                                           void* destination,
-                                                           ::std::size_t size) noexcept
-    {
-        return preload_memory_read_impl(memory_index, offset, destination, size);
-    }
+    [[nodiscard]] bool preload_memory_read_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
+    { return preload_memory_read_impl(memory_index, offset, destination, size); }
 
-    [[nodiscard]] inline bool preload_memory_write_host_api(::std::size_t memory_index,
-                                                            ::std::uint_least64_t offset,
-                                                            void const* source,
-                                                            ::std::size_t size) noexcept
-    {
-        return preload_memory_write_impl(memory_index, offset, source, size);
-    }
+    [[nodiscard]] bool preload_memory_write_host_api(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
+    { return preload_memory_write_impl(memory_index, offset, source, size); }
+
 }  // namespace uwvm2::runtime::uwvm_int
-
-namespace uwvm2::uwvm::wasm::type
-{
-    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept
-    {
-        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_count_host_api();
-    }
-
-    extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
-    {
-        return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_at_host_api(descriptor_index, out);
-    }
-
-    extern "C" bool uwvm_preload_memory_read(::std::size_t memory_index,
-                                              ::std::uint_least64_t offset,
-                                              void* destination,
-                                              ::std::size_t size) noexcept
-    {
-        return ::uwvm2::runtime::uwvm_int::preload_memory_read_host_api(memory_index, offset, destination, size);
-    }
-
-    extern "C" bool uwvm_preload_memory_write(::std::size_t memory_index,
-                                               ::std::uint_least64_t offset,
-                                               void const* source,
-                                               ::std::size_t size) noexcept
-    {
-        return ::uwvm2::runtime::uwvm_int::preload_memory_write_host_api(memory_index, offset, source, size);
-    }
-
-    extern "C" uwvm_preload_host_api_v1 const* uwvm_get_preload_host_api_v1() noexcept
-    {
-        static uwvm_preload_host_api_v1 const preload_host_api_v1{
-            .struct_size = sizeof(uwvm_preload_host_api_v1),
-            .abi_version = preload_host_api_v1_abi_version,
-            .memory_descriptor_count = uwvm_preload_memory_descriptor_count,
-            .memory_descriptor_at = uwvm_preload_memory_descriptor_at,
-            .memory_read = uwvm_preload_memory_read,
-            .memory_write = uwvm_preload_memory_write};
-
-        return ::std::addressof(preload_host_api_v1);
-    }
-}
 
 #ifndef UWVM_MODULE
 // macro

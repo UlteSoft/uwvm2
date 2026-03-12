@@ -64,6 +64,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_register_dl),
 #endif
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_expose_wasip1_host_api),
+# endif
+#endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_preload_module_attribute),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_initializer_limit),
@@ -101,6 +106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 # if defined(UWVM_IMPORT_WASI_WASIP1)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_fd_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_mount_dir),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_set_argv0),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_noinherit_system_environment),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_delete_system_environment),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_add_environment),

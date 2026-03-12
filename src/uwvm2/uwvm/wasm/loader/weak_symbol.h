@@ -65,6 +65,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         parse_error
     };
 
+    inline constexpr void apply_preload_host_api_to_loaded_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws) noexcept
+    {
+        if(wws.set_preload_host_api_v1 != nullptr)
+        {
+            auto const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
+            if(preload_host_api_v1 != nullptr) { wws.set_preload_host_api_v1(preload_host_api_v1); }
+        }
+    }
+
+    inline constexpr void apply_wasip1_host_api_to_loaded_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws) noexcept
+    {
+        if(wws.set_wasip1_host_api_v1 != nullptr) { wws.set_wasip1_host_api_v1(::uwvm2::uwvm::wasm::type::uwvm_get_wasip1_host_api_v1()); }
+    }
+
+    inline constexpr void refresh_loaded_weak_symbol_wasip1_host_api() noexcept
+    {
+        for(auto& curr_weak: ::uwvm2::uwvm::wasm::storage::weak_symbol) { apply_wasip1_host_api_to_loaded_weak_symbol(curr_weak); }
+    }
+
     inline constexpr load_wws_rtl load_weak_symbol(::uwvm2::uwvm::wasm::type::wasm_weak_symbol_t & wws,
                                                    ::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t const& ws_module,
                                                    ::uwvm2::uwvm::wasm::type::wasm_parameter_t para) noexcept
@@ -93,6 +112,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 
         wws.wasm_parameter = para;
+        wws.set_preload_host_api_v1 = ws_module.set_preload_host_api_v1;
+        wws.set_wasip1_host_api_v1 = ws_module.set_wasip1_host_api_v1;
 
         // verbose
         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -902,6 +923,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 
         wws.preload_module_memory_attribute = ::uwvm2::uwvm::wasm::storage::resolve_preload_module_memory_attribute(wws.module_name);
+
+        apply_preload_host_api_to_loaded_weak_symbol(wws);
+        apply_wasip1_host_api_to_loaded_weak_symbol(wws);
 
         return load_wws_rtl::ok;
     }

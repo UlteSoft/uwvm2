@@ -39,6 +39,8 @@
 # include "cwrapper.h"
 # include "dl.h"
 # include "preload_module_attribute.h"
+# include "preload_api.h"
+# include "wasip1_api.h"
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -59,6 +61,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::uwvm2::uwvm::wasm::type::wasm_parameter_t wasm_parameter{};
         // preload memory attribute
         ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t preload_module_memory_attribute{};
+        // optional host api setters (same treatment as preload DL)
+        ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1{};
+        ::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1{};
     };
 
     // Conversion from CAPI
@@ -68,6 +73,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         ::std::size_t module_name_length;
         ::uwvm2::uwvm::wasm::type::capi_custom_handler_vec_t custom_handler_vec;
         ::uwvm2::uwvm::wasm::type::capi_function_vec_t function_vec;
+        ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1;
+        ::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1;
     };
 }  // namespace uwvm2::uwvm::wasm::type
 

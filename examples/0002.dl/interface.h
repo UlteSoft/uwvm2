@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-03-08
+ * @date        2026-03-12
  * @copyright   APL-2.0 License
  */
 
@@ -23,18 +23,18 @@
 #pragma once
 
 #include <float.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #define UWVM_EXAMPLE_PRELOAD_HOST_API_V1_ABI_VERSION 1u
+#define UWVM_EXAMPLE_WASIP1_HOST_API_V1_ABI_VERSION 1u
+#define UWVM_EXAMPLE_WASI_ERRNO_SUCCESS ((uint_least16_t)0u)
 
 #if defined(__cplusplus)
 # define UWVM_EXAMPLE_STATIC_ASSERT(cond, msg) static_assert(cond, msg)
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-# define UWVM_EXAMPLE_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 #else
-# define UWVM_EXAMPLE_STATIC_ASSERT(cond, msg) typedef char uwvm_example_static_assertion[(cond) ? 1 : -1]
+# define UWVM_EXAMPLE_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
 #endif
 
 UWVM_EXAMPLE_STATIC_ASSERT(DBL_MANT_DIG == 53, "wasm_f64 must have a 53-bit mantissa");
@@ -149,3 +149,39 @@ typedef struct uwvm_preload_host_api_v1_def
 } uwvm_preload_host_api_v1;
 
 typedef void (*uwvm_set_preload_host_api_v1_t)(uwvm_preload_host_api_v1 const*);
+
+/*
+    This is intentionally a prefix projection of the full UWVM2 WASI Preview 1 table.
+    The real runtime object is larger; examples only need the first two entries.
+*/
+typedef wasm_u32 wasi_void_ptr_t;
+typedef uint_least16_t uwvm_wasi_errno_t;
+
+typedef uwvm_wasi_errno_t (*uwvm_wasip1_args_get_t)(wasi_void_ptr_t argv_ptrsz, wasi_void_ptr_t argv_buf_ptrsz);
+typedef uwvm_wasi_errno_t (*uwvm_wasip1_args_sizes_get_t)(wasi_void_ptr_t argc_ptrsz, wasi_void_ptr_t argv_buf_size_ptrsz);
+
+typedef struct uwvm_wasip1_host_api_v1_def
+{
+    size_t struct_size;
+    uint_least32_t abi_version;
+    uwvm_wasip1_args_get_t args_get;
+    uwvm_wasip1_args_sizes_get_t args_sizes_get;
+} uwvm_wasip1_host_api_v1;
+
+typedef void (*uwvm_set_wasip1_host_api_v1_t)(uwvm_wasip1_host_api_v1 const*);
+
+typedef struct uwvm_weak_symbol_module_c_def
+{
+    char const* module_name_ptr;
+    size_t module_name_length;
+    capi_custom_handler_vec_t custom_handler_vec;
+    capi_function_vec_t function_vec;
+    uwvm_set_preload_host_api_v1_t set_preload_host_api_v1;
+    uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1;
+} uwvm_weak_symbol_module_c;
+
+typedef struct uwvm_weak_symbol_module_vector_c_def
+{
+    uwvm_weak_symbol_module_c const* module_ptr;
+    size_t module_count;
+} uwvm_weak_symbol_module_vector_c;

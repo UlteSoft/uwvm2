@@ -58,6 +58,7 @@
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>
+# include <uwvm2/uwvm/cmdline/parser.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 #endif
 
@@ -127,6 +128,47 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                     u8")\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
+
+        // ====== Arguments ======
+        {
+            using u8string = ::uwvm2::utils::container::u8string;
+            using u8string_view = ::uwvm2::utils::container::u8string_view;
+
+            auto const wasm_file_ppos{::uwvm2::uwvm::cmdline::wasm_file_ppos};
+            auto const use_custom_argv0{!wasip1_argv0_storage.empty()};
+
+            wasip1_argument_storage.clear();
+            env.argv.clear();
+
+            if(wasm_file_ppos != nullptr || use_custom_argv0)
+            {
+                auto const& pr{::uwvm2::uwvm::cmdline::parsing_result};
+                auto const parsed_wasi_argv_size{wasm_file_ppos == nullptr ? 0uz : static_cast<::std::size_t>(pr.end() - wasm_file_ppos)};
+                auto const wasi_argv_size{parsed_wasi_argv_size + static_cast<::std::size_t>(wasm_file_ppos == nullptr && use_custom_argv0)};
+
+                wasip1_argument_storage.reserve(wasi_argv_size);
+                env.argv.reserve(wasi_argv_size);
+
+                if(use_custom_argv0)
+                {
+                    wasip1_argument_storage.emplace_back(wasip1_argv0_storage);
+                }
+
+                if(wasm_file_ppos != nullptr)
+                {
+                    auto curr{wasm_file_ppos + static_cast<::std::ptrdiff_t>(use_custom_argv0)};
+                    for(; curr != pr.end(); ++curr)
+                    {
+                        wasip1_argument_storage.emplace_back(u8string{curr->str});
+                    }
+                }
+
+                for(auto const& arg: wasip1_argument_storage)
+                {
+                    env.argv.emplace_back_unchecked(u8string_view{arg.data(), arg.size()});
+                }
+            }
+        }
 
         // ====== Environment variables ======
         {

@@ -29,6 +29,7 @@
 # include "local_imported.h"
 # include "preload_module_attribute.h"
 # include "preload_api.h"
+# include "wasip1_api.h"
 # include "dl.h"
 # include "weak_symbol.h"
 # include "all_module.h"
