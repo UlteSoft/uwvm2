@@ -34,6 +34,6 @@ import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
 import uwvm2.uwvm.wasm.storage;
-import uwvm2.uwvm.runtime.storage;
+import uwvm2.runtime;
 
 #include "uwvm_runtime.default.cpp"

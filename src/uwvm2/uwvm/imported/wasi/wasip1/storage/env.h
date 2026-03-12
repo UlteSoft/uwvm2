@@ -69,6 +69,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     /// @brief     The storage of final WASI Preview 1 environment variables ("key=value").
     inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_environment_storage{};  // [global]
 
+    /// @brief     The storage of final WASI Preview 1 arguments.
+    inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string> wasip1_argument_storage{};  // [global]
+
+    /// @brief     Override for WASI Preview 1 argv[0].
+    inline ::uwvm2::utils::container::u8string wasip1_argv0_storage{};  // [global]
+
     /// @brief     Default WasiPreview1 environment
     using wasip1_env_type = ::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<::uwvm2::object::memory::linear::native_memory_t>;
     inline wasip1_env_type default_wasip1_env{};  // [global]

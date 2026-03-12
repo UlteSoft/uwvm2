@@ -39,6 +39,9 @@ High-performance, spec-compliant WebAssembly binary parser built on concept-orie
 ### WASI host extensions
 WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. See [imported/readme.md](src/uwvm2/imported/readme.md) for details.
 
+### Plugin-facing host APIs
+Preload modules (dynamic libraries / weak-symbol plugins) can consume a stable host-side API for linear-memory access, and can now optionally consume the UWVM2 WASI Preview 1 host API as well. The WASI table is disabled by default and must be explicitly enabled from the command line.
+
 ### Flexible linear memory models
 uwvm2 provides three host-side models for implementing WebAssembly linear memory (mmap-based, multi-threaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual memory support. See [readme.md](src/uwvm2/object/memory/readme.md) for a detailed description.
 
@@ -59,6 +62,10 @@ $ uwvm <param0> <param1> ... --run <wasm> <argv1> <argv2> ...
 ```bash
 $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 ```
+* Expose WASI Preview 1 to preload plugins
+```bash
+$ uwvm --wasm-expose-wasip1-host-api --wasm-register-dl <plugin> <module> --run ...
+```
 
 ## How to build
 * Windows (aka. unknown-windows-msvc). See [windows.md](documents/how-to-build/windows.md)
@@ -69,7 +76,7 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 * WASM-WASI (self-hosting) (aka. [wasm32|wasm64]-[wasip1|wasip2]-(threads)). See [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
 * Other platforms: See [how-to-build](documents/how-to-build)
 
-## 💖 Support / Donations
+## Support / Donations
 
 If you find this project useful, you can support its development with a crypto donation.
 

@@ -23,8 +23,9 @@ module;
 
 // std
 #include <cstddef>
+#include <cstdint>
 
-export module uwvm2.uwvm.runtime.storage:storage;
+export module uwvm2.runtime;
 
 import uwvm2.utils.container;
 

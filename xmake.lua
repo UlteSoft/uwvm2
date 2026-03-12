@@ -338,9 +338,11 @@ target("uwvm")
 	if enable_cxx_module then
 		-- uwvm main
 		add_files("src/uwvm2/uwvm/main.module.cpp")
+		add_files("src/uwvm2/uwvm/host_api.module.cpp")
 	else
 		-- uwvm main
 		add_files("src/uwvm2/uwvm/main.default.cpp")
+		add_files("src/uwvm2/uwvm/host_api.default.cpp")
 	end
 
 	-- uwvm_runtime (uwvm_runtime interpreter runtime unit)

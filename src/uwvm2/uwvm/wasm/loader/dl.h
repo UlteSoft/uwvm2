@@ -66,6 +66,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         parse_error
     };
 
+    inline constexpr void apply_preload_host_api_to_loaded_dl(::uwvm2::uwvm::wasm::type::wasm_dl_t & wd) noexcept
+    {
+        ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1{};
+
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            set_preload_host_api_v1 = reinterpret_cast<::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t>(
+                ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_set_preload_host_api_v1"));
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(::fast_io::error)
+        {
+        }
+# endif
+
+        if(set_preload_host_api_v1 != nullptr)
+        {
+            auto const* const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
+            if(preload_host_api_v1 != nullptr) { set_preload_host_api_v1(preload_host_api_v1); }
+        }
+    }
+
+    inline constexpr void apply_wasip1_host_api_to_loaded_dl(::uwvm2::uwvm::wasm::type::wasm_dl_t & wd) noexcept
+    {
+        ::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1{};
+
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            set_wasip1_host_api_v1 = reinterpret_cast<::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t>(
+                ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_set_wasip1_host_api_v1"));
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(::fast_io::error)
+        {
+        }
+# endif
+
+        if(set_wasip1_host_api_v1 != nullptr) { set_wasip1_host_api_v1(::uwvm2::uwvm::wasm::type::uwvm_get_wasip1_host_api_v1()); }
+    }
+
+    inline constexpr void refresh_preloaded_dl_wasip1_host_api() noexcept
+    {
+        for(auto& curr_dl: ::uwvm2::uwvm::wasm::storage::preloaded_dl) { apply_wasip1_host_api_to_loaded_dl(curr_dl); }
+    }
+
     inline constexpr load_dl_rtl load_dl(::uwvm2::uwvm::wasm::type::wasm_dl_t & wd,
                                          ::uwvm2::utils::container::u8cstring_view load_file_name,
                                          ::uwvm2::utils::container::u8string_view rename_module_name,
@@ -86,17 +135,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
             bool const already_warned{warned.exchange(true, ::std::memory_order_relaxed)};
             if(!already_warned) [[unlikely]]
             {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    // 1
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    u8"[warn]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Loading an untrusted preload dl is equivalent to loading untrusted native code in the same process; it may install hooks and read or modify arbitrary process memory. Only load trusted modules. ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                    u8"(untrusted-dl)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::io::perr(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    // 1
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                    u8"[warn]  ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8"Loading an untrusted preload dl is equivalent to loading untrusted native code in the same process; it may install hooks and read or modify arbitrary process memory. Only load trusted modules. ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                    u8"(untrusted-dl)\n",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
 
                 if(::uwvm2::uwvm::io::untrusted_dl_warning_fatal) [[unlikely]]
                 {
@@ -1221,28 +1271,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
         wd.preload_module_memory_attribute = ::uwvm2::uwvm::wasm::storage::resolve_preload_module_memory_attribute(wd.module_name);
 
-        {
-            ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1{};
-
-# ifdef UWVM_CPP_EXCEPTIONS
-            try
-# endif
-            {
-                set_preload_host_api_v1 = reinterpret_cast<::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t>(
-                    ::fast_io::dll_load_symbol(wd.import_dll_file, u8"uwvm_set_preload_host_api_v1"));
-            }
-# ifdef UWVM_CPP_EXCEPTIONS
-            catch(::fast_io::error)
-            {
-            }
-# endif
-
-            if(set_preload_host_api_v1 != nullptr)
-            {
-                auto const* const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
-                if(preload_host_api_v1 != nullptr) { set_preload_host_api_v1(preload_host_api_v1); }
-            }
-        }
+        apply_preload_host_api_to_loaded_dl(wd);
+        apply_wasip1_host_api_to_loaded_dl(wd);
 
         return load_dl_rtl::ok;
     }

@@ -40,6 +40,8 @@ import :para;
 import :cwrapper;
 import :dl;
 import :preload_module_attribute;
+import :preload_api;
+import :wasip1_api;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

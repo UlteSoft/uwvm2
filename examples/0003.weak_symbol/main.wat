@@ -1,7 +1,7 @@
 (module
-  (import "dl.example" "add_i32" (func $add_i32 (param i32 i32) (result i32)))
-  (import "dl.example" "inspect_memory" (func $inspect_memory (result i32)))
-  (import "dl.example" "probe_host_apis" (func $probe_host_apis (param i32 i32) (result i32)))
+  (import "weak.example" "add_i32" (func $add_i32 (param i32 i32) (result i32)))
+  (import "weak.example" "inspect_memory" (func $inspect_memory (result i32)))
+  (import "weak.example" "probe_host_apis" (func $probe_host_apis (param i32 i32) (result i32)))
   (memory 1)
   (data (i32.const 0) "ABCD")
 
@@ -14,8 +14,8 @@
     end)
 
   (func $start
-    i32.const 7
-    i32.const 9
+    i32.const 11
+    i32.const 5
     call $add_i32
     i32.const 16
     call $assert_eq

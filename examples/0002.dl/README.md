@@ -1,36 +1,53 @@
 # `0002.dl` Example
 
-This directory contains practical preload-DL examples for UWVM2 in both C and C++.
+This directory now shows a **complete preload-DL plugin lifecycle** instead of only a toy function.
+It demonstrates three things together:
 
-## What the example demonstrates
+- ordinary imported functions (`add_i32`);
+- the stable preload memory host API (`inspect_memory`);
+- the optional WASI Preview 1 host API exposed to plugins (`probe_host_apis`).
 
-- how to export `uwvm_get_module_name()`;
-- how to export `uwvm_function()` with ordinary imported functions;
-- how to export `uwvm_get_custom_handler()` for custom sections;
-- how to export `uwvm_set_preload_host_api_v1()` and use the stable preload host API;
-- how to handle `copy`, `mmap_full_protection`, `mmap_partial_protection`, and `mmap_dynamic_bounds` delivery states.
+## Exported symbols
 
-The demo function `inspect_memory` performs these steps:
+The C and C++ examples both export:
 
-1. locate `memory[0]` through `memory_descriptor_count()` + `memory_descriptor_at()`;
-2. read the first four bytes of memory;
-3. return the sum of `A`, `B`, `C`, and `D` (`266`);
-4. replace the second byte with `Z`.
+- `uwvm_get_module_name()`
+- `uwvm_function()`
+- `uwvm_get_custom_handler()`
+- `uwvm_set_preload_host_api_v1()`
+- `uwvm_set_wasip1_host_api_v1()`
 
-The companion module `main.wat` verifies all of this in its start function.
+## What the plugin does
+
+### `add_i32`
+A plain imported function used to show the normal C ABI registration path.
+
+### `inspect_memory`
+Uses the stable preload host API to:
+
+1. locate `memory[0]`;
+2. read the first four bytes (`A`, `B`, `C`, `D`);
+3. return their sum (`266`);
+4. overwrite byte `1` with `Z`.
+
+### `probe_host_apis`
+Uses **both** host APIs together:
+
+1. receives two guest memory offsets as parameters;
+2. calls `args_sizes_get()` through the plugin-facing WASI P1 API;
+3. reads the written `argc` and `argv_buf_size` values back through the preload memory API;
+4. returns `0` on success or a negative diagnostic code on failure.
+
+This is the important part of the new example: it shows that a preload plugin can call a WASI function using the **guest's own linear memory**.
 
 ## Files
 
-- `interface.h`
-  Minimal standalone ABI header for external example code.
-- `regdl.c`
-  Full C preload-DL example.
-- `regdl_cxx.cc`
-  Full C++ preload-DL example.
-- `main.wat`
-  WebAssembly test module importing `add_i32` and `inspect_memory`.
+- `interface.h` — standalone example ABI header shared by DL and weak-symbol examples.
+- `regdl.c` — reference C implementation.
+- `regdl_cxx.cc` — reference C++ implementation.
+- `main.wat` — verification module that imports all three functions.
 
-## Build commands
+## Build
 
 ### macOS
 
@@ -48,34 +65,51 @@ c++ -std=c++20 -shared -fPIC regdl_cxx.cc -o libregdl_cxx.so
 wat2wasm main.wat -o main.wasm
 ```
 
-## Run commands
+## Run
 
-Use full compilation with the interpreter backend:
-
-```sh
-uwvm -Rcc int -Rcm full --wasm-register-dl ./libregdl_c.dylib dl.example --wasm-set-preload-module-attribute dl.example copy all --run ./main.wasm
-```
-
-When the active platform supports mmap-backed native memory, the same example can be run with direct mmap delivery:
+### Positive path: expose WASI P1 to the plugin
 
 ```sh
-uwvm -Rcc int -Rcm full --wasm-register-dl ./libregdl_c.dylib dl.example --wasm-set-preload-module-attribute dl.example mmap all --run ./main.wasm
+uwvm -Rcc int -Rcm full \
+  --wasm-expose-wasip1-host-api \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
 ```
 
-On platforms without mmap support, use `copy`.
+### Optional: override WASI `argv[0]`
 
-## Expected result
+If you want the guest-visible program name to differ from the wasm file path, add `--wasip1-set-argv0` **before** `--run`:
 
-The process exits successfully. The preload DL also emits a diagnostic line to `stderr`, for example:
+```sh
+uwvm -Rcc int -Rcm full \
+  --wasm-expose-wasip1-host-api \
+  --wasip1-set-argv0 main \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
+```
+
+With that override, the guest sees `argv = ["main", "hello", "world"]`, and the plugin-side `args_sizes_get()` result changes accordingly.
+
+### Negative path: do **not** expose WASI P1
+
+If you remove `--wasm-expose-wasip1-host-api`, the plugin still loads, but `probe_host_apis` returns a failure code and the verification wasm traps in its start function.
+
+```sh
+uwvm -Rcc int -Rcm full \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
+```
+
+## Expected output
+
+The process succeeds in the positive path and prints diagnostics similar to:
 
 ```text
-example-dl-c: state=copy backend=0 bytes=[65,66,67,68] sum=266 ...
+example-dl-c: state=copy backend=0 bytes=[65,66,67,68] sum=266
+example-dl-c: wasi argc=3 argv_buf_size=24
 ```
 
-or:
-
-```text
-example-dl-cxx: state=mmap_full_protection backend=0 bytes=[65,66,67,68] sum=266 ...
-```
-
-The exact state depends on the configured preload attribute and the runtime memory backend.
+`argc` includes `argv[0]` (the wasm path passed after `--run`), so the exact buffer size also depends on that path.

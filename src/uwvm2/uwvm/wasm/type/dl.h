@@ -142,8 +142,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             - export `uwvm_function()`;
             - export `uwvm_get_custom_handler()` only when you actually provide custom sections;
             - export `uwvm_set_preload_host_api_v1()` when the plugin wants the stable host API;
+            - export `uwvm_set_wasip1_host_api_v1()` when the plugin wants optional WASI Preview 1 access;
             - keep wasm-facing ABI structs trivial, packed, and byte-layout stable;
-            - route all memory interaction through the delivery-state contract documented in `preload_api.h`.
+            - route all memory interaction through the delivery-state contract documented in `preload_api.h`;
+            - include `wasip1_api.h` when the plugin wants to call the host-provided WASI Preview 1 table.
 
             If memory access is required, prefer the stable preload host API from `preload_api.h`
             instead of relying on internal hooks or runtime-private layouts.

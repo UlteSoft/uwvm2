@@ -62,6 +62,8 @@ UWVM_MODULE_EXPORT extern "C"
         ::std::size_t module_name_length;
         ::uwvm2::uwvm::wasm::type::capi_custom_handler_vec_t custom_handler_vec;
         ::uwvm2::uwvm::wasm::type::capi_function_vec_t function_vec;
+        ::uwvm2::uwvm::wasm::type::uwvm_set_preload_host_api_v1_t set_preload_host_api_v1;
+        ::uwvm2::uwvm::wasm::type::uwvm_set_wasip1_host_api_v1_t set_wasip1_host_api_v1;
     };
 
     static_assert(sizeof(uwvm_weak_symbol_module_c) == sizeof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t));
@@ -74,6 +76,10 @@ UWVM_MODULE_EXPORT extern "C"
                   __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, custom_handler_vec));
     static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, function_vec) ==
                   __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, function_vec));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, set_preload_host_api_v1) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, set_preload_host_api_v1));
+    static_assert(__builtin_offsetof(uwvm_weak_symbol_module_c, set_wasip1_host_api_v1) ==
+                  __builtin_offsetof(::uwvm2::uwvm::wasm::type::uwvm_weak_symbol_module_t, set_wasip1_host_api_v1));
 
     struct uwvm_weak_symbol_module_vector_c
     {
