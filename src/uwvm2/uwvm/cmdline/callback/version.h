@@ -499,11 +499,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"SVE2 "
 # endif
 # if defined(__ARM_FEATURE_SME)
-                                u8"SME"
-#  if !defined(UWVM_ENABLE_SME_SVE_STREAM_MODE)
-                                u8"(mno-SVESM)"
+#  if defined(UWVM_ENABLE_SME_SVE_STREAM_MODE)
+                                u8"SVESM "
 #  endif
-                                u8" "
+                                u8"SME "
 # endif
 # if defined(__ARM_FEATURE_SME2)
                                 u8"SME2 "
