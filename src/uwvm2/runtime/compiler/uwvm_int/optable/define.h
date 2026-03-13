@@ -28,6 +28,7 @@
 # include <cstring>
 # include <bit>
 # include <limits>
+# include <tuple>
 # include <memory>
 # include <concepts>
 // macro
@@ -36,6 +37,7 @@
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/impl.h>
 # include <uwvm2/object/impl.h>
@@ -1319,7 +1321,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(Index < ::fast_io::tuple_size<ValTuple>::value)
             {
-                using curr_val_t = typename ::fast_io::tuple_element<Index, ValTuple>::type;
+                using curr_val_t = typename ::std::tuple_element<Index, ValTuple>::type;
                 static_assert(is_uwvm_interpreter_valtype_supported<curr_val_t>());
 
                 constexpr bool can_use_stacktop{uwvm_interpreter_can_get_val_from_stacktop_cache<CompileOption, State, curr_val_t>()};
@@ -1346,7 +1348,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(Index < ::fast_io::tuple_size<ValTuple>::value)
             {
-                using curr_val_t = typename ::fast_io::tuple_element<Index, ValTuple>::type;
+                using curr_val_t = typename ::std::tuple_element<Index, ValTuple>::type;
                 static_assert(is_uwvm_interpreter_valtype_supported<curr_val_t>());
 
                 return calc_uwvm_interpreter_stacktop_state_after<CompileOption,

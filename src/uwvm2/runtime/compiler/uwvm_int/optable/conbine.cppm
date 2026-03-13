@@ -37,6 +37,7 @@ export module uwvm2.runtime.compiler.uwvm_int.optable:conbine;
 
 import fast_io;
 import uwvm2.utils.container;
+import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.object;
 import :define;

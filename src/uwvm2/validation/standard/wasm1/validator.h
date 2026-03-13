@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include "uwvm2/validation/error/error.h"
-#include "uwvm2/parser/wasm/standard/wasm1/opcode/mvp.h"
 #ifndef UWVM_MODULE
 // std
 # include <cstddef>
@@ -44,6 +42,7 @@
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/intrinsics/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
+# include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/parser/wasm/utils/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/impl.h>
