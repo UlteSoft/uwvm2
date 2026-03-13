@@ -33,6 +33,7 @@ module;
 export module uwvm2.runtime.compiler.uwvm_int.optable:delay_local;
 
 import uwvm2.utils.container;
+import uwvm2.utils.debug;
 import uwvm2.parser.wasm.standard.wasm1;
 import :define;
 import :register_ring;

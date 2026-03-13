@@ -31,6 +31,8 @@
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 // import
+# include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include "define.h"
 # include "register_ring.h"

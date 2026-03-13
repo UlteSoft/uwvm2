@@ -23,6 +23,8 @@
 #pragma once
 
 #ifndef UWVM_MODULE
+//std
+# include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 // import

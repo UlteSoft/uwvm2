@@ -22,7 +22,7 @@
 
 module;
 
-export module uwvm2.uwvm.runtime.storage;
+export module uwvm2.uwvm.runtime.runtime_mode;
 export import :mode;
 export import :storage;
 

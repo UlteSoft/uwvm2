@@ -331,6 +331,9 @@ target("uwvm")
 		-- wasm parser
 		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
 
+		-- validation
+		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
 		-- uwvm
 		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
 	end
@@ -364,6 +367,11 @@ if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "defaul
 
 		-- third-parties/fast_io
 		add_includedirs("third-parties/fast_io/include")
+
+		if enable_cxx_module then
+			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+		end
 		-- third-parties/bizwen
 		add_includedirs("third-parties/bizwen/include")
 		-- third-parties/boost
@@ -390,8 +398,14 @@ if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "defaul
 			-- wasm parser
 			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
 
+			-- validation
+			add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
 			-- uwvm
 			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+
+			-- runtime
+			add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
 		end
 
 		if enable_cxx_module then
@@ -460,6 +474,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
 			-- wasm parser
 			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+			-- validation
+			add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
 
 			-- uwvm
 			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
