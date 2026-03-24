@@ -184,6 +184,35 @@ option("enable-jit", function()
     set_values("none", "default", "llvm")
 end)
 
+option("llvm-jit-env", function()
+    set_default(true)
+    set_showmenu(false)
+    after_check(function(option)
+        import("utility.utility")
+        local llvm_jit_options = utility.get_llvm_jit_options()
+        if llvm_jit_options.includedirs then
+            option:add("sysincludedirs", llvm_jit_options.includedirs)
+        end
+        for _, field in ipairs({
+            "sysincludedirs",
+            "defines",
+            "linkdirs",
+            "links",
+            "syslinks",
+            "frameworkdirs",
+            "frameworks",
+            "cxxflags",
+            "ldflags",
+            "shflags"
+        }) do
+            local values = llvm_jit_options[field]
+            if values then
+                option:add(field, values)
+            end
+        end
+    end)
+end)
+
 option("enable-debug-int", function()
     set_description
     (

@@ -1,4 +1,4 @@
-set_xmakever("2.9.8")
+﻿set_xmakever("2.9.8")
 
 set_project("uwvm")
 
@@ -16,6 +16,7 @@ set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", 
 
 includes("xmake/impl.lua")
 includes("xmake/platform/impl.lua")
+add_moduledirs("xmake")
 
 -- Currently, there are no plugins.
 -- add_plugindirs("xmake/plugins")
@@ -103,6 +104,7 @@ function def_build()
 		add_defines("UWVM_USE_DEFAULT_JIT")
 	elseif enable_jit == "llvm" then
 		add_defines("UWVM_USE_LLVM_JIT")
+		add_options("llvm-jit-env")
 	end
 
 	local enable_debug_int = get_config("enable-debug-int")
