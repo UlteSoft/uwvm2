@@ -179,7 +179,7 @@ function def_build()
 		add_cxflags("-Wimplicit-fallthrough", { force = true })
 	else
 		if not is_plat("windows") then
-			add_cxflags("-Wno-maybe-musttail-local-addr", { force = true })
+			add_cxflags("-Wno-maybe-musttail-local-addr")
 		end
 	end
 

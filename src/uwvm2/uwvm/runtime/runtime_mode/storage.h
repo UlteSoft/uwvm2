@@ -84,6 +84,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline bool is_runtime_mode_code_aot_existed{};  // [global]
 #endif
 
+    /// @brief Whether the runtime compile thread count was explicitly configured.
+    /// @details When this is false, the runtime will use its default thread selection policy.
+    inline bool runtime_compile_threads_existed{};  // [global]
+
+    /// @brief Raw runtime compile thread count from the command line.
+    /// @details The execution meaning of 0 / positive / negative values is handled later by the runtime scheduler.
+    inline int global_runtime_compile_threads{};  // [global]
+
     /// @brief   The global runtime mode.
     /// @details default = runtime-tiered
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
