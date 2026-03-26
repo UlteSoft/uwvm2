@@ -271,7 +271,7 @@ This is a pure flag-style parameter. It toggles the global memory-growth policy 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
 | `--runtime-aot` | `-Raot` | None | Shortcut runtime: full compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
-| `--runtime-compile-threads` | `-Rct` | `<count:int>` | Parse and store a runtime compile-thread count. | Hosted runtime builds |
+| `--runtime-compile-threads` | `-Rct` | `<count:ssize_t>` | Configure the runtime compile-thread count, including signed offsets from detected hardware concurrency. | Hosted runtime builds |
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
 | `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy\|lazy+verification\|full]` | Select the runtime mode explicitly. | Hosted runtime builds |
@@ -359,15 +359,20 @@ This option is intentionally more permissive than the generic parser because it 
 
 Source behavior:
 
-- the argument is parsed as an `int`,
+- the argument is parsed as `ssize_t` (`std::make_signed_t<std::size_t>` in the source),
 - negative values such as `-1` are accepted,
 - the value is stored in `runtime::runtime_mode::global_runtime_compile_threads`,
-- the corresponding existence flag is `runtime_compile_threads_existed`.
+- the corresponding existence flag is `runtime_compile_threads_existed`,
+- the effective resolved value is stored later in `runtime::runtime_mode::global_runtime_compile_threads_resolved`.
 
-Current implementation note:
+Runtime-time resolution behavior in `run.h`:
 
-- in the current source, this option is a **parse-and-store** setting only,
-- the actual scheduling / execution semantics for full-compile vs lazy-compile are not implemented in this command-line layer.
+- if the option is omitted, uwvm selects a default compile-thread count using the default-policy `log2(N CPUs)` heuristic,
+- if the value is non-negative, that exact value becomes the resolved compile-thread count,
+- if the non-negative value is larger than the detected maximum hardware thread count, uwvm emits a dedicated `runtime-compile-threads` warning but still keeps the requested value,
+- if the value is negative, uwvm interprets it as `detected_max_threads - abs(value)`,
+- if the absolute value of a negative input is larger than the detected maximum, uwvm terminates with a fatal error,
+- when verbose logging is enabled, uwvm prints the final resolved compile-thread count.
 
 ### `--runtime-compiler-log`
 
@@ -388,8 +393,8 @@ On supported Windows NT-style path configurations:
 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
-| `--log-convert-warn-to-fatal` | `-log-wfatal` | `[all\|vm\|parser\|untrusted-dl\|dl\|weak-symbol\|depend\|nt-path\|toctou\|runtime]` | Promote selected warnings to fatal errors. Some categories are platform- or feature-specific. | Hosted builds |
-| `--log-disable-warning` | `-log-dw` | `[all\|vm\|untrusted-dl\|dl\|weak-symbol\|depend\|nt-path\|toctou\|runtime]` | Disable selected warning classes. Some categories are platform- or feature-specific. | Hosted builds |
+| `--log-convert-warn-to-fatal` | `-log-wfatal` | `[all\|vm\|parser\|untrusted-dl\|dl\|weak-symbol\|depend\|nt-path\|toctou\|runtime\|runtime-compile-threads]` | Promote selected warnings to fatal errors. Some categories are platform- or feature-specific. | Hosted builds |
+| `--log-disable-warning` | `-log-dw` | `[all\|vm\|untrusted-dl\|dl\|weak-symbol\|depend\|nt-path\|toctou\|runtime\|runtime-compile-threads]` | Disable selected warning classes. Some categories are platform- or feature-specific. | Hosted builds |
 | `--log-enable-warning` | `-log-ew` | `[all\|parser]` | Re-enable parser warnings. In the current source, `all` is effectively equivalent to `parser`. | Hosted builds |
 | `--log-output` | `-log` | `[out\|err\|file <file:path>]` | Select the primary log sink. | Hosted builds |
 | `--log-verbose` | `-log-vb` | None | Enable verbose log output. | Hosted builds |
@@ -410,6 +415,7 @@ Warning classes referenced by the source include:
 - `nt-path` on Windows NT-path-aware configurations
 - `toctou` on Windows 9x style configurations
 - `runtime`
+- `runtime-compile-threads`
 
 ### `--log-enable-warning`
 

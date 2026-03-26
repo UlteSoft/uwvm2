@@ -118,6 +118,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::io::show_toctou_warning = false;
 #endif
             ::uwvm2::uwvm::io::show_runtime_warning = false;
+            ::uwvm2::uwvm::io::show_runtime_compile_threads_warning = false;
         }
         else if(currp1_str == u8"vm") { ::uwvm2::uwvm::io::show_vm_warning = false; }
         else if(currp1_str == u8"untrusted-dl") { ::uwvm2::uwvm::io::show_untrusted_dl_warning = false; }
@@ -135,6 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else if(currp1_str == u8"toctou") { ::uwvm2::uwvm::io::show_toctou_warning = false; }
 #endif
         else if(currp1_str == u8"runtime") { ::uwvm2::uwvm::io::show_runtime_warning = false; }
+        else if(currp1_str == u8"runtime-compile-threads") { ::uwvm2::uwvm::io::show_runtime_compile_threads_warning = false; }
         else
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

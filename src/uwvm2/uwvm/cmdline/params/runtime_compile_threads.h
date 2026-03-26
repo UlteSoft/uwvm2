@@ -70,7 +70,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_compile_threads{
         .name{u8"--runtime-compile-threads"},
         .describe{u8"Set the runtime compile thread count."},
-        .usage{u8"<count:int>"},
+        .usage{u8"<count:ssize_t>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_compile_threads_alias), 1uz}},
         .handle{::std::addressof(details::runtime_compile_threads_callback)},
         .pretreatment{::std::addressof(details::runtime_compile_threads_pretreatment)},

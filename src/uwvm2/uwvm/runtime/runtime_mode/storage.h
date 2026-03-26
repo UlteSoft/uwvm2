@@ -27,6 +27,7 @@
 # include <cstdint>
 # include <limits>
 # include <memory>
+# include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
@@ -51,6 +52,9 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
+    using ssize_t = ::std::make_signed_t<::std::size_t>;
+    using runtime_compile_threads_type = ssize_t;
+
     inline bool custom_runtime_mode_existed{};      // [global]
     inline bool custom_runtime_compiler_existed{};  // [global]
 
@@ -90,7 +94,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief Raw runtime compile thread count from the command line.
     /// @details The execution meaning of 0 / positive / negative values is handled later by the runtime scheduler.
-    inline int global_runtime_compile_threads{};  // [global]
+    inline runtime_compile_threads_type global_runtime_compile_threads{};  // [global]
+
+    /// @brief Effective runtime compile thread count after defaulting / negative-offset resolution.
+    /// @details `0` means no extra compile thread; the runtime mode decides how that is interpreted during execution.
+    inline ::std::size_t global_runtime_compile_threads_resolved{};  // [global]
 
     /// @brief   The global runtime mode.
     /// @details default = runtime-tiered

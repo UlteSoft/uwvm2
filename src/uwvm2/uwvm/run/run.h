@@ -243,6 +243,174 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::fast_terminate();
     }
 
+    inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
+    {
+        // Follow the default policy: roughly one compiler thread per log2(N) CPUs.
+        ::std::size_t compiler_threads{};
+        while(max_compile_threads > 1uz)
+        {
+            max_compile_threads >>= 1u;
+            ++compiler_threads;
+        }
+        return compiler_threads == 0uz ? 1uz : compiler_threads;
+    }
+
+    inline ::std::size_t resolve_runtime_compile_threads() noexcept
+    {
+        using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
+        using runtime_compile_threads_unsigned_type = ::std::make_unsigned_t<runtime_compile_threads_type>;
+
+        constexpr auto runtime_compile_threads_warn{
+            []<typename... Args>(Args&&... args) constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    u8"[warn]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::std::forward<Args>(args)...,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8" (runtime-compile-threads)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }};
+
+        constexpr auto runtime_compile_threads_warn_to_fatal{
+            []() constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime-compile-threads)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }};
+
+        constexpr auto runtime_compile_threads_fatal{
+            []<typename... Args>(Args&&... args) constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::std::forward<Args>(args)...,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8" (runtime-compile-threads)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }};
+
+        constexpr auto runtime_compile_threads_verbose_info{
+            []<typename... Args>(Args&&... args) constexpr noexcept
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                    u8"[info]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    ::std::forward<Args>(args)...,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                    u8"[",
+                                    ::uwvm2::uwvm::io::get_local_realtime(),
+                                    u8"] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(verbose)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+            }};
+
+        auto max_compile_threads{static_cast<::std::size_t>(::fast_io::native_thread::hardware_concurrency())};
+        if(max_compile_threads == 0uz) [[unlikely]] { max_compile_threads = 1uz; }
+
+        auto resolved_compile_threads{calculate_default_runtime_compile_threads(max_compile_threads)};
+
+        if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
+        {
+            auto const requested_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads};
+            if(requested_compile_threads >= 0)
+            {
+                resolved_compile_threads = static_cast<::std::size_t>(requested_compile_threads);
+                if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                {
+                    runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                 resolved_compile_threads,
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                 u8", detected-max=",
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                 max_compile_threads,
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                 u8"). The requested value will still be used, but performance may be suboptimal.");
+
+                    if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
+                }
+            }
+            else
+            {
+                auto const requested_compile_threads_abs{static_cast<runtime_compile_threads_unsigned_type>(0u) -
+                                                         static_cast<runtime_compile_threads_unsigned_type>(requested_compile_threads)};
+
+                if(requested_compile_threads_abs > static_cast<runtime_compile_threads_unsigned_type>(max_compile_threads)) [[unlikely]]
+                {
+                    runtime_compile_threads_fatal(u8"Invalid negative runtime compile thread count (requested=",
+                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                  requested_compile_threads,
+                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                  u8", detected-max=",
+                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                  max_compile_threads,
+                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                  u8"): the absolute value of a negative setting must not exceed the detected max thread count.");
+                }
+
+                resolved_compile_threads = max_compile_threads - static_cast<::std::size_t>(requested_compile_threads_abs);
+            }
+        }
+
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved = resolved_compile_threads;
+
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
+            {
+                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     resolved_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8" (requested=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8", detected-max=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     max_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8"). ");
+            }
+            else
+            {
+                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     resolved_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8" by the default policy (detected-max=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     max_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8"). ");
+            }
+        }
+
+        return resolved_compile_threads;
+    }
+
     inline int run() noexcept
     {
         // already preload wasm module
@@ -365,6 +533,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 #endif
 
+        resolve_runtime_compile_threads();
+
         // run vm
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
         {
@@ -477,17 +647,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
                             {
                                 // not supported yet
-                                ::fast_io::io::perr(
-                                    ::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"LLVM JIT is not currently supported, currently only supports -Rcc int and -Rcm full. ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                    u8"(runtime)\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                    u8"uwvm: ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                    u8"[fatal] ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                    u8"LLVM JIT is not currently supported, currently only supports -Rcc int and -Rcm full. ",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                    u8"(runtime)\n\n",
+                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
