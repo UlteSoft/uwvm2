@@ -2639,7 +2639,7 @@ namespace uwvm2::runtime::uwvm_int
 #endif
             }
 
-            constexpr auto runtime_compile_threads_warn{
+            [[maybe_unused]] constexpr auto runtime_compile_threads_warn{
                 []<typename... Args>(Args&&... args) constexpr noexcept
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -2654,7 +2654,7 @@ namespace uwvm2::runtime::uwvm_int
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 }};
 
-            constexpr auto runtime_compile_threads_warn_to_fatal{
+            [[maybe_unused]] constexpr auto runtime_compile_threads_warn_to_fatal{
                 []() constexpr noexcept
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
