@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-03-25
+ * @date        2026-03-26
  * @copyright   APL-2.0 License
  */
 
@@ -44,37 +44,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view runtime_compile_threads_alias{u8"-Rct"};
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_scheduling_policy_alias{u8"-Rsp"};
 #if defined(UWVM_MODULE)
         extern "C++"
 #else
         inline constexpr
 #endif
-            void runtime_compile_threads_pretreatment(char8_t const* const*&,
-                                                      char8_t const* const*,
-                                                      ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>&) noexcept;
-#if defined(UWVM_MODULE)
-        extern "C++"
-#else
-        inline constexpr
-#endif
-            ::uwvm2::utils::cmdline::parameter_return_type runtime_compile_threads_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type runtime_scheduling_policy_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                              ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                              ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #if defined(__clang__)
 # pragma clang diagnostic push
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_compile_threads{
-        .name{u8"--runtime-compile-threads"},
-        .describe{u8"Set the runtime compile thread count or policy."},
-        .usage{u8"[default|aggressive|<count:ssize_t>]"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_compile_threads_alias), 1uz}},
-        .handle{::std::addressof(details::runtime_compile_threads_callback)},
-        .pretreatment{::std::addressof(details::runtime_compile_threads_pretreatment)},
-        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_scheduling_policy{
+        .name{u8"--runtime-scheduling-policy"},
+        .describe{u8"Set the runtime scheduling policy. Effective only when extra runtime compile threads are enabled."},
+        .usage{u8"[func_count <count:size_t>|code_size <bytes:size_t>]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_scheduling_policy_alias), 1uz}},
+        .handle{::std::addressof(details::runtime_scheduling_policy_callback)},
+        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_existed)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 #if defined(__clang__)
 # pragma clang diagnostic pop

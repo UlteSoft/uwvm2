@@ -114,31 +114,58 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         auto const currp1_str{currp1->str};
 
         using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
+        using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
 
         runtime_compile_threads_type compile_threads;  // No initialization necessary
         auto const [next, err]{::fast_io::parse_by_scan(currp1_str.cbegin(), currp1_str.cend(), compile_threads)};
 
-        if(err != ::fast_io::parse_code::ok || next != currp1_str.cend()) [[unlikely]]
+        if(err == ::fast_io::parse_code::ok && next == currp1_str.cend())
         {
-            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                u8"uwvm: ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                u8"[error] ",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"Invalid runtime compile thread count (ssize_t): \"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                currp1_str,
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                u8"\". Usage: ",
-                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
-                                u8"\n\n");
-            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads = compile_threads;
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy = runtime_compile_threads_policy_t::numeric;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
 
-        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads = compile_threads;
+        if(currp1_str == u8"default")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads = 0;
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy = runtime_compile_threads_policy_t::default_policy;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
 
-        return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        if(currp1_str == u8"aggressive")
+        {
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads = 0;
+            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy = runtime_compile_threads_policy_t::aggressive;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
+
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                            u8"[error] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"Invalid runtime compile thread setting: \"",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            currp1_str,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"\". Expected ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            u8"default",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8", ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            u8"aggressive",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8", or a ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            u8"ssize_t",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8". Usage: ",
+                            ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
+                            u8"\n\n");
+        return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
     }
 }  // namespace uwvm2::uwvm::cmdline::params::details
 

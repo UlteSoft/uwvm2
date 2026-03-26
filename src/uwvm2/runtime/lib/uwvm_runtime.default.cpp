@@ -2728,6 +2728,56 @@ namespace uwvm2::runtime::uwvm_int
                 }
             }
 
+            using runtime_scheduling_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_t;
+            using compile_task_split_policy_t = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_policy_t;
+
+            auto const runtime_scheduling_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_policy};
+            auto const runtime_scheduling_size{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size};
+
+            auto const compile_task_split_conf{
+                runtime_scheduling_policy == runtime_scheduling_policy_t::function_count
+                    ? ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_config{
+                          .policy = compile_task_split_policy_t::function_count,
+                          .split_size = runtime_scheduling_size}
+                    : ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_config{
+                          .policy = compile_task_split_policy_t::code_size,
+                          .split_size = runtime_scheduling_size}};
+
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                if(effective_extra_compile_threads == 0uz)
+                {
+                    if(::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_existed)
+                    {
+                        runtime_compile_threads_verbose_info(u8"Runtime scheduling policy is configured but inactive because no extra runtime compile threads are enabled. ");
+                    }
+                }
+                else if(runtime_scheduling_policy == runtime_scheduling_policy_t::function_count)
+                {
+                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation scheduling policy uses ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"func_count",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" with ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         runtime_scheduling_size,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" functions per task. ");
+                }
+                else
+                {
+                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation scheduling policy uses ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"code_size",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" with ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         runtime_scheduling_size,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" wasm code-body bytes per task. ");
+                }
+            }
+
             // Assign module ids.
             g_runtime.modules.clear();
             g_runtime.module_name_to_id.clear();
@@ -2772,7 +2822,8 @@ namespace uwvm2::runtime::uwvm_int
                         *rec.runtime_module,
                         opt,
                         err,
-                        effective_extra_compile_threads);
+                        effective_extra_compile_threads,
+                        compile_task_split_conf);
                 }
 #ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error)

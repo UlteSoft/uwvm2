@@ -256,10 +256,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return compiler_threads == 0uz ? 1uz : compiler_threads;
     }
 
+    inline constexpr ::std::size_t calculate_aggressive_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
+    {
+        if(max_compile_threads < 2uz) [[unlikely]] { return 0uz; }
+
+        // Prevent overflow
+        auto const quotient{max_compile_threads / 3uz};
+        auto const remainder{max_compile_threads % 3uz};
+        return quotient * 2uz + (remainder * 2uz) / 3uz;
+    }
+
     inline ::std::size_t resolve_runtime_compile_threads() noexcept
     {
         using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
         using runtime_compile_threads_unsigned_type = ::std::make_unsigned_t<runtime_compile_threads_type>;
+        using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
 
         constexpr auto runtime_compile_threads_warn{
             []<typename... Args>(Args&&... args) constexpr noexcept
@@ -329,47 +340,43 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
         ::std::size_t max_compile_threads{::uwvm2::utils::thread::hardware_concurrency()};
         if(max_compile_threads == 0uz) [[unlikely]] { max_compile_threads = 1uz; }
+        auto const default_compile_threads{calculate_default_runtime_compile_threads(max_compile_threads)};
+        auto const aggressive_compile_threads{calculate_aggressive_runtime_compile_threads(max_compile_threads)};
 #else
         constexpr ::std::size_t max_compile_threads{1uz};
 #endif
 
         ::std::size_t resolved_compile_threads{
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-            calculate_default_runtime_compile_threads(max_compile_threads)
+            default_compile_threads
 #endif
         };
 
         if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
         {
-            auto const requested_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads};
-            if(requested_compile_threads >= 0)
-            {
-                resolved_compile_threads = 0uz;
-                
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-                resolved_compile_threads = static_cast<::std::size_t>(requested_compile_threads);
-                if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
-                {
-                    runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                 resolved_compile_threads,
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                 u8", detected-max=",
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                 max_compile_threads,
-                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                 u8"). The requested value will still be used, but performance may be suboptimal.");
+            auto const requested_compile_threads_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy};
 
-                    if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
-                }
+            if(requested_compile_threads_policy == runtime_compile_threads_policy_t::default_policy)
+            {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                resolved_compile_threads = default_compile_threads;
 #else
-                if(requested_compile_threads != 0 && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                resolved_compile_threads = 0uz;
+#endif
+            }
+            else if(requested_compile_threads_policy == runtime_compile_threads_policy_t::aggressive)
+            {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                resolved_compile_threads = aggressive_compile_threads;
+#else
+                resolved_compile_threads = 0uz;
+                if(::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                 {
-                    runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
+                    runtime_compile_threads_warn(u8"Requested runtime compile thread policy \"",
                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                 requested_compile_threads,
+                                                 u8"aggressive",
                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                 u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
+                                                 u8"\", but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
 
                     if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
                 }
@@ -377,23 +384,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             else
             {
-                auto const requested_compile_threads_abs{static_cast<runtime_compile_threads_unsigned_type>(0u) -
-                                                         static_cast<runtime_compile_threads_unsigned_type>(requested_compile_threads)};
-
-                if(requested_compile_threads_abs > static_cast<runtime_compile_threads_unsigned_type>(max_compile_threads)) [[unlikely]]
+                auto const requested_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads};
+                if(requested_compile_threads >= 0)
                 {
-                    runtime_compile_threads_fatal(u8"Invalid negative runtime compile thread count (requested=",
-                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                  requested_compile_threads,
-                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                  u8", detected-max=",
-                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                  max_compile_threads,
-                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                  u8"): the absolute value of a negative setting must not exceed the detected max thread count.");
-                }
+                    resolved_compile_threads = 0uz;
 
-                resolved_compile_threads = max_compile_threads - static_cast<::std::size_t>(requested_compile_threads_abs);
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                    resolved_compile_threads = static_cast<::std::size_t>(requested_compile_threads);
+                    if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                    {
+                        runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     resolved_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8", detected-max=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     max_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8"). The requested value will still be used, but performance may be suboptimal.");
+
+                        if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
+                    }
+#else
+                    if(requested_compile_threads != 0 && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                    {
+                        runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     requested_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
+
+                        if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
+                    }
+#endif
+                }
+                else
+                {
+                    auto const requested_compile_threads_abs{static_cast<runtime_compile_threads_unsigned_type>(0u) -
+                                                             static_cast<runtime_compile_threads_unsigned_type>(requested_compile_threads)};
+
+                    if(requested_compile_threads_abs > static_cast<runtime_compile_threads_unsigned_type>(max_compile_threads)) [[unlikely]]
+                    {
+                        runtime_compile_threads_fatal(u8"Invalid negative runtime compile thread count (requested=",
+                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                      requested_compile_threads,
+                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                      u8", detected-max=",
+                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                      max_compile_threads,
+                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                      u8"): the absolute value of a negative setting must not exceed the detected max thread count.");
+                    }
+
+                    resolved_compile_threads = max_compile_threads - static_cast<::std::size_t>(requested_compile_threads_abs);
+                }
             }
         }
 
@@ -403,19 +447,80 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         {
             if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
             {
-                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                     resolved_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                     u8" (requested=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                     ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                     u8", detected-max=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                     max_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                     u8"). ");
+                auto const requested_compile_threads_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy};
+
+                if(requested_compile_threads_policy == runtime_compile_threads_policy_t::default_policy)
+                {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         resolved_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" (requested=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"default",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", detected-max=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         max_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8"). ");
+#else
+                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         resolved_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" (requested=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"default",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", fast_io::native_thread unavailable on this platform). ");
+#endif
+                }
+                else if(requested_compile_threads_policy == runtime_compile_threads_policy_t::aggressive)
+                {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         resolved_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" (requested=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"aggressive",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", detected-max=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         max_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", aggressive-policy=floor(max*2/3)). ");
+#else
+                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         resolved_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" (requested=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         u8"aggressive",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", fast_io::native_thread unavailable on this platform). ");
+#endif
+                }
+                else
+                {
+                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         resolved_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" (requested=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8", detected-max=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         max_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8"). ");
+                }
             }
             else
             {

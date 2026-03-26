@@ -1879,8 +1879,8 @@ case wasm1_code::br_if:
                 bool const fused{
                     [&]() constexpr UWVM_THROWS -> bool
                     {
-                        auto const* const loop_begin{target_frame.wasm_code_curr_at_start_label};
-                        auto const* const endp{op_begin};
+                        auto const loop_begin{target_frame.wasm_code_curr_at_start_label};
+                        auto const endp{op_begin};
                         if(loop_begin == nullptr || loop_begin >= endp) { return false; }
 
                         ::std::byte const* p{loop_begin};

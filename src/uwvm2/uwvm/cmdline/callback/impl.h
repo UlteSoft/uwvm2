@@ -52,6 +52,7 @@
 # include "runtime_aot.h"
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
+# include "runtime_scheduling_policy.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"

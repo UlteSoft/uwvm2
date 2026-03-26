@@ -21,7 +21,7 @@ if(local_func_count != 0uz)
         info.runtime_func = ::std::addressof(curr_module.local_defined_function_vec_storage.index_unchecked(i));
         info.compiled_func = ::std::addressof(storage.local_funcs.index_unchecked(i));
 
-        auto const* const ft{curr_module.local_defined_function_vec_storage.index_unchecked(i).function_type_ptr};
+        auto const ft{curr_module.local_defined_function_vec_storage.index_unchecked(i).function_type_ptr};
         if(ft == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         ::std::size_t para_bytes{};

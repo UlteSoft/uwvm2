@@ -108,9 +108,12 @@ These commands are intended for introspection. They print information and then r
 
 - Long options use `--option-name`.
 - Many options also have short project-specific aliases such as `-Rjit` or `-Wpre`.
-- `<name:type>` indicates a required argument.
-- `(<name:type>)` indicates an optional argument.
-- `[a|b|c]` indicates a required value chosen from a fixed set.
+- `<name:type>` indicates a typed placeholder. The supplied token must satisfy that type on the current platform.
+- `(<name:type>)` indicates an optional typed argument.
+- `|` separates alternative accepted forms within the same usage slot.
+- `[a|b|c]` indicates that the slot accepts one of the listed forms.
+- `[a|<int>]` means the slot accepts either the literal `a` or any token that satisfies the current platform's `int` parsing rules.
+- Whether a slot itself may be omitted is determined by the surrounding usage form, not by `[]` alone. For example, `<x>` is required, while `(<x>)` is optional.
 - `None` means the option is a pure flag.
 
 ## Global Commands
@@ -271,7 +274,8 @@ This is a pure flag-style parameter. It toggles the global memory-growth policy 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
 | `--runtime-aot` | `-Raot` | None | Shortcut runtime: full compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
-| `--runtime-compile-threads` | `-Rct` | `<count:ssize_t>` | Configure the runtime compile-thread count, including signed offsets from detected hardware concurrency. | Hosted runtime builds |
+| `--runtime-compile-threads` | `-Rct` | `[default\|aggressive\|count:ssize_t]` | Configure the runtime compile-thread count, including policy presets and signed offsets from detected hardware concurrency. | Hosted runtime builds |
+| `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>\|code_size <bytes:size_t>]` | Configure how full-compile groups local functions into translation tasks. Effective only when extra runtime compile threads are enabled. | Hosted runtime builds |
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
 | `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy\|lazy+verification\|full]` | Select the runtime mode explicitly. | Hosted runtime builds |
@@ -355,24 +359,55 @@ Source mapping:
 
 ### `--runtime-compile-threads`
 
-This option is intentionally more permissive than the generic parser because it accepts signed integers, including negative values.
+This option is intentionally more permissive than the generic parser because it accepts signed integers, including negative values, and also supports named policies.
 
 Source behavior:
 
-- the argument is parsed as `ssize_t` (`std::make_signed_t<std::size_t>` in the source),
-- negative values such as `-1` are accepted,
-- the value is stored in `runtime::runtime_mode::global_runtime_compile_threads`,
+- accepted forms are `default`, `aggressive`, or `ssize_t`,
+- numeric values are stored in `runtime::runtime_mode::global_runtime_compile_threads`,
+- named-policy values are stored in `runtime::runtime_mode::global_runtime_compile_threads_policy`,
 - the corresponding existence flag is `runtime_compile_threads_existed`,
 - the effective resolved value is stored later in `runtime::runtime_mode::global_runtime_compile_threads_resolved`.
 
 Runtime-time resolution behavior in `run.h`:
 
 - if the option is omitted, uwvm selects a default compile-thread count using the default-policy `log2(N CPUs)` heuristic,
+- if the value is `default`, uwvm explicitly uses that same default policy,
+- if the value is `aggressive`, uwvm resolves the extra compile-thread count to `floor(detected_max_threads * 2 / 3)`,
 - if the value is non-negative, that exact value becomes the resolved compile-thread count,
 - if the non-negative value is larger than the detected maximum hardware thread count, uwvm emits a dedicated `runtime-compile-threads` warning but still keeps the requested value,
 - if the value is negative, uwvm interprets it as `detected_max_threads - abs(value)`,
 - if the absolute value of a negative input is larger than the detected maximum, uwvm terminates with a fatal error,
+- if `aggressive` is requested on a platform without `fast_io::native_thread`, uwvm emits a warning and falls back to `0` extra compile threads,
 - when verbose logging is enabled, uwvm prints the final resolved compile-thread count.
+
+### `--runtime-scheduling-policy`
+
+This option controls how uwvm groups local functions into translation tasks during interpreter full-compile. It only has an effect when the resolved extra runtime compile thread count is greater than zero.
+
+Source behavior:
+
+- if the option is omitted, uwvm defaults to `code_size 4096`,
+- accepted forms are:
+  - `func_count <size_t>`: group by number of functions,
+  - `code_size <size_t>`: group by cumulative wasm code-body size,
+- the scheduling policy is stored in `runtime::runtime_mode::global_runtime_scheduling_policy`,
+- the scheduling granularity is stored in `runtime::runtime_mode::global_runtime_scheduling_size`,
+- the corresponding existence flag is `runtime_scheduling_policy_existed`.
+
+Task-building behavior in `translate/single_func.h`:
+
+- grouping always walks local functions in source order,
+- `func_count <N>` emits a task whenever `N` functions have been accumulated,
+- `code_size <N>` emits a task whenever the cumulative wasm code-body size reaches `N`,
+- the measured code-body size is derived from each function's parsed wasm code section boundaries,
+- the last incomplete group is emitted as the final task,
+- if full translation runs on the main thread only, the configured scheduling policy is inactive.
+
+Validation behavior:
+
+- all numeric forms must be `size_t` and strictly greater than `0`,
+- invalid modes or zero-sized thresholds are rejected at parse time.
 
 ### `--runtime-compiler-log`
 

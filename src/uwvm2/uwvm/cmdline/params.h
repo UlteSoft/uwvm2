@@ -97,6 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
 
         // wasi
 #if defined(UWVM_IMPORT_WASI)
