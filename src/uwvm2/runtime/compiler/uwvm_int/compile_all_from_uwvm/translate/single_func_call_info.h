@@ -117,5 +117,3 @@ if(local_func_count != 0uz)
         }
     }
 }
-
-return storage;

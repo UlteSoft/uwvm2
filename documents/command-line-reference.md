@@ -274,7 +274,7 @@ This is a pure flag-style parameter. It toggles the global memory-growth policy 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
 | `--runtime-aot` | `-Raot` | None | Shortcut runtime: full compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
-| `--runtime-compile-threads` | `-Rct` | `[default\|aggressive\|count:ssize_t]` | Configure the runtime compile-thread count, including policy presets and signed offsets from detected hardware concurrency. | Hosted runtime builds |
+| `--runtime-compile-threads` | `-Rct` | `[default\|aggressive\|count:ssize_t]` | Configure the runtime compile-thread count, or choose the adaptive `default` / `aggressive` policy upper bound. | Hosted runtime builds |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>\|code_size <bytes:size_t>]` | Configure how full-compile groups local functions into translation tasks. Effective only when extra runtime compile threads are enabled. | Hosted runtime builds |
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
 | `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
@@ -359,7 +359,7 @@ Source mapping:
 
 ### `--runtime-compile-threads`
 
-This option is intentionally more permissive than the generic parser because it accepts signed integers, including negative values, and also supports named policies.
+This option is intentionally more permissive than the generic parser because it accepts signed integers, including negative values, and also supports named adaptive policies.
 
 Source behavior:
 
@@ -367,19 +367,23 @@ Source behavior:
 - numeric values are stored in `runtime::runtime_mode::global_runtime_compile_threads`,
 - named-policy values are stored in `runtime::runtime_mode::global_runtime_compile_threads_policy`,
 - the corresponding existence flag is `runtime_compile_threads_existed`,
-- the effective resolved value is stored later in `runtime::runtime_mode::global_runtime_compile_threads_resolved`.
+- the effective resolved value is stored later in `runtime::runtime_mode::global_runtime_compile_threads_resolved`,
+- for `default` and `aggressive`, that resolved value is an adaptive upper bound rather than a guaranteed per-module thread count.
 
 Runtime-time resolution behavior in `run.h`:
 
-- if the option is omitted, uwvm selects a default compile-thread count using the default-policy `log2(N CPUs)` heuristic,
-- if the value is `default`, uwvm explicitly uses that same default policy,
-- if the value is `aggressive`, uwvm resolves the extra compile-thread count to `floor(detected_max_threads * 2 / 3)`,
+- if the option is omitted, uwvm selects the `default` adaptive policy upper bound using the `log2(N CPUs)` heuristic,
+- if the value is `default`, uwvm explicitly uses that same conservative adaptive policy,
+- if the value is `aggressive`, uwvm resolves an aggressive adaptive-policy upper bound to `floor(detected_max_threads * 2 / 3)`,
 - if the value is non-negative, that exact value becomes the resolved compile-thread count,
 - if the non-negative value is larger than the detected maximum hardware thread count, uwvm emits a dedicated `runtime-compile-threads` warning but still keeps the requested value,
 - if the value is negative, uwvm interprets it as `detected_max_threads - abs(value)`,
 - if the absolute value of a negative input is larger than the detected maximum, uwvm terminates with a fatal error,
 - if `aggressive` is requested on a platform without `fast_io::native_thread`, uwvm emits a warning and falls back to `0` extra compile threads,
-- when verbose logging is enabled, uwvm prints the final resolved compile-thread count.
+- during interpreter full-compile, `default` may reduce the per-module extra compile-thread count below that resolved upper bound when a small module would otherwise be overscheduled,
+- during interpreter full-compile, `aggressive` is also adaptive, but uses a less conservative per-module reduction rule than `default`,
+- numeric settings are not part of this adaptive-policy adjustment path,
+- when verbose logging is enabled, uwvm prints the final resolved upper bound, and per-module verbose logs show the actual thread count used for full translation when adaptation is active.
 
 ### `--runtime-scheduling-policy`
 
@@ -387,7 +391,8 @@ This option controls how uwvm groups local functions into translation tasks duri
 
 Source behavior:
 
-- if the option is omitted, uwvm defaults to `code_size 4096`,
+- if the option is omitted, uwvm starts from `code_size 4096`,
+- for small modules, the default policy may increase that `code_size` threshold automatically to reduce multithread scheduling overhead,
 - accepted forms are:
   - `func_count <size_t>`: group by number of functions,
   - `code_size <size_t>`: group by cumulative wasm code-body size,

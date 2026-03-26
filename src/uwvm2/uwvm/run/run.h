@@ -246,7 +246,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
     {
-        // Follow the default policy: roughly one compiler thread per log2(N) CPUs.
+        // Follow the default policy upper bound: roughly one compiler thread per log2(N) CPUs.
         ::std::size_t compiler_threads{};
         while(max_compile_threads > 1uz)
         {
@@ -452,7 +452,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 if(requested_compile_threads_policy == runtime_compile_threads_policy_t::default_policy)
                 {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                    runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -464,9 +464,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          max_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8"). ");
+                                                         u8", per-module full-compile scheduling may adapt below this upper bound). ");
 #else
-                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                    runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -480,7 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 else if(requested_compile_threads_policy == runtime_compile_threads_policy_t::aggressive)
                 {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                    runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -492,9 +492,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          max_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8", aggressive-policy=floor(max*2/3)). ");
+                                                         u8", aggressive-policy=floor(max*2/3), per-module full-compile scheduling may adapt below this upper bound). ");
 #else
-                    runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                    runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -525,7 +525,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             else
             {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
@@ -533,9 +533,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      max_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                     u8"). ");
+                                                     u8", per-module full-compile scheduling may adapt below this upper bound). ");
 #else
-                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),

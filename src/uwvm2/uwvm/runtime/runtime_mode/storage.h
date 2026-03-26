@@ -110,12 +110,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline runtime_compile_threads_type global_runtime_compile_threads{};  // [global]
 
     /// @brief Runtime compile thread selection policy from the command line.
-    /// @details When the option is omitted, the runtime still falls back to the default policy.
+    /// @details When the option is omitted, the runtime still falls back to the default adaptive policy.
     inline runtime_compile_threads_policy_t global_runtime_compile_threads_policy{
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t::default_policy};  // [global]
 
     /// @brief Effective runtime compile thread count after defaulting / negative-offset resolution.
-    /// @details `0` means no extra compile thread; the runtime mode decides how that is interpreted during execution.
+    /// @details For adaptive policies, this is the resolved upper bound before per-module full-compile adjustment. `0` means no extra compile thread.
     inline ::std::size_t global_runtime_compile_threads_resolved{};  // [global]
 
     inline constexpr ::std::size_t default_runtime_scheduling_size{4096uz};

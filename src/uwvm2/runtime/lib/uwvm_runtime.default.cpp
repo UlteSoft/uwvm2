@@ -2689,7 +2689,26 @@ namespace uwvm2::runtime::uwvm_int
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 }};
 
+            using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
+
             auto effective_extra_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
+            auto const runtime_compile_threads_policy{
+                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_policy};
+            auto const default_runtime_compile_threads_policy_active{
+                !::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed ||
+                runtime_compile_threads_policy == runtime_compile_threads_policy_t::default_policy};
+            auto const aggressive_runtime_compile_threads_policy_active{
+                ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed &&
+                runtime_compile_threads_policy == runtime_compile_threads_policy_t::aggressive};
+            auto const adaptive_runtime_compile_threads_policy_active{
+                default_runtime_compile_threads_policy_active || aggressive_runtime_compile_threads_policy_active};
+            ::uwvm2::utils::container::u8string_view const adaptive_runtime_compile_threads_policy_name{
+                aggressive_runtime_compile_threads_policy_active ? ::uwvm2::utils::container::u8string_view{u8"aggressive"}
+                                                                : ::uwvm2::utils::container::u8string_view{u8"default"}};
+            auto const adaptive_target_task_groups_per_adjusted_compile_thread{
+                aggressive_runtime_compile_threads_policy_active
+                    ? ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::aggressive_target_task_groups_per_adjusted_compile_thread
+                    : ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::default_target_task_groups_per_adjusted_compile_thread};
 #ifndef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
             if(effective_extra_compile_threads != 0uz)
             {
@@ -2714,6 +2733,18 @@ namespace uwvm2::runtime::uwvm_int
                 {
                     runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation will run on the main thread only. ");
                 }
+                else if(adaptive_runtime_compile_threads_policy_active)
+                {
+                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation will use up to ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         effective_extra_compile_threads + 1uz,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" compile threads (main=1, extra-up-to=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         effective_extra_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8"). ");
+                }
                 else
                 {
                     runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation will use ",
@@ -2733,15 +2764,18 @@ namespace uwvm2::runtime::uwvm_int
 
             auto const runtime_scheduling_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_policy};
             auto const runtime_scheduling_size{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size};
+            auto const runtime_scheduling_policy_existed{::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_existed};
 
             auto const compile_task_split_conf{
                 runtime_scheduling_policy == runtime_scheduling_policy_t::function_count
                     ? ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_config{
                           .policy = compile_task_split_policy_t::function_count,
-                          .split_size = runtime_scheduling_size}
+                          .split_size = runtime_scheduling_size,
+                          .adjust_for_default_policy = !runtime_scheduling_policy_existed}
                     : ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_config{
                           .policy = compile_task_split_policy_t::code_size,
-                          .split_size = runtime_scheduling_size}};
+                          .split_size = runtime_scheduling_size,
+                          .adjust_for_default_policy = !runtime_scheduling_policy_existed}};
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
@@ -2751,30 +2785,6 @@ namespace uwvm2::runtime::uwvm_int
                     {
                         runtime_compile_threads_verbose_info(u8"Runtime scheduling policy is configured but inactive because no extra runtime compile threads are enabled. ");
                     }
-                }
-                else if(runtime_scheduling_policy == runtime_scheduling_policy_t::function_count)
-                {
-                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation scheduling policy uses ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         u8"func_count",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8" with ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         runtime_scheduling_size,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8" functions per task. ");
-                }
-                else
-                {
-                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation scheduling policy uses ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         u8"code_size",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8" with ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         runtime_scheduling_size,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8" wasm code-body bytes per task. ");
                 }
             }
 
@@ -2812,6 +2822,144 @@ namespace uwvm2::runtime::uwvm_int
                 if(it == g_runtime.module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
                 opt.curr_wasm_id = it->second;
 
+                auto const thread_resolution_compile_task_split_conf{
+                    ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::resolve_effective_compile_task_split_config(
+                        *rec.runtime_module, compile_task_split_conf, effective_extra_compile_threads)};
+                auto const runtime_scheduling_policy_adjusted_for_thread_resolution{
+                    !runtime_scheduling_policy_existed && compile_task_split_conf.policy == compile_task_split_policy_t::code_size &&
+                    thread_resolution_compile_task_split_conf.split_size != runtime_scheduling_size};
+                auto effective_module_extra_compile_threads{effective_extra_compile_threads};
+                if(adaptive_runtime_compile_threads_policy_active)
+                {
+                    effective_module_extra_compile_threads =
+                        ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::resolve_effective_adaptive_extra_compile_threads(
+                            *rec.runtime_module,
+                            thread_resolution_compile_task_split_conf,
+                            effective_extra_compile_threads,
+                            adaptive_target_task_groups_per_adjusted_compile_thread,
+                            runtime_scheduling_policy_adjusted_for_thread_resolution);
+                }
+                auto const effective_compile_task_split_conf{
+                    ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::resolve_effective_compile_task_split_config(
+                        *rec.runtime_module, compile_task_split_conf, effective_module_extra_compile_threads)};
+                auto const default_runtime_scheduling_policy_adjusted{
+                    !runtime_scheduling_policy_existed && compile_task_split_conf.policy == compile_task_split_policy_t::code_size &&
+                    effective_compile_task_split_conf.split_size != runtime_scheduling_size};
+
+                if(::uwvm2::uwvm::io::show_verbose && effective_extra_compile_threads != 0uz) [[unlikely]]
+                {
+                    if(effective_module_extra_compile_threads == 0uz)
+                    {
+                        runtime_compile_threads_verbose_info(u8"Module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" full translation will run on the main thread only. ");
+                    }
+                    else
+                    {
+                        runtime_compile_threads_verbose_info(u8"Module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" full translation will use ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_module_extra_compile_threads + 1uz,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" compile threads (main=1, extra=",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_module_extra_compile_threads,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"). ");
+                    }
+
+                    if(effective_compile_task_split_conf.policy == compile_task_split_policy_t::function_count)
+                    {
+                        runtime_compile_threads_verbose_info(u8"Module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" full translation scheduling policy uses ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             u8"func_count",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" with ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_compile_task_split_conf.split_size,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" functions per task. ");
+                    }
+                    else
+                    {
+                        runtime_compile_threads_verbose_info(u8"Module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" full translation scheduling policy uses ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             u8"code_size",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" with ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_compile_task_split_conf.split_size,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" wasm code-body bytes per task. ");
+                    }
+
+                    if(adaptive_runtime_compile_threads_policy_active && effective_module_extra_compile_threads != effective_extra_compile_threads)
+                    {
+                        runtime_compile_threads_verbose_info(::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_WHITE),
+                                                             adaptive_runtime_compile_threads_policy_name,
+                                                             u8" runtime compile thread policy adjusted module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" extra compile threads from ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_extra_compile_threads,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" to ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_module_extra_compile_threads,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" to avoid overscheduling a small module. ");
+                    }
+
+                    if(default_runtime_scheduling_policy_adjusted)
+                    {
+                        runtime_compile_threads_verbose_info(u8"Default runtime scheduling policy adjusted module \"",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             rec.module_name,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8"\" code_size from ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             runtime_scheduling_size,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" to ",
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color,
+                                                                                  UWVM_COLOR_U8_YELLOW),
+                                                             effective_compile_task_split_conf.split_size,
+                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                             u8" to reduce scheduling overhead for a small module. ");
+                    }
+                }
+
                 ::uwvm2::validation::error::code_validation_error_impl err{};
 
 #ifdef UWVM_CPP_EXCEPTIONS
@@ -2822,8 +2970,8 @@ namespace uwvm2::runtime::uwvm_int
                         *rec.runtime_module,
                         opt,
                         err,
-                        effective_extra_compile_threads,
-                        compile_task_split_conf);
+                        effective_module_extra_compile_threads,
+                        effective_compile_task_split_conf);
                 }
 #ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error)
