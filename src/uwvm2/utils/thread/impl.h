@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2026-03-26
  * @copyright   APL-2.0 License
  */
 
@@ -19,22 +20,8 @@
  *                                      *
  ****************************************/
 
-// macro
+#pragma once
 
-import fast_io;
-import uwvm2.parser.wasm.concepts;
-import uwvm2.parser.wasm.standard.wasm1.features;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm.standard.wasm1p1.type;
-import uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
-import uwvm2.runtime.compiler.uwvm_int.optable;
-import uwvm2.utils.container;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.imported.wasi.wasip1.storage;
-import uwvm2.uwvm.wasm.feature;
-import uwvm2.uwvm.wasm.type;
-import uwvm2.uwvm.runtime.runtime_mode;
-import uwvm2.uwvm.wasm.storage;
-import uwvm2.runtime;
-
-#include "uwvm_runtime.default.cpp"
+#ifndef UWVM_MODULE
+# include "native_thread.h"
+#endif

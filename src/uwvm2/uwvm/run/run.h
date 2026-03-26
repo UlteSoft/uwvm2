@@ -42,6 +42,7 @@
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/utils/madvise/impl.h>
+# include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
 # include <uwvm2/parser/wasm/standard/impl.h>
@@ -325,16 +326,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
 
-        auto max_compile_threads{static_cast<::std::size_t>(::fast_io::native_thread::hardware_concurrency())};
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        ::std::size_t max_compile_threads{::uwvm2::utils::thread::hardware_concurrency()};
         if(max_compile_threads == 0uz) [[unlikely]] { max_compile_threads = 1uz; }
+#else
+        constexpr ::std::size_t max_compile_threads{1uz};
+#endif
 
-        auto resolved_compile_threads{calculate_default_runtime_compile_threads(max_compile_threads)};
+        ::std::size_t resolved_compile_threads{
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+            calculate_default_runtime_compile_threads(max_compile_threads)
+#endif
+        };
 
         if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
         {
             auto const requested_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads};
             if(requested_compile_threads >= 0)
             {
+                resolved_compile_threads = 0uz;
+                
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 resolved_compile_threads = static_cast<::std::size_t>(requested_compile_threads);
                 if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                 {
@@ -350,6 +362,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                     if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
                 }
+#else
+                if(requested_compile_threads != 0 && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                {
+                    runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                 requested_compile_threads,
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                 u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
+
+                    if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
+                }
+#endif
             }
             else
             {
@@ -395,6 +419,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             else
             {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
@@ -404,6 +429,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                      max_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                      u8"). ");
+#else
+                runtime_compile_threads_verbose_info(u8"Runtime compile threads resolved to ",
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                     resolved_compile_threads,
+                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                     u8" by the default policy (fast_io::native_thread unavailable on this platform). ");
+#endif
             }
         }
 

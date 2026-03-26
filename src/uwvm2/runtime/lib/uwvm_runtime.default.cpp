@@ -58,6 +58,7 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include <uwvm2/runtime/lib/uwvm_runtime.h>
 #endif
@@ -2638,6 +2639,95 @@ namespace uwvm2::runtime::uwvm_int
 #endif
             }
 
+            constexpr auto runtime_compile_threads_warn{
+                []<typename... Args>(Args&&... args) constexpr noexcept
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                        u8"[warn]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::std::forward<Args>(args)...,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8" (runtime-compile-threads)\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                }};
+
+            constexpr auto runtime_compile_threads_warn_to_fatal{
+                []() constexpr noexcept
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Convert warnings to fatal errors. ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(runtime-compile-threads)\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }};
+
+            constexpr auto runtime_compile_threads_verbose_info{
+                []<typename... Args>(Args&&... args) constexpr noexcept
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        u8"[info]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::std::forward<Args>(args)...,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                        u8"[",
+                                        ::uwvm2::uwvm::io::get_local_realtime(),
+                                        u8"] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(verbose)\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                }};
+
+            auto effective_extra_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
+#ifndef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+            if(effective_extra_compile_threads != 0uz)
+            {
+                if(::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
+                {
+                    runtime_compile_threads_warn(u8"Runtime compile threads resolved to ",
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                 effective_extra_compile_threads,
+                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                 u8", but this platform does not provide fast_io::native_thread. Falling back to main-thread-only uwvm-int full translation.");
+
+                    if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
+                }
+
+                effective_extra_compile_threads = 0uz;
+            }
+#endif
+
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                if(effective_extra_compile_threads == 0uz)
+                {
+                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation will run on the main thread only. ");
+                }
+                else
+                {
+                    runtime_compile_threads_verbose_info(u8"UWVM Interpreter full translation will use ",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         effective_extra_compile_threads + 1uz,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8" compile threads (main=1, extra=",
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                         effective_extra_compile_threads,
+                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                         u8"). ");
+                }
+            }
+
             // Assign module ids.
             g_runtime.modules.clear();
             g_runtime.module_name_to_id.clear();
@@ -2678,10 +2768,11 @@ namespace uwvm2::runtime::uwvm_int
                 try
 #endif
                 {
-                    rec.compiled =
-                        ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<kTranslateOpt>(*rec.runtime_module,
-                                                                                                                                      opt,
-                                                                                                                                      err);
+                    rec.compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm<kTranslateOpt>(
+                        *rec.runtime_module,
+                        opt,
+                        err,
+                        effective_extra_compile_threads);
                 }
 #ifdef UWVM_CPP_EXCEPTIONS
                 catch(::fast_io::error)
