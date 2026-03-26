@@ -301,6 +301,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     u8"[fatal] ",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     ::std::forward<Args>(args)...,
+                                    u8"\n\n",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 ::fast_io::fast_terminate();
             }};
