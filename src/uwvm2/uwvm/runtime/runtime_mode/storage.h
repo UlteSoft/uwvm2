@@ -27,6 +27,7 @@
 # include <cstdint>
 # include <limits>
 # include <memory>
+# include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
@@ -51,6 +52,22 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
+    using ssize_t = ::std::make_signed_t<::std::size_t>;
+    using runtime_compile_threads_type = ssize_t;
+
+    enum class runtime_compile_threads_policy_t : unsigned
+    {
+        numeric,
+        default_policy,
+        aggressive
+    };
+
+    enum class runtime_scheduling_policy_t : unsigned
+    {
+        function_count,
+        code_size
+    };
+
     inline bool custom_runtime_mode_existed{};      // [global]
     inline bool custom_runtime_compiler_existed{};  // [global]
 
@@ -83,6 +100,37 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details full_compile + llvm_jit_only
     inline bool is_runtime_mode_code_aot_existed{};  // [global]
 #endif
+
+    /// @brief Whether the runtime compile thread count was explicitly configured.
+    /// @details When this is false, the runtime will use its default thread selection policy.
+    inline bool runtime_compile_threads_existed{};  // [global]
+
+    /// @brief Raw runtime compile thread count from the command line.
+    /// @details Only used when the policy is `numeric`. The execution meaning of 0 / positive / negative values is handled later by the runtime scheduler.
+    inline runtime_compile_threads_type global_runtime_compile_threads{};  // [global]
+
+    /// @brief Runtime compile thread selection policy from the command line.
+    /// @details When the option is omitted, the runtime still falls back to the default adaptive policy.
+    inline runtime_compile_threads_policy_t global_runtime_compile_threads_policy{
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t::default_policy};  // [global]
+
+    /// @brief Effective runtime compile thread count after defaulting / negative-offset resolution.
+    /// @details For adaptive policies, this is the resolved upper bound before per-module full-compile adjustment. `0` means no extra compile thread.
+    inline ::std::size_t global_runtime_compile_threads_resolved{};  // [global]
+
+    inline constexpr ::std::size_t default_runtime_scheduling_size{4096uz};
+
+    /// @brief Whether the runtime scheduling policy was explicitly configured.
+    inline bool runtime_scheduling_policy_existed{};  // [global]
+
+    /// @brief Runtime scheduling policy.
+    /// @details The default policy groups local functions by cumulative wasm code-body size.
+    inline runtime_scheduling_policy_t global_runtime_scheduling_policy{
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_t::code_size};  // [global]
+
+    /// @brief Runtime scheduling granularity.
+    /// @details Interpreted either as `functions per task` or `cumulative wasm code-body bytes per task` depending on the selected policy.
+    inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
     /// @brief   The global runtime mode.
     /// @details default = runtime-tiered

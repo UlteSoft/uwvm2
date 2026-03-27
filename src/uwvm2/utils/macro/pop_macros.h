@@ -49,6 +49,7 @@
 #pragma pop_macro("UWVM_THROWS")
 #pragma pop_macro("UWVM_REPLACEABLE_IF_ELIGIBLE")
 #pragma pop_macro("UWVM_HAS_BUILTIN")
+#pragma pop_macro("UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD")
 #pragma pop_macro("UWVM_ASSERT")
 #pragma pop_macro("UWVM_GNU_RETURNS_NONNULL")
 #pragma pop_macro("UWVM_GNU_MALLOC")

@@ -56,6 +56,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool show_toctou_warning{true};  // [global]
 # endif
     inline bool show_runtime_warning{true};  // [global]
+    inline bool show_runtime_compile_threads_warning{true};  // [global]
 
     /// @brief wtrap control
     inline bool vm_warning_fatal{};            // [global]
@@ -75,6 +76,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool toctou_warning_fatal{};  // [global]
 # endif
     inline bool runtime_warning_fatal{};  // [global]
+    inline bool runtime_compile_threads_warning_fatal{};  // [global]
 
 }  // namespace uwvm2::uwvm::io
 #endif

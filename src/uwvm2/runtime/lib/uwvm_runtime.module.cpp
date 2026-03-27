@@ -33,6 +33,7 @@ import uwvm2.uwvm.io;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm.feature;
 import uwvm2.uwvm.wasm.type;
+import uwvm2.uwvm.runtime.runtime_mode;
 import uwvm2.uwvm.wasm.storage;
 import uwvm2.runtime;
 

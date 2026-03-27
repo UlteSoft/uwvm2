@@ -316,6 +316,15 @@
 # define UWVM_HAS_BUILTIN(...) 0
 #endif
 
+/// @brief        Whether fast_io::native_thread is available on the current target.
+/// @details      This is a define-only macro. Use `#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD`.
+#pragma push_macro("UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD")
+#undef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+#if ((defined(_WIN32) && !defined(__WINE__)) && !defined(__CYGWIN__)) || (defined(__wasi__) && defined(__wasi_thread__)) ||                                    \
+    (!defined(__SINGLE_THREAD__) && !defined(__NEWLIB__) && !defined(__MSDOS__) && !defined(__DJGPP__) && __has_include(<pthread.h>))
+# define UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+#endif
+
 /// @brief        assert
 /// @details      Avoid using C++26 contracts. Different modules including different handle_contract_violation
 ///               implementations may result in multiple handling approaches. If a module without handle_contract_violation

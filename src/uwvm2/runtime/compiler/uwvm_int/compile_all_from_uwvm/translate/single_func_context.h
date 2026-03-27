@@ -104,16 +104,6 @@ auto const imported_memory_count{static_cast<wasm_u32>(curr_module.imported_memo
 auto const local_memory_count{static_cast<wasm_u32>(curr_module.local_defined_memory_vec_storage.size())};
 auto const all_memory_count{static_cast<wasm_u32>(imported_memory_count + local_memory_count)};
 
-storage.local_funcs.reserve(local_func_count);
-storage.local_defined_call_info.clear();
-storage.local_defined_call_info.resize(local_func_count);
-for(::std::size_t i{}; i != local_func_count; ++i)
-{
-    auto& info{storage.local_defined_call_info.index_unchecked(i)};
-    info.module_id = options.curr_wasm_id;
-    info.function_index = import_func_count + i;
-}
-
 // Reuse translation temporaries across functions to avoid repeated heap allocations.
 using curr_block_type = block_t;
 ::uwvm2::utils::container::vector<curr_block_type> control_flow_stack{};
@@ -155,7 +145,11 @@ labels.reserve(64uz);
 ptr_fixups.reserve(256uz);
 thunks.reserve(256uz);
 
+#if defined(UWVM_COMPILE_SINGLE_LOCAL_FUNCTION)
+auto const local_function_idx{compile_local_function_idx};
+#else
 for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; ++local_function_idx)
+#endif
 {
     ::std::size_t const function_index{import_func_count + local_function_idx};
 
@@ -640,4 +634,3 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     // Bytecode emitter (writes into local_func_symbol.op.operands).
     bytecode_vec_t& bytecode{local_func_symbol.op.operands};
-

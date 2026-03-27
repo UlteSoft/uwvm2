@@ -168,7 +168,7 @@ case wasm1_code::call:
     if(func_index_uz >= import_func_count)
     {
         auto const local_idx{func_index_uz - import_func_count};
-        auto const* const info_ptr{::std::addressof(storage.local_defined_call_info.index_unchecked(local_idx))};
+        auto const info_ptr{::std::addressof(storage.local_defined_call_info.index_unchecked(local_idx))};
         call_module_id = SIZE_MAX;
         call_function_imm = reinterpret_cast<::std::size_t>(info_ptr);
     }

@@ -1024,14 +1024,9 @@ case wasm1_code::end:
         local_func_symbol.operand_stack_byte_max = runtime_operand_stack_byte_max;
         local_func_symbol.local_bytes_zeroinit_end =
             static_cast<::std::size_t>(local_bytes_zeroinit_end <= internal_temp_local_off ? local_bytes_zeroinit_end : internal_temp_local_off);
-        storage.local_bytes_max = ::std::max(storage.local_bytes_max, local_func_symbol.local_bytes_max);
-        storage.local_count = ::std::max(storage.local_count, local_func_symbol.local_count);
-        storage.local_bytes_zeroinit_end = ::std::max(storage.local_bytes_zeroinit_end, local_func_symbol.local_bytes_zeroinit_end);
-        storage.operand_stack_max = ::std::max(storage.operand_stack_max, runtime_operand_stack_max);
-        storage.operand_stack_byte_max = ::std::max(storage.operand_stack_byte_max, runtime_operand_stack_byte_max);
         // IMPORTANT: bytecode contains self-referential absolute pointers (patched from rel offsets).
         // Copying would produce a new buffer with pointers still targeting the old buffer (UAF).
-        storage.local_funcs.push_back(::std::move(local_func_symbol));
+        storage.local_funcs.index_unchecked(local_function_idx) = ::std::move(local_func_symbol);
 
         finished_current_func = true;
         break;

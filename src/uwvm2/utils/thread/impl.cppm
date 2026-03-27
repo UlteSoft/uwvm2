@@ -1,4 +1,4 @@
-/*************************************************************
+﻿/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2026-03-26
  * @copyright   APL-2.0 License
  */
 
@@ -21,26 +22,8 @@
 
 module;
 
-// std
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/uwvm/runtime/macro/push_macros.h>
-
-export module uwvm2.uwvm.runtime.runtime_mode:storage;
-
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.parser.wasm.standard.wasm1.type;
-import uwvm2.parser.wasm.standard.wasm1p1.type;
-import uwvm2.parser.wasm.standard.wasm3.type;
-import uwvm2.object;
-import uwvm2.uwvm.wasm;
-import :mode;
+export module uwvm2.utils.thread;
+export import :native_thread;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -49,5 +32,4 @@ import :mode;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "storage.h"
-
+#include "impl.h"

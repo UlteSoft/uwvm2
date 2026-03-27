@@ -140,7 +140,7 @@ case wasm1_code::f32_add:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
@@ -266,8 +266,8 @@ case wasm1_code::f32_add:
             {
                 wasm_u32 next_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                auto const* const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
-                auto const* const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
+                auto const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
+                auto const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
                 auto const [next_local_index_next, next_local_index_err]{
                     ::fast_io::parse_by_scan(next_local_imm_begin, next_local_imm_end, ::fast_io::mnp::leb128_get(next_local_index))};
                 (void)next_local_index_next;
@@ -429,7 +429,7 @@ case wasm1_code::f32_sub:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
@@ -588,7 +588,7 @@ case wasm1_code::f32_mul:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
@@ -1111,7 +1111,7 @@ case wasm1_code::f64_add:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
@@ -1237,8 +1237,8 @@ case wasm1_code::f64_add:
             {
                 wasm_u32 next_local_index{};
                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                auto const* const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
-                auto const* const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
+                auto const next_local_imm_begin{reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 1u)};
+                auto const next_local_imm_end{reinterpret_cast<char8_t_const_may_alias_ptr>(code_end)};
                 auto const [next_local_index_next, next_local_index_err]{
                     ::fast_io::parse_by_scan(next_local_imm_begin, next_local_imm_end, ::fast_io::mnp::leb128_get(next_local_index))};
                 (void)next_local_index_next;
@@ -1472,7 +1472,7 @@ case wasm1_code::f64_sub:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));
@@ -1630,7 +1630,7 @@ case wasm1_code::f64_mul:
                                                                                reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                                ::fast_io::mnp::leb128_get(tmp_local_index))};
                     if(parse_err != ::fast_io::parse_code::ok) { return false; }
-                    auto const* const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
+                    auto const next_code_bytes{reinterpret_cast<::std::byte const*>(next_code)};
                     if(next_code_bytes == code_end) { return false; }
                     wasm1_code after_tee{};  // init
                     ::std::memcpy(::std::addressof(after_tee), next_code_bytes, sizeof(after_tee));

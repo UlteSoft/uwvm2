@@ -756,7 +756,7 @@ case wasm1_code::local_get:
 
                         if(curr_local_type == curr_operand_stack_value_type::i32 && update_op == wasm1_code::local_tee)
                         {
-                            auto const* const after_local_tee{reinterpret_cast<::std::byte const*>(next_local_index_next)};
+                            auto const after_local_tee{reinterpret_cast<::std::byte const*>(next_local_index_next)};
                             if(after_local_tee != code_end)
                             {
                                 wasm1_code after_tee{};  // init
@@ -2596,20 +2596,20 @@ case wasm1_code::global_get:
         if(next_op == wasm1_code::i32_const)
         {
             wasm_i32 imm{};
-            auto const* const const_imm_begin{code_curr + sizeof(wasm1_code)};
+            auto const const_imm_begin{code_curr + sizeof(wasm1_code)};
             auto const [imm_next, imm_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(const_imm_begin),
                                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
                                                                     ::fast_io::mnp::leb128_get(imm))};
             if(imm_err == ::fast_io::parse_code::ok)
             {
-                auto const* const after_const{reinterpret_cast<::std::byte const*>(imm_next)};
+                auto const after_const{reinterpret_cast<::std::byte const*>(imm_next)};
                 if(after_const != code_end)
                 {
                     wasm1_code op_after_const{};  // init
                     ::std::memcpy(::std::addressof(op_after_const), after_const, sizeof(wasm1_code));
                     if(op_after_const == wasm1_code::i32_add)
                     {
-                        auto const* const after_add{after_const + sizeof(wasm1_code)};
+                        auto const after_add{after_const + sizeof(wasm1_code)};
                         if(after_add != code_end)
                         {
                             wasm1_code op_after_add{};  // init
@@ -2617,7 +2617,7 @@ case wasm1_code::global_get:
                             if(op_after_add == wasm1_code::global_set)
                             {
                                 wasm_u32 set_global_index{};
-                                auto const* const set_index_begin{after_add + sizeof(wasm1_code)};
+                                auto const set_index_begin{after_add + sizeof(wasm1_code)};
                                 auto const [set_index_next,
                                             set_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(set_index_begin),
                                                                                     reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),

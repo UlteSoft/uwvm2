@@ -42,6 +42,7 @@ import fast_io;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
 import uwvm2.utils.madvise;
+import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.standard;

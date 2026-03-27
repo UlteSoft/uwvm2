@@ -53,6 +53,8 @@ export import :runtime_jit;
 export import :runtime_tiered;
 export import :runtime_aot;
 export import :runtime_compiler_log;
+export import :runtime_compile_threads;
+export import :runtime_scheduling_policy;
 
 // wasi
 export import :wasi_disable_utf8_check;

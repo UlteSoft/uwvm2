@@ -22,6 +22,7 @@
 module;
 
 // std
+#include <algorithm>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,7 @@ export module uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm:translate;
 import fast_io;
 import uwvm2.utils.intrinsics;
 import uwvm2.utils.container;
+import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.standard.wasm1;
 import uwvm2.validation.error;

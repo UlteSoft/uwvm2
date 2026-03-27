@@ -27,8 +27,8 @@ namespace details
         trivial_call_inline_match res{};
         if(code_ptr == nullptr) { return res; }
 
-        auto const* curr{reinterpret_cast<::std::byte const*>(code_ptr->body.expr_begin)};
-        auto const* const end{reinterpret_cast<::std::byte const*>(code_ptr->body.code_end)};
+        auto curr{reinterpret_cast<::std::byte const*>(code_ptr->body.expr_begin)};
+        auto const end{reinterpret_cast<::std::byte const*>(code_ptr->body.code_end)};
 
         auto const read_op{[&](wasm1_code& out) noexcept -> bool
                            {
@@ -92,7 +92,7 @@ namespace details
         // - We match the exact canonical form (locals only, no extra ops) to avoid false positives.
         auto const match_xorshift32_i32{[&]() noexcept -> bool
                                         {
-                                            auto const* const begin{curr};
+                                            auto const begin{curr};
                                             auto fail{[&]() noexcept
                                                       {
                                                           curr = begin;

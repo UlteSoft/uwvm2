@@ -23,6 +23,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <algorithm>
 # include <array>
 # include <bit>
 # include <cstddef>
@@ -38,6 +39,7 @@
 # include <fast_io.h>
 # include <uwvm2/utils/intrinsics/impl.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/thread/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/validation/error/impl.h>
