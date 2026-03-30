@@ -7,7 +7,7 @@ set_version("2.0.0")
 add_defines("UWVM_VERSION_X=2")
 add_defines("UWVM_VERSION_Y=0")
 add_defines("UWVM_VERSION_Z=0")
-add_defines("UWVM_VERSION_S=0")
+add_defines("UWVM_VERSION_S=1")
 
 set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd",
 	"openbsd", "macosx", "iphoneos", "watchos", "wasm-wasi", "wasm-wasip1", "wasm-wasip2", "wasm-wasip3",
