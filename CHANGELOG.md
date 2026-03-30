@@ -52,7 +52,8 @@ Each release entry should record:
 
 ### Beta Fixes
 
-- None recorded yet.
+- Removed unintended LLVM JIT environment probing during `xmake f` configuration when JIT support is disabled.
+- The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.0.1` builds.
 
 ### Release Fixes
 

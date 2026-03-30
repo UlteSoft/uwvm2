@@ -100,11 +100,6 @@ function def_build()
 	local enable_jit = get_config("enable-jit")
 	if not enable_jit or enable_jit == "none" then
 		add_defines("UWVM_DISABLE_JIT")
-	elseif enable_jit == "default" then
-		add_defines("UWVM_USE_DEFAULT_JIT")
-	elseif enable_jit == "llvm" then
-		add_defines("UWVM_USE_LLVM_JIT")
-		add_options("llvm-jit-env")
 	end
 
 	local enable_debug_int = get_config("enable-debug-int")
