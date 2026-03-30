@@ -1,0 +1,170 @@
+/*************************************************************
+ * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * Copyright (c) 2025-present UlteSoft. All rights reserved. *
+ * Licensed under the APL-2.0 License (see LICENSE file).    *
+ *************************************************************/
+
+/**
+ * @author      GPT
+ * @version     2.0.0
+ */
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+#ifndef UWVM_MODULE
+# include <fast_io_dsal/string.h>
+
+# include <uwvm2/utils/container/impl.h>
+
+#else
+# error "Module testing is not currently supported"
+#endif
+
+namespace test::wasm1_code_section_module_builder
+{
+    using ::uwvm2::utils::container::u8string;
+
+    inline void append_byte(u8string& out, ::std::uint8_t b) noexcept { out.push_back(static_cast<char8_t>(b)); }
+
+    inline void append_uleb128(u8string& out, ::std::uint32_t value) noexcept
+    {
+        ::std::uint32_t v{value};
+        do
+        {
+            ::std::uint8_t byte{static_cast<::std::uint8_t>(v & 0x7Fu)};
+            v >>= 7u;
+            if(v != 0u) { byte = static_cast<::std::uint8_t>(byte | 0x80u); }
+            append_byte(out, byte);
+        }
+        while(v != 0u);
+    }
+
+    inline ::std::uint8_t consume_byte(::std::uint8_t const* data, ::std::size_t size, ::std::size_t& pos, ::std::uint8_t fallback = 0u) noexcept
+    {
+        if(data == nullptr || pos >= size) { return fallback; }
+        return data[pos++];
+    }
+
+    inline void append_section_with_payload(u8string& mod, ::std::uint8_t sec_id, u8string const& payload) noexcept
+    {
+        append_byte(mod, sec_id);
+        append_uleb128(mod, static_cast<::std::uint32_t>(payload.size()));
+        for(auto ch: payload) { mod.push_back(ch); }
+    }
+
+    inline void append_module_header(u8string& mod) noexcept
+    {
+        mod.push_back(u8'\0');
+        mod.push_back(u8'a');
+        mod.push_back(u8's');
+        mod.push_back(u8'm');
+        mod.push_back(static_cast<char8_t>(0x01));
+        mod.push_back(u8'\0');
+        mod.push_back(u8'\0');
+        mod.push_back(u8'\0');
+    }
+
+    inline void build_fixed_type_section(u8string& out) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // type count
+        append_byte(payload, 0x60u);  // functype
+        append_uleb128(payload, 0u);  // param count
+        append_uleb128(payload, 0u);  // result count
+        append_section_with_payload(out, 1u, payload);
+    }
+
+    inline void build_fixed_function_section(u8string& out) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // function count
+        append_uleb128(payload, 0u);  // typeidx 0
+        append_section_with_payload(out, 3u, payload);
+    }
+
+    inline void build_fixed_table_section(u8string& out) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // table count
+        append_byte(payload, 0x70u);  // funcref
+        append_byte(payload, 0x00u);  // min only
+        append_uleb128(payload, 1u);  // min = 1
+        append_section_with_payload(out, 4u, payload);
+    }
+
+    inline void build_fixed_memory_section(u8string& out) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // memory count
+        append_byte(payload, 0x00u);  // min only
+        append_uleb128(payload, 1u);  // min = 1 page
+        append_section_with_payload(out, 5u, payload);
+    }
+
+    inline void build_fixed_global_section(u8string& out) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // global count
+        append_byte(payload, 0x7Fu);  // i32
+        append_byte(payload, 0x01u);  // mutable
+        append_byte(payload, 0x41u);  // i32.const
+        append_byte(payload, 0x00u);  // 0
+        append_byte(payload, 0x0Bu);  // end
+        append_section_with_payload(out, 6u, payload);
+    }
+
+    inline ::std::uint8_t select_local_value_type(::std::uint8_t tag) noexcept
+    {
+        switch(tag & 0x03u)
+        {
+            case 0u: return 0x7Fu;  // i32
+            case 1u: return 0x7Eu;  // i64
+            case 2u: return 0x7Du;  // f32
+            default: return 0x7Cu;  // f64
+        }
+    }
+
+    inline void build_code_section_from_fuzz(u8string& out, ::std::uint8_t const* data, ::std::size_t size) noexcept
+    {
+        u8string payload{};
+        append_uleb128(payload, 1u);  // code count
+
+        u8string body{};
+        ::std::size_t pos{};
+
+        auto const local_group_count{static_cast<::std::uint32_t>(consume_byte(data, size, pos, 1u) % 4u)};
+        append_uleb128(body, local_group_count);
+
+        for(::std::uint32_t group_idx{}; group_idx != local_group_count; ++group_idx)
+        {
+            auto const local_count{static_cast<::std::uint32_t>(1u + (consume_byte(data, size, pos, 0u) % 4u))};
+            append_uleb128(body, local_count);
+            append_byte(body, select_local_value_type(consume_byte(data, size, pos, group_idx == 0u ? 0u : 1u)));
+        }
+
+        for(; pos < size; ++pos) { append_byte(body, data[pos]); }
+
+        if(body.empty() || static_cast<::std::uint8_t>(body.back()) != 0x0Bu) { append_byte(body, 0x0Bu); }
+
+        append_uleb128(payload, static_cast<::std::uint32_t>(body.size()));
+        for(auto ch: body) { payload.push_back(ch); }
+
+        append_section_with_payload(out, 10u, payload);
+    }
+
+    [[nodiscard]] inline u8string build_module_from_code_section_bytes(::std::uint8_t const* data, ::std::size_t size) noexcept
+    {
+        u8string mod{};
+        append_module_header(mod);
+        build_fixed_type_section(mod);
+        build_fixed_function_section(mod);
+        build_fixed_table_section(mod);
+        build_fixed_memory_section(mod);
+        build_fixed_global_section(mod);
+        build_code_section_from_fuzz(mod, data, size);
+        return mod;
+    }
+}  // namespace test::wasm1_code_section_module_builder
