@@ -14,7 +14,7 @@ xmake f -m release
 xmake
 
 # LLVM/Clang toolchain
-xmake f -m release --use-llvm=y
+xmake f -m release --use-llvm-compiler=y
 xmake
 
 # Install
@@ -45,7 +45,7 @@ $ xmake i -o <install_path>
 2. Install [[llvm]](https://github.com/llvm/llvm-project/releases)
 3. Build
 ```shell
-$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm=y
+$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm-compiler=y
 $ xmake
 ```
 4. Install UWVM2

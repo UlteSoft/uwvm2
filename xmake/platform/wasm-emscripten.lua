@@ -48,7 +48,7 @@ function wasm_emscripten_target()
     end
 
     -- dynamic libary loader
-    --if use_llvm_toolchain then	
+    --if use_llvm_compiler then	
     --    add_syslinks("c++abi")
     --end
 

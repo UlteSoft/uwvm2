@@ -1,8 +1,8 @@
 
 function darwin_target()
 
-	local use_llvm_toolchain = get_config("use-llvm")
-	if use_llvm_toolchain then	
+	local use_llvm_compiler = get_config("use-llvm-compiler")
+	if use_llvm_compiler then	
 	    -- On macOS, xmake's `clang` toolchain typically resolves to Apple clang in `/usr/bin/clang`,
 	    -- which can be incompatible with our custom SYSROOT/toolchain (and may crash while compiling).
 	    -- Use xmake's `llvm` toolchain instead so it can pick up the standalone LLVM toolchain
@@ -129,7 +129,7 @@ function darwin_target()
 
     -- dynamic libary loader
     add_syslinks("dl")
-    --if use_llvm_toolchain then	
+    --if use_llvm_compiler then	
     --    add_syslinks("c++abi")
     --end
 

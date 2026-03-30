@@ -133,10 +133,11 @@ option("static", function()
     set_default(true)
 end)
 
-option("use-llvm", function()
+option("use-llvm-compiler", function()
     set_description
     (
-        "Use Clang-CL under windows and clang on the rest of the platforms.",
+        "Use the LLVM/Clang compiler toolchain (Clang-CL on Windows, clang on other platforms).",
+        "This only switches the compiler toolchain and does not enable LLVM JIT by itself.",
         "default = false"
     )
     set_default(false)

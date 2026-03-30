@@ -7,8 +7,8 @@ set_defaultarchs("djgpp|i586")
 
 function djgpp_target()
 
-    local use_llvm_toolchain = get_config("use-llvm")
-    if use_llvm_toolchain then	
+    local use_llvm_compiler = get_config("use-llvm-compiler")
+    if use_llvm_compiler then	
         set_toolchains("clang")
         add_ldflags("-fuse-ld=lld", {force = true})
     end

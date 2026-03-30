@@ -167,8 +167,8 @@ function def_build()
 		none_target()
 	end
 
-	local use_llvm_toolchain = get_config("use-llvm")
-	if use_llvm_toolchain then
+	local use_llvm_compiler = get_config("use-llvm-compiler")
+	if use_llvm_compiler then
 		local llvm_target = get_config("llvm-target")
 		if llvm_target ~= "detect" and llvm_target then
 			local llvm_target_cvt = "--target=" .. llvm_target
@@ -492,7 +492,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		local test_libfuzzer = get_config("test-libfuzzer")
 
 		if is_libfuzzer then
-			if get_config("use-llvm") and test_libfuzzer then
+			if get_config("use-llvm-compiler") and test_libfuzzer then
 				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
 				if need_wabt then
 					before_build(function(target)
@@ -583,7 +583,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				add_tests("fuzz",
 					{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
 				add_files(file)
-			elseif not get_config("use-llvm") and test_libfuzzer then
+			elseif not get_config("use-llvm-compiler") and test_libfuzzer then
 				raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
 			end
 		else
