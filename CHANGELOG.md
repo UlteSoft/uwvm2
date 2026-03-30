@@ -54,6 +54,7 @@ Each release entry should record:
 
 - Removed unintended LLVM JIT environment probing during `xmake f` configuration when JIT support is disabled.
 - The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.0.1` builds.
+- Renamed the build-toolchain option from `--use-llvm` to `--use-llvm-compiler` to make it explicit that the flag selects the LLVM/Clang compiler toolchain rather than enabling JIT.
 
 ### Release Fixes
 

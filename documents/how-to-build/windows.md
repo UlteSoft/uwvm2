@@ -13,7 +13,7 @@ xmake f -m release
 xmake
 
 # LLVM/Clang toolchain
-xmake f -m release --use-llvm=y --sysroot=<unknown-windows-msvc sysroot path>
+xmake f -m release --use-llvm-compiler=y --sysroot=<unknown-windows-msvc sysroot path>
 xmake
 
 # Install
@@ -50,7 +50,7 @@ $ xmake i -o <install_path>
 2. Install [[llvm]](https://github.com/llvm/llvm-project/releases)
 3. Build
 ```shell
-$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm=y --sysroot=<unknown-windows-msvc sysroot path>
+$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm-compiler=y --sysroot=<unknown-windows-msvc sysroot path>
 $ xmake
 ```
 4. Install UWVM2

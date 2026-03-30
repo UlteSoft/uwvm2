@@ -6,7 +6,7 @@ end
 
 function mingw_target()
 
-    local use_llvm_toolchain = get_config("use-llvm")
+    local use_llvm_toolchain = get_config("use-llvm-compiler")
     if use_llvm_toolchain then	
         set_toolchains("clang")
         add_ldflags("-fuse-ld=lld", {force = true})

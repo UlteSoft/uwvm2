@@ -1,7 +1,7 @@
 
 function darwin_target()
 
-	local use_llvm_toolchain = get_config("use-llvm")
+	local use_llvm_toolchain = get_config("use-llvm-compiler")
 	if use_llvm_toolchain then	
 	    -- On macOS, xmake's `clang` toolchain typically resolves to Apple clang in `/usr/bin/clang`,
 	    -- which can be incompatible with our custom SYSROOT/toolchain (and may crash while compiling).

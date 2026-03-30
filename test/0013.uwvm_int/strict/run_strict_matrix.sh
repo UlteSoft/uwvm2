@@ -40,7 +40,7 @@ fi
 
 COMMON_F_FLAGS=(
   -m debug
-  --use-llvm=y
+  --use-llvm-compiler=y
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
   --enable-test-0013-uwvm-int=y

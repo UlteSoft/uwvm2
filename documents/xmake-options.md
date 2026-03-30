@@ -55,7 +55,7 @@ Controls `--sysroot=...` usage for GCC/Clang and (in some configurations) may al
 
 ### `--llvm-target=TRIPLET`
 
-Controls the LLVM/Clang target triple when `--use-llvm=y` is enabled.
+Controls the LLVM/Clang target triple when `--use-llvm-compiler=y` is enabled.
 
 - **Default:** `detect`
 - **Values:**
@@ -64,7 +64,7 @@ Controls the LLVM/Clang target triple when `--use-llvm=y` is enabled.
   - Any other string: Treated as a target triple (e.g. `x86_64-w64-mingw32`, `aarch64-apple-darwin`).
 - **Impact:** Influences codegen, predefined macros, and the selected runtime/ABI when using Clang.
 - **Example:**
-  - `xmake f --use-llvm=y --llvm-target=x86_64-w64-mingw32`
+  - `xmake f --use-llvm-compiler=y --llvm-target=x86_64-w64-mingw32`
 
 ### `--rtlib=RTLIB`
 
@@ -134,14 +134,15 @@ Enables static linking by adding `-static` at link time (where supported).
 - **Example:**
   - `xmake f --static=y`
 
-### `--use-llvm=[y|n]`
+### `--use-llvm-compiler=[y|n]`
 
-Switches to Clang-based toolchains (Clang-CL on Windows, Clang elsewhere) and may select `lld` as the linker.
+Switches to the LLVM/Clang compiler toolchain (Clang-CL on Windows, Clang elsewhere) and may select `lld` as the linker.
+This option controls the compiler toolchain only and does not enable JIT support.
 
 - **Default:** `n`
 - **Impact:** Changes the compiler/linker frontend, warning behaviors, available flags, and runtime defaults. Combine with `--llvm-target` for cross-targeting.
 - **Example:**
-  - `xmake f --use-llvm=y`
+  - `xmake f --use-llvm-compiler=y`
 
 ### `--use-cxx-module=[y|n]`
 
@@ -244,9 +245,9 @@ Selects an Apple platform target and minimum OS version (macOS/iOS/tvOS/watchOS/
 Enables a libFuzzer-oriented test mode (currently intended for LLVM environments).
 
 - **Default:** `n`
-- **Impact:** Alters how certain test targets are configured/built. Typically combined with `--use-llvm=y`.
+- **Impact:** Alters how certain test targets are configured/built. Typically combined with `--use-llvm-compiler=y`.
 - **Example:**
-  - `xmake f --use-llvm=y --test-libfuzzer=y`
+  - `xmake f --use-llvm-compiler=y --test-libfuzzer=y`
 
 ### `--debug-timer=[y|n]`
 

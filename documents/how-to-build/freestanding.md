@@ -124,7 +124,7 @@ However, some existing xmake options and platform helpers are still informative:
 
 - `xmake/option.lua`
   - `--enable-int=[none|default|uwvm-int]` controls whether the interpreter is built when it is available.
-  - `--use-llvm=y` switches to the LLVM/Clang toolchain.
+  - `--use-llvm-compiler=y` switches to the LLVM/Clang compiler toolchain.
   - `--sysroot=...` and `--target=...` configure cross‑compilation.
 - `xmake/platform/none.lua`
   - Shows how `--sysroot` and `--target` flags are forwarded to the compiler and linker.
