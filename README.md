@@ -1,12 +1,16 @@
 <div align="center">
   <img src="documents/logo/uwvm2.svg" alt="uwvm2 logo" width="240"/>
   <br/>
-  <h1>Ultimate WebAssembly Virtual Machine 2</h1>
+  <h1>Ultimate WebAssembly Virtual Machine<br/>2</h1>
+  <p>
+    <img src="https://img.shields.io/badge/Beta-2ea043?style=for-the-badge" alt="Beta"/>
+    <img src="https://img.shields.io/badge/V2.0.0.1-ffffff?style=for-the-badge" alt="V2.0.0.1"/>
+  </p>
 </div>
 
 > [!IMPORTANT]
-> This project is currently only developer stable
->
+> This repository currently tracks `uwvm2` `V2.0.0.1` in its public beta phase.
+> See [CHANGELOG.md](CHANGELOG.md) for release notes, lifecycle details, support tracking, and deprecation records.
 
 <div style="text-align:center">
     <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI">
@@ -21,31 +25,40 @@
 </div>
 
 ## Introduction
-Ultimate WebAssembly Virtual Machine 2
+Ultimate WebAssembly Virtual Machine 2 (`uwvm2`) is a cross-platform WebAssembly runtime and toolchain project implemented in modern C++26, with a strong emphasis on standards compliance, portability, and interpreter-first execution.
+
+## Current Version Highlights
+- Direct-threaded `u2` interpreter with a register-ring stack-top cache and translation-time fusion.
+- Spec-oriented WebAssembly parser and validation pipeline with structured diagnostics and extensive fuzz testing.
+- Cross-platform WASI Preview 1 host integration, plus stable APIs for preload modules and native plugins.
+- Multiple linear-memory backends and broad platform coverage across POSIX, Windows, DOS, BSD, WASI, Emscripten, and selected freestanding targets.
+
+## Changelog
+See [CHANGELOG.md](CHANGELOG.md) for release history, distribution baseline commits, fixes, support tracking, and deprecation records.
 
 ## Features
-### WASM Feature Extensions
-Most wasm standards are supported. See [feature.md](documents/features.md). For detailed changes in each WebAssembly release, see [wasm-release.md](documents/wasm-release.md).
+### WebAssembly feature coverage
+UWVM2 supports a broad set of WebAssembly standards and extensions. See [features.md](documents/features.md). For the mapping between supported functionality and official WebAssembly release milestones, see [wasm-release.md](documents/wasm-release.md).
 
-### Supports multiple platforms
-Supports over 100 triplet platforms, including DOS series, POSIX series, Windows 9x series, Windows NT series, and the Host C Library Series. Supports interpretation execution (INT), just-in-time compilation (JIT), and tiered compilation (TC). See [support.md](documents/support.md) for details.
+### Broad platform coverage
+UWVM2 targets more than 100 platform triplets across DOS-family systems, POSIX-family systems, Windows 9x, Windows NT, hosted C library environments, and selected freestanding environments. See [support.md](documents/support.md) for details.
 
 ### Runtime execution backends
-UWVM2 includes multiple runtime execution backends (interpreter and in-memory compilation components). See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the u2 interpreter (“register-ring stack-top cache”) architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
+UWVM2 currently ships interpreter-oriented runtime compiler backends, including the high-performance `u2` interpreter and a debug interpreter for observability and correctness work. LLVM-based JIT integration exists as early groundwork and remains a work in progress. See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the `u2` interpreter architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
 
-### High-performance, secure, and highly scalable standard parser
-High-performance, spec-compliant WebAssembly binary parser built on concept-oriented C++26 with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
+### Standard parser and validation pipeline
+UWVM2 includes a high-performance, spec-compliant WebAssembly binary parser and validation stack built on concept-oriented C++26, with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
 
-### WASI host extensions
+### WASI Preview 1 host integration
 WebAssembly System Interface Preview 1 (WASI P1) host bindings for `wasm32-wasip1` and `wasm64-wasip1` targets, built on the same cross-platform runtime as UWVM2 and exposing file-system and related services to WebAssembly modules. See [imported/readme.md](src/uwvm2/imported/readme.md) for details.
 
-### Plugin-facing host APIs
-Preload modules (dynamic libraries / weak-symbol plugins) can consume a stable host-side API for linear-memory access, and can now optionally consume the UWVM2 WASI Preview 1 host API as well. The WASI table is disabled by default and must be explicitly enabled from the command line.
+### Plugin and preload module integration
+Preload modules (dynamic libraries / weak-symbol plugins) can consume a stable host-side API for linear-memory access and can optionally consume the UWVM2 WASI Preview 1 host API as well. The WASI table is disabled by default and must be explicitly enabled from the command line.
 
-### Flexible linear memory models
-uwvm2 provides three host-side models for implementing WebAssembly linear memory (mmap-based, multi-threaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual memory support. See [readme.md](src/uwvm2/object/memory/readme.md) for a detailed description.
+### Flexible linear-memory backends
+UWVM2 provides three host-side models for implementing WebAssembly linear memory (`mmap`-based, multithreaded allocator-based, and single-thread allocator-based backends), allowing efficient execution on platforms with or without virtual-memory support. See [readme.md](src/uwvm2/object/memory/readme.md) for a detailed description.
 
-## Commandline interface
+## Command-Line Interface
 * Get version information
 ```bash
 $ uwvm --version
@@ -54,11 +67,11 @@ $ uwvm --version
 ```bash
 $ uwvm --help
 ```
-* Running uwvm2 virtual machine
+* Run the UWVM2 virtual machine
 ```bash
 $ uwvm <param0> <param1> ... --run <wasm> <argv1> <argv2> ...
 ```
-* WASI mount dir (wasip1)
+* Mount a WASI directory (`wasip1`)
 ```bash
 $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 ```
@@ -67,7 +80,7 @@ $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 $ uwvm --wasm-expose-wasip1-host-api --wasm-register-dl <plugin> <module> --run ...
 ```
 
-## How to build
+## How to Build
 * Windows (aka. unknown-windows-msvc). See [windows.md](documents/how-to-build/windows.md)
 * MinGW (aka. unknown-windows-gnu, unknown-w64-mingw32). See [mingw.md](documents/how-to-build/mingw.md)
 * Linux (aka. unknown-linux-unknown). See [linux.md](documents/how-to-build/linux.md)
