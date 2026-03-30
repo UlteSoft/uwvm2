@@ -70,8 +70,8 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         if(data == nullptr) { return 0; }
 
         // Full-module parser fuzzing already exists elsewhere.
-        // This target fixes a valid wasm shell and spends mutations on the code section only.
-        auto const mod{::test::wasm1_code_section_module_builder::build_module_from_code_section_bytes(data, size)};
+        // This target mutates only the sections that directly affect code validation semantics.
+        auto const mod{::test::wasm1_code_section_module_builder::build_module_from_code_validation_bytes(data, size)};
         auto const* begin{reinterpret_cast<::std::byte const*>(mod.data())};
         auto const* end{begin + mod.size()};
 
