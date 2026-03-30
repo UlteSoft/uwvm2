@@ -187,7 +187,12 @@ end)
 option("llvm-jit-env", function()
     set_default(true)
     set_showmenu(false)
+    add_deps("enable-jit")
     after_check(function(option)
+        local enable_jit = get_config("enable-jit")
+        if enable_jit ~= "default" and enable_jit ~= "llvm" then
+            return
+        end
         import("utility.utility")
         local llvm_jit_options = utility.get_llvm_jit_options()
         if llvm_jit_options.includedirs then

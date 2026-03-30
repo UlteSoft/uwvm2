@@ -182,7 +182,7 @@ Controls the JIT backend selection.
   - `none`: Disable JIT support (`UWVM_DISABLE_JIT`).
   - `default`: Enable and use the default JIT (`UWVM_USE_DEFAULT_JIT`).
   - `llvm`: Enable and use LLVM as the JIT engine (`UWVM_USE_LLVM_JIT`).
-- **Notes:** When `llvm` is selected, `xmake` now probes LLVM through `llvm-config` and imports the returned include paths, link paths, defines, system libraries, and LLVM libraries automatically. Ensure `llvm-config` is discoverable on `PATH`, or point `LLVM_CONFIG` to the executable explicitly.
+- **Notes:** When `default` or `llvm` is selected, `xmake` probes LLVM through `llvm-config` and imports the returned include paths, link paths, defines, system libraries, and LLVM libraries automatically. `none` skips this probe entirely. Ensure `llvm-config` is discoverable on `PATH`, or point `LLVM_CONFIG` to the executable explicitly.
 - **Example:**
   - `xmake f --enable-jit=llvm --use-llvm=y`
 

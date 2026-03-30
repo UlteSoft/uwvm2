@@ -102,6 +102,7 @@ function def_build()
 		add_defines("UWVM_DISABLE_JIT")
 	elseif enable_jit == "default" then
 		add_defines("UWVM_USE_DEFAULT_JIT")
+		add_options("llvm-jit-env")
 	elseif enable_jit == "llvm" then
 		add_defines("UWVM_USE_LLVM_JIT")
 		add_options("llvm-jit-env")
