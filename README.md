@@ -13,8 +13,8 @@
 > See [CHANGELOG.md](CHANGELOG.md) for release notes, lifecycle details, support tracking, and deprecation records.
 
 <div style="text-align:center">
-    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI">
-        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=master" alt="github-ci" />
+    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI+branch%3AV2.0.0.1">
+        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=V2.0.0.1" alt="github-ci" />
     </a>
     <a href="LICENSE.md">
         <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" , alt="License" />
@@ -27,16 +27,16 @@
 ## Introduction
 Ultimate WebAssembly Virtual Machine 2 (`uwvm2`) is a cross-platform WebAssembly runtime and toolchain project implemented in modern C++26, with a strong emphasis on standards compliance, portability, and interpreter-first execution.
 
-## Current Version Highlights
-- Direct-threaded `u2` interpreter with a register-ring stack-top cache and translation-time fusion.
-- Spec-oriented WebAssembly parser and validation pipeline with structured diagnostics and extensive fuzz testing.
-- Cross-platform WASI Preview 1 host integration, plus stable APIs for preload modules and native plugins.
-- Multiple linear-memory backends and broad platform coverage across POSIX, Windows, DOS, BSD, WASI, Emscripten, and selected freestanding targets.
-
 ## Changelog
 See [CHANGELOG.md](CHANGELOG.md) for release history, distribution baseline commits, fixes, support tracking, and deprecation records.
 
 ## Features
+- Direct-threaded `u2` interpreter with a register-ring stack-top cache and translation-time fusion.
+- Very fast interpreter full-translation performance, with support for multi-threaded full translation on hosted builds.
+- Spec-oriented WebAssembly parser and validation pipeline with structured diagnostics and extensive fuzz testing.
+- Cross-platform WASI Preview 1 host integration, plus stable APIs for preload modules and native plugins.
+- Multiple linear-memory backends and broad platform coverage across POSIX, Windows, DOS, BSD, WASI, Emscripten, and selected freestanding targets.
+
 ### WebAssembly feature coverage
 UWVM2 supports a broad set of WebAssembly standards and extensions. See [features.md](documents/features.md). For the mapping between supported functionality and official WebAssembly release milestones, see [wasm-release.md](documents/wasm-release.md).
 
@@ -44,7 +44,7 @@ UWVM2 supports a broad set of WebAssembly standards and extensions. See [feature
 UWVM2 targets more than 100 platform triplets across DOS-family systems, POSIX-family systems, Windows 9x, Windows NT, hosted C library environments, and selected freestanding environments. See [support.md](documents/support.md) for details.
 
 ### Runtime execution backends
-UWVM2 currently ships interpreter-oriented runtime compiler backends, including the high-performance `u2` interpreter and a debug interpreter for observability and correctness work. LLVM-based JIT integration exists as early groundwork and remains a work in progress. See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the `u2` interpreter architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
+UWVM2 currently ships interpreter-oriented runtime compiler backends, including the high-performance `u2` interpreter and a debug interpreter for observability and correctness work. The `u2` pipeline emphasizes very fast full translation with low translation overhead, and hosted builds support multi-threaded full-translation scheduling. LLVM-based JIT integration exists as early groundwork and remains a work in progress. See [runtime compiler documentation](src/uwvm2/runtime/compiler/readme.md). For the `u2` interpreter architecture, see [u2 interpreter documentation](src/uwvm2/runtime/compiler/uwvm_int/readme.md).
 
 ### Standard parser and validation pipeline
 UWVM2 includes a high-performance, spec-compliant WebAssembly binary parser and validation stack built on concept-oriented C++26, with SIMD-aware design and extensive fuzzing for safety and robustness. See [readme.md](src/uwvm2/parser/readme.md) for details.
