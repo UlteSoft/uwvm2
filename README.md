@@ -2,11 +2,11 @@
   <img src="documents/logo/uwvm2.svg" alt="uwvm2 logo" width="240"/>
   <br/>
   <h1>Ultimate WebAssembly Virtual Machine 2</h1>
+  <p>
+    <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
+    <img src="https://img.shields.io/badge/V2.0.0.2-1f6feb?style=for-the-badge" alt="V2.0.0.2"/>
+  </p>
 </div>
-
-> [!IMPORTANT]
-> This project is currently only developer stable
->
 
 <div style="text-align:center">
     <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI">
@@ -75,6 +75,10 @@ $ uwvm --wasm-expose-wasip1-host-api --wasm-register-dl <plugin> <module> --run 
 * FreeBSD (aka. unknown-freebsd(Version)). See [freebsd.md](documents/how-to-build/freebsd.md)
 * WASM-WASI (self-hosting) (aka. [wasm32|wasm64]-[wasip1|wasip2]-(threads)). See [wasm-wasi.md](documents/how-to-build/wasm-wasi.md)
 * Other platforms: See [how-to-build](documents/how-to-build)
+
+## Releases
+* [Dev](https://github.com/UlteSoft/uwvm2/tree/master): branch `master`
+* [Beta V2.0.0.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.0.1): branch `V2.0.0.1`
 
 ## Support / Donations
 
