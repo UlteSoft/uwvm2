@@ -176,12 +176,10 @@ option("enable-jit", function()
     set_description
     (
         "enable just-in-time compilation",
-        [[    none: disable jit.]],
-        [[    defualt: use default jit engine.]],
-        [[    llvm: use llvm jit engine.]]
+        [[    none: disable jit.]]
     )
-    set_default("default")
-    set_values("none", "default", "llvm")
+    set_default("none")
+    set_values("none")
 end)
 
 option("llvm-jit-env", function()
