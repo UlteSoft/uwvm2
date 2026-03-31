@@ -36,6 +36,7 @@ This means a coroutine is used here as a deferred execution frame, not as a long
 
 - `handle_count` tracks how many entries are live.
 - `resume_and_destroy(i)` resumes one coroutine and destroys its frame immediately after it reaches `final_suspend`.
+- `resume_and_destroy(i)` also enforces the one-shot contract: a task must reach `final_suspend` on its first resume.
 - `resume_all_serial()` executes the whole batch on the current thread.
 - `clear()` destroys any still-owned coroutine frames, which makes the batch exception-safe and leak-safe.
 

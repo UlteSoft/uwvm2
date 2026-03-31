@@ -215,9 +215,32 @@ namespace details
     struct parallel_compile_failure_state
     {
         ::std::atomic_bool failed{};
-        ::std::atomic_flag err_claim = ATOMIC_FLAG_INIT;
+        ::std::atomic_flag failure_claim = ATOMIC_FLAG_INIT;
         ::uwvm2::validation::error::code_validation_error_impl err{};
+#ifdef UWVM_CPP_EXCEPTIONS
+        ::std::exception_ptr exception{};
+        bool has_err{};
+#endif
     };
+
+#ifdef UWVM_CPP_EXCEPTIONS
+    inline void publish_parallel_compile_failure(parallel_compile_failure_state& failure_state,
+                                                 ::uwvm2::validation::error::code_validation_error_impl const& local_err,
+                                                 ::std::exception_ptr exception,
+                                                 bool store_err) noexcept
+    {
+        if(!failure_state.failure_claim.test_and_set(::std::memory_order_acq_rel))
+        {
+            if(store_err)
+            {
+                failure_state.err = local_err;
+                failure_state.has_err = true;
+            }
+            failure_state.exception = ::std::move(exception);
+        }
+        failure_state.failed.store(true, ::std::memory_order_release);
+    }
+#endif
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
     inline ::uwvm2::utils::thread::scheduled_task
@@ -242,8 +265,11 @@ namespace details
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error const&)
         {
-            if(!failure_state.err_claim.test_and_set(::std::memory_order_acq_rel)) { failure_state.err = local_err; }
-            failure_state.failed.store(true, ::std::memory_order_release);
+            publish_parallel_compile_failure(failure_state, local_err, ::std::current_exception(), true);
+        }
+        catch(...)
+        {
+            publish_parallel_compile_failure(failure_state, local_err, ::std::current_exception(), false);
         }
 #endif
 
@@ -360,8 +386,9 @@ inline ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_func
 #ifdef UWVM_CPP_EXCEPTIONS
         if(failure_state.failed.load(::std::memory_order_acquire))
         {
-            err = failure_state.err;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            if(failure_state.has_err) { err = failure_state.err; }
+            if(failure_state.exception) { ::std::rethrow_exception(failure_state.exception); }
+            ::fast_io::fast_terminate();
         }
 #endif
     }

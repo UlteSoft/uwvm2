@@ -24,11 +24,11 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
-# include <array>
 # include <bit>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
+# include <exception>
 # include <limits>
 # include <memory>
 # include <utility>

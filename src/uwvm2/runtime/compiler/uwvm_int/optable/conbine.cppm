@@ -25,7 +25,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <array>
 #include <limits>
 #include <memory>
 #include <type_traits>
