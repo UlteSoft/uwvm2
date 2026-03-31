@@ -290,8 +290,13 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     auto const operand_stack_pop_unchecked{[&]() constexpr noexcept
                                            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                               if(operand_stack.empty()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+                                               if(!is_polymorphic && operand_stack.empty()) [[unlikely]]
+                                               {
+                                                   ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                                               }
 #endif
+                                               // Polymorphic stacks model unreachable code, so virtual pops may exceed the
+                                               // currently materialized operand depth.
                                                if(operand_stack.empty()) { return; }
                                                auto const vt{operand_stack.back_unchecked().type};
                                                operand_stack.pop_back_unchecked();
