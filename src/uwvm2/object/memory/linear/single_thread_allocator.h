@@ -51,7 +51,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     /// @brief      The basic allocator memory class for single-thread usage.
     /// @defailt    Supports platforms without mmap or when custom_page is smaller than platform_page.
     template <typename Alloc>
-    struct basic_single_thread_allocator_memory_t 
+    struct basic_single_thread_allocator_memory_t
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"single-thread allocator"};
 
@@ -201,9 +201,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         /// @brief     Strictly use a non-silent allocator (which may return nullptr), then indicates allocation success via the return value.
         inline constexpr bool grow_strictly(::std::size_t page_grow_size,
-                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),
+                                            ::std::size_t* old_page_size_out = nullptr) noexcept
         {
-            if(page_grow_size == 0uz) [[unlikely]] { return true; }
+            if(page_grow_size == 0uz) [[unlikely]]
+            {
+                if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = this->get_page_size(); }
+                return true;
+            }
 
             if(this->memory_begin == nullptr) [[unlikely]]
             {
@@ -221,6 +226,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             auto const memory_grow_size{page_grow_size << this_custom_page_size_log2};
             auto const curr_memory_length{this->memory_length};
+            if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = curr_memory_length >> this_custom_page_size_log2; }
 
             if(max_limit_memory_length < curr_memory_length) [[unlikely]]
             {

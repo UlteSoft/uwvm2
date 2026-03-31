@@ -19,13 +19,35 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <cstddef>
+#include <cstdint>
+#include <version>
+#include <limits>
+#include <memory>
+#include <new>
+#include <atomic>
+#include <bit>
+#include <utility>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+
+export module uwvm2.object.memory.linear:access;
+
+import uwvm2.utils.debug;
+import uwvm2.utils.mutex;
+import :base;
+import :allocator;
+import :single_thread_allocator;
+import :mmap;
 
 #ifndef UWVM_MODULE
-# include "base.h"
-# include "allocator.h"
-# include "single_thread_allocator.h"
-# include "mmap.h"
-# include "access.h"
-# include "native.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "access.h"

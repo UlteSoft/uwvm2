@@ -112,6 +112,18 @@ namespace
         if(!mod.memory_grow_from_index(0uz, 2uz)) { return 8; }
         if(mod.memory_size_from_index(0uz) != 3uz) { return 9; }
 
+        ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t snapshot{};
+        if(!mod.memory_access_snapshot_from_index(0uz, snapshot)) { return 10; }
+        if(snapshot.memory_begin == nullptr) { return 11; }
+        if(snapshot.page_count != 3uz) { return 12; }
+
+        ::std::byte in{static_cast<::std::byte>(0x5Au)};
+        if(!mod.memory_write_to_index(0uz, 0u, ::std::addressof(in), 1uz)) { return 13; }
+
+        ::std::byte out{};
+        if(!mod.memory_read_from_index(0uz, 0u, ::std::addressof(out), 1uz)) { return 14; }
+        if(out != in) { return 15; }
+
         return 0;
     }
 }  // namespace

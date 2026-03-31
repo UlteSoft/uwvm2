@@ -27,6 +27,7 @@ export import :base;
 export import :allocator;
 export import :single_thread_allocator;
 export import :mmap;
+export import :access;
 export import :native;
 
 #ifndef UWVM_MODULE
