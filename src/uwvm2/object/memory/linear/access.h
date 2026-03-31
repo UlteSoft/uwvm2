@@ -50,7 +50,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 {
     /// @brief Execute `fn(memory_begin, byte_length)` against a consistent linear-memory snapshot.
-    /// @note  For allocator-backed multi-threaded memories, the callback runs while the relocation guard is held.
+    /// @note  For allocator-backed multi-threaded memories, the callback runs under exclusive access: grow and other in-flight memory operations must drain first.
     template <typename MemoryT, typename Fn>
     [[nodiscard]] inline constexpr bool with_memory_access_snapshot(MemoryT const& memory, Fn&& fn) noexcept
     {
@@ -70,7 +70,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(memory.growing_flag_p == nullptr || memory.active_ops_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 # endif
 
-            memory_operation_guard_t memory_guard{memory.growing_flag_p, memory.active_ops_p};
+            growing_flag_guard_t growing_flag_guard{memory.growing_flag_p};
+
+            unsigned spin_count{};
+            for(auto v{memory.active_ops_p->load(::std::memory_order_acquire)}; v != 0uz; v = memory.active_ops_p->load(::std::memory_order_acquire))
+            {
+                if(++spin_count > 1000u)
+                {
+                    memory.active_ops_p->wait(v, ::std::memory_order_acquire);
+                    spin_count = 0u;
+                }
+                else
+                {
+                    ::uwvm2::utils::mutex::rwlock_pause();
+                }
+            }
+
             return static_cast<bool>(::std::forward<Fn>(fn)(memory.memory_begin, memory.memory_length));
 #else
             return static_cast<bool>(::std::forward<Fn>(fn)(memory.memory_begin, memory.memory_length));
