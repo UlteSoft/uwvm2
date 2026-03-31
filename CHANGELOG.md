@@ -28,8 +28,8 @@ Each release entry should record:
 - Release date: `2026-03-30`
 - Planned general availability: `2026-06-30`
 - Distribution baseline commit: `TBD` when the release artifact or tag is finalized
-- Current source baseline reference: `95b1836d31af291feb8ee08feb3d8eedfecfded8`
-- Source baseline timestamp: `2026-03-30T14:45:08+08:00`
+- Current source baseline reference: `4da46fb2f84cf8d6d6cd4839b4b1401a17f655bb`
+- Source baseline timestamp: `2026-03-31T22:04:01+08:00`
 - Maintenance support window: `TBD`
 - Deprecated notice date: `None`
 - Removal target: `None`
@@ -43,7 +43,9 @@ Each release entry should record:
 
 - No prior public 2.x release exists, so no release-to-release functional delta applies yet.
 - Build configuration currently force-disables JIT support because no production-ready JIT backend is available in this release line.
-- Commit reference: `95b1836d31af291feb8ee08feb3d8eedfecfded8`
+- Contributor documentation for the register-ring header now uses clearer transport-system wording and correctly refers to the native interpreter implementation.
+- CI workflow can now skip the Windows MINGW job unless it is explicitly requested, reducing unnecessary default validation runs during beta maintenance.
+- Commit reference: `4da46fb2f84cf8d6d6cd4839b4b1401a17f655bb`
 - `xmake` JIT configuration is restricted to `none`, and JIT is therefore unavailable for `V2.0.1.1`.
 
 ### Fixed
@@ -58,6 +60,8 @@ Each release entry should record:
 - Fixed `memory.grow` to return the previous page count on success and `-1` on failure across strict and silent growth paths, including concurrent linear-memory backends where the old size must be captured inside the grow critical section.
 - Added stable linear-memory access snapshots for relocation-capable backends so preload copies and local-imported memory reads and writes no longer race against concurrent `memory.grow` relocation.
 - Exposed local-imported memory snapshot, read, and write helpers through the runtime bridge so host-side memory transfers use the same validated snapshot semantics as native-defined memories.
+- Strengthened `with_memory_access_snapshot` synchronization so snapshot callbacks wait for in-flight memory operations to finish before entering the exclusive-access section, improving correctness for concurrent linear-memory access.
+- Added exception capture and propagation for parallel compilation failures so background compiler tasks can terminate cleanly and surface stored error state deterministically.
 
 ### Release Fixes
 
