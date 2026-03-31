@@ -4,7 +4,7 @@
   <h1>Ultimate WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
-    <img src="https://img.shields.io/badge/V2.0.0.2-1f6feb?style=for-the-badge" alt="V2.0.0.2"/>
+    <img src="https://img.shields.io/badge/V2.0.2.0-1f6feb?style=for-the-badge" alt="V2.0.2.0"/>
   </p>
 </div>
 
@@ -78,7 +78,7 @@ $ uwvm --wasm-expose-wasip1-host-api --wasm-register-dl <plugin> <module> --run 
 
 ## Releases
 * [Dev](https://github.com/UlteSoft/uwvm2/tree/master): branch `master`
-* [Beta V2.0.0.1](https://github.com/UlteSoft/uwvm2/tree/V2.0.0.1): branch `V2.0.0.1`
+* [Beta V2.0.2.0](https://github.com/UlteSoft/uwvm2/tree/V2.0.2.0): branch `V2.0.2.0`
 
 ## Support / Donations
 
