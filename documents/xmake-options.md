@@ -181,7 +181,7 @@ Controls the JIT backend selection.
 - **Default:** `none`
 - **Values:**
   - `none`: Disable JIT support (`UWVM_DISABLE_JIT`).
-- **Notes:** `V2.0.0.1` does not provide a supported JIT backend. The build configuration is intentionally restricted to `none`.
+- **Notes:** `V2.0.1.x` does not provide a supported JIT backend. The build configuration is intentionally restricted to `none`.
 - **Example:**
   - `xmake f --enable-jit=none`
 

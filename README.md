@@ -4,17 +4,13 @@
   <h1>Ultimate WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/Beta-2ea043?style=for-the-badge" alt="Beta"/>
-    <img src="https://img.shields.io/badge/V2.0.0.1-ffffff?style=for-the-badge" alt="V2.0.0.1"/>
+    <img src="https://img.shields.io/badge/V2.0.1.x-ffffff?style=for-the-badge" alt="V2.0.1.x"/>
   </p>
 </div>
 
-> [!IMPORTANT]
-> This repository currently tracks `uwvm2` `V2.0.0.1` in its public beta phase.
-> See [CHANGELOG.md](CHANGELOG.md) for release notes, lifecycle details, support tracking, and deprecation records.
-
 <div style="text-align:center">
-    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI+branch%3ARelease%2FV2.0.0.1">
-        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=Release%2FV2.0.0.1" alt="github-ci" />
+    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI+branch%3AV2.0.1.x">
+        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=V2.0.1.x" alt="github-ci" />
     </a>
     <a href="LICENSE.md">
         <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" , alt="License" />

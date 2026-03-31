@@ -21,7 +21,7 @@ Each release entry should record:
 - `Release Fixes`: fixes made after general availability.
 - `Deprecated`: items officially marked as deprecated, including notice dates and removal targets where known.
 
-## V2.0.0.1
+## V2.0.1.1
 
 - Release channel: `Beta`
 - Release status: `Initial public beta`
@@ -44,7 +44,7 @@ Each release entry should record:
 - No prior public 2.x release exists, so no release-to-release functional delta applies yet.
 - Build configuration currently force-disables JIT support because no production-ready JIT backend is available in this release line.
 - Commit reference: `95b1836d31af291feb8ee08feb3d8eedfecfded8`
-- `xmake` JIT configuration is restricted to `none`, and JIT is therefore unavailable for `V2.0.0.1`.
+- `xmake` JIT configuration is restricted to `none`, and JIT is therefore unavailable for `V2.0.1.1`.
 
 ### Fixed
 
@@ -53,7 +53,7 @@ Each release entry should record:
 ### Beta Fixes
 
 - Removed unintended LLVM JIT environment probing during `xmake f` configuration when JIT support is disabled.
-- The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.0.1` builds.
+- The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.1.1` builds.
 - Renamed the build-toolchain option from `--use-llvm` to `--use-llvm-compiler` to make it explicit that the flag selects the LLVM/Clang compiler toolchain rather than enabling JIT.
 - Fixed `memory.grow` to return the previous page count on success and `-1` on failure across strict and silent growth paths, including concurrent linear-memory backends where the old size must be captured inside the grow critical section.
 - Added stable linear-memory access snapshots for relocation-capable backends so preload copies and local-imported memory reads and writes no longer race against concurrent `memory.grow` relocation.
