@@ -9,8 +9,8 @@
 </div>
 
 <div style="text-align:center">
-    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI+branch%3AV2.0.1.x">
-        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=V2.0.1.x" alt="github-ci" />
+    <a href="https://github.com/UlteSoft/uwvm2/actions?query=workflow%3ACI+branch%3AV2.0.1">
+        <img src="https://img.shields.io/github/actions/workflow/status/UlteSoft/uwvm2/ci.yml?branch=V2.0.1" alt="github-ci" />
     </a>
     <a href="LICENSE.md">
         <img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" , alt="License" />
