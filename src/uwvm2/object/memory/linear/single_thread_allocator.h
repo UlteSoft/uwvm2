@@ -51,7 +51,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
     /// @brief      The basic allocator memory class for single-thread usage.
     /// @defailt    Supports platforms without mmap or when custom_page is smaller than platform_page.
     template <typename Alloc>
-    struct basic_single_thread_allocator_memory_t 
+    struct basic_single_thread_allocator_memory_t
     {
         inline static constexpr ::uwvm2::utils::container::u8string_view name{u8"single-thread allocator"};
 
@@ -118,10 +118,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         /// @brief      Grow the memory.
         /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
-        inline constexpr void grow_silently(::std::size_t page_grow_size,
-                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        inline constexpr bool try_grow_silently(::std::size_t page_grow_size,
+                                                ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),
+                                                ::std::size_t* old_page_size_out = nullptr) noexcept
         {
-            if(page_grow_size == 0uz) [[unlikely]] { return; }
+            if(page_grow_size == 0uz) [[unlikely]]
+            {
+                if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = this->get_page_size(); }
+                return true;
+            }
 
             if(this->memory_begin == nullptr) [[unlikely]]
             {
@@ -134,18 +139,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this_custom_page_size_log2) [[unlikely]]
             {
                 // This situation cannot occur; it is due to user input error.
-                // slient
-                ::fast_io::fast_terminate();
+                return false;
             }
 
             auto const memory_grow_size{page_grow_size << this_custom_page_size_log2};
             auto const curr_memory_length{this->memory_length};
+            if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = curr_memory_length >> this_custom_page_size_log2; }
 
             if(max_limit_memory_length < curr_memory_length) [[unlikely]]
             {
                 // This situation cannot occur; it is due to user input error.
-                // slient
-                ::fast_io::fast_terminate();
+                return false;
             }
 
             auto const left_memory_size{max_limit_memory_length - curr_memory_length};
@@ -153,8 +157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(memory_grow_size > left_memory_size) [[unlikely]]
             {
                 // Exceeded the maximum allowed value, error reported.
-                // slient
-                ::fast_io::fast_terminate();
+                return false;
             }
 
             // After realloc, write new_memory_length
@@ -197,6 +200,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
             this->memory_begin = ::std::assume_aligned<alignment>(temp_memory_begin);
             this->memory_length = new_memory_length;
+
+            return true;
+        }
+
+        inline constexpr void grow_silently(::std::size_t page_grow_size,
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        {
+            if(!this->try_grow_silently(page_grow_size, max_limit_memory_length)) [[unlikely]] { ::fast_io::fast_terminate(); }
         }
 
         /// @brief     Strictly use a non-silent allocator (which may return nullptr), then indicates allocation success via the return value.
