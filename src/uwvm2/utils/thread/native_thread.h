@@ -191,6 +191,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             auto& handle{this->handles.buffer[index]};
             if(!handle) [[unlikely]] { return; }
             handle.resume();
+            // This scheduler only supports one-shot tasks: the first resume must reach final_suspend().
+            if(!handle.done()) [[unlikely]] { ::fast_io::fast_terminate(); }
             handle.destroy();
             handle = {};
         }
