@@ -1645,6 +1645,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // This is equivalent to per-store bounds checks for the contiguous 16-word range [0..60].
         if(memory_p == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
         auto const& mem{*memory_p};
+        [[maybe_unused]] auto const lock_guard{details::lock_memory(mem)};
         ::std::uint_least64_t const max_eff{static_cast<::std::uint_least64_t>(out_ptr) + 60u};
         details::memory_offset_t const effective_offset{.offset = max_eff, .offset_65_bit = (max_eff >> 32u) != 0u};
         details::bounds_check_generic(mem, 0uz, 60u, effective_offset, 4uz);

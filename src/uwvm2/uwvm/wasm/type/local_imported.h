@@ -457,6 +457,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
     namespace details
     {
+        inline constexpr auto memory_access_snapshot_probe_fn{[](::std::byte*, ::std::size_t) constexpr noexcept { return true; }};
+
+        template <typename SingleMemory>
+        concept has_memory_access_snapshot = requires(SingleMemory& mem) {
+            { with_memory_access_snapshot(mem, memory_access_snapshot_probe_fn) } -> ::std::same_as<bool>;
+        };
+
         template <typename T>
         struct is_local_imported_memory_tuple_impl : ::std::false_type
         {
@@ -779,6 +786,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         memory_get_result_t<Fs...> const* end{};
     };
 
+    struct memory_access_snapshot_result_t
+    {
+        ::std::byte* memory_begin{};
+        ::std::uint_least64_t page_count{};
+    };
+
     template <::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
     struct global_get_all_result_t
     {
@@ -809,6 +822,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             virtual constexpr ::uwvm2::uwvm::wasm::type::memory_get_all_result_t<Fs...> get_all_memory_information() const noexcept = 0;
             virtual constexpr ::std::uint_least64_t memory_page_size_from_index(::std::size_t index) const noexcept = 0;
             virtual constexpr bool memory_grow_from_index(::std::size_t index, ::std::uint_least64_t grow_page_size) noexcept = 0;
+            virtual constexpr bool memory_access_snapshot_from_index(::std::size_t index,
+                                                                     ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept = 0;
+            virtual constexpr bool
+                memory_read_from_index(::std::size_t index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept = 0;
+            virtual constexpr bool
+                memory_write_to_index(::std::size_t index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept = 0;
             virtual constexpr ::std::byte* memory_begin_from_index(::std::size_t index) noexcept = 0;
             virtual constexpr ::std::uint_least64_t memory_size_from_index(::std::size_t index) noexcept = 0;
 
@@ -1282,6 +1301,182 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
             }
         }
 
+        template <::std::size_t N, typename MemTuple>
+        inline constexpr bool memory_access_snapshot_from_index_impl(MemTuple& mems,
+                                                                     ::std::size_t index,
+                                                                     ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept
+        {
+            using curr_tuple_type = ::std::remove_cvref_t<MemTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return memory_access_snapshot_from_index_impl<N + 1uz, curr_tuple_type>(mems, index, out); }
+
+                auto& memory{::fast_io::get<N>(mems)};
+                using memory_type = ::std::remove_cvref_t<decltype(memory)>;
+
+                if constexpr(has_memory_access_snapshot<memory_type>)
+                {
+                    constexpr auto page_size_bytes{memory_page_size_bytes<memory_type>()};
+
+                    return static_cast<bool>(with_memory_access_snapshot(
+                        memory,
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        {
+                            if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }
+
+                            auto const byte_length_u64{static_cast<::std::uint_least64_t>(byte_length)};
+                            if(page_size_bytes == 0u || byte_length_u64 % page_size_bytes != 0u) [[unlikely]] { return false; }
+
+                            out.memory_begin = memory_begin;
+                            out.page_count = byte_length_u64 / page_size_bytes;
+                            return true;
+                        }));
+                }
+                else
+                {
+                    out.memory_begin = memory_begin(memory);
+                    out.page_count = memory_size(memory);
+                    return true;
+                }
+            }
+        }
+
+        [[nodiscard]] inline constexpr bool
+            compute_memory_byte_length(::std::uint_least64_t page_count, ::std::uint_least64_t page_size_bytes, ::std::uint_least64_t& byte_length) noexcept
+        {
+            if(page_size_bytes != 0u && page_count > ((::std::numeric_limits<::std::uint_least64_t>::max)() / page_size_bytes)) [[unlikely]] { return false; }
+            byte_length = page_count * page_size_bytes;
+            return true;
+        }
+
+        [[nodiscard]] inline constexpr bool
+            validate_memory_copy_range(::std::uint_least64_t byte_length, ::std::uint_least64_t offset, ::std::size_t size, ::std::size_t& host_offset) noexcept
+        {
+            if(byte_length > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return false; }
+            if(offset > static_cast<::std::uint_least64_t>((::std::numeric_limits<::std::size_t>::max)())) [[unlikely]] { return false; }
+
+            auto const host_byte_length{static_cast<::std::size_t>(byte_length)};
+            host_offset = static_cast<::std::size_t>(offset);
+
+            if(host_offset > host_byte_length) [[unlikely]] { return false; }
+            if(size > (host_byte_length - host_offset)) [[unlikely]] { return false; }
+
+            return true;
+        }
+
+        template <::std::size_t N, typename MemTuple>
+        inline constexpr bool
+            memory_read_from_index_impl(MemTuple& mems, ::std::size_t index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
+        {
+            if(size != 0uz && destination == nullptr) [[unlikely]] { return false; }
+
+            using curr_tuple_type = ::std::remove_cvref_t<MemTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return memory_read_from_index_impl<N + 1uz, curr_tuple_type>(mems, index, offset, destination, size); }
+
+                auto& memory{::fast_io::get<N>(mems)};
+                using memory_type = ::std::remove_cvref_t<decltype(memory)>;
+                constexpr auto page_size_bytes{memory_page_size_bytes<memory_type>()};
+
+                if constexpr(has_memory_access_snapshot<memory_type>)
+                {
+                    return static_cast<bool>(with_memory_access_snapshot(
+                        memory,
+                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) noexcept
+                        {
+                            if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
+                            if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }
+
+                            ::std::size_t host_offset{};
+                            if(!validate_memory_copy_range(static_cast<::std::uint_least64_t>(byte_length), offset, size, host_offset)) [[unlikely]]
+                            {
+                                return false;
+                            }
+
+                            ::std::memcpy(destination, memory_begin_ptr + host_offset, size);
+                            return true;
+                        }));
+                }
+                else
+                {
+                    auto const page_count{memory_size(memory)};
+                    ::std::uint_least64_t byte_length{};
+                    if(!compute_memory_byte_length(page_count, page_size_bytes, byte_length)) [[unlikely]] { return false; }
+
+                    ::std::size_t host_offset{};
+                    if(!validate_memory_copy_range(byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+
+                    auto* const memory_begin_ptr{memory_begin(memory)};
+                    if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
+
+                    ::std::memcpy(destination, memory_begin_ptr + host_offset, size);
+                    return true;
+                }
+            }
+        }
+
+        template <::std::size_t N, typename MemTuple>
+        inline constexpr bool
+            memory_write_to_index_impl(MemTuple& mems, ::std::size_t index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
+        {
+            if(size != 0uz && source == nullptr) [[unlikely]] { return false; }
+
+            using curr_tuple_type = ::std::remove_cvref_t<MemTuple>;
+            constexpr ::std::size_t tuple_size{::fast_io::tuple_size<curr_tuple_type>::value};
+
+            if constexpr(N >= tuple_size) { ::fast_io::fast_terminate(); }
+            else
+            {
+                if(index != N) { return memory_write_to_index_impl<N + 1uz, curr_tuple_type>(mems, index, offset, source, size); }
+
+                auto& memory{::fast_io::get<N>(mems)};
+                using memory_type = ::std::remove_cvref_t<decltype(memory)>;
+                constexpr auto page_size_bytes{memory_page_size_bytes<memory_type>()};
+
+                if constexpr(has_memory_access_snapshot<memory_type>)
+                {
+                    return static_cast<bool>(with_memory_access_snapshot(
+                        memory,
+                        [&](::std::byte* memory_begin_ptr, ::std::size_t byte_length) noexcept
+                        {
+                            if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
+                            if(byte_length > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least64_t>::max)())) [[unlikely]] { return false; }
+
+                            ::std::size_t host_offset{};
+                            if(!validate_memory_copy_range(static_cast<::std::uint_least64_t>(byte_length), offset, size, host_offset)) [[unlikely]]
+                            {
+                                return false;
+                            }
+
+                            ::std::memcpy(memory_begin_ptr + host_offset, source, size);
+                            return true;
+                        }));
+                }
+                else
+                {
+                    auto const page_count{memory_size(memory)};
+                    ::std::uint_least64_t byte_length{};
+                    if(!compute_memory_byte_length(page_count, page_size_bytes, byte_length)) [[unlikely]] { return false; }
+
+                    ::std::size_t host_offset{};
+                    if(!validate_memory_copy_range(byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
+
+                    auto* const memory_begin_ptr{memory_begin(memory)};
+                    if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
+
+                    ::std::memcpy(memory_begin_ptr + host_offset, source, size);
+                    return true;
+                }
+            }
+        }
+
         template <::std::size_t N, typename FuncTuple, ::uwvm2::parser::wasm::concepts::wasm_feature... Fs>
         inline constexpr ::uwvm2::uwvm::wasm::type::function_get_result_with_success_indicator_t<Fs...>
             get_function_information_from_index_impl(::std::size_t index) noexcept
@@ -1461,6 +1656,54 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     constexpr auto tuple_size{::fast_io::tuple_size<curr_mem_tuple_type>::value};
                     if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
                     return memory_grow_from_index_impl<0uz>(module.local_memory, index, grow_page_size);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr bool memory_access_snapshot_from_index(::std::size_t index,
+                                                                            ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept override
+            {
+                if constexpr(has_local_memory_storage<rcvmod_type>)
+                {
+                    using curr_mem_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_memory_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_mem_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return memory_access_snapshot_from_index_impl<0uz>(module.local_memory, index, out);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr bool
+                memory_read_from_index(::std::size_t index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept override
+            {
+                if constexpr(has_local_memory_storage<rcvmod_type>)
+                {
+                    using curr_mem_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_memory_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_mem_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return memory_read_from_index_impl<0uz>(module.local_memory, index, offset, destination, size);
+                }
+                else
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+            virtual inline constexpr bool
+                memory_write_to_index(::std::size_t index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept override
+            {
+                if constexpr(has_local_memory_storage<rcvmod_type>)
+                {
+                    using curr_mem_tuple_type = typename ::std::remove_cvref_t<rcvmod_type>::local_memory_tuple;
+                    constexpr auto tuple_size{::fast_io::tuple_size<curr_mem_tuple_type>::value};
+                    if(index >= tuple_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    return memory_write_to_index_impl<0uz>(module.local_memory, index, offset, source, size);
                 }
                 else
                 {
@@ -1747,6 +1990,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
         {
             if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
             return this->ptr->memory_grow_from_index(index, grow_page_size);
+        }
+
+        inline constexpr bool memory_access_snapshot_from_index(::std::size_t index, ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t& out) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->memory_access_snapshot_from_index(index, out);
+        }
+
+        inline constexpr bool memory_read_from_index(::std::size_t index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->memory_read_from_index(index, offset, destination, size);
+        }
+
+        inline constexpr bool memory_write_to_index(::std::size_t index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
+        {
+            if(this->ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return this->ptr->memory_write_to_index(index, offset, source, size);
         }
 
         inline constexpr ::std::byte const* memory_begin_from_index(::std::size_t index) const noexcept

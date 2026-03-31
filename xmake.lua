@@ -3,10 +3,10 @@
 set_project("uwvm")
 
 -- Version
-set_version("2.0.0")
+set_version("2.0.1")
 add_defines("UWVM_VERSION_X=2")
 add_defines("UWVM_VERSION_Y=0")
-add_defines("UWVM_VERSION_Z=0")
+add_defines("UWVM_VERSION_Z=1")
 add_defines("UWVM_VERSION_S=1")
 
 set_allowedplats("windows", "mingw", "cygwin", "linux", "djgpp", "unix", "bsd", "freebsd", "dragonflybsd", "netbsd",

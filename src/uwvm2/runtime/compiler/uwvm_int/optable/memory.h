@@ -2695,8 +2695,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const delta_i32{get_curr_val_from_operand_stack_top<CompileOption, wasm_i32, curr_i32_stack_top>(type...)};
         auto const delta_pages{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(delta_i32))};
 
-        auto const old_pages{static_cast<::std::size_t>(memory_p->get_page_size())};
-
+        ::std::size_t old_pages{};
         wasm_i32 result_pages{};
 
         // We intentionally keep a single `memory.grow` opcode and branch on the global `grow_strict` flag here instead of emitting two separate opcodes
@@ -2705,7 +2704,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // surface area.
         if(::uwvm2::object::memory::flags::grow_strict)
         {
-            bool const ok{memory_p->grow_strictly(delta_pages, max_limit_memory_length)};
+            bool const ok{memory_p->grow_strictly(delta_pages, max_limit_memory_length, ::std::addressof(old_pages))};
             if(ok) { result_pages = static_cast<wasm_i32>(old_pages); }
             else
             {
@@ -2714,18 +2713,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
-            // Even in "silent" allocator mode, Wasm requires `memory.grow` to return -1 on failure
-            // (e.g. exceeding the declared maximum). Do the deterministic limit check here to avoid
-            // trapping inside `grow_silently()` on max-exceed / overflow.
-            auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
-            if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+            // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
+            // otherwise another grow may slip in between the caller-side precheck and the actual grow.
+            if constexpr(native_memory_t::support_multi_thread)
             {
-                result_pages = static_cast<wasm_i32>(-1);
+                bool const ok{memory_p->try_grow_silently(delta_pages, max_limit_memory_length, ::std::addressof(old_pages))};
+                result_pages = ok ? static_cast<wasm_i32>(old_pages) : static_cast<wasm_i32>(-1);
             }
             else
             {
-                memory_p->grow_silently(delta_pages, max_limit_memory_length);
-                result_pages = static_cast<wasm_i32>(old_pages);
+                old_pages = static_cast<::std::size_t>(memory_p->get_page_size());
+
+                auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
+                if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+                {
+                    result_pages = static_cast<wasm_i32>(-1);
+                }
+                else
+                {
+                    memory_p->grow_silently(delta_pages, max_limit_memory_length);
+                    result_pages = static_cast<wasm_i32>(old_pages);
+                }
             }
         }
 
@@ -3296,15 +3304,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const delta_i32{get_curr_val_from_operand_stack_cache<wasm_i32>(typeref...)};
         auto const delta_pages{static_cast<::std::size_t>(static_cast<::std::uint_least32_t>(delta_i32))};
 
-        auto const old_pages{static_cast<::std::size_t>(memory_p->get_page_size())};
-
+        ::std::size_t old_pages{};
         wasm_i32 result_pages{};
         // Same rationale as the tail-call version: do not split strict/silent growth into separate opcodes.
         // The branch is negligible compared to the growth work itself; splitting would only bloat the opcode set and the translator without speeding up
         // the hot path (because `memory.grow` is not a hot-path instruction).
         if(::uwvm2::object::memory::flags::grow_strict)
         {
-            bool const ok{memory_p->grow_strictly(delta_pages, max_limit_memory_length)};
+            bool const ok{memory_p->grow_strictly(delta_pages, max_limit_memory_length, ::std::addressof(old_pages))};
             if(ok) { result_pages = static_cast<wasm_i32>(old_pages); }
             else
             {
@@ -3313,18 +3320,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         }
         else
         {
-            // Even in "silent" allocator mode, Wasm requires `memory.grow` to return -1 on failure
-            // (e.g. exceeding the declared maximum). Do the deterministic limit check here to avoid
-            // trapping inside `grow_silently()` on max-exceed / overflow.
-            auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
-            if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+            // Concurrent memories must capture `old_pages` and run the limit check inside the grow critical section;
+            // otherwise another grow may slip in between the caller-side precheck and the actual grow.
+            if constexpr(native_memory_t::support_multi_thread)
             {
-                result_pages = static_cast<wasm_i32>(-1);
+                bool const ok{memory_p->try_grow_silently(delta_pages, max_limit_memory_length, ::std::addressof(old_pages))};
+                result_pages = ok ? static_cast<wasm_i32>(old_pages) : static_cast<wasm_i32>(-1);
             }
             else
             {
-                memory_p->grow_silently(delta_pages, max_limit_memory_length);
-                result_pages = static_cast<wasm_i32>(old_pages);
+                old_pages = static_cast<::std::size_t>(memory_p->get_page_size());
+
+                auto const limit_pages{max_limit_memory_length >> memory_p->custom_page_size_log2};
+                if(old_pages > limit_pages || delta_pages > (limit_pages - old_pages)) [[unlikely]]
+                {
+                    result_pages = static_cast<wasm_i32>(-1);
+                }
+                else
+                {
+                    memory_p->grow_silently(delta_pages, max_limit_memory_length);
+                    result_pages = static_cast<wasm_i32>(old_pages);
+                }
             }
         }
 

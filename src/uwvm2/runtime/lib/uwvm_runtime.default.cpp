@@ -1137,15 +1137,26 @@ namespace uwvm2::runtime::uwvm_int
             resolved.native_memory = ::std::addressof(memory);
             resolved.local_imported = nullptr;
             resolved.local_imported_index = 0uz;
-            resolved.memory_begin = memory.memory_begin;
-            resolved.page_count = static_cast<::std::uint_least64_t>(memory.get_page_size());
             resolved.page_size_bytes = static_cast<::std::uint_least64_t>(1u) << memory.custom_page_size_log2;
             resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_native_defined;
             resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
             resolved.partial_protection_limit_bytes = 0u;
             resolved.dynamic_length_atomic_object = nullptr;
 
-            if(!compute_preload_byte_length(resolved.page_count, resolved.page_size_bytes, resolved.byte_length)) [[unlikely]] { return false; }
+            ::std::size_t snapshot_byte_length{};
+            if(!::uwvm2::object::memory::linear::with_memory_access_snapshot(memory,
+                                                                             [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                                                                             {
+                                                                                 resolved.memory_begin = memory_begin;
+                                                                                 snapshot_byte_length = byte_length;
+                                                                                 return true;
+                                                                             })) [[unlikely]]
+            {
+                return false;
+            }
+
+            resolved.byte_length = static_cast<::std::uint_least64_t>(snapshot_byte_length);
+            resolved.page_count = static_cast<::std::uint_least64_t>(snapshot_byte_length >> memory.custom_page_size_log2);
             if(resolved.memory_begin == nullptr && resolved.byte_length != 0u) [[unlikely]] { return false; }
 
 #if defined(UWVM_SUPPORT_MMAP)
@@ -1177,12 +1188,15 @@ namespace uwvm2::runtime::uwvm_int
         {
             if(local_imported == nullptr) [[unlikely]] { return false; }
 
+            ::uwvm2::uwvm::wasm::type::memory_access_snapshot_result_t snapshot{};
+            if(!local_imported->memory_access_snapshot_from_index(local_imported_index, snapshot)) [[unlikely]] { return false; }
+
             resolved.kind = resolved_preload_memory_t::target_kind::local_imported;
             resolved.native_memory = nullptr;
             resolved.local_imported = local_imported;
             resolved.local_imported_index = local_imported_index;
-            resolved.memory_begin = local_imported->memory_begin_from_index(local_imported_index);
-            resolved.page_count = local_imported->memory_size_from_index(local_imported_index);
+            resolved.memory_begin = snapshot.memory_begin;
+            resolved.page_count = snapshot.page_count;
             resolved.page_size_bytes = local_imported->memory_page_size_from_index(local_imported_index);
             resolved.backend_kind = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_backend_local_imported;
             resolved.mmap_delivery_state = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_delivery_none;
@@ -1274,23 +1288,7 @@ namespace uwvm2::runtime::uwvm_int
 
         template <typename Fn>
         [[nodiscard]] inline bool with_native_preload_copy_access(native_memory_t const& memory, Fn&& fn) noexcept
-        {
-            static_cast<void>(memory);
-            if constexpr(native_memory_t::can_mmap) { return static_cast<bool>(fn()); }
-            else if constexpr(native_memory_t::support_multi_thread)
-            {
-#if !defined(UWVM_SUPPORT_MMAP) && defined(UWVM_USE_MULTITHREAD_ALLOCATOR) && (__cpp_lib_atomic_wait >= 201907L)
-                ::uwvm2::object::memory::linear::memory_operation_guard_t memory_guard{memory.growing_flag_p, memory.active_ops_p};
-                return static_cast<bool>(fn());
-#else
-                return static_cast<bool>(fn());
-#endif
-            }
-            else
-            {
-                return static_cast<bool>(fn());
-            }
-        }
+        { return ::uwvm2::object::memory::linear::with_memory_access_snapshot(memory, ::std::forward<Fn>(fn)); }
 
         [[nodiscard]] inline constexpr ::std::size_t active_preload_total_memory_count(runtime_module_storage_t const& rt) noexcept
         { return rt.imported_memory_vec_storage.size() + rt.local_defined_memory_vec_storage.size(); }
@@ -1376,8 +1374,6 @@ namespace uwvm2::runtime::uwvm_int
 
             resolved_preload_memory_t resolved{};
             if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
-            ::std::size_t host_offset{};
-            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
             if(size == 0uz) [[unlikely]] { return true; }
 
             switch(resolved.kind)
@@ -1385,19 +1381,28 @@ namespace uwvm2::runtime::uwvm_int
                 case resolved_preload_memory_t::target_kind::native_defined:
                 {
                     auto const* const memory{resolved.native_memory};
-                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
-                    return with_native_preload_copy_access(*memory,
-                                                           [&]() noexcept
-                                                           {
-                                                               ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
-                                                               return true;
-                                                           });
+                    if(memory == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(
+                        *memory,
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        {
+                            if(memory_begin == nullptr) [[unlikely]] { return false; }
+
+                            ::std::size_t host_offset{};
+                            if(!validate_preload_copy_range(static_cast<::std::uint_least64_t>(byte_length), offset, size, host_offset)) [[unlikely]]
+                            {
+                                return false;
+                            }
+
+                            ::std::memcpy(destination, memory_begin + host_offset, size);
+                            return true;
+                        });
                 }
                 case resolved_preload_memory_t::target_kind::local_imported:
                 {
-                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
-                    ::std::memcpy(destination, resolved.memory_begin + host_offset, size);
-                    return true;
+                    auto* const local_imported{resolved.local_imported};
+                    if(local_imported == nullptr) [[unlikely]] { return false; }
+                    return local_imported->memory_read_from_index(resolved.local_imported_index, offset, destination, size);
                 }
                 default:
                 {
@@ -1413,8 +1418,6 @@ namespace uwvm2::runtime::uwvm_int
 
             resolved_preload_memory_t resolved{};
             if(!try_build_preload_memory_descriptor(memory_index, nullptr, ::std::addressof(resolved), nullptr)) [[unlikely]] { return false; }
-            ::std::size_t host_offset{};
-            if(!validate_preload_copy_range(resolved.byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
             if(size == 0uz) [[unlikely]] { return true; }
 
             switch(resolved.kind)
@@ -1422,19 +1425,28 @@ namespace uwvm2::runtime::uwvm_int
                 case resolved_preload_memory_t::target_kind::native_defined:
                 {
                     auto const* const memory{resolved.native_memory};
-                    if(memory == nullptr || resolved.memory_begin == nullptr) [[unlikely]] { return false; }
-                    return with_native_preload_copy_access(*memory,
-                                                           [&]() noexcept
-                                                           {
-                                                               ::std::memcpy(resolved.memory_begin + host_offset, source, size);
-                                                               return true;
-                                                           });
+                    if(memory == nullptr) [[unlikely]] { return false; }
+                    return with_native_preload_copy_access(
+                        *memory,
+                        [&](::std::byte* memory_begin, ::std::size_t byte_length) noexcept
+                        {
+                            if(memory_begin == nullptr) [[unlikely]] { return false; }
+
+                            ::std::size_t host_offset{};
+                            if(!validate_preload_copy_range(static_cast<::std::uint_least64_t>(byte_length), offset, size, host_offset)) [[unlikely]]
+                            {
+                                return false;
+                            }
+
+                            ::std::memcpy(memory_begin + host_offset, source, size);
+                            return true;
+                        });
                 }
                 case resolved_preload_memory_t::target_kind::local_imported:
                 {
-                    if(resolved.memory_begin == nullptr) [[unlikely]] { return false; }
-                    ::std::memcpy(resolved.memory_begin + host_offset, source, size);
-                    return true;
+                    auto* const local_imported{resolved.local_imported};
+                    if(local_imported == nullptr) [[unlikely]] { return false; }
+                    return local_imported->memory_write_to_index(resolved.local_imported_index, offset, source, size);
                 }
                 default:
                 {

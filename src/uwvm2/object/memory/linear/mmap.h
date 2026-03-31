@@ -526,10 +526,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 
         /// @brief      Grow the memory.
         /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
-        inline constexpr void grow_silently(::std::size_t page_grow_size,
-                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        inline constexpr bool try_grow_silently(::std::size_t page_grow_size,
+                                                ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),
+                                                ::std::size_t* old_page_size_out = nullptr) noexcept
         {
-            if(page_grow_size == 0uz) [[unlikely]] { return; }
+            if(page_grow_size == 0uz) [[unlikely]]
+            {
+                if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = this->get_page_size(); }
+                return true;
+            }
 
             if(this->memory_begin == nullptr) [[unlikely]]
             {
@@ -540,7 +545,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             if(page_grow_size > ::std::numeric_limits<::std::size_t>::max() >> this->custom_page_size_log2) [[unlikely]]
             {
                 // This situation cannot occur; it is due to user input error.
-                ::fast_io::fast_terminate();
+                return false;
             }
 
             // Once initialized, the custom_page_size_log2 will not change.
@@ -558,6 +563,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             // This atomic operation prevents the dynamic check from retrieving an erroneous value when reading the length.
             // Here, with the lock's support, memory access is already guaranteed to be relaxed. However, during dynamic checks, an acquire is still required.
             auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};
+            if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = current_length >> this->custom_page_size_log2; }
 
             // Select the smaller value between the manually set maximum and the maximum already mmapped by the platform.
             // Beyond the boundaries of the VMA (adjacent virtual address space), protection is not automatically enforced; these regions are simply “unmapped.”
@@ -609,10 +615,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             max_limit_memory_length = ::std::min(max_limit_memory_length, max_page_memory_length);
 
             // start checking
-            if(max_limit_memory_length < current_length) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(max_limit_memory_length < current_length) [[unlikely]] { return false; }
 
             auto const left_memory_size{max_limit_memory_length - current_length};
-            if(memory_grow_size > left_memory_size) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(memory_grow_size > left_memory_size) [[unlikely]] { return false; }
 
             // grown region [current_length, grow_final_memory_length)
             auto const grow_final_memory_length{current_length + memory_grow_size};
@@ -682,7 +688,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             this->memory_length_p->store(grow_final_memory_length, ::std::memory_order_release);
 
             // growing_mutex_guard_1 destruct here
-            return;
+            return true;
+        }
+
+        inline constexpr void grow_silently(::std::size_t page_grow_size,
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+        {
+            if(!this->try_grow_silently(page_grow_size, max_limit_memory_length)) [[unlikely]] { ::fast_io::fast_terminate(); }
         }
 
         /// @brief      Grow the memory (non-silent).
@@ -691,9 +703,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
         ///             platform's immediate response to the commit/protection step.
         /// @param      max_limit_memory_length     This maximum value is derived from the maximum memory limit.
         inline constexpr bool grow_strictly(::std::size_t page_grow_size,
-                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max()) noexcept
+                                            ::std::size_t max_limit_memory_length = ::std::numeric_limits<::std::size_t>::max(),
+                                            ::std::size_t* old_page_size_out = nullptr) noexcept
         {
-            if(page_grow_size == 0uz) [[unlikely]] { return true; }
+            if(page_grow_size == 0uz) [[unlikely]]
+            {
+                if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = this->get_page_size(); }
+                return true;
+            }
 
             if(this->memory_begin == nullptr) [[unlikely]]
             {
@@ -720,6 +737,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
             ::uwvm2::utils::mutex::mutex_guard_t growing_mutex_guard_1{*this->growing_mutex_p};
 
             auto const current_length{this->memory_length_p->load(::std::memory_order_relaxed)};
+            if(old_page_size_out != nullptr) [[likely]] { *old_page_size_out = current_length >> this->custom_page_size_log2; }
 
             ::std::size_t max_page_memory_length;  // No initlization is required
 

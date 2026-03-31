@@ -55,6 +55,9 @@ Each release entry should record:
 - Removed unintended LLVM JIT environment probing during `xmake f` configuration when JIT support is disabled.
 - The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.0.1` builds.
 - Renamed the build-toolchain option from `--use-llvm` to `--use-llvm-compiler` to make it explicit that the flag selects the LLVM/Clang compiler toolchain rather than enabling JIT.
+- Fixed `memory.grow` to return the previous page count on success and `-1` on failure across strict and silent growth paths, including concurrent linear-memory backends where the old size must be captured inside the grow critical section.
+- Added stable linear-memory access snapshots for relocation-capable backends so preload copies and local-imported memory reads and writes no longer race against concurrent `memory.grow` relocation.
+- Exposed local-imported memory snapshot, read, and write helpers through the runtime bridge so host-side memory transfers use the same validated snapshot semantics as native-defined memories.
 
 ### Release Fixes
 
