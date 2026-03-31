@@ -54,7 +54,7 @@
  *
  * @details
  * ## What this provides (layer 1: "what is it doing?")
- * WebAssembly is a stack machine. This header implements the "搬运 system" that moves values between:
+ * WebAssembly is a stack machine. This header implements the "transport system" that moves values between:
  * - The real operand stack in memory (`sp`), and
  * - A cached stack-top segment ("stack-top cache") carried in the interpreter opfunc argument pack
  *   (i.e. ABI-friendly locals / registers).
@@ -64,7 +64,7 @@
  * - **fill**:  operand stack → stack-top cache (dematerialize from memory)
  *
  * ## Why it exists (layer 2: "why do we need it?")
- * A naïve interpreter performs frequent loads/stores to the operand stack in memory. That is expensive due to
+ * A native interpreter performs frequent loads/stores to the operand stack in memory. That is expensive due to
  * cache misses and memory bandwidth. UWVM keeps the hottest part of the operand stack in registers/locals by
  * treating a fixed set of opfunc argument slots as a **stack-top cache**.
  *
