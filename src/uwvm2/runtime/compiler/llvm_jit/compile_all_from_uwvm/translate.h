@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2026-03-30
  * @copyright   APL-2.0 License
  */
 
@@ -19,39 +20,37 @@
  *                                      *
  ****************************************/
 
-module;
-
-// std
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <type_traits>
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
-
-export module uwvm2.runtime.compiler.uwvm_int.optable:conbine;
-
-import fast_io;
-import uwvm2.utils.container;
-import uwvm2.utils.debug;
-import uwvm2.parser.wasm.standard.wasm1;
-import uwvm2.object;
-import :define;
-import :register_ring;
-import :memory;
-import :numeric;
-import :compare;
-import :variable;
-import :call;
+#pragma once
 
 #ifndef UWVM_MODULE
-# define UWVM_MODULE
-#endif
-#ifndef UWVM_MODULE_EXPORT
-# define UWVM_MODULE_EXPORT export
+// std
+# include <cstddef>
+# include <cstdint>
+# include <limits>
+# include <memory>
+# include <utility>
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
+// import
+# include <fast_io.h>
+# include <uwvm2/utils/container/impl.h>
+# include <uwvm2/utils/debug/impl.h>
+# include <uwvm2/parser/wasm/base/impl.h>
+# include <uwvm2/validation/error/impl.h>
+# include <uwvm2/uwvm/runtime/storage/impl.h>
+# include <uwvm2/uwvm/runtime/validator/impl.h>
 #endif
 
-#include "conbine.h"
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT
+#endif
+
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm
+{
+#include "translate/single_func.h"
+}
+
+#ifndef UWVM_MODULE
+// macro
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif

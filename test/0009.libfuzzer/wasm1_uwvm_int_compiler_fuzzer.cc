@@ -33,6 +33,8 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/loader/load_and_check_modules.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
+
+# include "wasm1_code_section_module_builder.h"
 #else
 # error "Module testing is not currently supported"
 #endif
@@ -45,8 +47,11 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         if(size > (1u << 20u)) { return 0; }
         if(data == nullptr) { return 0; }
 
-        auto const* begin = reinterpret_cast<::std::byte const*>(data);
-        auto const* end = begin + size;
+        // Full-module parser fuzzing already exists elsewhere.
+        // This target mutates only the sections that directly affect code validation semantics.
+        auto const mod{::test::wasm1_code_section_module_builder::build_module_from_code_validation_bytes(data, size)};
+        auto const* begin = reinterpret_cast<::std::byte const*>(mod.data());
+        auto const* end = begin + mod.size();
 
         // Parse (must succeed) -> runtime init -> compiler path.
         ::uwvm2::parser::wasm::base::error_impl err{};

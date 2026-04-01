@@ -9,4 +9,5 @@ Includes various widgets
 * `intrinsics` Provide some intrinsics functions, like prefetch, etc.
 * `macro` Generic Macro Definitions
 * `madvise` posix_madvise and simulation on win32
+* `thread` Lightweight native-thread batch scheduler built around C++20 coroutine handles
 * `version` revision structure: 2.major.minor.patch

@@ -39,7 +39,7 @@ SYSROOT=/opt/riscv64-unknown-elf
 TARGET=riscv64-unknown-elf
 
 # Configure xmake to use clang/llvm tools
-xmake f -m release --use-llvm=y \
+xmake f -m release --use-llvm-compiler=y \
   --cc=clang \
   --cxx=clang++ \
   --ld=clang \

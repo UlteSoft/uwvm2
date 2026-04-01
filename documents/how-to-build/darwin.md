@@ -16,7 +16,7 @@ xmake f -m release
 xmake
 
 # LLVM/Clang toolchain
-xmake f -m release --use-llvm=y
+xmake f -m release --use-llvm-compiler=y
 xmake
 
 # Install
@@ -47,7 +47,7 @@ $ xmake i -o <install_path>
 2. Install [[llvm]](https://github.com/llvm/llvm-project/releases)
 3. Build
 ```shell
-$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm=y
+$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm-compiler=y
 $ xmake
 ```
 4. Install UWVM2
@@ -115,19 +115,19 @@ Use it at configure time, for example:
 
 ```shell
 # iOS
-xmake f -m release --use-llvm=y --apple-platform=IOS_18
+xmake f -m release --use-llvm-compiler=y --apple-platform=IOS_18
 
 # tvOS
-xmake f -m release --use-llvm=y --apple-platform=TVOS_18
+xmake f -m release --use-llvm-compiler=y --apple-platform=TVOS_18
 
 # watchOS
-xmake f -m release --use-llvm=y --apple-platform=WATCHOS_11
+xmake f -m release --use-llvm-compiler=y --apple-platform=WATCHOS_11
 
 # visionOS
-xmake f -m release --use-llvm=y --apple-platform=VISIONOS_2
+xmake f -m release --use-llvm-compiler=y --apple-platform=VISIONOS_2
 
 # Custom version (example)
-xmake f -m release --use-llvm=y --apple-platform=ios:17.0
+xmake f -m release --use-llvm-compiler=y --apple-platform=ios:17.0
 ```
 
 Then build and install as usual:
@@ -138,5 +138,5 @@ xmake i -o <install_path>
 ```
 
 ## Caveat
-1. You must add `--use-llvm` if you use llvm underneath, otherwise it will fail to compile, including but not limited to symbolic linking of `gcc` to `clang`
+1. Add `--use-llvm-compiler` when you want to build with the LLVM/Clang compiler toolchain. This only selects the compiler toolchain and does not enable LLVM JIT by itself.
 2. Currently llvm does not have static linking on darwin.

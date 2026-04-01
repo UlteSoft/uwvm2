@@ -13,7 +13,7 @@ xmake f -m release
 xmake
 
 # LLVM/Clang toolchain
-xmake f -m release --use-llvm=y
+xmake f -m release --use-llvm-compiler=y
 xmake
 
 # Install
@@ -43,7 +43,7 @@ $ xmake i -o <install_path>
 2. Install [[llvm]](https://github.com/llvm/llvm-project/releases)
 3. Build
 ```shell
-$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm=y
+$ xmake f -m [debug|release|releasedbg|minsizerel] --use-llvm-compiler=y
 $ xmake
 ```
 4. Install UWVM2
@@ -57,6 +57,6 @@ $ xmake i -o <install_path>
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 
 ## Caveat
-1. You must add `--use-llvm` if you use llvm underneath, otherwise it will fail to compile, including but not limited to symbolic linking of `gcc` to `clang`
-2. On some platforms such as the latest Android which only has llvm, you must also add `--use-llvm`, same as note 1.
+1. Add `--use-llvm-compiler` when you want to build with the LLVM/Clang compiler toolchain. This only selects the compiler toolchain and does not enable LLVM JIT by itself.
+2. On some platforms such as the latest Android which only provide LLVM/Clang, you must also add `--use-llvm-compiler`, same as note 1.
 3. On some platforms, such as Android, the static link option will have no effect.

@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * Ultimate WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -30,7 +30,7 @@
 # include <uwvm2/validation/error/error.h>
 # include <uwvm2/validation/standard/wasm1/impl.h>
 
-# include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/translate.h>
+# include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/runtime/initializer/init.h>
@@ -72,8 +72,8 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         // Full-module parser fuzzing already exists elsewhere.
         // This target mutates only the sections that directly affect code validation semantics.
         auto const mod{::test::wasm1_code_section_module_builder::build_module_from_code_validation_bytes(data, size)};
-        auto const* begin = reinterpret_cast<::std::byte const*>(mod.data());
-        auto const* end = begin + mod.size();
+        auto const* begin{reinterpret_cast<::std::byte const*>(mod.data())};
+        auto const* end{begin + mod.size()};
 
         // Phase 1: parser check (must pass before running validators).
         ::uwvm2::parser::wasm::base::error_impl parse_err{};
@@ -93,19 +93,6 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
         auto const& codesec{::uwvm2::parser::wasm::concepts::operation::get_first_type_in_tuple<
             ::uwvm2::parser::wasm::standard::wasm1::features::code_section_storage_t<Feature>>(module_storage.sections)};
-
-        // Temporary limitation: the compiler-side validator needs type section pointers for call_indirect.
-        // Skip inputs that might contain call_indirect (0x11) anywhere in function bodies.
-        for(::std::size_t local_idx{}; local_idx < codesec.codes.size(); ++local_idx)
-        {
-            auto const& code{codesec.codes.index_unchecked(local_idx)};
-            auto const* p = reinterpret_cast<::std::byte const*>(code.body.expr_begin);
-            auto const* q = reinterpret_cast<::std::byte const*>(code.body.code_end);
-            for(; p != q; ++p)
-            {
-                if(*p == ::std::byte{0x11}) { return 0; }
-            }
-        }
 
         // Phase 2 (standard validation): find the first code-validation error (or ok).
         code_validation_error_code std_code{code_validation_error_code::ok};
@@ -132,7 +119,7 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
             }
         }
 
-        // Phase 3 (runtime init for compiler path): parser -> init -> compile (captures compiler-side code-validation error).
+        // Phase 3 (runtime init for llvm_jit path): parser -> init -> runtime validation / compile.
         ::uwvm2::parser::wasm::base::error_impl rt_parse_err{};
         ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t rt_parsed_module_storage{};
         rt_parsed_module_storage =
@@ -189,9 +176,8 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
 
         if(::uwvm2::uwvm::wasm::loader::check_import_exist_and_detect_cycles() != ::uwvm2::uwvm::wasm::loader::load_and_check_modules_rtl::ok) { return 0; }
 
-        // `initialize_runtime()` applies active element/data segments and treats out-of-bounds initialization
-        // as a fatal error (process termination). This fuzzer only compares *code* validation results, so
-        // build the per-module runtime record for the compiler path and skip full runtime initialization.
+        // `initialize_runtime()` applies active element/data segments and may terminate on OOB initialization.
+        // This differential fuzzer only compares code validation results, so we only build the per-module runtime record.
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.clear();
         ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.reserve(1uz);
         ::uwvm2::uwvm::runtime::initializer::details::import_alias_sanity_checked = false;
@@ -205,12 +191,28 @@ extern "C" int LLVMFuzzerTestOneInput(::std::uint8_t const* data, ::std::size_t 
         auto it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(u8"fuzz")};
         if(it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) { return 0; }
 
-        ::uwvm2::validation::error::code_validation_error_impl compiler_err{};
-        ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option op{};
-        (void)::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm_single_func<
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t{}>(it->second, op, compiler_err);
+        ::uwvm2::validation::error::code_validation_error_impl jit_validate_err{};
+        try
+        {
+            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::validate_runtime_wasm_code_for_module(it->second, jit_validate_err);
+        }
+        catch(::fast_io::error const&)
+        {
+        }
 
-        if(std_code != compiler_err.err_code) [[unlikely]] { fuzz_trap(); }
+        ::uwvm2::validation::error::code_validation_error_impl jit_compile_err{};
+        ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option op{};
+        try
+        {
+            (void)::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_all_from_uwvm(it->second, op, jit_compile_err, 0uz);
+        }
+        catch(::fast_io::error const&)
+        {
+        }
+
+        if(std_code != jit_validate_err.err_code) [[unlikely]] { fuzz_trap(); }
+        if(std_code != jit_compile_err.err_code) [[unlikely]] { fuzz_trap(); }
+        if(jit_validate_err.err_code != jit_compile_err.err_code) [[unlikely]] { fuzz_trap(); }
 
         return 0;
     }

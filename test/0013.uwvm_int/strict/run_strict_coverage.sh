@@ -48,7 +48,7 @@ fi
 
 COMMON_F_FLAGS=(
   -m debug
-  --use-llvm=y
+  --use-llvm-compiler=y
   --ccache=n
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y

@@ -324,7 +324,7 @@ function get_llvm_jit_options()
     local cache_info = common.get_cache()
     local llvm_config = _find_llvm_config_tool()
     assert(llvm_config and llvm_config.program,
-        [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=llvm.]])
+        [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
 
     local cache_key = table.concat({
         llvm_config.program,

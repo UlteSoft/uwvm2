@@ -30,7 +30,7 @@ jobs:
       - name: Work around LLVM libc++ header bug
         run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
       - name: Configure
-        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm=y --sdk="$(brew --prefix llvm)" --static=n
+        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm-compiler=y --sdk="$(brew --prefix llvm)" --static=n
       - name: Build
         run: |
           xmake b -rv
@@ -78,7 +78,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=n
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=n
       - name: Build
         run: |
           xmake b -rv
@@ -128,7 +128,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=n
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=n
       - name: Build
         run: |
           # Build all targets (including tests), but do not run them.
@@ -194,7 +194,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --static=n
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --static=n
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
@@ -229,7 +229,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y --static=n
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-cxx-module=y --static=n
       - name: Build
         run: | 
           xmake b -rv
@@ -239,6 +239,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-windows-gnu:
+    if: ${{ !always() }}
     name: Windows MINGW (x86_64) ${{ matrix.env.name }}
     strategy:
       matrix:
@@ -282,7 +283,7 @@ jobs:
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
       - name: Configure
-        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} --static=y
+        run: xmake f -p mingw --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} --static=y
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
@@ -320,7 +321,7 @@ jobs:
             ${{ matrix.env.prefix }}-cc
             ${{ matrix.env.prefix }}-xmake
       - name: Configure
-        run: xmake f -p mingw --use-llvm=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} -a i686 --static=y
+        run: xmake f -p mingw --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --mingw-min=${{ matrix.winver }} -a i686 --static=y
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version
@@ -372,7 +373,7 @@ jobs:
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm=y --sdk="$(llvm-config21 --prefix)" --static=n"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --static=n"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0

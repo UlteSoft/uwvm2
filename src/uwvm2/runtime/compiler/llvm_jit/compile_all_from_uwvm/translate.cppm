@@ -7,6 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
+ * @date        2026-03-30
  * @copyright   APL-2.0 License
  */
 
@@ -24,28 +25,23 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <memory>
-#include <type_traits>
+#include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
 
-export module uwvm2.runtime.compiler.uwvm_int.optable:conbine;
+export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm:translate;
 
 import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
-import uwvm2.parser.wasm.standard.wasm1;
-import uwvm2.object;
-import :define;
-import :register_ring;
-import :memory;
-import :numeric;
-import :compare;
-import :variable;
-import :call;
+import uwvm2.parser.wasm.base;
+import uwvm2.parser.wasm.concepts;
+import uwvm2.parser.wasm.binfmt.binfmt_ver1;
+import uwvm2.validation.error;
+import uwvm2.uwvm.runtime.storage;
+import uwvm2.uwvm.runtime.validator;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -54,4 +50,4 @@ import :call;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "conbine.h"
+#include "translate.h"
