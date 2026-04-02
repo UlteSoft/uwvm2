@@ -29,21 +29,19 @@
 # include <limits>
 # include <memory>
 # include <utility>
-// predefine
-# ifndef UWVM
-#  define UWVM
-# endif
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/uwvm_predefine/io/impl.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
-# include <uwvm2/uwvm_predefine/io/impl.h>
-# include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 #endif
 
