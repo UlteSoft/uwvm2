@@ -841,7 +841,7 @@ case wasm1_code::br:
             // Wasm1: arity is 0 or 1.
             auto const result_type{target_frame.result.begin[0]};
 
-            if(curr_size > target_base + 1uz)
+            if(curr_size - target_base > 1uz)
             {
                 // Preserve the result value across dropping extra values.
                 emit_local_set_typed_to_no_fill(bytecode, result_type, internal_temp_local_off);
@@ -974,12 +974,16 @@ case wasm1_code::br_if:
     // not result types.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
+    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
+    auto const required_stack_size{target_arity_plus_cond_overflows ? max_operand_stack_requirement : (target_arity + 1uz)};
+
+    if(!is_polymorphic && (target_arity_plus_cond_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity + 1uz;
+        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
         err.err_code = code_validation_error_code::operand_stack_underflow;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -3083,6 +3087,43 @@ case wasm1_code::br_table:
     // [       safe         ] unsafe (could be the section_end)
     //                       ^^ code_curr
 
+    // Security hardening: each `br_table` label index (including the default label) is encoded as
+    // an unsigned LEB128 value and therefore occupies at least one byte. Reject encodings whose
+    // remaining byte count cannot possibly contain `target_count + 1` label indices before any
+    // reservation/allocation, preventing attacker-controlled oversized `target_count` values from
+    // amplifying into excessive memory requests.
+    auto const remaining_bytes{static_cast<::std::size_t>(code_end - code_curr)};
+    auto constexpr max_br_table_label_count{::std::numeric_limits<::std::size_t>::max()};
+    bool target_count_exceeds_size_t{};
+    ::std::size_t target_count_uz{};
+    if constexpr(::std::numeric_limits<wasm_u32>::max() > max_br_table_label_count)
+    {
+        if(target_count > max_br_table_label_count) [[unlikely]]
+        {
+            target_count_exceeds_size_t = true;
+        }
+        else
+        {
+            target_count_uz = static_cast<::std::size_t>(target_count);
+        }
+    }
+    else
+    {
+        target_count_uz = static_cast<::std::size_t>(target_count);
+    }
+
+    auto const target_count_plus_default_overflows{!target_count_exceeds_size_t && target_count_uz == max_br_table_label_count};
+    if(target_count_exceeds_size_t || target_count_plus_default_overflows || remaining_bytes == 0uz || target_count_uz >= remaining_bytes)
+        [[unlikely]]
+    {
+        err.err_curr = op_begin;
+        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
+        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.remaining_bytes = remaining_bytes;
+        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.max_target_count = (remaining_bytes == 0uz ? 0uz : remaining_bytes - 1uz);
+        err.err_code = code_validation_error_code::br_table_target_count_exceeds_remaining_bytes;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
     auto const all_label_count_uz{control_flow_stack.size()};
     auto const validate_label{[&](wasm_u32 li) constexpr UWVM_THROWS
                               {
@@ -3120,8 +3161,10 @@ case wasm1_code::br_table:
     ::std::size_t expected_arity{};
     curr_operand_stack_value_type expected_type{};
 
+    auto const br_table_label_capacity{target_count_uz + 1uz};
+
     ::uwvm2::utils::container::vector<wasm_u32> br_table_label_indices{};
-    br_table_label_indices.reserve(static_cast<::std::size_t>(target_count) + 1uz);
+    br_table_label_indices.reserve(br_table_label_capacity);
 
     for(wasm_u32 i{}; i != target_count; ++i)
     {
@@ -3151,7 +3194,7 @@ case wasm1_code::br_table:
         //                     ^^ code_curr
 
         validate_label(li);
-        // Safe: reserved exactly `target_count + 1` above.
+        // Safe: reserved one slot per branch target plus the default label above.
         br_table_label_indices.push_back_unchecked(li);
 
         auto const [arity, type]{get_sig(li)};
@@ -3202,7 +3245,7 @@ case wasm1_code::br_table:
     //                                 ^^ code_curr
 
     validate_label(default_label);
-    // Safe: reserved exactly `target_count + 1` above.
+    // Safe: reserved one slot per branch target plus the default label above.
     br_table_label_indices.push_back_unchecked(default_label);
 
     auto const [default_arity, default_type]{get_sig(default_label)};
@@ -3226,12 +3269,16 @@ case wasm1_code::br_table:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(!is_polymorphic && operand_stack.size() < expected_arity + 1uz) [[unlikely]]
+    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
+    auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
+
+    if(!is_polymorphic && (expected_arity_plus_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = expected_arity + 1uz;
+        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
         err.err_code = code_validation_error_code::operand_stack_underflow;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }

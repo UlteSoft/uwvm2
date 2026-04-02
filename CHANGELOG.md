@@ -62,6 +62,10 @@ Each release entry should record:
 - Exposed local-imported memory snapshot, read, and write helpers through the runtime bridge so host-side memory transfers use the same validated snapshot semantics as native-defined memories.
 - Strengthened `with_memory_access_snapshot` synchronization so snapshot callbacks wait for in-flight memory operations to finish before entering the exclusive-access section, improving correctness for concurrent linear-memory access.
 - Added exception capture and propagation for parallel compilation failures so background compiler tasks can terminate cleanly and surface stored error state deterministically.
+- Hardened `br_table` validation and `uwvm_int` translation against malformed target counts by rejecting encodings whose remaining bytes cannot contain all branch labels plus the default label before reserving storage, preventing oversized allocation and resource-exhaustion paths.
+- Added a dedicated `br_table_target_count_exceeds_remaining_bytes` validation error and diagnostic output so malformed `br_table` encodings now report the offending target count, remaining bytes, and computed maximum target count.
+- Guarded operand-stack requirement calculations for `br_if`, `br_table`, and `call_indirect` against `size_t` overflow in both validation and `uwvm_int` translation, preserving correct stack-underflow handling for extreme arities.
+- Corrected single-result `br` and `return` lowering in the `uwvm_int` translator so temporary result preservation now compares live stack depth relative to the branch target base instead of relying on an overflow-prone addition.
 
 ### Release Fixes
 
