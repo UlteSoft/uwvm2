@@ -31,14 +31,18 @@
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
+# include <uwvm2/uwvm_predefine/io/impl.h>
+# include <uwvm2/uwvm_predefine/utils/ansies/impl.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/base/impl.h>
+# include <uwvm2/parser/wasm/concepts/impl.h>
+# include <uwvm2/parser/wasm/binfmt/binfmt_ver1/impl.h>
 # include <uwvm2/validation/error/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
-# include <uwvm2/uwvm/runtime/validator/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -52,5 +56,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_fro
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

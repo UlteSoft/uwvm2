@@ -65,7 +65,7 @@ case wasm1_code::return_:
         {
             auto const result_type{func_frame.result.begin[0]};
 
-            if(curr_size > target_base + 1uz)
+            if(curr_size - target_base > 1uz)
             {
                 emit_local_set_typed_to_no_fill(bytecode, result_type, internal_temp_local_off);
                 if constexpr(stacktop_enabled) { emit_drop_to_stack_size_no_fill(bytecode, target_base); }
@@ -989,12 +989,16 @@ case wasm1_code::call_indirect:
     flush_conbine_pending();
 #endif
 
-    if(!is_polymorphic && operand_stack.size() < param_count + 1uz) [[unlikely]]
+    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
+    auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
+
+    if(!is_polymorphic && (param_count_plus_table_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.operand_stack_underflow.op_code_name = u8"call_indirect";
         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = param_count + 1uz;
+        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
         err.err_code = code_validation_error_code::operand_stack_underflow;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
@@ -1046,7 +1050,9 @@ case wasm1_code::call_indirect:
         if(!is_polymorphic)
         {
             bool const n_ok{param_count <= 4uz};
-            bool const state_ok{stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && stack_size >= (param_count + 1uz)};
+            bool const state_ok{
+                stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && !param_count_plus_table_index_overflows &&
+                stack_size >= required_stack_size};
 
             if(n_ok && state_ok)
             {
@@ -1308,7 +1314,7 @@ case wasm1_code::call_indirect:
     {
         if(!is_polymorphic)
         {
-            ::std::size_t const pop_count{param_count + 1uz};
+            ::std::size_t const pop_count{required_stack_size};
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
             if(use_stacktop_call_indirect_fast)
             {
