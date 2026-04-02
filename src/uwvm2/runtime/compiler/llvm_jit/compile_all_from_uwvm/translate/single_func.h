@@ -1611,12 +1611,16 @@ namespace details
                         target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
                     // Need (labelargs..., i32 cond)
-                    if(!is_polymorphic && operand_stack.size() < target_arity + 1uz) [[unlikely]]
+                    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+                    auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
+                    auto const required_stack_size{target_arity_plus_cond_overflows ? max_operand_stack_requirement : (target_arity + 1uz)};
+
+                    if(!is_polymorphic && (target_arity_plus_cond_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-                        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity + 1uz;
+                        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -1697,6 +1701,45 @@ namespace details
                     // br_table  target_count ...
                     // [       safe         ] unsafe (could be the section_end)
                     //                       ^^ code_curr
+
+                    // Security hardening: each `br_table` label index (including the default label)
+                    // is an unsigned LEB128 value, so every entry consumes at least one byte.
+                    // Reject encodings that cannot possibly provide `target_count + 1` indices
+                    // before further validation work, which also blocks attacker-controlled
+                    // oversized counts from turning malformed inputs into resource-amplification paths.
+                    auto const remaining_bytes{static_cast<::std::size_t>(code_end - code_curr)};
+                    auto constexpr max_br_table_label_count{::std::numeric_limits<::std::size_t>::max()};
+                    bool target_count_exceeds_size_t{};
+                    ::std::size_t target_count_uz{};
+                    if constexpr(::std::numeric_limits<::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32>::max() > max_br_table_label_count)
+                    {
+                        if(target_count > max_br_table_label_count) [[unlikely]]
+                        {
+                            target_count_exceeds_size_t = true;
+                        }
+                        else
+                        {
+                            target_count_uz = static_cast<::std::size_t>(target_count);
+                        }
+                    }
+                    else
+                    {
+                        target_count_uz = static_cast<::std::size_t>(target_count);
+                    }
+
+                    auto const target_count_plus_default_overflows{
+                        !target_count_exceeds_size_t && target_count_uz == max_br_table_label_count};
+                    if(target_count_exceeds_size_t || target_count_plus_default_overflows || remaining_bytes == 0uz || target_count_uz >= remaining_bytes)
+                        [[unlikely]]
+                    {
+                        err.err_curr = op_begin;
+                        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
+                        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.remaining_bytes = remaining_bytes;
+                        err.err_selectable.br_table_target_count_exceeds_remaining_bytes.max_target_count =
+                            (remaining_bytes == 0uz ? 0uz : remaining_bytes - 1uz);
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_count_exceeds_remaining_bytes;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
 
                     auto const all_label_count_uz{control_flow_stack.size()};
                     auto const validate_label{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr UWVM_THROWS
@@ -1846,12 +1889,16 @@ namespace details
                     }
 
                     // Stack effect: (labelargs..., i32 index) -> unreachable
-                    if(!is_polymorphic && operand_stack.size() < expected_arity + 1uz) [[unlikely]]
+                    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+                    auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
+                    auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
+
+                    if(!is_polymorphic && (expected_arity_plus_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-                        err.err_selectable.operand_stack_underflow.stack_size_required = expected_arity + 1uz;
+                        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }
@@ -2186,12 +2233,17 @@ namespace details
                     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
 
                     // Stack effect: (args..., i32 func_index) -> (results...)
-                    if(!is_polymorphic && operand_stack.size() < param_count + 1uz) [[unlikely]]
+                    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+                    auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
+                    auto const required_stack_size{
+                        param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
+
+                    if(!is_polymorphic && (param_count_plus_table_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
                     {
                         err.err_curr = op_begin;
                         err.err_selectable.operand_stack_underflow.op_code_name = u8"call_indirect";
                         err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-                        err.err_selectable.operand_stack_underflow.stack_size_required = param_count + 1uz;
+                        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
                         err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
                         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                     }

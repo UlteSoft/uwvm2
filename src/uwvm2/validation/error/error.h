@@ -74,6 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
         illegal_label_index,
         br_value_type_mismatch,
         br_cond_type_not_i32,
+        br_table_target_count_exceeds_remaining_bytes,
         br_table_target_type_mismatch,
         invalid_function_index_encoding,
         invalid_type_index,
@@ -171,6 +172,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
     {
         ::uwvm2::utils::container::u8string_view op_code_name;
         ::uwvm2::parser::wasm::standard::wasm1::type::value_type cond_type;
+    };
+
+    struct br_table_target_count_exceeds_remaining_bytes_err_t
+    {
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 target_count;
+        ::std::size_t remaining_bytes;
+        ::std::size_t max_target_count;
     };
 
     struct br_table_target_type_mismatch_err_t
@@ -319,6 +327,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
 
         br_cond_type_not_i32_err_t br_cond_type_not_i32;
         static_assert(::std::is_trivially_copyable_v<br_cond_type_not_i32_err_t> && ::std::is_trivially_destructible_v<br_cond_type_not_i32_err_t>);
+
+        br_table_target_count_exceeds_remaining_bytes_err_t br_table_target_count_exceeds_remaining_bytes;
+        static_assert(::std::is_trivially_copyable_v<br_table_target_count_exceeds_remaining_bytes_err_t> &&
+                      ::std::is_trivially_destructible_v<br_table_target_count_exceeds_remaining_bytes_err_t>);
 
         br_table_target_type_mismatch_err_t br_table_target_type_mismatch;
         static_assert(::std::is_trivially_copyable_v<br_table_target_type_mismatch_err_t> &&

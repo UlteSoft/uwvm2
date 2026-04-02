@@ -168,6 +168,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::error
 #include "error_code_outputs/eco_br_cond_type_not_i32.h"
                 return;
             }
+            case ::uwvm2::validation::error::code_validation_error_code::br_table_target_count_exceeds_remaining_bytes:
+            {
+#include "error_code_outputs/eco_br_table_target_count_exceeds_remaining_bytes.h"
+                return;
+            }
             case ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch:
             {
 #include "error_code_outputs/eco_br_table_target_type_mismatch.h"
