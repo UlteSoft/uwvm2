@@ -5,6 +5,9 @@
 #if !defined(BIZWEN_DEQUE_HPP)
 #define BIZWEN_DEQUE_HPP
 
+#pragma push_macro("BIZWEN_EXPORT")
+#undef BIZWEN_EXPORT
+
 #if !defined(BIZWEN_MODULE)
 #define BIZWEN_EXPORT
 
@@ -1109,7 +1112,7 @@ class deque
 #endif
     using atraits_t_ = ::std::allocator_traits<Alloc>;
 
-    static constexpr bool is_default_operation_ = requires(Alloc &a) { a.construct(static_cast<T *>(nullptr)); };
+    static constexpr bool is_default_destroy_ = !requires(Alloc &a) { a.destroy(static_cast<T *>(nullptr)); };
     static constexpr bool is_aleq_ = atraits_t_::is_always_equal::value;
     static constexpr bool is_pocca_ = atraits_t_::propagate_on_container_copy_assignment::value;
     static constexpr bool is_pocma_ = atraits_t_::propagate_on_container_move_assignment::value;
@@ -1208,7 +1211,7 @@ class deque
     // 空deque安全，但执行后必须手动维护状态合法
     constexpr void destroy_elems_() noexcept
     {
-        if constexpr (!(::std::is_trivially_destructible_v<T> && is_default_operation_))
+        if constexpr (!(::std::is_trivially_destructible_v<T> && is_default_destroy_))
         {
             // 4种情况，0，1，2，3+个块有元素
             auto const block_size = block_elem_size_();
@@ -2852,7 +2855,7 @@ class deque
     constexpr void resize_shrink_(::std::size_t const old_size, ::std::size_t const new_size) noexcept
     {
         assert(old_size >= new_size);
-        if constexpr (::std::is_trivially_destructible_v<T> && is_default_operation_)
+        if constexpr (::std::is_trivially_destructible_v<T> && is_default_destroy_)
         {
             auto const res =
                 deque_detail::calc_pos<T>(static_cast<::std::size_t>(elem_begin_begin_ - elem_begin_first_), new_size);
@@ -3014,8 +3017,8 @@ class deque
             return begin();
         }
         // 此时容器一定不为空
-        auto const back_diff = end_pre - pos + ::std::size_t(0);
-        auto const front_diff = pos - begin_pre + ::std::size_t(0);
+        auto const back_diff = end_pre - pos;
+        auto const front_diff = pos - begin_pre;
         // NB:
         // 如果args是当前容器的元素的引用，那么必须使得该元素先被emplace_back/front后再被移动到正确位置，否则该引用会失效，同时reserve不会导致引用失效
         // 此处逻辑和无分配器版本稍微不一样
@@ -3024,7 +3027,7 @@ class deque
             reserve_back_(::std::size_t(2));
             emplace_back_noalloc_(::std::forward<Args>(args)...); // 满足标准要求经过A::construct
             // back_emplace向后移动1个元素并插入，因此先reserve以获得一个不失效的pos
-            auto new_pos = begin() + static_cast<difference_type>(front_diff);
+            auto new_pos = begin() + front_diff;
             back_emplace_(new_pos.block_elem_curr_, new_pos.elem_curr_);
             *new_pos = ::std::move(back());
             pop_back();
@@ -3034,7 +3037,7 @@ class deque
         {
             reserve_front_(::std::size_t(2));
             emplace_front_noalloc_(::std::forward<Args>(args)...);
-            auto new_pos = end() - static_cast<difference_type>(back_diff);
+            auto new_pos = end() - back_diff;
             front_emplace_(new_pos.block_elem_curr_, new_pos.elem_curr_);
             *(--new_pos) = ::std::move(front());
             pop_front();
@@ -3130,20 +3133,20 @@ class deque
         }
         auto const front_diff = pos - begin_pre;
         auto const back_diff = end_pre - pos;
-        auto const old_size = front_diff + back_diff;
+        auto const old_size = static_cast<size_type>(front_diff + back_diff);
         if (back_diff <= front_diff)
         {
-            partial_guard_<true> guard(this, static_cast<size_type>(old_size));
+            partial_guard_<true> guard(this, old_size);
             append_range_noguard_(first, last);
             guard.release();
-            ::std::rotate(begin() + front_diff, begin() + old_size, end());
+            ::std::rotate(begin() + front_diff, begin() + static_cast<difference_type>(old_size), end());
         }
         else
         {
-            partial_guard_<false> guard(this, static_cast<size_type>(old_size));
+            partial_guard_<false> guard(this, old_size);
             prepend_range_noguard_(first, last);
             guard.release();
-            ::std::rotate(begin(), begin() + (static_cast<difference_type>(size()) - old_size), end() - back_diff);
+            ::std::rotate(begin(), begin() + static_cast<difference_type>(size() - old_size), end() - back_diff);
         }
         return begin() + front_diff;
     }
@@ -3297,6 +3300,6 @@ using deque = deque<T, ::std::pmr::polymorphic_allocator<T>>;
 
 // STL-vNext END
 
-#undef BIZWEN_EXPORT
+#pragma pop_macro("BIZWEN_EXPORT")
 
 #endif
