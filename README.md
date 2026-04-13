@@ -1,7 +1,7 @@
 <div align="center">
   <img src="documents/logo/uwvm2.svg" alt="uwvm2 logo" width="240"/>
   <br/>
-  <h1>Ultimate WebAssembly Virtual Machine 2</h1>
+  <h1>UlteSoft WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/Beta-2ea043?style=for-the-badge" alt="Beta"/>
     <img src="https://img.shields.io/badge/V2.0.1.1-ffffff?style=for-the-badge" alt="V2.0.1.1"/>
@@ -21,7 +21,7 @@
 </div>
 
 ## Introduction
-Ultimate WebAssembly Virtual Machine 2 (`uwvm2`) is a cross-platform WebAssembly runtime and toolchain project implemented in modern C++26, with a strong emphasis on standards compliance, portability, and interpreter-first execution.
+UlteSoft WebAssembly Virtual Machine 2 (`uwvm2`) is a cross-platform WebAssembly runtime and toolchain project implemented in modern C++26, with a strong emphasis on standards compliance, portability, and interpreter-first execution.
 
 ## Changelog
 See [CHANGELOG.md](CHANGELOG.md) for release history, distribution baseline commits, fixes, support tracking, and deprecation records.
