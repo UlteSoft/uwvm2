@@ -91,6 +91,12 @@ case wasm1_code::br:
     operand_stack_truncate_to(curr_frame_base);
     is_polymorphic = true;
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_br(llvm_jit_emit_state, label_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+    }
+
     break;
 }
 case wasm1_code::br_if:
@@ -197,6 +203,15 @@ case wasm1_code::br_if:
         }
     }
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_br_if(llvm_jit_emit_state, label_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::br_table:
@@ -272,6 +287,9 @@ case wasm1_code::br_table:
         err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_count_exceeds_remaining_bytes;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
+
+    ::uwvm2::utils::container::vector<validation_module_traits_t::wasm_u32> llvm_jit_label_indices{};
+    if(emit_llvm_jit_active) { llvm_jit_label_indices.reserve(target_count_uz); }
 
     auto const all_label_count_uz{control_flow_stack.size()};
     auto const validate_label{[&](::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 li) constexpr UWVM_THROWS
@@ -364,6 +382,8 @@ case wasm1_code::br_table:
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_table_target_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
+
+        if(emit_llvm_jit_active) { llvm_jit_label_indices.push_back(li); }
     }
 
     // ... last_target | default_label ...
@@ -463,6 +483,15 @@ case wasm1_code::br_table:
     operand_stack_truncate_to(curr_frame_base);
     is_polymorphic = true;
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_br_table(llvm_jit_emit_state, llvm_jit_label_indices, default_label)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::return_:
@@ -527,6 +556,12 @@ case wasm1_code::return_:
     auto const curr_frame_base{control_flow_stack.back_unchecked().operand_stack_base};
     operand_stack_truncate_to(curr_frame_base);
     is_polymorphic = true;
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_return(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+    }
 
     break;
 }

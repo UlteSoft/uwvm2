@@ -108,6 +108,20 @@ function def_build()
 		add_options("llvm-jit-env")
 	end
 
+	if (enable_jit == "default" or enable_jit == "llvm") and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
+		on_load(function(target)
+			local utility = import("utility.utility", { anonymous = true })
+			-- Keep the runtime search path aligned with the LLVM installation
+			-- selected by llvm-config, rather than inferring it from the C++ driver.
+			local llvm_jit_options = utility.get_llvm_jit_options()
+			for _, llvm_libdir in ipairs(llvm_jit_options.linkdirs or {}) do
+				if llvm_libdir and llvm_libdir ~= "" then
+					target:add("ldflags", "-Wl,-rpath," .. llvm_libdir, { force = true })
+				end
+			end
+		end)
+	end
+
 	local enable_debug_int = get_config("enable-debug-int")
 	if enable_debug_int then
 		add_defines("UWVM_ENABLE_DEBUG_INT")
@@ -179,9 +193,9 @@ function def_build()
 		-- Since neither LLVM nor Wextra supports this parameter by default, this addition prevents compilation.
 		add_cxflags("-Wimplicit-fallthrough", { force = true })
 	else
-		if not is_plat("windows") then
-			add_cxflags("-Wno-maybe-musttail-local-addr")
-		end
+		-- Keep the non-LLVM toolchain path portable: some Clang builds do not
+		-- recognize this warning class at all, which turns the suppression into a
+		-- hard error under `-Werror`.
 	end
 
 	before_build(

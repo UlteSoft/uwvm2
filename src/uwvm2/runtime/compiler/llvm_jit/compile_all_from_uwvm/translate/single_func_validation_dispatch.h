@@ -10,6 +10,8 @@
 // work, but its bytecode stream still must contain a valid terminating `end`.
 for(;;)
 {
+    auto const instruction_begin{code_curr};
+
     if(code_curr == code_end) [[unlikely]]
     {
         // [... ] | (end)
@@ -30,6 +32,12 @@ for(;;)
 
     wasm1_code curr_opbase;  // no initialization necessary
     ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
+    bool llvm_jit_instruction_emitted_inline{};
+    auto const disable_inline_llvm_jit_emission{[&]()
+                                                {
+                                                    emit_llvm_jit_active = false;
+                                                    if(emitted_llvm_jit_ir_storage != nullptr) { *emitted_llvm_jit_ir_storage = {}; }
+                                                }};
 
     switch(curr_opbase)
     {
@@ -48,6 +56,14 @@ for(;;)
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::illegal_opbase;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             break;
+        }
+    }
+
+    if(emit_llvm_jit_active && !llvm_jit_instruction_emitted_inline)
+    {
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            emit_llvm_jit_active = false;
         }
     }
 }

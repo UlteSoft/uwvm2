@@ -1053,16 +1053,16 @@ namespace uwvm2::uwvm::wasm::type
 
 namespace uwvm2::uwvm::wasm::type
 {
-    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept { return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_count_host_api(); }
+    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept { return ::uwvm2::runtime::lib::preload_memory_descriptor_count_host_api(); }
 
     extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
-    { return ::uwvm2::runtime::uwvm_int::preload_memory_descriptor_at_host_api(descriptor_index, out); }
+    { return ::uwvm2::runtime::lib::preload_memory_descriptor_at_host_api(descriptor_index, out); }
 
     extern "C" bool uwvm_preload_memory_read(::std::size_t memory_index, ::std::uint_least64_t offset, void* destination, ::std::size_t size) noexcept
-    { return ::uwvm2::runtime::uwvm_int::preload_memory_read_host_api(memory_index, offset, destination, size); }
+    { return ::uwvm2::runtime::lib::preload_memory_read_host_api(memory_index, offset, destination, size); }
 
     extern "C" bool uwvm_preload_memory_write(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
-    { return ::uwvm2::runtime::uwvm_int::preload_memory_write_host_api(memory_index, offset, source, size); }
+    { return ::uwvm2::runtime::lib::preload_memory_write_host_api(memory_index, offset, source, size); }
 
     extern "C" uwvm_preload_host_api_v1 const* uwvm_get_preload_host_api_v1() noexcept
     {

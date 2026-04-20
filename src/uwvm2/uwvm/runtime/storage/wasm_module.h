@@ -171,6 +171,19 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 {
+    struct llvm_jit_raw_call_target_t
+    {
+        ::std::uintptr_t entry_address{};
+        ::std::uintptr_t context_address{};
+        ::std::uint_least32_t encoded_type_id{};
+    };
+
+    struct llvm_jit_call_indirect_table_view_t
+    {
+        ::std::uintptr_t data_address{};
+        ::std::size_t size{};
+    };
+
     /// @brief Table section storage
 
     enum class local_defined_table_elem_storage_type_t : unsigned
@@ -222,6 +235,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<local_defined_table_elem_storage_t>>);
 
         wasm_binfmt1_final_table_type_t const* table_type_ptr{};
+        wasm_module_storage_t* owner_module_rt_ptr{};
     };
 
     struct imported_table_storage_t
@@ -258,7 +272,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
         inline static constexpr bool value =
             ::fast_io::freestanding::is_zero_default_constructible_v<
                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
-            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*>;
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*> &&
+            ::fast_io::freestanding::is_zero_default_constructible_v<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t*>;
     };
 
     template <>
@@ -267,7 +282,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
         inline static constexpr bool value =
             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_t>> &&
-            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*>;
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_table_type_t const*> &&
+            ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::uwvm::runtime::storage::wasm_module_storage_t*>;
     };
 
     template <>
@@ -615,6 +631,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // table
         ::uwvm2::utils::container::vector<imported_table_storage_t> imported_table_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_table_storage_t> local_defined_table_vec_storage{};
+        ::uwvm2::utils::container::vector<llvm_jit_call_indirect_table_view_t> llvm_jit_call_indirect_table_views{};
 
         // memory
         ::uwvm2::utils::container::vector<imported_memory_storage_t> imported_memory_vec_storage{};
@@ -649,6 +666,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_memory_storage_t>> &&
@@ -675,6 +694,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_memory_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<

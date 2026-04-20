@@ -26,6 +26,15 @@ case wasm1_code::unreachable:
 
     is_polymorphic = true;
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_unreachable(llvm_jit_emit_state)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::nop:
@@ -39,6 +48,15 @@ case wasm1_code::nop:
     // nop    ...
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_nop(llvm_jit_emit_state)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -127,6 +145,15 @@ case wasm1_code::block:
 
     control_flow_stack.push_back(
         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::block, .polymorphic_base = is_polymorphic});
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_block(llvm_jit_emit_state, block_result)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -217,6 +244,15 @@ case wasm1_code::loop:
                                   .type = block_type::loop,
                                   .polymorphic_base = is_polymorphic,
                                   .then_polymorphic_end = false});
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_loop(llvm_jit_emit_state, block_result)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -328,6 +364,15 @@ case wasm1_code::if_:
     control_flow_stack.push_back(
         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::if_, .polymorphic_base = is_polymorphic});
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_if(llvm_jit_emit_state, block_result)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::else_:
@@ -398,6 +443,15 @@ case wasm1_code::else_:
 
     // Mark that else has been consumed.
     if_frame.type = block_type::else_;
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_else(llvm_jit_emit_state)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -569,7 +623,27 @@ case wasm1_code::end:
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
 
+        if(emit_llvm_jit_active)
+        {
+            llvm_jit_instruction_emitted_inline = true;
+            if(!try_emit_runtime_local_func_llvm_jit_end(llvm_jit_emit_state) ||
+               !finalize_runtime_local_func_llvm_jit_emit_state(llvm_jit_emit_state, *emitted_llvm_jit_ir_storage))
+                [[unlikely]]
+            {
+                disable_inline_llvm_jit_emission();
+            }
+        }
+
         return;
+    }
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_end(llvm_jit_emit_state)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 
     break;

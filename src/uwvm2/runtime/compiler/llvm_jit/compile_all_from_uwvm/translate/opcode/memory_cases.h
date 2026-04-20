@@ -1,116 +1,346 @@
 case wasm1_code::i32_load:
 {
     validate_mem_load(u8"i32.load", 2u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load:
 {
     validate_mem_load(u8"i64.load", 3u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::f32_load:
 {
     validate_mem_load(u8"f32.load", 2u, curr_operand_stack_value_type::f32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::f64_load:
 {
     validate_mem_load(u8"f64.load", 3u, curr_operand_stack_value_type::f64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_load8_s:
 {
     validate_mem_load(u8"i32.load8_s", 0u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_load8_u:
 {
     validate_mem_load(u8"i32.load8_u", 0u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_load16_s:
 {
     validate_mem_load(u8"i32.load16_s", 1u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_load16_u:
 {
     validate_mem_load(u8"i32.load16_u", 1u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load8_s:
 {
     validate_mem_load(u8"i64.load8_s", 0u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load8_u:
 {
     validate_mem_load(u8"i64.load8_u", 0u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load16_s:
 {
     validate_mem_load(u8"i64.load16_s", 1u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load16_u:
 {
     validate_mem_load(u8"i64.load16_u", 1u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load32_s:
 {
     validate_mem_load(u8"i64.load32_s", 2u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_load32_u:
 {
     validate_mem_load(u8"i64.load32_u", 2u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_store:
 {
     validate_mem_store(u8"i32.store", 2u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_store:
 {
     validate_mem_store(u8"i64.store", 3u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::f32_store:
 {
     validate_mem_store(u8"f32.store", 2u, curr_operand_stack_value_type::f32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::f64_store:
 {
     validate_mem_store(u8"f64.store", 3u, curr_operand_stack_value_type::f64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_store8:
 {
     validate_mem_store(u8"i32.store8", 0u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i32_store16:
 {
     validate_mem_store(u8"i32.store16", 1u, curr_operand_stack_value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_store8:
 {
     validate_mem_store(u8"i64.store8", 0u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_store16:
 {
     validate_mem_store(u8"i64.store16", 1u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::i64_store32:
 {
     validate_mem_store(u8"i64.store32", 2u, curr_operand_stack_value_type::i64);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::memory_size:
@@ -177,6 +407,15 @@ case wasm1_code::memory_size:
 
     // Stack effect: () -> (i32)
     operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -271,6 +510,15 @@ case wasm1_code::memory_grow:
     }
 
     operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }

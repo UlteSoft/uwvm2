@@ -118,6 +118,12 @@ case wasm1_code::call:
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
     }
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_call(llvm_jit_emit_state, func_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+    }
+
     break;
 }
 case wasm1_code::call_indirect:
@@ -260,6 +266,15 @@ case wasm1_code::call_indirect:
     if(result_count != 0uz)
     {
         for(::std::size_t i{}; i != result_count; ++i) { operand_stack_push(callee_type.result.begin[i]); }
+    }
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_call_indirect(llvm_jit_emit_state, type_index, table_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 
     break;

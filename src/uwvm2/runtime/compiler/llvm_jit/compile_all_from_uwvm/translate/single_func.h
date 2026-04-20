@@ -5,11 +5,19 @@ struct local_func_storage_t
     ::std::byte const* code_begin{};
     ::std::byte const* code_end{};
     ::std::size_t function_index{};
+    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* runtime_module_ptr{};
+};
+
+struct local_func_llvm_jit_ir_storage_t
+{
+    bool emitted{};
+    ::std::string ir{};
 };
 
 struct full_function_symbol_t
 {
     ::uwvm2::utils::container::vector<local_func_storage_t> local_funcs{};
+    ::uwvm2::utils::container::vector<local_func_llvm_jit_ir_storage_t> local_func_llvm_jit_irs{};
     ::std::size_t local_count{};
     ::std::size_t local_bytes_max{};
     ::std::size_t local_bytes_zeroinit_end{};
@@ -385,9 +393,12 @@ namespace details
         return validation_module;
     }
 
+#include "single_func_emit.h"
+
     inline constexpr void validate_runtime_local_func(validation_module_storage_t const& module_storage,
                                                       local_func_storage_t const& local_func_storage,
-                                                      ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                      ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                      local_func_llvm_jit_ir_storage_t* emitted_llvm_jit_ir_storage = nullptr) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -587,6 +598,12 @@ namespace details
 
         // start parse the code
         auto code_curr{code_begin};
+
+        if(emitted_llvm_jit_ir_storage != nullptr) { *emitted_llvm_jit_ir_storage = {}; }
+
+        runtime_local_func_llvm_jit_emit_state_t llvm_jit_emit_state{};
+        bool emit_llvm_jit_active{
+            emitted_llvm_jit_ir_storage != nullptr && try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage, llvm_jit_emit_state)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
         using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
@@ -930,17 +947,19 @@ namespace details
                 .wasm_code_ptr = curr_local_func.wasm_code_ptr,
                 .code_begin = code_begin,
                 .code_end = code_end,
-                .function_index = function_index};
+                .function_index = function_index,
+                .runtime_module_ptr = ::std::addressof(curr_module)};
     }
 
     inline constexpr local_func_storage_t compile_all_from_uwvm_local_func(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                                            validation_module_storage_t const& validation_module,
                                                                            [[maybe_unused]] compile_option const& options,
                                                                            ::std::size_t local_function_idx,
-                                                                           ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                                           ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                                           local_func_llvm_jit_ir_storage_t& emitted_llvm_jit_ir_storage) UWVM_THROWS
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
-        validate_runtime_local_func(validation_module, local_func_storage, err);
+        validate_runtime_local_func(validation_module, local_func_storage, err, ::std::addressof(emitted_llvm_jit_ir_storage));
         return local_func_storage;
     }
 
@@ -1198,10 +1217,13 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
 
     auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
     storage.local_funcs.reserve(local_func_count);
+    storage.local_func_llvm_jit_irs.reserve(local_func_count);
 
     for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
     {
-        storage.local_funcs.push_back(details::compile_all_from_uwvm_local_func(curr_module, validation_module, options, local_function_idx, err));
+        storage.local_func_llvm_jit_irs.push_back({});
+        storage.local_funcs.push_back(
+            details::compile_all_from_uwvm_local_func(curr_module, validation_module, options, local_function_idx, err, storage.local_func_llvm_jit_irs.back_unchecked()));
     }
 
     return storage;
@@ -1216,6 +1238,9 @@ inline full_function_symbol_t compile_all_from_uwvm_single_func(::uwvm2::uwvm::r
     auto const validation_module{details::build_runtime_validation_module(curr_module)};
 
     storage.local_funcs.reserve(1uz);
-    storage.local_funcs.push_back(details::compile_all_from_uwvm_local_func(curr_module, validation_module, options, 0uz, err));
+    storage.local_func_llvm_jit_irs.reserve(1uz);
+    storage.local_func_llvm_jit_irs.push_back({});
+    storage.local_funcs.push_back(
+        details::compile_all_from_uwvm_local_func(curr_module, validation_module, options, 0uz, err, storage.local_func_llvm_jit_irs.back_unchecked()));
     return storage;
 }

@@ -34,6 +34,12 @@ case wasm1_code::drop:
         static_cast<void>(operand_stack_pop_unchecked());
     }
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_drop(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+    }
+
     break;
 }
 case wasm1_code::select:
@@ -118,6 +124,12 @@ case wasm1_code::select:
     if(v1_from_stack) { operand_stack_push(v1_type); }
     else if(v2_from_stack) { operand_stack_push(v2_type); }
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_select(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
+    }
+
     break;
 }
 case wasm1_code::local_get:
@@ -177,6 +189,15 @@ case wasm1_code::local_get:
     // `local.get` materializes a fresh transient operand register from the stable
     // local register slot, even when the surrounding type state is polymorphic.
     operand_stack_push(local_type_from_index(local_index));
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_local_get(llvm_jit_emit_state, local_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -265,6 +286,15 @@ case wasm1_code::local_set:
         }
 
         static_cast<void>(operand_stack_pop_unchecked());
+    }
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_local_set(llvm_jit_emit_state, local_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
     }
 
     break;
@@ -360,6 +390,15 @@ case wasm1_code::local_tee:
         }
     }
 
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_local_tee(llvm_jit_emit_state, local_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
+
     break;
 }
 case wasm1_code::global_get:
@@ -433,6 +472,15 @@ case wasm1_code::global_get:
 
     // global.get always pushes one value of the global's type (even in polymorphic mode)
     operand_stack_push(curr_global_type);
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_global_get(llvm_jit_emit_state, global_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
+        }
+    }
 
     break;
 }
@@ -547,6 +595,15 @@ case wasm1_code::global_set:
             err.err_selectable.global_variable_type_mismatch.actual_type = value.type;
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::global_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }
+    }
+
+    if(emit_llvm_jit_active)
+    {
+        llvm_jit_instruction_emitted_inline = true;
+        if(!try_emit_runtime_local_func_llvm_jit_global_set(llvm_jit_emit_state, global_index)) [[unlikely]]
+        {
+            disable_inline_llvm_jit_emission();
         }
     }
 
