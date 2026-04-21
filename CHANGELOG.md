@@ -73,6 +73,9 @@ Each release entry should record:
 - Aligned the `uwvm_int` compiler-side validator with Wasm MVP stack-polymorphism semantics so operand underflow is now bounded by the current control-frame base instead of the whole function stack, while concrete operands pushed after `unreachable` remain fully type-checked.
 - Closed a high-risk validation gap where invalid modules could pass the compiler-integrated validator path but fail the core validator, covering numeric operators, `if`, `br`/`br_if`/`br_table`, `return`, `call`/`call_indirect`, `drop`/`select`, `local.set`/`local.tee`, `global.set`, and `memory.grow`.
 - Added strict regression coverage for block-base underflow, polymorphic concrete numeric mismatches, and polymorphic `br_if` condition mismatches so the standalone validator and compiler-side validator stay behaviorally aligned.
+- Corrected nested `block`/`loop`/`if`/`else` control-frame validation so stack-polymorphism no longer leaks in from an outer unreachable region; newly entered frames now start reachable, matching the W3C WebAssembly MVP validation algorithm.
+- Added strict regression coverage for operand underflow inside nested blocks and `else` frames entered from polymorphic outer control flow, preventing recurrence of the validator/compiler-validator mismatch in this release line.
+- Stopped adding `-Wno-maybe-musttail-local-addr` on Apple platforms so the strict validation test targets can build under Apple Clang without failing on an unsupported warning-suppression flag.
 
 ### Release Fixes
 

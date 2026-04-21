@@ -764,6 +764,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     control_flow_stack.push_back(
                         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::block, .polymorphic_base = is_polymorphic});
 
+                    // Stack-polymorphism is scoped to the current control frame only.
+                    // Entering a nested frame starts it in reachable mode.
+                    is_polymorphic = false;
+
                     break;
                 }
                 case wasm1_code::loop:
@@ -857,6 +861,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                                   .type = block_type::loop,
                                                   .polymorphic_base = is_polymorphic,
                                                   .then_polymorphic_end = false});
+
+                    // Stack-polymorphism is scoped to the current control frame only.
+                    // Entering a nested frame starts it in reachable mode.
+                    is_polymorphic = false;
 
                     break;
                 }
@@ -960,6 +968,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     control_flow_stack.push_back(
                         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::if_, .polymorphic_base = is_polymorphic});
 
+                    // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
+                    // surrounding frame is polymorphic.
+                    is_polymorphic = false;
+
                     break;
                 }
                 case wasm1_code::else_:
@@ -1054,7 +1066,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
 
                     // Start else branch with the operand stack at if-entry height.
                     while(operand_stack.size() > if_frame.operand_stack_base) { operand_stack.pop_back_unchecked(); }
-                    is_polymorphic = if_frame.polymorphic_base;
+                    // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
+                    is_polymorphic = false;
 
                     // Mark that else has been consumed.
                     if_frame.type = block_type::else_;

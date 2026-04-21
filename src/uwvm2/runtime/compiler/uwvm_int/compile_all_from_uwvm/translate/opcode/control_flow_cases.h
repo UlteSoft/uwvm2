@@ -126,6 +126,10 @@ case wasm1_code::block:
                                   .end_label_id = new_label(false),
                                   .else_label_id = SIZE_MAX});
 
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
+
     break;
 }
 case wasm1_code::loop:
@@ -280,6 +284,10 @@ case wasm1_code::loop:
                                   .end_label_id = new_label(false),
                                   .else_label_id = SIZE_MAX,
                                   .wasm_code_curr_at_start_label = code_curr});
+
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
 
     break;
 }
@@ -516,6 +524,10 @@ case wasm1_code::if_:
                                   .start_label_id = SIZE_MAX,
                                   .end_label_id = end_label_id,
                                   .else_label_id = else_dest_label_id});
+
+    // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
+    // surrounding frame is polymorphic.
+    is_polymorphic = false;
     break;
 }
 case wasm1_code::else_:
@@ -633,7 +645,8 @@ case wasm1_code::else_:
     set_label_offset(if_frame.else_label_id, bytecode.size());
 
     operand_stack_truncate_to(if_frame.operand_stack_base);
-    is_polymorphic = if_frame.polymorphic_base;
+    // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
+    is_polymorphic = false;
     if constexpr(stacktop_enabled)
     {
         if(!if_frame.polymorphic_base)

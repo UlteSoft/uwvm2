@@ -677,6 +677,53 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_numeric_operand_underflow_in_nested_polymorphic_block_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // Stack-polymorphism from an outer `unreachable` must not leak into a nested block frame.
+        // The nested block starts reachable, so `i32.eqz` must underflow at the block base.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::i32_eqz);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_numeric_operand_underflow_in_polymorphic_else_frame_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // The outer frame is polymorphic, so the `if` condition may be unknown.
+        // However, the `else` control frame itself starts reachable and must not inherit the
+        // outer polymorphic state.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_eqz);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_local_tee_type_mismatch_module()
     {
         module_builder mb{};
@@ -1164,6 +1211,12 @@ namespace
                                          errc::local_set_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_at_block_base_module(),
                                          u8"uwvm2test_validate_numeric_underflow_block_base",
+                                         errc::operand_stack_underflow) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_in_nested_polymorphic_block_module(),
+                                         u8"uwvm2test_validate_numeric_underflow_nested_poly_block",
+                                         errc::operand_stack_underflow) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_in_polymorphic_else_frame_module(),
+                                         u8"uwvm2test_validate_numeric_underflow_poly_else_frame",
                                          errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_local_tee_type_mismatch_module(), u8"uwvm2test_validate_local_tee_mismatch", errc::local_tee_type_mismatch) == 0);
