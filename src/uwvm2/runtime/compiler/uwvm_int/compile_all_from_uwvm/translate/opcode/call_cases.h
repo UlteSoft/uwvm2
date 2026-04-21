@@ -19,23 +19,19 @@ case wasm1_code::return_:
     auto const& func_frame{control_flow_stack.index_unchecked(0u)};
     ::std::size_t const return_arity{static_cast<::std::size_t>(func_frame.result.end - func_frame.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < return_arity) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"return";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = return_arity;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"return", return_arity);
     }
 
-    auto const operator_stack_size{operand_stack.size()};
-    if(!is_polymorphic && return_arity != 0uz && operator_stack_size >= return_arity)
+    if(return_arity != 0uz)
     {
-        for(::std::size_t i{}; i != return_arity; ++i)
+        auto const available_result_count{concrete_operand_count()};
+        auto const concrete_to_check{available_result_count < return_arity ? available_result_count : return_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operator_stack_size - 1uz - i).type};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -178,23 +174,21 @@ case wasm1_code::call:
     flush_conbine_pending();
 #endif
 
-    if(!is_polymorphic && operand_stack.size() < param_count) [[unlikely]]
+    auto const stack_size{operand_stack.size()};
+
+    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"call";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = param_count;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"call", param_count);
     }
 
-    auto const stack_size{operand_stack.size()};
-    if(!is_polymorphic && param_count != 0uz && stack_size >= param_count)
+    if(param_count != 0uz)
     {
-        for(::std::size_t i{}; i != param_count; ++i)
+        auto const available_param_count{concrete_operand_count()};
+        auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -992,21 +986,16 @@ case wasm1_code::call_indirect:
     auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
     auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
+    auto const stack_size{operand_stack.size()};
 
-    if(!is_polymorphic && (param_count_plus_table_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (param_count_plus_table_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"call_indirect";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"call_indirect", required_stack_size);
     }
 
-    if(!operand_stack.empty())
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        auto const idx{operand_stack.back_unchecked()};
-        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
@@ -1016,15 +1005,14 @@ case wasm1_code::call_indirect:
         }
     }
 
-    // Stack layout (validated above): [args..., idx]
-    auto const stack_size{operand_stack.size()};
-    auto const arg_stack_size{stack_size == 0uz ? 0uz : (stack_size - 1uz)};
-    if(!is_polymorphic && param_count != 0uz && arg_stack_size >= param_count)
+    if(param_count != 0uz)
     {
-        for(::std::size_t i{}; i != param_count; ++i)
+        auto const available_param_count{concrete_operand_count()};
+        auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(arg_stack_size - 1uz - i).type};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -1388,23 +1376,17 @@ case wasm1_code::drop:
     bool have_drop_operand{};
     curr_operand_stack_value_type drop_operand_type{};
 
-    if(operand_stack.empty()) [[unlikely]]
+    if(concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        // Polymorphic stack: underflow is allowed, so `drop` becomes a no-op on the concrete stack.
+        if(!is_polymorphic) { report_operand_stack_underflow(op_begin, u8"drop", 1uz); }
     }
     else
     {
-        have_drop_operand = true;
-        drop_operand_type = operand_stack.back_unchecked().type;
+        auto const operand{operand_stack.back_unchecked()};
         operand_stack_pop_unchecked();
+        have_drop_operand = true;
+        drop_operand_type = operand.type;
     }
 
     // Translate: typed `drop`.
@@ -1430,22 +1412,12 @@ case wasm1_code::select:
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
 
-    if(!is_polymorphic && operand_stack.size() < 3uz) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
+    if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
 
     bool cond_from_stack{};
     curr_operand_stack_value_type cond_type{};
-    if(!operand_stack.empty())
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
-        auto const cond{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
         cond_from_stack = true;
         cond_type = cond.type;
     }
@@ -1460,19 +1432,16 @@ case wasm1_code::select:
 
     bool v2_from_stack{};
     curr_operand_stack_value_type v2_type{};
-    if(!operand_stack.empty())
+    if(auto const v2{try_pop_concrete_operand()}; v2.from_stack)
     {
-        auto const v2{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
         v2_from_stack = true;
         v2_type = v2.type;
     }
 
     bool v1_from_stack{};
     curr_operand_stack_value_type v1_type{};
-    if(!operand_stack.empty())
+    if(auto const v1{try_peek_concrete_operand()}; v1.from_stack)
     {
-        auto const v1{operand_stack.back_unchecked()};
         v1_from_stack = true;
         v1_type = v1.type;
     }

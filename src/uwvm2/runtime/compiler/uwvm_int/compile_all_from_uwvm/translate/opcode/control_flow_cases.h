@@ -362,27 +362,14 @@ case wasm1_code::if_:
         }
     }
 
-    if(!is_polymorphic && operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"if", 1uz); }
+
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"if";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-        err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
+        err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
+        err.err_code = code_validation_error_code::if_cond_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    if(!operand_stack.empty())
-    {
-        auto const cond{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
-        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
-            err.err_code = code_validation_error_code::if_cond_type_not_i32;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
     }
 
     auto const else_dest_label_id{new_label(false)};

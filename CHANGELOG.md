@@ -70,6 +70,9 @@ Each release entry should record:
 - Guarded operand-stack requirement calculations for `br_if`, `br_table`, and `call_indirect` against `size_t` overflow in both validation and `uwvm_int` translation, preserving correct stack-underflow handling for extreme arities.
 - Corrected single-result `br` and `return` lowering in the `uwvm_int` translator so temporary result preservation now compares live stack depth relative to the branch target base instead of relying on an overflow-prone addition.
 - Corrected `else` transition result validation in both the standard validator and `uwvm_int` translator so `if` then-branch checking now matches `end` semantics: polymorphic paths may omit required values, but still reject extra stack values and still validate concrete result types, including multi-value result signatures.
+- Aligned the `uwvm_int` compiler-side validator with Wasm MVP stack-polymorphism semantics so operand underflow is now bounded by the current control-frame base instead of the whole function stack, while concrete operands pushed after `unreachable` remain fully type-checked.
+- Closed a high-risk validation gap where invalid modules could pass the compiler-integrated validator path but fail the core validator, covering numeric operators, `if`, `br`/`br_if`/`br_table`, `return`, `call`/`call_indirect`, `drop`/`select`, `local.set`/`local.tee`, `global.set`, and `memory.grow`.
+- Added strict regression coverage for block-base underflow, polymorphic concrete numeric mismatches, and polymorphic `br_if` condition mismatches so the standalone validator and compiler-side validator stay behaviorally aligned.
 
 ### Release Fixes
 
