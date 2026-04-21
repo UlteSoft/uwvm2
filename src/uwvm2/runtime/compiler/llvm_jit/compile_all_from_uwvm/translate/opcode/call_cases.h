@@ -78,25 +78,20 @@ case wasm1_code::call:
     auto const param_count{static_cast<::std::size_t>(callee_type.parameter.end - callee_type.parameter.begin)};
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < param_count) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"call";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = param_count;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"call", param_count);
     }
 
-    auto const stack_size{operand_stack.size()};
-
     // Type-check arguments when the stack is non-polymorphic.
-    if(!is_polymorphic && param_count != 0uz && stack_size >= param_count)
+    if(param_count != 0uz)
     {
-        for(::std::size_t i{}; i != param_count; ++i)
+        auto const available_param_count{concrete_operand_count()};
+        auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -217,22 +212,15 @@ case wasm1_code::call_indirect:
     auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
     auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
 
-    if(!is_polymorphic && (param_count_plus_table_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (param_count_plus_table_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"call_indirect";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"call_indirect", required_stack_size);
     }
 
     // function index operand (must be i32 if present)
-    if(!operand_stack.empty())
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        auto const idx{operand_stack_pop_unchecked()};
-
-        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"call_indirect";
@@ -242,13 +230,14 @@ case wasm1_code::call_indirect:
         }
     }
 
-    auto const stack_size{operand_stack.size()};
-    if(!is_polymorphic && param_count != 0uz && stack_size >= param_count)
+    if(param_count != 0uz)
     {
-        for(::std::size_t i{}; i != param_count; ++i)
+        auto const available_param_count{concrete_operand_count()};
+        auto const concrete_to_check{available_param_count < param_count ? available_param_count : param_count};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{callee_type.parameter.begin[param_count - 1uz - i]};
-            auto const actual_type{operand_stack[stack_size - 1uz - i].type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;

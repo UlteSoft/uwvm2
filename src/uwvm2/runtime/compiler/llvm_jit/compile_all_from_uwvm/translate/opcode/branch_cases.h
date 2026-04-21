@@ -58,29 +58,31 @@ case wasm1_code::br:
     // not the loop result types. MVP has no block parameters, so a loop label always has arity 0.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br", target_arity);
     }
 
     // type-check the branch arguments if present
-    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+    if(target_arity != 0uz)
     {
-        auto const expected_type{*target_frame.result.begin};
-        auto const actual_type{operand_stack.back().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
+                err.err_selectable.br_value_type_mismatch.expected_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
     }
 
@@ -163,21 +165,15 @@ case wasm1_code::br_if:
     auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
     auto const required_stack_size{target_arity_plus_cond_overflows ? max_operand_stack_requirement : (target_arity + 1uz)};
 
-    if(!is_polymorphic && (target_arity_plus_cond_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (target_arity_plus_cond_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br_if", required_stack_size);
     }
 
     // cond (must be i32 if present)
-    if(!operand_stack.empty())
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
-        auto const cond{operand_stack_pop_unchecked()};
-        if(!is_polymorphic && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
@@ -188,18 +184,25 @@ case wasm1_code::br_if:
     }
 
     // type-check label arguments if present (they remain on stack for the fallthrough path)
-    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+    if(target_arity != 0uz)
     {
-        auto const expected_type{*target_frame.result.begin};
-        auto const actual_type{operand_stack.back().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
+                err.err_selectable.br_value_type_mismatch.expected_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
     }
 
@@ -439,20 +442,14 @@ case wasm1_code::br_table:
     auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
     auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
 
-    if(!is_polymorphic && (expected_arity_plus_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (expected_arity_plus_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br_table", required_stack_size);
     }
 
-    if(!operand_stack.empty())
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        auto const idx{operand_stack_pop_unchecked()};
-        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
@@ -462,17 +459,24 @@ case wasm1_code::br_table:
         }
     }
 
-    if(!is_polymorphic && expected_arity != 0uz && operand_stack.size() >= expected_arity)
+    if(expected_arity != 0uz)
     {
-        auto const actual_type{operand_stack.back().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < expected_arity ? available_arg_count : expected_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
+                err.err_selectable.br_value_type_mismatch.expected_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type =
+                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
     }
 
@@ -518,25 +522,20 @@ case wasm1_code::return_:
 
     ::std::size_t const return_arity{static_cast<::std::size_t>(func_frame.result.end - func_frame.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < return_arity) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"return";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = return_arity;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"return", return_arity);
     }
 
-    auto const operator_stack_size{operand_stack.size()};
-
     // Type-check the return values if present. For multi-value, values are validated from the top of the stack.
-    if(!is_polymorphic && return_arity != 0uz && operator_stack_size >= return_arity)
+    if(return_arity != 0uz)
     {
-        for(::std::size_t i{}; i != return_arity; ++i)
+        auto const available_result_count{concrete_operand_count()};
+        auto const concrete_to_check{available_result_count < return_arity ? available_result_count : return_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{func_frame.result.begin[return_arity - 1uz - i]};
-            auto const actual_type{operand_stack[operator_stack_size - 1uz - i].type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;

@@ -1359,32 +1359,17 @@ case wasm1_code::memory_grow:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(!is_polymorphic)
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(operand_stack.empty()) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"memory.grow";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-
-        auto const delta{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
-
-        if(delta.type != wasm_value_type_u::i32) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
-            err.err_code = code_validation_error_code::memory_grow_delta_type_not_i32;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz);
     }
-    else
+
+    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != wasm_value_type_u::i32) [[unlikely]]
     {
-        operand_stack_pop_unchecked();
+        err.err_curr = op_begin;
+        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
+        err.err_code = code_validation_error_code::memory_grow_delta_type_not_i32;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
     ensure_memory0_resolved();

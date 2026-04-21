@@ -1121,24 +1121,14 @@ case wasm1_code::local_set:
 
     bool have_set_operand{};
     curr_operand_stack_value_type set_operand_type{};
-    if(operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.set";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"local.set", 1uz);
     }
-    else
+    else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
         have_set_operand = true;
-        set_operand_type = operand_stack.back_unchecked().type;
-        // Wasm stack polymorphism only suppresses underflow. Concrete operands that
-        // were pushed after entering the polymorphic region must still match here.
+        set_operand_type = value.type;
         if(set_operand_type != curr_local_type) [[unlikely]]
         {
             err.err_curr = op_begin;
@@ -1850,25 +1840,19 @@ case wasm1_code::local_tee:
 
     auto const curr_local_type{local_type_from_index(local_index)};
 
-    if(operand_stack.empty()) [[unlikely]]
+    if(concrete_operand_count() == 0uz) [[unlikely]]
     {
         if(!is_polymorphic)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.tee";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            report_operand_stack_underflow(op_begin, u8"local.tee", 1uz);
         }
         else
         {
             operand_stack_push(curr_local_type);
         }
     }
-    else
+    else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
-        auto const value{operand_stack.back_unchecked()};
         if(value.type != curr_local_type) [[unlikely]]
         {
             err.err_curr = op_begin;
@@ -2783,22 +2767,12 @@ case wasm1_code::global_set:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"global.set";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"global.set", 1uz);
     }
-    else
+    else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
-        auto const value{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
         if(value.type != curr_global_type) [[unlikely]]
         {
             err.err_curr = op_begin;

@@ -482,31 +482,19 @@ case wasm1_code::memory_grow:
     }
 
     // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
-    if(!is_polymorphic)
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(operand_stack.empty()) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"memory.grow";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
-
-        auto const delta{operand_stack_pop_unchecked()};
-
-        if(delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz);
     }
-    else
+
+    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack &&
+                                                   delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
+        [[unlikely]]
     {
-        if(!operand_stack.empty()) { static_cast<void>(operand_stack_pop_unchecked()); }
+        err.err_curr = op_begin;
+        err.err_selectable.memory_grow_delta_type_not_i32.delta_type = delta.type;
+        err.err_code = ::uwvm2::validation::error::code_validation_error_code::memory_grow_delta_type_not_i32;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
     operand_stack_push(::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32);

@@ -16,18 +16,10 @@ case wasm1_code::drop:
     // [safe] unsafe (could be the section_end)
     //        ^^ code_curr
 
-    if(operand_stack.empty()) [[unlikely]]
+    if(concrete_operand_count() == 0uz) [[unlikely]]
     {
         // Polymorphic stack: underflow is allowed, so drop becomes a no-op on the concrete stack.
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"drop";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        if(!is_polymorphic) { report_operand_stack_underflow(op_begin, u8"drop", 1uz); }
     }
     else
     {
@@ -63,22 +55,13 @@ case wasm1_code::select:
     // Stack effect: (v1 v2 i32) -> (v) where v is v1/v2 and v1,v2 must have the same type.
     // In polymorphic mode, operand-stack underflow is allowed, but concrete operands (if present) are still type-checked.
 
-    if(!is_polymorphic && operand_stack.size() < 3uz) [[unlikely]]
-    {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"select";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = 3uz;
-        err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
+    if(!is_polymorphic && concrete_operand_count() < 3uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"select", 3uz); }
 
     // cond (must be i32 if it exists on the concrete stack)
     bool cond_from_stack{};
     curr_operand_stack_value_type cond_type{};
-    if(!operand_stack.empty())
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
-        auto const cond{operand_stack_pop_unchecked()};
         cond_from_stack = true;
         cond_type = cond.type;
     }
@@ -94,9 +77,8 @@ case wasm1_code::select:
     // v2
     bool v2_from_stack{};
     curr_operand_stack_value_type v2_type{};
-    if(!operand_stack.empty())
+    if(auto const v2{try_pop_concrete_operand()}; v2.from_stack)
     {
-        auto const v2{operand_stack_pop_unchecked()};
         v2_from_stack = true;
         v2_type = v2.type;
     }
@@ -104,9 +86,8 @@ case wasm1_code::select:
     // v1
     bool v1_from_stack{};
     curr_operand_stack_value_type v1_type{};
-    if(!operand_stack.empty())
+    if(auto const v1{try_peek_concrete_operand()}; v1.from_stack)
     {
-        auto const v1{operand_stack_pop_unchecked()};
         v1_from_stack = true;
         v1_type = v1.type;
     }
@@ -259,22 +240,13 @@ case wasm1_code::local_set:
 
     // `local.set` consumes one transient operand register and conceptually copies
     // that value into the stable register assigned to the target local.
-    if(operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
         // Polymorphic stack: underflow is allowed, so local.set becomes a no-op on the concrete stack.
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.set";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"local.set", 1uz);
     }
-    else
+    else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
-        auto const value{operand_stack.back()};
         if(value.type != curr_local_type) [[unlikely]]
         {
             err.err_curr = op_begin;
@@ -284,8 +256,6 @@ case wasm1_code::local_set:
             err.err_code = ::uwvm2::validation::error::code_validation_error_code::local_set_type_mismatch;
             ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
         }
-
-        static_cast<void>(operand_stack_pop_unchecked());
     }
 
     if(emit_llvm_jit_active)
@@ -357,18 +327,10 @@ case wasm1_code::local_tee:
 
     // `local.tee` is the register-form equivalent of "copy into the local register
     // slot, but keep the operand register live on the stack for subsequent uses".
-    if(operand_stack.empty()) [[unlikely]]
+    if(concrete_operand_count() == 0uz) [[unlikely]]
     {
         // Polymorphic stack: underflow is allowed.
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"local.tee";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        if(!is_polymorphic) { report_operand_stack_underflow(op_begin, u8"local.tee", 1uz); }
         else
         {
             // In polymorphic mode, `local.tee` still produces a value of the local's type.
@@ -376,9 +338,8 @@ case wasm1_code::local_tee:
             operand_stack_push(curr_local_type);
         }
     }
-    else
+    else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
-        auto const value{operand_stack.back()};
         if(value.type != curr_local_type) [[unlikely]]
         {
             err.err_curr = op_begin;
@@ -570,23 +531,13 @@ case wasm1_code::global_set:
     }
 
     // Stack effect: (value) -> () where value must match global's value type
-    if(operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
     {
         // Polymorphic stack: underflow is allowed, so global.set becomes a no-op on the concrete stack.
-        if(!is_polymorphic)
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.operand_stack_underflow.op_code_name = u8"global.set";
-            err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-            err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-            err.err_code = ::uwvm2::validation::error::code_validation_error_code::operand_stack_underflow;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
+        report_operand_stack_underflow(op_begin, u8"global.set", 1uz);
     }
-    else
+    else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
-        auto const value{operand_stack_pop_unchecked()};
-
         if(value.type != curr_global_type) [[unlikely]]
         {
             err.err_curr = op_begin;
