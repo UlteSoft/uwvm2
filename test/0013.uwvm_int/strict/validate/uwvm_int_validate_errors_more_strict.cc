@@ -629,6 +629,29 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_local_set_type_mismatch_polymorphic_concrete_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+        auto i64 = [&](byte_vec& c, ::std::int64_t v) { append_i64_leb(c, v); };
+
+        // After `unreachable`, the operand stack is only polymorphic at the current
+        // block base. Concrete values pushed afterwards must still type-check.
+        func_type ty{{k_val_i32}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i64_const);
+        i64(fb.code, 0);
+        op(fb.code, wasm_op::local_set);
+        u32(fb.code, 0u);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_local_tee_type_mismatch_module()
     {
         module_builder mb{};
@@ -1063,6 +1086,9 @@ namespace
             compile_expect(build_memory_grow_underflow_module(), u8"uwvm2test_validate_memory_grow_underflow", errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_local_set_type_mismatch_module(), u8"uwvm2test_validate_local_set_mismatch", errc::local_set_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_local_set_type_mismatch_polymorphic_concrete_module(),
+                                         u8"uwvm2test_validate_local_set_mismatch_poly_concrete",
+                                         errc::local_set_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_local_tee_type_mismatch_module(), u8"uwvm2test_validate_local_tee_mismatch", errc::local_tee_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memarg_align_module(),
