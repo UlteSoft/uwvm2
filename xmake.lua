@@ -480,6 +480,12 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		end
 
 		set_warnings("all", "extra", "error")
+		if get_config("use-llvm-compiler") then
+			-- Test targets include CLI glue headers that currently trigger
+			-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
+			-- strictness and only downgrade this diagnostic for tests.
+			add_cxxflags("-Wno-error=undefined-inline")
+		end
 
 		local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
 			(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)

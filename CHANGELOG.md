@@ -54,6 +54,9 @@ Each release entry should record:
 
 ### Beta Fixes
 
+- Corrected `local_set` type checking in both validation and `uwvm_int` translation for polymorphic control-flow regions so values pushed after `unreachable` are still validated as concrete operands instead of bypassing type mismatch diagnostics.
+- Added strict regression coverage for polymorphic `local_set` mismatch cases, including delayed combine/local-update translation paths in `uwvm_int`.
+- Downgraded LLVM-only `-Wundefined-inline` diagnostics from error to warning for test targets so the Clang/LLVM toolchain can build the test suite without relaxing warning-as-error handling for runtime sources.
 - Removed unintended LLVM JIT environment probing during `xmake f` configuration when JIT support is disabled.
 - The hidden `llvm-jit-env` configuration path has been removed so `llvm-config` is no longer queried for `V2.0.1.1` builds.
 - Renamed the build-toolchain option from `--use-llvm` to `--use-llvm-compiler` to make it explicit that the flag selects the LLVM/Clang compiler toolchain rather than enabling JIT.

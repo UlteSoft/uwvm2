@@ -1137,7 +1137,9 @@ case wasm1_code::local_set:
     {
         have_set_operand = true;
         set_operand_type = operand_stack.back_unchecked().type;
-        if(!is_polymorphic && set_operand_type != curr_local_type) [[unlikely]]
+        // Wasm stack polymorphism only suppresses underflow. Concrete operands that
+        // were pushed after entering the polymorphic region must still match here.
+        if(set_operand_type != curr_local_type) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.local_variable_type_mismatch.local_index = local_index;
