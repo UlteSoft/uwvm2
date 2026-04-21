@@ -322,6 +322,61 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_if_then_result_mismatch_polymorphic_overflow_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_val_i32);  // (result i32)
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);                // extra concrete value must still be rejected at `else`
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_if_then_result_mismatch_polymorphic_type_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+        auto i64 = [&](byte_vec& c, ::std::int64_t v) { append_i64_leb(c, v); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_val_i32);  // (result i32)
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i64_const);
+        i64(fb.code, 0);                // enough concrete values remain, so `else` must still type-check
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_if_missing_else_module()
     {
         module_builder mb{};
@@ -952,6 +1007,12 @@ namespace
         UWVM2TEST_REQUIRE(compile_expect(build_if_cond_underflow_module(), u8"uwvm2test_validate_if_underflow", errc::operand_stack_underflow) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_if_then_result_mismatch_module(), u8"uwvm2test_validate_if_then_mismatch", errc::if_then_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_then_result_mismatch_polymorphic_overflow_module(),
+                                         u8"uwvm2test_validate_if_then_mismatch_poly_overflow",
+                                         errc::if_then_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_then_result_mismatch_polymorphic_type_module(),
+                                         u8"uwvm2test_validate_if_then_mismatch_poly_type",
+                                         errc::if_then_result_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_if_missing_else_module(), u8"uwvm2test_validate_if_missing_else", errc::if_missing_else) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_end_result_mismatch_count_module(), u8"uwvm2test_validate_end_res_mismatch_count", errc::end_result_mismatch) == 0);

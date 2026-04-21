@@ -152,10 +152,8 @@ case wasm1_code::f32_const:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
-    for(::std::size_t byte_index{}; byte_index != sizeof(bits); ++byte_index)
-    {
-        bits |= static_cast<::std::uint32_t>(::std::to_integer<::std::uint_least8_t>(code_curr[byte_index])) << (byte_index * 8u);
-    }
+    ::std::memcpy(::std::addressof(bits), code_curr, sizeof(bits));
+    bits = ::fast_io::little_endian(bits);
 
     // f32.const f32 ...
     // [ safe      ] unsafe (could be the section_end)
@@ -212,10 +210,8 @@ case wasm1_code::f64_const:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::end_of_file);
     }
 
-    for(::std::size_t byte_index{}; byte_index != sizeof(bits); ++byte_index)
-    {
-        bits |= static_cast<::std::uint64_t>(::std::to_integer<::std::uint_least8_t>(code_curr[byte_index])) << (byte_index * 8u);
-    }
+    ::std::memcpy(::std::addressof(bits), code_curr, sizeof(bits));
+    bits = ::fast_io::little_endian(bits);
 
     // f64.const f64 ...
     // [     safe  ] unsafe (could be the section_end)

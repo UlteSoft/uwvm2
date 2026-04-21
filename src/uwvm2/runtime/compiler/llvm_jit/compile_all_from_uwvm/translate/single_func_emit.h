@@ -1033,7 +1033,7 @@ struct runtime_memory_access_info_t
     ::std::size_t max_limit_memory_length{};
     ::std::byte* stable_memory_begin{};
     ::std::atomic_size_t* stable_memory_length_p{};
-    ::std::size_t* stable_memory_length_value_p{};
+    ::std::size_t const* stable_memory_length_value_p{};
     unsigned custom_page_size_log2{};
     bool mmap_requires_dynamic_bounds{};
     bool mmap_uses_partial_protection{};
