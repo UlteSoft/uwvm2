@@ -1014,38 +1014,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
 
                     auto& if_frame{control_flow_stack.back_unchecked()};
 
-                    // Validate the then-branch result types/count before switching to else.
-                    // In polymorphic mode (e.g. then branch was unreachable), result checking is suppressed.
-                    if(!is_polymorphic)
+                    // Validate the then-branch result before switching to else.
+                    // Match `end`: polymorphic mode only relaxes underflow, but still rejects extra values
+                    // and still checks types when enough concrete values are present.
+                    auto const expected_count{static_cast<::std::size_t>(if_frame.result.end - if_frame.result.begin)};
+                    auto const base{if_frame.operand_stack_base};
+                    auto const stack_size{operand_stack.size()};
+                    auto const actual_count{stack_size >= base ? stack_size - base : 0uz};
+
+                    if(!is_polymorphic ? (actual_count != expected_count) : (actual_count > expected_count))
                     {
-                        auto const expected_count{static_cast<::std::size_t>(if_frame.result.end - if_frame.result.begin)};
-                        auto const actual_count{operand_stack.size() - if_frame.operand_stack_base};
+                        err.err_curr = op_begin;
+                        err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
+                        err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
 
-                        bool mismatch{expected_count != actual_count};
-
-                        ::uwvm2::parser::wasm::standard::wasm1::type::value_type expected_type{};
-                        ::uwvm2::parser::wasm::standard::wasm1::type::value_type actual_type{};
-
-                        bool const expected_single{expected_count == 1uz};
-                        bool const actual_single{actual_count == 1uz};
-
-                        if(expected_single) { expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*if_frame.result.begin); }
-                        if(actual_single)
+                        if(expected_count == 1uz)
                         {
-                            actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_stack.back_unchecked().type);
+                            err.err_selectable.if_then_result_mismatch.expected_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(*if_frame.result.begin);
+                        }
+                        else
+                        {
+                            err.err_selectable.if_then_result_mismatch.expected_type = {};
                         }
 
-                        if(!mismatch && expected_single && actual_single && expected_type != actual_type) { mismatch = true; }
-
-                        if(mismatch) [[unlikely]]
+                        if(actual_count == 1uz && stack_size != 0uz)
                         {
-                            err.err_curr = op_begin;
-                            err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
-                            err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
-                            err.err_selectable.if_then_result_mismatch.expected_type = expected_type;
-                            err.err_selectable.if_then_result_mismatch.actual_type = actual_type;
-                            err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
-                            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            err.err_selectable.if_then_result_mismatch.actual_type =
+                                static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(operand_stack.back_unchecked().type);
+                        }
+                        else
+                        {
+                            err.err_selectable.if_then_result_mismatch.actual_type = {};
+                        }
+
+                        err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
+                        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                    }
+
+                    if(expected_count != 0uz && actual_count >= expected_count)
+                    {
+                        for(::std::size_t i{}; i != expected_count; ++i)
+                        {
+                            auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
+                            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
+                            if(actual_type != expected_type) [[unlikely]]
+                            {
+                                err.err_curr = op_begin;
+                                err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
+                                err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
+                                err.err_selectable.if_then_result_mismatch.expected_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                                err.err_selectable.if_then_result_mismatch.actual_type =
+                                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                                err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
+                                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                            }
                         }
                     }
 

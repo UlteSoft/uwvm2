@@ -66,6 +66,7 @@ Each release entry should record:
 - Added a dedicated `br_table_target_count_exceeds_remaining_bytes` validation error and diagnostic output so malformed `br_table` encodings now report the offending target count, remaining bytes, and computed maximum target count.
 - Guarded operand-stack requirement calculations for `br_if`, `br_table`, and `call_indirect` against `size_t` overflow in both validation and `uwvm_int` translation, preserving correct stack-underflow handling for extreme arities.
 - Corrected single-result `br` and `return` lowering in the `uwvm_int` translator so temporary result preservation now compares live stack depth relative to the branch target base instead of relying on an overflow-prone addition.
+- Corrected `else` transition result validation in both the standard validator and `uwvm_int` translator so `if` then-branch checking now matches `end` semantics: polymorphic paths may omit required values, but still reject extra stack values and still validate concrete result types, including multi-value result signatures.
 
 ### Release Fixes
 
