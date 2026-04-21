@@ -29,10 +29,7 @@ case wasm1_code::unreachable:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unreachable(llvm_jit_emit_state)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_unreachable(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -52,10 +49,7 @@ case wasm1_code::nop:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_nop(llvm_jit_emit_state)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_nop(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -146,13 +140,14 @@ case wasm1_code::block:
     control_flow_stack.push_back(
         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::block, .polymorphic_base = is_polymorphic});
 
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
+
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_block(llvm_jit_emit_state, block_result)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_block(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -245,13 +240,14 @@ case wasm1_code::loop:
                                   .polymorphic_base = is_polymorphic,
                                   .then_polymorphic_end = false});
 
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
+
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_loop(llvm_jit_emit_state, block_result)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_loop(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -351,13 +347,14 @@ case wasm1_code::if_:
     control_flow_stack.push_back(
         {.result = block_result, .operand_stack_base = operand_stack.size(), .type = block_type::if_, .polymorphic_base = is_polymorphic});
 
+    // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
+    // surrounding frame is polymorphic.
+    is_polymorphic = false;
+
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_if(llvm_jit_emit_state, block_result)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_if(llvm_jit_emit_state, block_result)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -438,10 +435,8 @@ case wasm1_code::else_:
                 err.err_curr = op_begin;
                 err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
                 err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
-                err.err_selectable.if_then_result_mismatch.expected_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                err.err_selectable.if_then_result_mismatch.actual_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_selectable.if_then_result_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.if_then_result_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::if_then_result_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -453,7 +448,8 @@ case wasm1_code::else_:
 
     // Start else branch with the operand stack at if-entry height.
     operand_stack_truncate_to(if_frame.operand_stack_base);
-    is_polymorphic = if_frame.polymorphic_base;
+    // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
+    is_polymorphic = false;
 
     // Mark that else has been consumed.
     if_frame.type = block_type::else_;
@@ -461,10 +457,7 @@ case wasm1_code::else_:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_else(llvm_jit_emit_state)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_else(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -641,8 +634,7 @@ case wasm1_code::end:
         {
             llvm_jit_instruction_emitted_inline = true;
             if(!try_emit_runtime_local_func_llvm_jit_end(llvm_jit_emit_state) ||
-               !finalize_runtime_local_func_llvm_jit_emit_state(llvm_jit_emit_state, *emitted_llvm_jit_ir_storage))
-                [[unlikely]]
+               !finalize_runtime_local_func_llvm_jit_emit_state(llvm_jit_emit_state, *emitted_llvm_jit_ir_storage)) [[unlikely]]
             {
                 disable_inline_llvm_jit_emission();
             }
@@ -654,10 +646,7 @@ case wasm1_code::end:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_end(llvm_jit_emit_state)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_end(llvm_jit_emit_state)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
