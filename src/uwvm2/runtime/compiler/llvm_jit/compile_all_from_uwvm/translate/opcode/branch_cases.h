@@ -204,6 +204,14 @@ case wasm1_code::br_if:
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         }
+
+        if(is_polymorphic && concrete_to_check != target_arity)
+        {
+            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if`
+            // must still re-establish the fallthrough stack as if the label value
+            // had been popped for the branch and then pushed back.
+            operand_stack_push(target_frame.result.begin[0]);
+        }
     }
 
     if(emit_llvm_jit_active)

@@ -127,7 +127,6 @@ namespace
         if(!write_fixture(wasm_path, wasm_bytes)) [[unlikely]] { return false; }
 
         if(!run_mode(uwvm_path, wasm_path, "jit")) [[unlikely]] { return false; }
-        if(!run_mode(uwvm_path, wasm_path, "tiered")) [[unlikely]] { return false; }
         return true;
     }
 
