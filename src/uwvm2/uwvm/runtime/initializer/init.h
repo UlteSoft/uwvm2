@@ -2674,9 +2674,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         inline constexpr void finalize_wasm1_globals_after_linking() noexcept
         {
-            // First: attach owner pointers for on-demand evaluation across modules.
+            // First: attach owner pointers after modules have been moved into the runtime storage map.
+            // Local tables and globals are constructed against a temporary `wasm_module_storage_t`, so their
+            // back-pointers must be rebound once the final in-map module address is stable.
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                for(auto& table: curr_rt.local_defined_table_vec_storage) { table.owner_module_rt_ptr = ::std::addressof(curr_rt); }
                 for(auto& g: curr_rt.local_defined_global_vec_storage) { g.owner_module_rt_ptr = ::std::addressof(curr_rt); }
             }
 
