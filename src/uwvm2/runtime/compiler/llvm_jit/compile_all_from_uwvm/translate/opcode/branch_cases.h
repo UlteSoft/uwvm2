@@ -71,7 +71,7 @@ case wasm1_code::br:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -191,7 +191,7 @@ case wasm1_code::br_if:
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
             auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;
@@ -465,7 +465,7 @@ case wasm1_code::br_table:
         auto const concrete_to_check{available_arg_count < expected_arity ? available_arg_count : expected_arity};
         for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            auto const actual_type{operand_stack[operand_stack.size() - 1uz - i].type};
             if(actual_type != expected_type) [[unlikely]]
             {
                 err.err_curr = op_begin;

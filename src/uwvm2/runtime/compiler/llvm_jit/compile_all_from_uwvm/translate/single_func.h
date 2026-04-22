@@ -586,6 +586,8 @@ namespace details
             curr_operand_stack_value_type type{};
         };
 
+        using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
+
         auto const curr_frame_operand_stack_base{[&]() constexpr noexcept -> ::std::size_t
                                                  {
                                                      if(control_flow_stack.empty()) { return 0uz; }
@@ -620,16 +622,8 @@ namespace details
         auto const try_peek_concrete_operand{[&]() constexpr -> concrete_operand_t
                                              {
                                                  if(concrete_operand_count() == 0uz) { return {}; }
-                                                 return {.from_stack = true, .type = operand_stack.back_unchecked().type};
+                                                 return {.from_stack = true, .type = operand_stack.back().type};
                                              }};
-
-        auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr
-                                                   {
-                                                       while(count-- != 0uz && concrete_operand_count() != 0uz)
-                                                       {
-                                                           static_cast<void>(operand_stack_pop_unchecked());
-                                                       }
-                                                   }};
 
         // block type
         using value_type_enum = curr_operand_stack_value_type;
@@ -657,7 +651,6 @@ namespace details
             emitted_llvm_jit_ir_storage != nullptr && try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage, llvm_jit_emit_state)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
-        using code_validation_error_code = ::uwvm2::validation::error::code_validation_error_code;
 
         auto const validate_numeric_unary{[&](::uwvm2::utils::container::u8string_view op_name,
                                               curr_operand_stack_value_type expected_operand_type,
