@@ -78,6 +78,7 @@ case wasm1_code::br:
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         }
+
     }
 
     // Translate: `br` requires stack-shape repair before jumping because the interpreter `br` opcode does not unwind the operand stack.
@@ -1012,6 +1013,14 @@ case wasm1_code::br_if:
                 err.err_code = code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
+        }
+
+        if(is_polymorphic && concrete_to_check != target_arity)
+        {
+            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if`
+            // must still re-establish the fallthrough stack as if the label value
+            // had been popped for the branch and then pushed back.
+            operand_stack_push(target_frame.result.begin[0]);
         }
     }
 
