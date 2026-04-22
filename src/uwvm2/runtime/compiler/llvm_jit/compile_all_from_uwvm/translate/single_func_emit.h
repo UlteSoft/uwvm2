@@ -486,6 +486,9 @@ struct runtime_direct_callee_resolution_t
     return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_ir_module_for_func_" + ::std::to_string(func_index_uz);
 }
 
+[[nodiscard]] inline ::std::string get_llvm_wasm_ir_module_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module)
+{ return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_ir_module"; }
+
 [[nodiscard]] inline ::llvm::FunctionType*
     get_llvm_function_type_from_wasm_function_type(::llvm::LLVMContext& llvm_context,
                                                    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type) noexcept;
@@ -1957,8 +1960,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
     bool valid{};
     local_func_storage_t const* local_func_storage_ptr{};
     ::uwvm2::utils::container::vector<runtime_operand_stack_value_type> local_types{};
-    ::std::unique_ptr<::llvm::LLVMContext> llvm_context_holder{};
-    ::std::unique_ptr<::llvm::Module> llvm_module{};
+    ::llvm::LLVMContext* llvm_context_holder{};
+    ::llvm::Module* llvm_module{};
     ::llvm::Function* llvm_function{};
     ::std::unique_ptr<::llvm::IRBuilder<>> ir_builder{};
     ::uwvm2::utils::container::vector<::llvm::AllocaInst*> local_pointers{};
@@ -1974,7 +1977,20 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::std::size_t unreachable_control_depth{};
 };
 
+[[nodiscard]] inline bool try_prepare_runtime_llvm_jit_module_storage(
+    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+    llvm_jit_module_storage_t& module_storage)
+{
+    module_storage = {};
+    module_storage.llvm_context_holder = ::std::make_unique<::llvm::LLVMContext>();
+    if(module_storage.llvm_context_holder == nullptr) [[unlikely]] { return false; }
+
+    module_storage.llvm_module = ::std::make_unique<::llvm::Module>(get_llvm_wasm_ir_module_name(runtime_module), *module_storage.llvm_context_holder);
+    return module_storage.llvm_module != nullptr;
+}
+
 [[nodiscard]] inline bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
+                                                                             llvm_jit_module_storage_t& module_storage,
                                                                              runtime_local_func_llvm_jit_emit_state_t& state)
 {
     state = {};
@@ -2012,16 +2028,15 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     auto const* runtime_module_ptr{local_func_storage.runtime_module_ptr};
     if(runtime_module_ptr == nullptr) [[unlikely]] { return false; }
+    if(module_storage.llvm_context_holder == nullptr || module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
     state.local_func_storage_ptr = ::std::addressof(local_func_storage);
     state.func_result_count_uz = func_result_count_uz;
     state.function_result = runtime_block_result_type{func_result_begin, func_result_end};
 
-    state.llvm_context_holder = ::std::make_unique<::llvm::LLVMContext>();
+    state.llvm_context_holder = module_storage.llvm_context_holder.get();
     auto& llvm_context{*state.llvm_context_holder};
-    state.llvm_module = ::std::make_unique<::llvm::Module>(
-        get_llvm_wasm_function_ir_module_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index)),
-        llvm_context);
+    state.llvm_module = module_storage.llvm_module.get();
 
     ::uwvm2::utils::container::vector<::llvm::Type*> llvm_parameter_types{};
     llvm_parameter_types.reserve(func_parameter_count_uz);
@@ -2040,11 +2055,17 @@ struct runtime_local_func_llvm_jit_emit_state_t
     }
 
     auto* llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
-    state.llvm_function = ::llvm::Function::Create(
-        llvm_function_type,
-        ::llvm::Function::ExternalLinkage,
-        get_llvm_wasm_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index)),
-        state.llvm_module.get());
+    auto const function_name{get_llvm_wasm_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
+    state.llvm_function = state.llvm_module->getFunction(function_name);
+    if(state.llvm_function == nullptr)
+    {
+        state.llvm_function = ::llvm::Function::Create(llvm_function_type, ::llvm::Function::ExternalLinkage, function_name, state.llvm_module);
+    }
+    else
+    {
+        if(state.llvm_function->getFunctionType() != llvm_function_type || !state.llvm_function->empty()) [[unlikely]] { return false; }
+        state.llvm_function->setLinkage(::llvm::Function::ExternalLinkage);
+    }
     if(state.llvm_function == nullptr) [[unlikely]] { return false; }
 
     auto* entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
@@ -2102,7 +2123,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
 }
 
 [[nodiscard]] inline bool finalize_runtime_local_func_llvm_jit_emit_state(runtime_local_func_llvm_jit_emit_state_t& state,
-                                                                          local_func_llvm_jit_ir_storage_t& result)
+                                                                          llvm_jit_module_storage_t&)
 {
     if(!state.valid || state.llvm_context_holder == nullptr || state.llvm_module == nullptr || state.llvm_function == nullptr || state.ir_builder == nullptr)
         [[unlikely]]
@@ -2127,11 +2148,6 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::llvm::raw_string_ostream verify_stream(verify_error);
     if(::llvm::verifyFunction(*state.llvm_function, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
     if(::llvm::verifyModule(*state.llvm_module, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
-
-    ::llvm::raw_string_ostream ir_stream(result.ir);
-    state.llvm_module->print(ir_stream, nullptr);
-    ir_stream.flush();
-    result.emitted = true;
     return true;
 }
 
@@ -2715,7 +2731,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     }
 
     auto& llvm_context{*state.llvm_context_holder};
-    auto* llvm_module{state.llvm_module.get()};
+    auto* llvm_module{state.llvm_module};
     auto& ir_builder{*state.ir_builder};
 
     auto* callee_function{get_or_create_llvm_wasm_function_declaration(*llvm_module, llvm_context, runtime_module, func_index, wasm_function_type)};
@@ -3160,7 +3176,7 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     if(!prepared_call.valid) [[unlikely]] { return false; }
 
     auto& llvm_context{*state.llvm_context_holder};
-    auto* llvm_module{state.llvm_module.get()};
+    auto* llvm_module{state.llvm_module};
     auto& ir_builder{*state.ir_builder};
     auto* llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
     auto* llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
@@ -3314,7 +3330,7 @@ template <typename CreateValue>
     auto const& local_func_storage{*state.local_func_storage_ptr};
     [[maybe_unused]] auto const& local_types{state.local_types};
     auto& llvm_context{*state.llvm_context_holder};
-    auto* llvm_module{state.llvm_module.get()};
+    auto* llvm_module{state.llvm_module};
     [[maybe_unused]] auto* llvm_function{state.llvm_function};
     auto& ir_builder{*state.ir_builder};
     [[maybe_unused]] auto const& local_pointers{state.local_pointers};

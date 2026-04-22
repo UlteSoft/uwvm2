@@ -11,7 +11,7 @@ case wasm1_code::i32_clz:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -38,7 +38,7 @@ case wasm1_code::i32_ctz:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -65,7 +65,7 @@ case wasm1_code::i32_popcnt:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -152,7 +152,7 @@ case wasm1_code::i32_div_s:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_signed_div_overflow_trap(*llvm_module, ir_builder, left.value, right.value);
@@ -178,7 +178,7 @@ case wasm1_code::i32_div_u:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_divide_by_zero_trap(*llvm_module, ir_builder, right.value);
@@ -204,7 +204,7 @@ case wasm1_code::i32_rem_s:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
                    return emit_llvm_signed_remainder_with_wasm_semantics(*llvm_module, ir_builder, left.value, right.value);
                })) [[unlikely]]
@@ -228,7 +228,7 @@ case wasm1_code::i32_rem_u:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_divide_by_zero_trap(*llvm_module, ir_builder, right.value);
@@ -414,7 +414,7 @@ case wasm1_code::i64_clz:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -441,7 +441,7 @@ case wasm1_code::i64_ctz:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -468,7 +468,7 @@ case wasm1_code::i64_popcnt:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -555,7 +555,7 @@ case wasm1_code::i64_div_s:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_signed_div_overflow_trap(*llvm_module, ir_builder, left.value, right.value);
@@ -581,7 +581,7 @@ case wasm1_code::i64_div_u:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_divide_by_zero_trap(*llvm_module, ir_builder, right.value);
@@ -607,7 +607,7 @@ case wasm1_code::i64_rem_s:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
                    return emit_llvm_signed_remainder_with_wasm_semantics(*llvm_module, ir_builder, left.value, right.value);
                })) [[unlikely]]
@@ -631,7 +631,7 @@ case wasm1_code::i64_rem_u:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
                {
-                   auto* llvm_module{llvm_jit_emit_state.llvm_module.get()};
+                   auto* llvm_module{llvm_jit_emit_state.llvm_module};
                    if(llvm_module == nullptr) [[unlikely]] { return static_cast<::llvm::Value*>(nullptr); }
 
                    emit_llvm_divide_by_zero_trap(*llvm_module, ir_builder, right.value);

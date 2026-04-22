@@ -43,14 +43,20 @@
 # include <alloca.h>
 #endif
 # if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
-#  include <llvm/AsmParser/Parser.h>
+#  include <llvm/Analysis/TargetTransformInfo.h>
+#  include <llvm/ADT/StringMap.h>
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/SourceMgr.h>
 #  include <llvm/Support/TargetSelect.h>
+#  include <llvm/Target/TargetMachine.h>
 #  include <llvm/TargetParser/Host.h>
+#  include <llvm/Transforms/InstCombine/InstCombine.h>
+#  include <llvm/Transforms/Scalar.h>
+#  include <llvm/Transforms/Utils.h>
 #  include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # endif
 
@@ -2576,6 +2582,57 @@ namespace uwvm2::runtime::lib
             return success;
         }
 
+        [[nodiscard]] inline auto get_llvm_jit_host_target_attributes()
+        {
+            ::llvm::SmallVector<::std::string, 16> mattrs{};
+            ::llvm::StringMap<bool> host_features{};
+            if(::llvm::sys::getHostCPUFeatures(host_features))
+            {
+                for(auto const& [feature_name, feature_enabled] : host_features)
+                {
+                    auto prefix{feature_enabled ? '+' : '-'};
+                    mattrs.push_back(::std::string(1u, prefix) + feature_name.str().str());
+                }
+            }
+            return mattrs;
+        }
+
+        [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
+        {
+            ::std::string verify_error{};
+            ::llvm::raw_string_ostream verify_stream(verify_error);
+            if(::llvm::verifyModule(module, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
+
+            ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
+            function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
+            function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
+            function_pass_manager.add(::llvm::createInstructionCombiningPass());
+            function_pass_manager.add(::llvm::createReassociatePass());
+            function_pass_manager.add(::llvm::createGVNPass());
+            function_pass_manager.add(::llvm::createCFGSimplificationPass());
+            function_pass_manager.add(::llvm::createLICMPass());
+            function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
+            function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
+
+            function_pass_manager.doInitialization();
+            for(auto& function : module)
+            {
+                if(function.isDeclaration()) { continue; }
+                function_pass_manager.run(function);
+            }
+            function_pass_manager.doFinalization();
+
+            ::llvm::legacy::PassManager module_pass_manager{};
+            module_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
+            module_pass_manager.add(::llvm::createGlobalDCEPass());
+            module_pass_manager.add(::llvm::createConstantMergePass());
+            module_pass_manager.run(module);
+
+            ::std::string optimized_verify_error{};
+            ::llvm::raw_string_ostream optimized_verify_stream(optimized_verify_error);
+            return !::llvm::verifyModule(module, ::std::addressof(optimized_verify_stream));
+        }
+
         [[nodiscard]] inline bool try_materialize_runtime_module_llvm_jit(compiled_module_record& rec) noexcept
         {
             rec.llvm_jit_ready = false;
@@ -2593,44 +2650,46 @@ namespace uwvm2::runtime::lib
                 return true;
             }
 
-            auto const& llvm_jit_ir_funcs{rec.llvm_jit_compiled.local_func_llvm_jit_irs};
-            if(llvm_jit_ir_funcs.size() != local_func_count) [[unlikely]] { return false; }
+            auto& llvm_jit_module_storage{rec.llvm_jit_compiled.llvm_jit_module};
+            if(!llvm_jit_module_storage.emitted || llvm_jit_module_storage.llvm_context_holder == nullptr || llvm_jit_module_storage.llvm_module == nullptr)
+                [[unlikely]]
+            {
+                return false;
+            }
             if(!ensure_llvm_jit_native_target_initialized()) [[unlikely]] { return false; }
 
-            auto llvm_context_holder{::std::make_unique<::llvm::LLVMContext>()};
-            auto& llvm_context{*llvm_context_holder};
+            auto llvm_context_holder{::std::move(llvm_jit_module_storage.llvm_context_holder)};
+            auto merged_module{::std::move(llvm_jit_module_storage.llvm_module)};
+            if(llvm_context_holder == nullptr || merged_module == nullptr) [[unlikely]] { return false; }
 
-            ::std::unique_ptr<::llvm::Module> merged_module{};
-            for(::std::size_t local_index{}; local_index != local_func_count; ++local_index)
-            {
-                auto const& llvm_jit_ir_storage{llvm_jit_ir_funcs.index_unchecked(local_index)};
-                if(!llvm_jit_ir_storage.emitted || llvm_jit_ir_storage.ir.empty()) [[unlikely]] { return false; }
-
-                ::llvm::SMDiagnostic parse_error{};
-                auto curr_module{::llvm::parseAssemblyString(llvm_jit_ir_storage.ir, parse_error, llvm_context)};
-                if(curr_module == nullptr) [[unlikely]] { return false; }
-
-                if(merged_module == nullptr)
-                {
-                    merged_module = ::std::move(curr_module);
-                }
-                else
-                {
-                    ::llvm::Linker linker(*merged_module);
-                    if(linker.linkInModule(::std::move(curr_module))) [[unlikely]] { return false; }
-                }
-            }
-
-            if(merged_module == nullptr) [[unlikely]] { return false; }
-
-            merged_module->setTargetTriple(::llvm::sys::getDefaultTargetTriple());
+            auto const target_triple{::llvm::sys::getDefaultTargetTriple()};
+            auto const host_cpu_name{::llvm::sys::getHostCPUName().str()};
+            auto const host_target_attributes{get_llvm_jit_host_target_attributes()};
 
             ::std::string engine_error{};
+            ::llvm::EngineBuilder target_builder{};
+            target_builder.setErrorStr(::std::addressof(engine_error))
+                .setEngineKind(::llvm::EngineKind::JIT)
+                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                .setMCPU(host_cpu_name)
+                .setMAttrs(host_target_attributes);
+
+            ::std::unique_ptr<::llvm::TargetMachine> target_machine{
+                target_builder.selectTarget(::llvm::Triple(target_triple), "", host_cpu_name, host_target_attributes)};
+            if(target_machine == nullptr) [[unlikely]] { return false; }
+
+            merged_module->setTargetTriple(target_triple);
+            merged_module->setDataLayout(target_machine->createDataLayout());
+            if(!optimize_runtime_llvm_jit_module(*merged_module, *target_machine)) [[unlikely]] { return false; }
+
             auto* raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
                                  .setEngineKind(::llvm::EngineKind::JIT)
                                  .setErrorStr(::std::addressof(engine_error))
+                                 .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                                 .setMCPU(host_cpu_name)
+                                 .setMAttrs(host_target_attributes)
                                  .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
-                                 .create()};
+                                 .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
 
             ::std::unique_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
@@ -3447,7 +3506,11 @@ namespace uwvm2::runtime::lib
                             *rec.runtime_module,
                             llvm_jit_opt,
                             err,
-                            0uz);
+                            effective_module_extra_compile_threads,
+                            { .policy = static_cast<::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_policy_t>(
+                                  static_cast<unsigned>(effective_compile_task_split_conf.policy)),
+                              .split_size = effective_compile_task_split_conf.split_size,
+                              .adjust_for_default_policy = effective_compile_task_split_conf.adjust_for_default_policy });
                     }
 #endif
                 }
@@ -3463,8 +3526,7 @@ namespace uwvm2::runtime::lib
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
                 if(local_n != rec.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-                if(compile_llvm_jit_translation &&
-                   (local_n != rec.llvm_jit_compiled.local_funcs.size() || local_n != rec.llvm_jit_compiled.local_func_llvm_jit_irs.size()))
+                if(compile_llvm_jit_translation && local_n != rec.llvm_jit_compiled.local_funcs.size())
                     [[unlikely]]
                 {
                     ::fast_io::fast_terminate();
