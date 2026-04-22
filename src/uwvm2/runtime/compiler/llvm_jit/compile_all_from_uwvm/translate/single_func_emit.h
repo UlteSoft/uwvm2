@@ -1298,6 +1298,42 @@ inline void llvm_jit_store_little_endian_integer(::std::byte* memory_ptr, UInt v
 
 [[noreturn]] inline void llvm_jit_memory_bridge_trap() noexcept { ::fast_io::fast_terminate(); }
 
+template <typename MemoryT, typename Fn>
+[[nodiscard]] inline bool llvm_jit_try_checked_memory_access(MemoryT const& memory,
+                                                             llvm_jit_wasm32_effective_offset_t effective_offset,
+                                                             ::std::size_t access_size,
+                                                             Fn&& fn)
+{
+    auto const checked_access{
+        [&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept
+        {
+            if(memory_begin == nullptr || effective_offset.offset_65_bit || access_size > memory_length ||
+               effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - access_size))
+            {
+                return false;
+            }
+
+            fn(memory_begin, static_cast<::std::size_t>(effective_offset.offset));
+            return true;
+        }};
+
+    if constexpr(MemoryT::can_mmap)
+    {
+        return ::uwvm2::object::memory::linear::with_memory_access_snapshot(
+            memory,
+            [&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept { return checked_access(memory_begin, memory_length); });
+    }
+    else if constexpr(MemoryT::support_multi_thread)
+    {
+        [[maybe_unused]] ::uwvm2::object::memory::linear::memory_operation_guard_t guard{memory.growing_flag_p, memory.active_ops_p};
+        return checked_access(memory.memory_begin, memory.memory_length);
+    }
+    else
+    {
+        return checked_access(memory.memory_begin, memory.memory_length);
+    }
+}
+
 template <typename Fn>
 inline void llvm_jit_with_checked_memory_access(::std::uintptr_t memory_address,
                                                 validation_module_traits_t::wasm_u32 static_offset,
@@ -1309,22 +1345,10 @@ inline void llvm_jit_with_checked_memory_access(::std::uintptr_t memory_address,
     if(memory_p == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
 
     auto const effective_offset{llvm_jit_compute_wasm32_effective_offset(address, static_offset)};
-
-    bool const access_ok{::uwvm2::object::memory::linear::with_memory_access_snapshot(
-        *memory_p,
-        [&](::std::byte* memory_begin, ::std::size_t memory_length) noexcept
-        {
-            if(memory_begin == nullptr || effective_offset.offset_65_bit || access_size > memory_length ||
-               effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - access_size))
-            {
-                return false;
-            }
-
-            fn(memory_begin, static_cast<::std::size_t>(effective_offset.offset));
-            return true;
-        })};
-
-    if(!access_ok) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
+    if(!llvm_jit_try_checked_memory_access(*memory_p, effective_offset, access_size, ::std::forward<Fn>(fn))) [[unlikely]]
+    {
+        llvm_jit_memory_bridge_trap();
+    }
 }
 
 template <typename ResultType, ::std::size_t LoadBytes, bool Signed = false>
@@ -1682,6 +1706,14 @@ inline void llvm_jit_local_imported_memory_store_bridge(::std::uintptr_t local_i
         memory_p->grow_silently(delta_pages, max_limit_memory_length);
         return static_cast<runtime_wasm_i32>(old_pages);
     }
+}
+
+[[nodiscard]] inline runtime_wasm_i32 llvm_jit_memory_size_bridge(::std::uintptr_t memory_address) noexcept
+{
+    auto* memory_p{reinterpret_cast<runtime_native_memory_t*>(memory_address)};
+    if(memory_p == nullptr) [[unlikely]] { llvm_jit_memory_bridge_trap(); }
+
+    return static_cast<runtime_wasm_i32>(memory_p->get_page_size());
 }
 
 [[nodiscard]] inline runtime_wasm_i32 llvm_jit_local_imported_memory_grow_bridge(::std::uintptr_t local_imported_module_address,
@@ -4013,6 +4045,19 @@ template <typename CreateValue>
                                              value});
         }};
 
+    auto const emit_native_memory_page_count_bridge_call{
+        [&]() -> ::llvm::CallInst*
+        {
+            if(memory0_access_info.memory_p == nullptr) [[unlikely]] { return nullptr; }
+
+            auto* llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto* bridge_function_type{
+                ::llvm::FunctionType::get(::llvm::Type::getInt32Ty(llvm_context), {llvm_intptr_type}, false)};
+            return emit_runtime_bridge_call(llvm_jit_memory_size_bridge,
+                                            bridge_function_type,
+                                            {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(memory0_access_info.memory_p))});
+        }};
+
     auto const emit_memory_load_bridge_fallback_call{
         [&](validation_module_traits_t::wasm_u32 static_offset,
             runtime_operand_stack_value_type result_type,
@@ -4250,6 +4295,10 @@ template <typename CreateValue>
                                                 if(memory0_access_info.local_imported_module_ptr != nullptr)
                                                 {
                                                     return emit_local_imported_memory_page_count_value();
+                                                }
+                                                if constexpr(!runtime_native_memory_t::can_mmap && runtime_native_memory_t::support_multi_thread)
+                                                {
+                                                    return emit_native_memory_page_count_bridge_call();
                                                 }
                                                 return emit_direct_memory_page_count_value();
                                             }};
