@@ -1447,6 +1447,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                             }
                         }
+
+                        if(is_polymorphic && concrete_to_check != target_arity)
+                        {
+                            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if` still
+                            // re-establishes the fallthrough stack as if the label arguments had been
+                            // popped and pushed back, so a missing concrete label value must be materialized.
+                            operand_stack.push_back({target_frame.result.begin[0]});
+                        }
                     }
 
                     break;
