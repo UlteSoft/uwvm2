@@ -131,6 +131,40 @@ namespace
         return 0;
     }
 
+    [[nodiscard]] int compile_expect_ok(byte_vec const& wasm, ::uwvm2::utils::container::u8string_view name)
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        bool started_compile{};
+        try
+        {
+            auto prep = prepare_runtime_from_wasm(wasm, name);
+            UWVM2TEST_REQUIRE(prep.mod != nullptr);
+            runtime_module_t const& rt = *prep.mod;
+
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            optable::compile_option cop{};
+
+            started_compile = true;
+            (void)compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+        }
+        catch(::fast_io::error const&)
+        {
+            return fail(__LINE__, "unexpected fast_io::error");
+        }
+        catch(...)
+        {
+            return fail(__LINE__, "unexpected exception type");
+        }
+        if(!started_compile) { return fail(__LINE__, "compiler did not start"); }
+        if(err.err_code != errc::ok)
+        {
+            char buf[128]{};
+            ::std::snprintf(buf, sizeof(buf), "err_code mismatch: expected=%u actual=%u", static_cast<unsigned>(errc::ok), static_cast<unsigned>(err.err_code));
+            return fail(__LINE__, buf);
+        }
+        return 0;
+    }
+
     [[nodiscard]] byte_vec build_missing_end_module()
     {
         module_builder mb{};
@@ -246,6 +280,56 @@ namespace
         op(fb.code, wasm_op::select);
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_call_indirect_then_select_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+
+        func_type ret_i32{{}, {k_val_i32}};
+
+        func_body main_fb{};
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 22);
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 0);
+        op(main_fb.code, wasm_op::call_indirect);
+        u32(main_fb.code, 0u);
+        u32(main_fb.code, 0u);
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 1);
+        op(main_fb.code, wasm_op::select);
+        op(main_fb.code, wasm_op::end);
+
+        func_body callee_fb{};
+        op(callee_fb.code, wasm_op::i32_const);
+        i32(callee_fb.code, 11);
+        op(callee_fb.code, wasm_op::end);
+
+        mb.types.push_back(ret_i32);
+        mb.function_type_indices.push_back(0u);
+        mb.function_bodies.push_back(::std::move(main_fb));
+        mb.function_type_indices.push_back(0u);
+        mb.function_bodies.push_back(::std::move(callee_fb));
+
+        mb.has_table = true;
+        mb.table_min = 1u;
+        mb.table_max = 1u;
+        mb.table_has_max = true;
+
+        element_segment seg{};
+        seg.table_index = 0u;
+        op(seg.offset_expr, wasm_op::i32_const);
+        i32(seg.offset_expr, 0);
+        op(seg.offset_expr, wasm_op::end);
+        seg.func_indices.push_back(1u);
+        mb.elements.push_back(::std::move(seg));
 
         return mb.build();
     }
@@ -1093,7 +1177,7 @@ namespace
         auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
         auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
 
-        func_type ty{{}, {wasm_type::i32}};
+        func_type ty{{}, {k_val_i32}};
         func_body fb{};
         op(fb.code, wasm_op::block);
         append_u8(fb.code, k_val_i32);
@@ -1162,6 +1246,7 @@ namespace
         UWVM2TEST_REQUIRE(compile_expect(build_select_type_mismatch_module(), u8"uwvm2test_validate_select_ty", errc::select_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_select_cond_type_not_i32_module(), u8"uwvm2test_validate_select_cond", errc::select_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_ok(build_call_indirect_then_select_module(), u8"uwvm2test_validate_call_indirect_then_select_ok") == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_else_module(), u8"uwvm2test_validate_illegal_else", errc::illegal_else) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_if_cond_underflow_module(),
                                                            u8"uwvm2test_validate_if_missing_block_type",

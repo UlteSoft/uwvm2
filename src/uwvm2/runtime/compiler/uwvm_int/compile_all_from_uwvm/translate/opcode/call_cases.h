@@ -19,10 +19,7 @@ case wasm1_code::return_:
     auto const& func_frame{control_flow_stack.index_unchecked(0u)};
     ::std::size_t const return_arity{static_cast<::std::size_t>(func_frame.result.end - func_frame.result.begin)};
 
-    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"return", return_arity);
-    }
+    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"return", return_arity); }
 
     if(return_arity != 0uz)
     {
@@ -176,10 +173,7 @@ case wasm1_code::call:
 
     auto const stack_size{operand_stack.size()};
 
-    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"call", param_count);
-    }
+    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"call", param_count); }
 
     if(param_count != 0uz)
     {
@@ -983,7 +977,7 @@ case wasm1_code::call_indirect:
     flush_conbine_pending();
 #endif
 
-    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const param_count_plus_table_index_overflows{param_count == max_operand_stack_requirement};
     auto const required_stack_size{param_count_plus_table_index_overflows ? max_operand_stack_requirement : (param_count + 1uz)};
     auto const stack_size{operand_stack.size()};
@@ -1038,9 +1032,8 @@ case wasm1_code::call_indirect:
         if(!is_polymorphic)
         {
             bool const n_ok{param_count <= 4uz};
-            bool const state_ok{
-                stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && !param_count_plus_table_index_overflows &&
-                stack_size >= required_stack_size};
+            bool const state_ok{stacktop_memory_count == 0uz && stacktop_cache_count == stack_size && !param_count_plus_table_index_overflows &&
+                                stack_size >= required_stack_size};
 
             if(n_ok && state_ok)
             {
@@ -1284,7 +1277,8 @@ case wasm1_code::call_indirect:
     }
 
     // Update the validation operand stack after the `call_indirect` is encoded.
-    operand_stack_pop_unchecked();  // pop selector index
+    // The selector index was already consumed by `try_pop_concrete_operand()` above;
+    // only the call arguments remain to be removed here.
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
     ::std::size_t effective_result_count{result_count};
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS

@@ -77,6 +77,8 @@ Each release entry should record:
 - Added strict regression coverage for operand underflow inside nested blocks and `else` frames entered from polymorphic outer control flow, preventing recurrence of the validator/compiler-validator mismatch in this release line.
 - Corrected `br_if` validation in polymorphic Wasm MVP paths so fallthrough typing now re-materializes missing label values for single-result labels, matching the W3C stack-polymorphism algorithm and preventing false acceptance of later concrete type mismatches.
 - Stopped adding `-Wno-maybe-musttail-local-addr` on Apple platforms so the strict validation test targets can build under Apple Clang without failing on an unsupported warning-suppression flag.
+- Corrected `uwvm_int` `call_indirect` validation-stack bookkeeping so the table selector is no longer popped twice after validation has already consumed it, preventing false operand-stack underflow reports on later instructions in valid Wasm MVP modules.
+- Added strict regression coverage for a valid `call_indirect` followed by `select`, keeping the compiler-integrated `uwvm_int` validator aligned with the W3C WebAssembly MVP stack effect for indirect calls and parametric instructions.
 
 ### Release Fixes
 
