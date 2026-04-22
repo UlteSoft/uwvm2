@@ -3541,7 +3541,7 @@ namespace uwvm2::runtime::lib
                 {
                     runtime_compile_threads_verbose_info(u8"LLVM JIT translation artifacts will also be generated during full translation. ");
                     runtime_compile_threads_verbose_info(
-                        u8"Current LLVM JIT IR emission/materialization still runs per module on a shared LLVM module, so runtime compile-thread scheduling primarily accelerates uwvm-int translation rather than the LLVM optimize/finalize stage. ");
+                        u8"Current LLVM JIT translation parallelizes Wasm-to-LLVM IR emission across task modules and links them back into one module before optimization/materialization, so runtime compile-thread scheduling can also reduce LLVM translation time while keeping the final aggressive whole-module optimization path unchanged. ");
                 }
             }
 

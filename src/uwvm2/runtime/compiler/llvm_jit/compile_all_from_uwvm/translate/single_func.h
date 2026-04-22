@@ -1084,7 +1084,8 @@ namespace details
                                                        [[maybe_unused]] compile_option const& options,
                                                        full_function_symbol_t& storage,
                                                        local_function_task_group task_group,
-                                                       ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+                                                       ::uwvm2::validation::error::code_validation_error_impl& err,
+                                                       llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr) UWVM_THROWS
     {
         for(::std::size_t local_function_idx{task_group.begin_index}; local_function_idx != task_group.end_index; ++local_function_idx)
         {
@@ -1093,7 +1094,7 @@ namespace details
                                                                                                        options,
                                                                                                        local_function_idx,
                                                                                                        err,
-                                                                                                       ::std::addressof(storage.llvm_jit_module));
+                                                                                                       emitted_llvm_jit_ir_storage);
         }
     }
 
@@ -1133,7 +1134,8 @@ namespace details
                                                          [[maybe_unused]] compile_option const& options,
                                                          full_function_symbol_t& storage,
                                                          parallel_compile_failure_state& failure_state,
-                                                         local_function_task_group task_group)
+                                                         local_function_task_group task_group,
+                                                         llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr)
     {
 #ifdef UWVM_CPP_EXCEPTIONS
         if(failure_state.failed.load(::std::memory_order_acquire)) { co_return; }
@@ -1145,7 +1147,8 @@ namespace details
         try
 #endif
         {
-            compile_all_from_uwvm_local_func_group(curr_module, validation_module, options, storage, task_group, local_err);
+            compile_all_from_uwvm_local_func_group(
+                curr_module, validation_module, options, storage, task_group, local_err, emitted_llvm_jit_ir_storage);
         }
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error const&)
@@ -1159,6 +1162,43 @@ namespace details
 #endif
 
         co_return;
+    }
+
+    [[nodiscard]] inline bool link_llvm_jit_module_fragments(llvm_jit_module_storage_t& merged_module_storage,
+                                                             ::uwvm2::utils::container::vector<llvm_jit_module_storage_t>& task_module_storages)
+    {
+        if(merged_module_storage.llvm_context_holder == nullptr || merged_module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
+
+        auto& merged_llvm_context{*merged_module_storage.llvm_context_holder};
+        ::llvm::Linker linker(*merged_module_storage.llvm_module);
+        for(auto& task_module_storage: task_module_storages)
+        {
+            if(task_module_storage.llvm_context_holder == nullptr || task_module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
+
+            ::std::string serialized_bitcode{};
+            {
+                // Reparse each fragment into the merged context before linking. Direct
+                // cross-context linking hit unstable intrinsic remangling on this toolchain.
+                ::llvm::raw_string_ostream bitcode_stream(serialized_bitcode);
+                ::llvm::WriteBitcodeToFile(*task_module_storage.llvm_module, bitcode_stream);
+            }
+
+            auto parsed_task_module_expected{
+                ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(serialized_bitcode, task_module_storage.llvm_module->getModuleIdentifier()),
+                                         merged_llvm_context)};
+            if(!parsed_task_module_expected) [[unlikely]]
+            {
+                ::llvm::consumeError(parsed_task_module_expected.takeError());
+                return false;
+            }
+
+            if(linker.linkInModule(::std::move(*parsed_task_module_expected))) [[unlikely]] { return false; }
+            task_module_storage.llvm_module.reset();
+            task_module_storage.llvm_context_holder.reset();
+            task_module_storage.emitted = false;
+        }
+
+        return true;
     }
 
     inline constexpr void validate_runtime_module_all_local_funcs(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
@@ -1444,26 +1484,104 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
     auto const validation_module{details::build_runtime_validation_module(curr_module)};
 
     split_config = resolve_effective_compile_task_split_config(curr_module, split_config, extra_compile_threads);
-    static_cast<void>(split_config);
 
     auto const local_func_count{curr_module.local_defined_function_vec_storage.size()};
     storage.local_funcs.clear();
     storage.local_funcs.resize(local_func_count);
-    auto const emit_llvm_jit_active{details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module)};
 
-    // A shared LLVM module lets MCJIT see and optimize the whole Wasm module at once.
-    // Module/Context mutation is not thread-safe, so IR emission is serialized here.
-    for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
+    auto const compile_local_functions_serially{
+        [&]() UWVM_THROWS
+        {
+            auto const emit_llvm_jit_active{details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module)};
+            for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
+            {
+                storage.local_funcs.index_unchecked(local_function_idx) = details::compile_all_from_uwvm_local_func(curr_module,
+                                                                                                                     validation_module,
+                                                                                                                     options,
+                                                                                                                     local_function_idx,
+                                                                                                                     err,
+                                                                                                                     emit_llvm_jit_active
+                                                                                                                         ? ::std::addressof(
+                                                                                                                               storage.llvm_jit_module)
+                                                                                                                         : nullptr);
+            }
+            storage.llvm_jit_module.emitted = storage.llvm_jit_module.llvm_context_holder != nullptr && storage.llvm_jit_module.llvm_module != nullptr;
+        }};
+
+    if(details::should_run_local_functions_serially(curr_module, split_config, extra_compile_threads))
     {
-        storage.local_funcs.index_unchecked(local_function_idx) = details::compile_all_from_uwvm_local_func(curr_module,
-                                                                                                             validation_module,
-                                                                                                             options,
-                                                                                                             local_function_idx,
-                                                                                                             err,
-                                                                                                             emit_llvm_jit_active
-                                                                                                                 ? ::std::addressof(storage.llvm_jit_module)
-                                                                                                                 : nullptr);
+        compile_local_functions_serially();
+        return storage;
     }
+
+    auto const task_groups{details::build_local_function_task_groups(curr_module, split_config)};
+    auto const effective_extra_compile_threads{::uwvm2::utils::thread::clamp_extra_worker_count(task_groups.size(), extra_compile_threads)};
+
+    if(effective_extra_compile_threads == 0uz)
+    {
+        compile_local_functions_serially();
+        return storage;
+    }
+
+    if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module))
+    {
+        compile_local_functions_serially();
+        return storage;
+    }
+
+    ::uwvm2::utils::container::vector<llvm_jit_module_storage_t> task_llvm_jit_modules{};
+    task_llvm_jit_modules.resize(task_groups.size());
+
+    bool prepared_task_llvm_jit_modules{true};
+    for(auto& task_llvm_jit_module: task_llvm_jit_modules)
+    {
+        if(!details::try_prepare_runtime_llvm_jit_module_storage(curr_module, task_llvm_jit_module))
+        {
+            prepared_task_llvm_jit_modules = false;
+            break;
+        }
+    }
+
+    if(!prepared_task_llvm_jit_modules)
+    {
+        compile_local_functions_serially();
+        return storage;
+    }
+
+    ::uwvm2::utils::thread::scheduled_task_batch task_batch{task_groups.size()};
+
+    details::parallel_compile_failure_state failure_state{};
+    for(::std::size_t task_group_index{}; task_group_index != task_groups.size(); ++task_group_index)
+    {
+        auto task{details::make_compile_all_from_uwvm_local_func_group_task(curr_module,
+                                                                            validation_module,
+                                                                            options,
+                                                                            storage,
+                                                                            failure_state,
+                                                                            task_groups.index_unchecked(task_group_index),
+                                                                            ::std::addressof(task_llvm_jit_modules.index_unchecked(task_group_index)))};
+        ::std::construct_at(task_batch.handles.buffer + task_batch.handle_count, task.release());
+        ++task_batch.handle_count;
+    }
+
+    ::uwvm2::utils::thread::native_thread_pool thread_pool{};
+    thread_pool.run(task_batch, effective_extra_compile_threads);
+
+#ifdef UWVM_CPP_EXCEPTIONS
+    if(failure_state.failed.load(::std::memory_order_acquire))
+    {
+        if(failure_state.has_err) { err = failure_state.err; }
+        if(failure_state.exception) { ::std::rethrow_exception(failure_state.exception); }
+        ::fast_io::fast_terminate();
+    }
+#endif
+
+    if(!details::link_llvm_jit_module_fragments(storage.llvm_jit_module, task_llvm_jit_modules))
+    {
+        compile_local_functions_serially();
+        return storage;
+    }
+
     storage.llvm_jit_module.emitted = storage.llvm_jit_module.llvm_context_holder != nullptr && storage.llvm_jit_module.llvm_module != nullptr;
 
     return storage;

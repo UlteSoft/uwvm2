@@ -35,6 +35,8 @@
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
 // platform
 # if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+#  include <llvm/Bitcode/BitcodeReader.h>
+#  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/BasicBlock.h>
 #  include <llvm/IR/Constants.h>
 #  include <llvm/IR/Function.h>
@@ -44,6 +46,7 @@
 #  include <llvm/IR/Type.h>
 #  include <llvm/IR/Value.h>
 #  include <llvm/IR/Verifier.h>
+#  include <llvm/Linker/Linker.h>
 #  include <llvm/Support/raw_ostream.h>
 # endif
 // import
