@@ -2009,9 +2009,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     auto const func_parameter_count_uz{func_parameter_begin == nullptr ? 0uz : static_cast<::std::size_t>(func_parameter_end - func_parameter_begin)};
     auto const func_result_count_uz{func_result_begin == nullptr ? 0uz : static_cast<::std::size_t>(func_result_end - func_result_begin)};
+    auto const defined_local_count_uz{static_cast<::std::size_t>(wasm_code_ptr->all_local_count)};
+    auto const all_local_count_uz{func_parameter_count_uz + defined_local_count_uz};
     if(func_result_count_uz > 1uz) [[unlikely]] { return false; }
 
-    state.local_types.reserve(wasm_code_ptr->all_local_count);
+    state.local_types.reserve(all_local_count_uz);
     for(::std::size_t i{}; i != func_parameter_count_uz; ++i)
     {
         state.local_types.push_back(static_cast<runtime_operand_stack_value_type>(func_parameter_begin[i]));
@@ -2024,7 +2026,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         }
     }
 
-    if(state.local_types.size() != static_cast<::std::size_t>(wasm_code_ptr->all_local_count)) [[unlikely]] { return false; }
+    if(state.local_types.size() != all_local_count_uz) [[unlikely]] { return false; }
 
     auto const* runtime_module_ptr{local_func_storage.runtime_module_ptr};
     if(runtime_module_ptr == nullptr) [[unlikely]] { return false; }
@@ -2474,7 +2476,16 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     if(state.control_stack.empty()) { return true; }
 
     state.control_stack.back().is_reachable = continuation_reachable;
-    if(!continuation_reachable) { return true; }
+    if(!continuation_reachable)
+    {
+        if(end_block != nullptr && end_block->getTerminator() == nullptr)
+        {
+            if(end_phi != nullptr && end_phi->getNumIncomingValues() == 0u) { end_phi->eraseFromParent(); }
+            ::llvm::IRBuilder<> unreachable_builder(end_block);
+            unreachable_builder.CreateUnreachable();
+        }
+        return true;
+    }
     if(end_block == nullptr) [[unlikely]] { return false; }
 
     state.ir_builder->SetInsertPoint(end_block);

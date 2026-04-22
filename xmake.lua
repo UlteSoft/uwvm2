@@ -108,6 +108,23 @@ function def_build()
 		add_options("llvm-jit-env")
 	end
 
+	if enable_jit == "default" or enable_jit == "llvm" then
+		on_load(function(target)
+			local utility = import("utility.utility", { anonymous = true })
+			local llvm_jit_options = utility.get_llvm_jit_options()
+			local llvm_config = llvm_jit_options.llvm_config or "llvm-config"
+			local native_codegen_linkflags = os.iorunv(llvm_config, { "--libs", "native", "nativecodegen" }) or ""
+			for _, flag in ipairs(os.argv(native_codegen_linkflags)) do
+				if flag:startswith("-l") and #flag > 2 then
+					local link = flag:startswith("-l:") and flag:sub(4) or flag:sub(3)
+					target:add("links", link)
+				elseif flag:startswith("-L") and #flag > 2 then
+					target:add("linkdirs", flag:sub(3))
+				end
+			end
+		end)
+	end
+
 	if (enable_jit == "default" or enable_jit == "llvm") and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
