@@ -25,6 +25,15 @@ namespace
         0x00u, 0x41u, 0x00u, 0x28u, 0x02u, 0x00u, 0x41u, 0x2au, 0x47u, 0x04u, 0x40u, 0x00u,
         0x0bu, 0x0bu};
 
+    // Generated from a tiny `_start` fixture that uses `select`, stores the
+    // result to a local, and traps if the selected value is wrong.
+    inline constexpr ::std::array<unsigned char, 56uz> select_start_wasm{
+        0x00u, 0x61u, 0x73u, 0x6du, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u, 0x04u, 0x01u, 0x60u,
+        0x00u, 0x00u, 0x03u, 0x02u, 0x01u, 0x00u, 0x07u, 0x0au, 0x01u, 0x06u, 0x5fu, 0x73u,
+        0x74u, 0x61u, 0x72u, 0x74u, 0x00u, 0x00u, 0x0au, 0x18u, 0x01u, 0x16u, 0x01u, 0x01u,
+        0x7fu, 0x41u, 0x0au, 0x41u, 0x14u, 0x41u, 0x01u, 0x1bu, 0x21u, 0x00u, 0x20u, 0x00u,
+        0x41u, 0x0au, 0x47u, 0x04u, 0x40u, 0x00u, 0x0bu, 0x0bu};
+
     [[maybe_unused]] void test_runtime_entry()
     {
         ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t module{};
@@ -63,7 +72,8 @@ namespace
         }
     }
 
-    [[nodiscard]] bool write_fixture(::std::filesystem::path const& wasm_path)
+    template <::std::size_t N>
+    [[nodiscard]] bool write_fixture(::std::filesystem::path const& wasm_path, ::std::array<unsigned char, N> const& wasm_bytes)
     {
         ::std::error_code ec{};
         ::std::filesystem::create_directories(wasm_path.parent_path(), ec);
@@ -80,8 +90,7 @@ namespace
             return false;
         }
 
-        output.write(reinterpret_cast<char const*>(nontrivial_start_wasm.data()),
-                     static_cast<::std::streamsize>(nontrivial_start_wasm.size()));
+        output.write(reinterpret_cast<char const*>(wasm_bytes.data()), static_cast<::std::streamsize>(wasm_bytes.size()));
 
         if(!output) [[unlikely]]
         {
@@ -108,6 +117,20 @@ namespace
         return false;
     }
 
+    template <::std::size_t N>
+    [[nodiscard]] bool run_fixture(::std::filesystem::path const& uwvm_path,
+                                   ::std::filesystem::path const& executable_dir,
+                                   ::std::string_view file_name,
+                                   ::std::array<unsigned char, N> const& wasm_bytes)
+    {
+        auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / ::std::string{file_name}};
+        if(!write_fixture(wasm_path, wasm_bytes)) [[unlikely]] { return false; }
+
+        if(!run_mode(uwvm_path, wasm_path, "jit")) [[unlikely]] { return false; }
+        if(!run_mode(uwvm_path, wasm_path, "tiered")) [[unlikely]] { return false; }
+        return true;
+    }
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -127,11 +150,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / "nontrivial_start.wasm"};
-    if(!write_fixture(wasm_path)) [[unlikely]] { return 1; }
-
-    if(!run_mode(uwvm_path, wasm_path, "jit")) [[unlikely]] { return 1; }
-    if(!run_mode(uwvm_path, wasm_path, "tiered")) [[unlikely]] { return 1; }
+    if(!run_fixture(uwvm_path, executable_dir, "nontrivial_start.wasm", nontrivial_start_wasm)) [[unlikely]] { return 1; }
+    if(!run_fixture(uwvm_path, executable_dir, "select_start.wasm", select_start_wasm)) [[unlikely]] { return 1; }
 
     return 0;
 }

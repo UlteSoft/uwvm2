@@ -1284,7 +1284,8 @@ case wasm1_code::call_indirect:
     }
 
     // Update the validation operand stack after the `call_indirect` is encoded.
-    operand_stack_pop_unchecked();  // pop selector index
+    // The selector index was already consumed by `try_pop_concrete_operand()` above;
+    // only the call arguments remain to be removed here.
     if(param_count != 0uz) { operand_stack_pop_n(param_count); }
     ::std::size_t effective_result_count{result_count};
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS

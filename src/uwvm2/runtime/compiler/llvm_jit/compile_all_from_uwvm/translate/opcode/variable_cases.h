@@ -86,7 +86,7 @@ case wasm1_code::select:
     // v1
     bool v1_from_stack{};
     curr_operand_stack_value_type v1_type{};
-    if(auto const v1{try_peek_concrete_operand()}; v1.from_stack)
+    if(auto const v1{try_pop_concrete_operand()}; v1.from_stack)
     {
         v1_from_stack = true;
         v1_type = v1.type;
@@ -101,7 +101,7 @@ case wasm1_code::select:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    // `select` consumes its concrete inputs and materializes a fresh result register.
+    // `select` consumes three inputs and materializes one fresh result register.
     if(v1_from_stack) { operand_stack_push(v1_type); }
     else if(v2_from_stack) { operand_stack_push(v2_type); }
 
