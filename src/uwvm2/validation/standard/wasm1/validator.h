@@ -2774,6 +2774,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
+                    // In the Wasm MVP binary format, `memory.size` carries a reserved memory index
+                    // immediate that must decode to memory index 0. This immediate is still encoded
+                    // as an unsigned LEB128 integer, not as a raw fixed byte.
+                    //
+                    // That distinction matters for validation strictness: the validator must reject
+                    // malformed LEB128, but it must not incorrectly require the canonical single-byte
+                    // encoding `0x00`. Per the W3C binary integer rules, trailing-zero forms that are
+                    // still well-formed LEB128 within the width bounds remain valid encodings of zero.
+                    // Therefore the correct MVP check here is:
+                    //   1. decode the immediate as `u32` LEB128,
+                    //   2. reject malformed encodings as `invalid_memory_index`,
+                    //   3. reject decoded non-zero values as `illegal_memory_index`.
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
 
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -2798,7 +2810,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe           ] unsafe (could be the section_end)
                     //                    ^^ code_curr
 
-                    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+                    // MVP only defines memory 0 here. The binary encoding may use any well-formed
+                    // LEB128 representation whose decoded value is zero; the semantic constraint is
+                    // on the decoded memidx, not on the byte sequence being exactly `0x00`.
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;
@@ -2841,6 +2855,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [ safe    ] unsafe (could be the section_end)
                     //             ^^ code_curr
 
+                    // `memory.grow` follows the same MVP rule as `memory.size`: the immediate is a
+                    // reserved memidx encoded as unsigned LEB128 and it must decode to zero.
+                    //
+                    // We intentionally validate the decoded value instead of hard-coding a literal
+                    // single-byte check, because well-formed non-canonical zero encodings are still
+                    // accepted by the Wasm binary integer grammar.
                     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
 
                     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -2865,7 +2885,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::validation::standard::wasm1
                     // [        safe    ] unsafe (could be the section_end)
                     //                    ^^ code_curr
 
-                    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+                    // As above, this is a decoded-value check, not a raw-byte check.
                     if(memidx != 0u) [[unlikely]]
                     {
                         err.err_curr = op_begin;

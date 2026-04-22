@@ -361,6 +361,13 @@ case wasm1_code::memory_size:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
+    // MVP keeps `memory.size` on memory 0 only, but the immediate is still represented as an
+    // unsigned LEB128 memory index in the binary stream. The correct validation contract is to
+    // decode first and then require the decoded value to be zero.
+    //
+    // This compiler-integrated validator intentionally mirrors the standalone validator so both
+    // paths accept the same set of well-formed MVP binaries, including non-canonical zero LEB128
+    // encodings that remain valid under the W3C integer grammar.
     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
 
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -385,7 +392,7 @@ case wasm1_code::memory_size:
     // [ safe           ] unsafe (could be the section_end)
     //                    ^^ code_curr
 
-    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+    // Enforce the MVP semantic restriction on the decoded memidx value.
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;
@@ -437,6 +444,8 @@ case wasm1_code::memory_grow:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
+    // `memory.grow` uses the same reserved memidx rule. Keep this logic aligned with the standard
+    // validator: malformed LEB128 is invalid encoding; well-formed non-zero memidx is illegal MVP use.
     ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 memidx;  // No initialization necessary
 
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
@@ -461,7 +470,7 @@ case wasm1_code::memory_grow:
     // [        safe    ] unsafe (could be the section_end)
     //                    ^^ code_curr
 
-    // MVP: only memory 0 exists and the encoding must be memidx=0 (reserved byte 0x00).
+    // Enforce the MVP semantic restriction on the decoded memidx value.
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;
