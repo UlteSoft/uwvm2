@@ -1086,6 +1086,28 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_br_if_polymorphic_label_type_reification_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+
+        func_type ty{{}, {wasm_type::i32}};
+        func_body fb{};
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_val_i32);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::br_if);
+        u32(fb.code, 0u);
+        op(fb.code, wasm_op::i64_add);  // W3C MVP: fallthrough stack re-materializes the block's i32 label value.
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_br_table_target_type_mismatch_module()
     {
         module_builder mb{};
@@ -1257,6 +1279,9 @@ namespace
         UWVM2TEST_REQUIRE(compile_expect(build_br_cond_type_not_i32_polymorphic_concrete_module(),
                                          u8"uwvm2test_validate_br_cond_ty_poly_concrete",
                                          errc::br_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_br_if_polymorphic_label_type_reification_module(),
+                                         u8"uwvm2test_validate_br_if_poly_label_reify",
+                                         errc::numeric_operand_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_br_table_target_type_mismatch_module(), u8"uwvm2test_validate_br_table_mismatch", errc::br_table_target_type_mismatch) ==
             0);
