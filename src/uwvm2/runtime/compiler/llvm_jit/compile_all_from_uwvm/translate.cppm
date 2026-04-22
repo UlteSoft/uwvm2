@@ -1,5 +1,5 @@
 /*************************************************************
- * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
@@ -27,10 +27,22 @@ module;
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <string>
 #include <utility>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+// platform
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm:translate;
 
@@ -39,6 +51,7 @@ import uwvm2.uwvm_predefine.io;
 import uwvm2.uwvm_predefine.utils.ansies;
 import uwvm2.utils.container;
 import uwvm2.utils.debug;
+import uwvm2.utils.thread;
 import uwvm2.parser.wasm.base;
 import uwvm2.parser.wasm.concepts;
 import uwvm2.parser.wasm.binfmt.binfmt_ver1;

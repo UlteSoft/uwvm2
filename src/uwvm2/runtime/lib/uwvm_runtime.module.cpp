@@ -1,5 +1,5 @@
 /*************************************************************
- * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
@@ -28,6 +28,7 @@ import uwvm2.parser.wasm.standard.wasm1.type;
 import uwvm2.parser.wasm.standard.wasm1p1.type;
 import uwvm2.runtime.compiler.uwvm_int.compile_all_from_uwvm;
 import uwvm2.runtime.compiler.uwvm_int.optable;
+import uwvm2.runtime.compiler.llvm_jit.compile_all_from_uwvm;
 import uwvm2.utils.container;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;

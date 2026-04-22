@@ -315,6 +315,58 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
                                              while(operand_stack.size() > new_size) { operand_stack_pop_unchecked(); }
                                          }};
 
+    struct concrete_operand_t
+    {
+        bool from_stack{};
+        curr_operand_stack_value_type type{};
+    };
+
+    auto const curr_frame_operand_stack_base{[&]() constexpr noexcept -> ::std::size_t
+                                             {
+                                                 if(control_flow_stack.empty()) { return 0uz; }
+                                                 return control_flow_stack.back_unchecked().operand_stack_base;
+                                             }};
+
+    auto const concrete_operand_count{[&]() constexpr noexcept -> ::std::size_t
+                                      {
+                                          auto const base{curr_frame_operand_stack_base()};
+                                          auto const stack_size{operand_stack.size()};
+                                          return stack_size >= base ? (stack_size - base) : 0uz;
+                                      }};
+
+    auto const report_operand_stack_underflow{
+        [&](::std::byte const* op_begin, ::uwvm2::utils::container::u8string_view op_name, ::std::size_t required_count) constexpr UWVM_THROWS
+        {
+            err.err_curr = op_begin;
+            err.err_selectable.operand_stack_underflow.op_code_name = op_name;
+            err.err_selectable.operand_stack_underflow.stack_size_actual = concrete_operand_count();
+            err.err_selectable.operand_stack_underflow.stack_size_required = required_count;
+            err.err_code = code_validation_error_code::operand_stack_underflow;
+            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        }};
+
+    auto const try_pop_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
+                                        {
+                                            if(concrete_operand_count() == 0uz) { return {}; }
+                                            auto const vt{operand_stack.back_unchecked().type};
+                                            operand_stack_pop_unchecked();
+                                            return {.from_stack = true, .type = vt};
+                                        }};
+
+    auto const try_peek_concrete_operand{[&]() constexpr noexcept -> concrete_operand_t
+                                         {
+                                             if(concrete_operand_count() == 0uz) { return {}; }
+                                             return {.from_stack = true, .type = operand_stack.back_unchecked().type};
+                                         }};
+
+    [[maybe_unused]] auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr noexcept
+                                                                {
+                                                                    while(count-- != 0uz && concrete_operand_count() != 0uz)
+                                                                    {
+                                                                        operand_stack_pop_unchecked();
+                                                                    }
+                                                                }};
+
     auto const sync_type_stacks_from_codegen_snapshot{[&](curr_operand_stack_type const& snapshot) constexpr UWVM_THROWS
                                                       {
                                                           operand_stack = snapshot;

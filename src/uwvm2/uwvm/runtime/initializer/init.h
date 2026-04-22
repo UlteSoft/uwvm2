@@ -1,5 +1,5 @@
 /*************************************************************
- * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
@@ -2110,7 +2110,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: imported descriptors. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: imported descriptors. "); }
 
             // imported
             {
@@ -2195,7 +2195,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local functions and code. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local functions and code. "); }
 
             // local defined function + code
             {
@@ -2274,7 +2274,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local tables. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local tables. "); }
 
             // local defined table
             {
@@ -2284,12 +2284,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 {
                     ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t rec{};
                     rec.table_type_ptr = ::std::addressof(table_type);
+                    rec.owner_module_rt_ptr = ::std::addressof(out);
                     rec.elems.resize(static_cast<::std::size_t>(table_type.limits.min));
                     out.local_defined_table_vec_storage.push_back_unchecked(::std::move(rec));
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local memories. "); }
+            out.llvm_jit_call_indirect_table_views.resize(out.imported_table_vec_storage.size() + out.local_defined_table_vec_storage.size());
+
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local memories. "); }
 
             // local defined memory
             {
@@ -2304,7 +2307,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: local globals. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local globals. "); }
 
             // local defined global
             {
@@ -2387,7 +2390,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: element segments. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: element segments. "); }
             // element (wasm1: active segments)
             {
                 details::check_reserve_limit(u8"local_defined_elements", elemsec.elems.size(), initializer_limit.max_local_defined_elements);
@@ -2415,7 +2418,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
-            if(::uwvm2::uwvm::io::show_verbose) { verbose_module_info(u8"Init: data segments. "); }
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: data segments. "); }
             // data (wasm1: active segments)
             {
                 details::check_reserve_limit(u8"local_defined_datas", datasec.datas.size(), initializer_limit.max_local_defined_datas);
@@ -2671,9 +2674,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
         inline constexpr void finalize_wasm1_globals_after_linking() noexcept
         {
-            // First: attach owner pointers for on-demand evaluation across modules.
+            // First: attach owner pointers after modules have been moved into the runtime storage map.
+            // Local tables and globals are constructed against a temporary `wasm_module_storage_t`, so their
+            // back-pointers must be rebound once the final in-map module address is stable.
             for([[maybe_unused]] auto& [curr_module_name, curr_rt]: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
             {
+                for(auto& table: curr_rt.local_defined_table_vec_storage) { table.owner_module_rt_ptr = ::std::addressof(curr_rt); }
                 for(auto& g: curr_rt.local_defined_global_vec_storage) { g.owner_module_rt_ptr = ::std::addressof(curr_rt); }
             }
 

@@ -1,5 +1,5 @@
 ﻿/*************************************************************
- * Ultimate WebAssembly Virtual Machine (Version 2)          *
+ * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
  *************************************************************/
@@ -140,7 +140,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(72, 61, 139)),
                             u8"|",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(189, 37, 206)),
-                            u8" Ultimate ",
+                            u8" UlteSoft ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(152, 37, 206)),
                             u8"WebAssembly ",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RGB(113, 37, 206)),
@@ -191,7 +191,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         ::fast_io::io::perr(u8log_output_ul,
                                 // uwvm
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_PURPLE),
-                                u8"Ultimate WebAssembly Virtual Machine 2",
+                                u8"UlteSoft WebAssembly Virtual Machine 2",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 // mode
                                 u8"\nMode: "
@@ -1327,7 +1327,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             #endif
         }
 #endif
-
+        // LLVM JIT
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        
+#endif
         // ENDL
         ::fast_io::io::perrln(u8log_output_ul);
 

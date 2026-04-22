@@ -55,29 +55,30 @@ case wasm1_code::br:
     // not result types.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    if(!is_polymorphic && operand_stack.size() < target_arity) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = target_arity;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br", target_arity);
     }
 
-    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+    if(target_arity != 0uz)
     {
-        auto const expected_type{*target_frame.result.begin};
-        auto const actual_type{operand_stack.back_unchecked().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
-            err.err_code = code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_code = code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
+
     }
 
     // Translate: `br` requires stack-shape repair before jumping because the interpreter `br` opcode does not unwind the operand stack.
@@ -978,21 +979,14 @@ case wasm1_code::br_if:
     auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
     auto const required_stack_size{target_arity_plus_cond_overflows ? max_operand_stack_requirement : (target_arity + 1uz)};
 
-    if(!is_polymorphic && (target_arity_plus_cond_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (target_arity_plus_cond_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_if";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br_if", required_stack_size);
     }
 
-    if(!operand_stack.empty())
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack)
     {
-        auto const cond{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
-        if(!is_polymorphic && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_if";
@@ -1002,18 +996,31 @@ case wasm1_code::br_if:
         }
     }
 
-    if(!is_polymorphic && target_arity != 0uz && operand_stack.size() >= target_arity)
+    if(target_arity != 0uz)
     {
-        auto const expected_type{*target_frame.result.begin};
-        auto const actual_type{operand_stack.back_unchecked().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < target_arity ? available_arg_count : target_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
-            err.err_code = code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const expected_type{target_frame.result.begin[target_arity - 1uz - i]};
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_code = code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
+        }
+
+        if(is_polymorphic && concrete_to_check != target_arity)
+        {
+            // Wasm MVP only permits 0/1 label arity. In polymorphic mode, `br_if`
+            // must still re-establish the fallthrough stack as if the label value
+            // had been popped for the branch and then pushed back.
+            operand_stack_push(target_frame.result.begin[0]);
         }
     }
 
@@ -3273,21 +3280,14 @@ case wasm1_code::br_table:
     auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
     auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
 
-    if(!is_polymorphic && (expected_arity_plus_index_overflows || operand_stack.size() < required_stack_size)) [[unlikely]]
+    if(!is_polymorphic && (expected_arity_plus_index_overflows || concrete_operand_count() < required_stack_size)) [[unlikely]]
     {
-        err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"br_table";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = operand_stack.size();
-        err.err_selectable.operand_stack_underflow.stack_size_required = required_stack_size;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
-        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+        report_operand_stack_underflow(op_begin, u8"br_table", required_stack_size);
     }
 
-    if(!operand_stack.empty())
+    if(auto const idx{try_pop_concrete_operand()}; idx.from_stack)
     {
-        auto const idx{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
-        if(!is_polymorphic && idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
+        if(idx.type != curr_operand_stack_value_type::i32) [[unlikely]]
         {
             err.err_curr = op_begin;
             err.err_selectable.br_cond_type_not_i32.op_code_name = u8"br_table";
@@ -3317,17 +3317,22 @@ case wasm1_code::br_table:
         }
     }
 
-    if(!is_polymorphic && expected_arity != 0uz && operand_stack.size() >= expected_arity)
+    if(expected_arity != 0uz)
     {
-        auto const actual_type{operand_stack.back_unchecked().type};
-        if(actual_type != expected_type) [[unlikely]]
+        auto const available_arg_count{concrete_operand_count()};
+        auto const concrete_to_check{available_arg_count < expected_arity ? available_arg_count : expected_arity};
+        for(::std::size_t i{}; i != concrete_to_check; ++i)
         {
-            err.err_curr = op_begin;
-            err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-            err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
-            err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
-            err.err_code = code_validation_error_code::br_value_type_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            auto const actual_type{operand_stack.index_unchecked(operand_stack.size() - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_code = code_validation_error_code::br_value_type_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
     }
 

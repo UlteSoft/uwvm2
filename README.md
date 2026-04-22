@@ -1,7 +1,7 @@
 <div align="center">
   <img src="documents/logo/uwvm2.svg" alt="uwvm2 logo" width="240"/>
   <br/>
-  <h1>Ultimate WebAssembly Virtual Machine 2</h1>
+  <h1>UlteSoft WebAssembly Virtual Machine 2</h1>
   <p>
     <img src="https://img.shields.io/badge/DEV-1f6feb?style=for-the-badge" alt="DEV"/>
     <img src="https://img.shields.io/badge/V2.0.2.0-1f6feb?style=for-the-badge" alt="V2.0.2.0"/>
@@ -21,7 +21,7 @@
 </div>
 
 ## Introduction
-Ultimate WebAssembly Virtual Machine 2
+UlteSoft WebAssembly Virtual Machine 2
 
 ## Features
 ### WASM Feature Extensions

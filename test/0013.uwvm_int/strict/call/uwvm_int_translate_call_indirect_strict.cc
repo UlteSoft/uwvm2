@@ -498,6 +498,24 @@ namespace
             op(c, wasm_op::end);
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
         }
+        // 21: (i32)->i32 : keep two pre-call operands alive across `call_indirect`, then feed the result into `select`
+        //     Mirrors the clang-generated pattern seen in real-world C++ code:
+        //       i32.const 0; local.get x; local.get x; call_indirect; i32.const -1; i32.eq; select
+        {
+            func_type ty{{k_val_i32}, {k_val_i32}};
+            func_body fb{};
+            auto& c = fb.code;
+            op(c, wasm_op::i32_const); i32(c, 0);
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::local_get); u32(c, 0u);
+            op(c, wasm_op::i32_const); i32(c, 2);
+            emit_ci(c, 2u, 0u);
+            op(c, wasm_op::i32_const); i32(c, -1);
+            op(c, wasm_op::i32_eq);
+            op(c, wasm_op::select);
+            op(c, wasm_op::end);
+            (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        }
 
         return mb.build();
     }
@@ -544,6 +562,8 @@ namespace
         UWVM2TEST_RUN_EXPECT_I32(18uz, pack_i32x5(42, 1, 2, 3, 4), 42);
         UWVM2TEST_RUN_EXPECT_I32(19uz, pack_i32(123), 77);
         UWVM2TEST_RUN_EXPECT_I32(20uz, pack_i32(5), 12);
+        UWVM2TEST_RUN_EXPECT_I32(21uz, pack_i32(5), 5);
+        UWVM2TEST_RUN_EXPECT_I32(21uz, pack_i32(-8), 0);
 
 #undef UWVM2TEST_RUN_EXPECT_I32
         return 0;

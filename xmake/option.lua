@@ -213,7 +213,11 @@ option("llvm-jit-env", function()
         }) do
             local values = llvm_jit_options[field]
             if values then
-                option:add(field, values)
+                if field == "ldflags" or field == "shflags" then
+                    option:add(field, values, { force = true })
+                else
+                    option:add(field, values)
+                end
             end
         end
     end)

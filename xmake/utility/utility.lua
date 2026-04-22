@@ -4,7 +4,14 @@ import("lib.detect.find_tool")
 local llvm_jit_base_components = {
     "core",
     "support",
+    "analysis",
+    "target",
     "passes",
+    "linker",
+    "irreader",
+    "asmparser",
+    "executionengine",
+    "mcjit",
     "runtimedyld",
     "object",
     "mc",
@@ -327,6 +334,7 @@ function get_llvm_jit_options()
         [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
 
     local cache_key = table.concat({
+        "llvm-jit-v3",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
@@ -363,6 +371,13 @@ function get_llvm_jit_options()
     _parse_llvm_cxxflags(cxxflags, result, seen)
     _parse_llvm_linkflags(system_libs, result, seen, "syslinks")
     _parse_llvm_linkflags(libs, result, seen, "links")
+
+    -- Some LLVM builds omit explicit JIT driver libraries and/or the native
+    -- target codegen family from wide component sets such as the all-target
+    -- asmparser aggregates. Re-add them explicitly so MCJIT-backed runtime
+    -- linking remains stable across LLVM distributions.
+    local explicit_jit_libs = _run_llvm_config(llvm_config, { "--libs", "executionengine", "mcjit", "native", "nativecodegen" }) or ""
+    _parse_llvm_linkflags(explicit_jit_libs, result, seen, "links")
 
     cprint("detecting for llvm-jit ... ${color.success}%s (%s), component set: %s",
         llvm_config.program,

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Ultimate WebAssembly Virtual Machine 2 (uwvm2) is a ground-up rearchitecture of the WebAssembly virtual machine, built with Concept-Oriented Programming (COP) principles to provide extensible, specification-driven, and memory-safe WebAssembly execution capabilities.
+UlteSoft WebAssembly Virtual Machine 2 (uwvm2) is a ground-up rearchitecture of the WebAssembly virtual machine, built with Concept-Oriented Programming (COP) principles to provide extensible, specification-driven, and memory-safe WebAssembly execution capabilities.
 
 ## Current Development Status
 

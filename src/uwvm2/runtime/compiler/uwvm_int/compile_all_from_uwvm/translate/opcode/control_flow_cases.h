@@ -126,6 +126,10 @@ case wasm1_code::block:
                                   .end_label_id = new_label(false),
                                   .else_label_id = SIZE_MAX});
 
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
+
     break;
 }
 case wasm1_code::loop:
@@ -281,6 +285,10 @@ case wasm1_code::loop:
                                   .else_label_id = SIZE_MAX,
                                   .wasm_code_curr_at_start_label = code_curr});
 
+    // Stack-polymorphism is scoped to the current control frame only.
+    // Entering a nested frame starts it in reachable mode for validation.
+    is_polymorphic = false;
+
     break;
 }
 case wasm1_code::if_:
@@ -362,27 +370,14 @@ case wasm1_code::if_:
         }
     }
 
-    if(!is_polymorphic && operand_stack.empty()) [[unlikely]]
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"if", 1uz); }
+
+    if(auto const cond{try_pop_concrete_operand()}; cond.from_stack && cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
     {
         err.err_curr = op_begin;
-        err.err_selectable.operand_stack_underflow.op_code_name = u8"if";
-        err.err_selectable.operand_stack_underflow.stack_size_actual = 0uz;
-        err.err_selectable.operand_stack_underflow.stack_size_required = 1uz;
-        err.err_code = code_validation_error_code::operand_stack_underflow;
+        err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
+        err.err_code = code_validation_error_code::if_cond_type_not_i32;
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-    }
-
-    if(!operand_stack.empty())
-    {
-        auto const cond{operand_stack.back_unchecked()};
-        operand_stack_pop_unchecked();
-        if(cond.type != curr_operand_stack_value_type::i32) [[unlikely]]
-        {
-            err.err_curr = op_begin;
-            err.err_selectable.if_cond_type_not_i32.cond_type = cond.type;
-            err.err_code = code_validation_error_code::if_cond_type_not_i32;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-        }
     }
 
     auto const else_dest_label_id{new_label(false)};
@@ -529,6 +524,10 @@ case wasm1_code::if_:
                                   .start_label_id = SIZE_MAX,
                                   .end_label_id = end_label_id,
                                   .else_label_id = else_dest_label_id});
+
+    // As in the spec's push_ctrl algorithm, the then-frame starts reachable even when the
+    // surrounding frame is polymorphic.
+    is_polymorphic = false;
     break;
 }
 case wasm1_code::else_:
@@ -558,33 +557,54 @@ case wasm1_code::else_:
 
     auto& if_frame{control_flow_stack.back_unchecked()};
 
-    if(!is_polymorphic)
+    // Match `end`: polymorphic mode only relaxes underflow, but still rejects extra values
+    // and still checks types when enough concrete values are present.
+    auto const expected_count{static_cast<::std::size_t>(if_frame.result.end - if_frame.result.begin)};
+    auto const base{if_frame.operand_stack_base};
+    auto const stack_size{operand_stack.size()};
+    auto const actual_count{stack_size >= base ? stack_size - base : 0uz};
+
+    if(!is_polymorphic ? (actual_count != expected_count) : (actual_count > expected_count))
     {
-        auto const expected_count{static_cast<::std::size_t>(if_frame.result.end - if_frame.result.begin)};
-        auto const actual_count{operand_stack.size() - if_frame.operand_stack_base};
+        err.err_curr = op_begin;
+        err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
+        err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
 
-        bool mismatch{expected_count != actual_count};
-
-        wasm_value_type_u expected_type{};
-        wasm_value_type_u actual_type{};
-
-        bool const expected_single{expected_count == 1uz};
-        bool const actual_single{actual_count == 1uz};
-
-        if(expected_single) { expected_type = static_cast<wasm_value_type_u>(*if_frame.result.begin); }
-        if(actual_single) { actual_type = static_cast<wasm_value_type_u>(operand_stack.back_unchecked().type); }
-
-        if(!mismatch && expected_single && actual_single && expected_type != actual_type) { mismatch = true; }
-
-        if(mismatch) [[unlikely]]
+        if(expected_count == 1uz) { err.err_selectable.if_then_result_mismatch.expected_type = static_cast<wasm_value_type_u>(*if_frame.result.begin); }
+        else
         {
-            err.err_curr = op_begin;
-            err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
-            err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
-            err.err_selectable.if_then_result_mismatch.expected_type = expected_type;
-            err.err_selectable.if_then_result_mismatch.actual_type = actual_type;
-            err.err_code = code_validation_error_code::if_then_result_mismatch;
-            ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            err.err_selectable.if_then_result_mismatch.expected_type = {};
+        }
+
+        if(actual_count == 1uz && stack_size != 0uz)
+        {
+            err.err_selectable.if_then_result_mismatch.actual_type = static_cast<wasm_value_type_u>(operand_stack.back_unchecked().type);
+        }
+        else
+        {
+            err.err_selectable.if_then_result_mismatch.actual_type = {};
+        }
+
+        err.err_code = code_validation_error_code::if_then_result_mismatch;
+        ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+    }
+
+    if(expected_count != 0uz && actual_count >= expected_count)
+    {
+        for(::std::size_t i{}; i != expected_count; ++i)
+        {
+            auto const expected_type{if_frame.result.begin[expected_count - 1uz - i]};
+            auto const actual_type{operand_stack.index_unchecked(stack_size - 1uz - i).type};
+            if(actual_type != expected_type) [[unlikely]]
+            {
+                err.err_curr = op_begin;
+                err.err_selectable.if_then_result_mismatch.expected_count = expected_count;
+                err.err_selectable.if_then_result_mismatch.actual_count = actual_count;
+                err.err_selectable.if_then_result_mismatch.expected_type = static_cast<wasm_value_type_u>(expected_type);
+                err.err_selectable.if_then_result_mismatch.actual_type = static_cast<wasm_value_type_u>(actual_type);
+                err.err_code = code_validation_error_code::if_then_result_mismatch;
+                ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+            }
         }
     }
 
@@ -625,7 +645,8 @@ case wasm1_code::else_:
     set_label_offset(if_frame.else_label_id, bytecode.size());
 
     operand_stack_truncate_to(if_frame.operand_stack_base);
-    is_polymorphic = if_frame.polymorphic_base;
+    // As in the spec's push_ctrl(else, ...), the else-frame itself starts reachable.
+    is_polymorphic = false;
     if constexpr(stacktop_enabled)
     {
         if(!if_frame.polymorphic_base)

@@ -3,22 +3,7 @@
 namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
-
-    [[nodiscard]] byte_vec pack_f32_i32(float a, ::std::int32_t b)
-    {
-        byte_vec out(8);
-        ::std::memcpy(out.data(), ::std::addressof(a), 4);
-        ::std::memcpy(out.data() + 4, ::std::addressof(b), 4);
-        return out;
-    }
-
-    [[nodiscard]] byte_vec pack_f64_i64(double a, ::std::int64_t b)
-    {
-        byte_vec out(16);
-        ::std::memcpy(out.data(), ::std::addressof(a), 8);
-        ::std::memcpy(out.data() + 8, ::std::addressof(b), 8);
-        return out;
-    }
+    using errc = ::uwvm2::validation::error::code_validation_error_code;
 
     [[nodiscard]] byte_vec build_conbine_float_update_local_polymorphic_flush_f32_f64_module()
     {
@@ -30,7 +15,8 @@ namespace
         auto f32 = [&](byte_vec& c, float v) { append_f32_ieee(c, v); };
         auto f64 = [&](byte_vec& c, double v) { append_f64_ieee(c, v); };
 
-        auto add_f32_flush_case = [&](wasm_op binop, float imm, float fallback)
+        // Concrete values pushed after `unreachable` remain concrete for validation,
+        // even if combine state was delayed by the preceding arithmetic pattern.
         {
             func_type ty{{k_val_f32, k_val_i32}, {k_val_f32}};
             func_body fb{};
@@ -41,20 +27,19 @@ namespace
 
             op(c, wasm_op::unreachable);
             op(c, wasm_op::local_get); u32(c, 0u);
-            op(c, wasm_op::f32_const); f32(c, imm);
-            op(c, binop);
-            op(c, wasm_op::local_set); u32(c, 1u);  // wrong-type/same-offset barrier under polymorphic stack
-            op(c, wasm_op::f32_const); f32(c, fallback);
+            op(c, wasm_op::f32_const); f32(c, 1.5f);
+            op(c, wasm_op::f32_add);
+            op(c, wasm_op::local_set); u32(c, 1u);  // local 1 is i32
+            op(c, wasm_op::f32_const); f32(c, 11.25f);
 
             op(c, wasm_op::else_);
-            op(c, wasm_op::f32_const); f32(c, fallback);
+            op(c, wasm_op::f32_const); f32(c, 11.25f);
             op(c, wasm_op::end);
             op(c, wasm_op::end);
 
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
-        };
+        }
 
-        auto add_f64_flush_case = [&](wasm_op binop, double imm, double fallback)
         {
             func_type ty{{k_val_f64, k_val_i64}, {k_val_f64}};
             func_body fb{};
@@ -65,159 +50,53 @@ namespace
 
             op(c, wasm_op::unreachable);
             op(c, wasm_op::local_get); u32(c, 0u);
-            op(c, wasm_op::f64_const); f64(c, imm);
-            op(c, binop);
-            op(c, wasm_op::local_set); u32(c, 1u);  // wrong-type/same-offset barrier under polymorphic stack
-            op(c, wasm_op::f64_const); f64(c, fallback);
+            op(c, wasm_op::f64_const); f64(c, 1.125);
+            op(c, wasm_op::f64_add);
+            op(c, wasm_op::local_set); u32(c, 1u);  // local 1 is i64, but operand is f64
+            op(c, wasm_op::f64_const); f64(c, 44.5);
 
             op(c, wasm_op::else_);
-            op(c, wasm_op::f64_const); f64(c, fallback);
+            op(c, wasm_op::f64_const); f64(c, 44.5);
             op(c, wasm_op::end);
             op(c, wasm_op::end);
 
             (void)mb.add_func(::std::move(ty), ::std::move(fb));
-        };
-
-        add_f32_flush_case(wasm_op::f32_add, 1.5f, 11.25f);
-        add_f32_flush_case(wasm_op::f32_mul, 2.0f, 22.5f);
-        add_f32_flush_case(wasm_op::f32_sub, 0.25f, 33.75f);
-
-        add_f64_flush_case(wasm_op::f64_add, 1.125, 44.5);
-        add_f64_flush_case(wasm_op::f64_mul, 3.0, 55.625);
-        add_f64_flush_case(wasm_op::f64_sub, 0.5, 66.75);
+        }
 
         return mb.build();
     }
 
-    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
-    [[nodiscard]] bool bytecode_contains_f32_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
-    {
-        auto curr{make_entry_stacktop_currpos<Opt>()};
-        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
-
-        if constexpr(Opt.f32_stack_top_begin_pos != SIZE_MAX && Opt.f32_stack_top_begin_pos != Opt.f32_stack_top_end_pos)
-        {
-            for(::std::size_t pos{Opt.f32_stack_top_begin_pos}; pos < Opt.f32_stack_top_end_pos; ++pos)
-            {
-                curr.f32_stack_top_curr_pos = pos;
-                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
-            }
-        }
-
-        return false;
-    }
-
-    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MakeFptr>
-    [[nodiscard]] bool bytecode_contains_f64_variant(ByteStorage const& bc, MakeFptr&& make_fptr) noexcept
-    {
-        auto curr{make_entry_stacktop_currpos<Opt>()};
-        if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
-
-        if constexpr(Opt.f64_stack_top_begin_pos != SIZE_MAX && Opt.f64_stack_top_begin_pos != Opt.f64_stack_top_end_pos)
-        {
-            for(::std::size_t pos{Opt.f64_stack_top_begin_pos}; pos < Opt.f64_stack_top_end_pos; ++pos)
-            {
-                curr.f64_stack_top_curr_pos = pos;
-                if(bytecode_contains_fptr(bc, make_fptr(curr))) { return true; }
-            }
-        }
-
-        return false;
-    }
-
     template <optable::uwvm_interpreter_translate_option_t Opt>
-    [[nodiscard]] int run_conbine_float_update_local_polymorphic_flush_f32_f64_suite(runtime_module_t const& rt) noexcept
+    [[nodiscard]] int compile_expect_local_set_mismatch(runtime_module_t const& rt) noexcept
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
         optable::compile_option cop{};
-        auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
-        UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-        UWVM2TEST_REQUIRE(cm.local_funcs.size() == 6uz);
-
-        using Runner = interpreter_runner<Opt>;
-
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-        constexpr auto tuple =
-            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
-
-        auto require_f32_negative_case = [&](::std::size_t index, auto make_set_same_fptr) constexpr noexcept -> int
+        bool started_compile{};
+        try
         {
-            auto const& bc = cm.local_funcs.index_unchecked(index).op.operands;
-            UWVM2TEST_REQUIRE(!bytecode_contains_f32_variant<Opt>(bc, make_set_same_fptr));
-            return 0;
-        };
-
-        auto require_f64_negative_case = [&](::std::size_t index, auto make_set_same_fptr) constexpr noexcept -> int
+            started_compile = true;
+            (void)compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
+        }
+        catch(::fast_io::error const&)
         {
-            auto const& bc = cm.local_funcs.index_unchecked(index).op.operands;
-            UWVM2TEST_REQUIRE(!bytecode_contains_f64_variant<Opt>(bc, make_set_same_fptr));
-            return 0;
-        };
+            // Expected for validation failures.
+        }
+        catch(...)
+        {
+            return fail(__LINE__, "unexpected exception type");
+        }
 
-        UWVM2TEST_REQUIRE(require_f32_negative_case(
-            0uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f32_add_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-        UWVM2TEST_REQUIRE(require_f32_negative_case(
-            1uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f32_mul_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-        UWVM2TEST_REQUIRE(require_f32_negative_case(
-            2uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f32_sub_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-
-        UWVM2TEST_REQUIRE(require_f64_negative_case(
-            3uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f64_add_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-        UWVM2TEST_REQUIRE(require_f64_negative_case(
-            4uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f64_mul_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-        UWVM2TEST_REQUIRE(require_f64_negative_case(
-            5uz,
-            [&](auto const& curr) constexpr noexcept
-            { return optable::translate::get_uwvmint_f64_sub_imm_local_set_same_fptr_from_tuple<Opt>(curr, tuple); }) == 0);
-#endif
-
-        UWVM2TEST_REQUIRE(load_f32(Runner::run(cm.local_funcs.index_unchecked(0),
-                                              rt.local_defined_function_vec_storage.index_unchecked(0),
-                                              pack_f32_i32(9.0f, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 11.25f);
-        UWVM2TEST_REQUIRE(load_f32(Runner::run(cm.local_funcs.index_unchecked(1),
-                                              rt.local_defined_function_vec_storage.index_unchecked(1),
-                                              pack_f32_i32(9.0f, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 22.5f);
-        UWVM2TEST_REQUIRE(load_f32(Runner::run(cm.local_funcs.index_unchecked(2),
-                                              rt.local_defined_function_vec_storage.index_unchecked(2),
-                                              pack_f32_i32(9.0f, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 33.75f);
-
-        UWVM2TEST_REQUIRE(load_f64(Runner::run(cm.local_funcs.index_unchecked(3),
-                                              rt.local_defined_function_vec_storage.index_unchecked(3),
-                                              pack_f64_i64(9.0, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 44.5);
-        UWVM2TEST_REQUIRE(load_f64(Runner::run(cm.local_funcs.index_unchecked(4),
-                                              rt.local_defined_function_vec_storage.index_unchecked(4),
-                                              pack_f64_i64(9.0, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 55.625);
-        UWVM2TEST_REQUIRE(load_f64(Runner::run(cm.local_funcs.index_unchecked(5),
-                                              rt.local_defined_function_vec_storage.index_unchecked(5),
-                                              pack_f64_i64(9.0, 7),
-                                              nullptr,
-                                              nullptr)
-                                       .results) == 66.75);
+        if(!started_compile) { return fail(__LINE__, "fast_io::error thrown before compiler validation"); }
+        if(err.err_code != errc::local_set_type_mismatch)
+        {
+            char buf[128]{};
+            ::std::snprintf(buf,
+                            sizeof(buf),
+                            "err_code mismatch: expected=%u actual=%u",
+                            static_cast<unsigned>(errc::local_set_type_mismatch),
+                            static_cast<unsigned>(err.err_code));
+            return fail(__LINE__, buf);
+        }
 
         return 0;
     }
@@ -240,32 +119,32 @@ namespace
         if(abi_mode_enabled("byref"))
         {
             constexpr auto opt{k_test_byref_opt};
-            UWVM2TEST_REQUIRE(run_conbine_float_update_local_polymorphic_flush_f32_f64_suite<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(compile_expect_local_set_mismatch<opt>(rt) == 0);
         }
 
         if(abi_mode_enabled("tail-min"))
         {
             constexpr auto opt{k_test_tail_min_opt};
-            UWVM2TEST_REQUIRE(run_conbine_float_update_local_polymorphic_flush_f32_f64_suite<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(compile_expect_local_set_mismatch<opt>(rt) == 0);
         }
 
         if(abi_mode_enabled("tail-sysv"))
         {
             constexpr auto opt{k_test_tail_sysv_opt};
-            UWVM2TEST_REQUIRE(run_conbine_float_update_local_polymorphic_flush_f32_f64_suite<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(compile_expect_local_set_mismatch<opt>(rt) == 0);
         }
 
         if(abi_mode_enabled("tail-aapcs64"))
         {
             constexpr auto opt{k_test_tail_aapcs64_opt};
-            UWVM2TEST_REQUIRE(run_conbine_float_update_local_polymorphic_flush_f32_f64_suite<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(compile_expect_local_set_mismatch<opt>(rt) == 0);
         }
 
         if(legacy_layouts_enabled())
         {
             constexpr auto opt{make_tailcall_scalar4_merged_opt<2uz>()};
             static_assert(compiler::details::interpreter_tuple_has_no_holes<opt>());
-            UWVM2TEST_REQUIRE(run_conbine_float_update_local_polymorphic_flush_f32_f64_suite<opt>(rt) == 0);
+            UWVM2TEST_REQUIRE(compile_expect_local_set_mismatch<opt>(rt) == 0);
         }
 
         return 0;

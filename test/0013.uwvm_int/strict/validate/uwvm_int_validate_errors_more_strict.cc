@@ -5,10 +5,7 @@
 // - This test relies on catching `fast_io::error` thrown by the validator to early-exit invalid modules.
 // - On macOS with sanitizers enabled, C++ exception handling may be unreliable in this project configuration.
 //   Rebuild without sanitizer policies to run this test.
-int main()
-{
-    return 0;
-}
+int main() { return 0; }
 #else
 
 namespace
@@ -40,18 +37,11 @@ namespace
         {
             return fail(__LINE__, "unexpected exception type");
         }
-        if(!started_compile)
-        {
-            return fail(__LINE__, "fast_io::error thrown before compiler validation");
-        }
+        if(!started_compile) { return fail(__LINE__, "fast_io::error thrown before compiler validation"); }
         if(err.err_code != expected)
         {
             char buf[128]{};
-            ::std::snprintf(buf,
-                            sizeof(buf),
-                            "err_code mismatch: expected=%u actual=%u",
-                            static_cast<unsigned>(expected),
-                            static_cast<unsigned>(err.err_code));
+            ::std::snprintf(buf, sizeof(buf), "err_code mismatch: expected=%u actual=%u", static_cast<unsigned>(expected), static_cast<unsigned>(err.err_code));
             return fail(__LINE__, buf);
         }
         return 0;
@@ -68,10 +58,8 @@ namespace
         }
     };
 
-    [[nodiscard]] int compile_expect_truncated_code_end(byte_vec const& wasm,
-                                                        ::uwvm2::utils::container::u8string_view name,
-                                                        errc expected,
-                                                        ::std::size_t new_expr_len)
+    [[nodiscard]] int
+        compile_expect_truncated_code_end(byte_vec const& wasm, ::uwvm2::utils::container::u8string_view name, errc expected, ::std::size_t new_expr_len)
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
         bool started_compile{};
@@ -114,18 +102,45 @@ namespace
         {
             return fail(__LINE__, "unexpected exception type");
         }
-        if(!started_compile)
-        {
-            return fail(__LINE__, "fast_io::error thrown before compiler validation");
-        }
+        if(!started_compile) { return fail(__LINE__, "fast_io::error thrown before compiler validation"); }
         if(err.err_code != expected)
         {
             char buf[128]{};
-            ::std::snprintf(buf,
-                            sizeof(buf),
-                            "err_code mismatch: expected=%u actual=%u",
-                            static_cast<unsigned>(expected),
-                            static_cast<unsigned>(err.err_code));
+            ::std::snprintf(buf, sizeof(buf), "err_code mismatch: expected=%u actual=%u", static_cast<unsigned>(expected), static_cast<unsigned>(err.err_code));
+            return fail(__LINE__, buf);
+        }
+        return 0;
+    }
+
+    [[nodiscard]] int compile_expect_ok(byte_vec const& wasm, ::uwvm2::utils::container::u8string_view name)
+    {
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        bool started_compile{};
+        try
+        {
+            auto prep = prepare_runtime_from_wasm(wasm, name);
+            UWVM2TEST_REQUIRE(prep.mod != nullptr);
+            runtime_module_t const& rt = *prep.mod;
+
+            constexpr optable::uwvm_interpreter_translate_option_t opt{.is_tail_call = true};
+            optable::compile_option cop{};
+
+            started_compile = true;
+            (void)compiler::compile_all_from_uwvm_single_func<opt>(rt, cop, err);
+        }
+        catch(::fast_io::error const&)
+        {
+            return fail(__LINE__, "unexpected fast_io::error");
+        }
+        catch(...)
+        {
+            return fail(__LINE__, "unexpected exception type");
+        }
+        if(!started_compile) { return fail(__LINE__, "compiler did not start"); }
+        if(err.err_code != errc::ok)
+        {
+            char buf[128]{};
+            ::std::snprintf(buf, sizeof(buf), "err_code mismatch: expected=%u actual=%u", static_cast<unsigned>(errc::ok), static_cast<unsigned>(err.err_code));
             return fail(__LINE__, buf);
         }
         return 0;
@@ -250,6 +265,56 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_call_indirect_then_select_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+
+        func_type ret_i32{{}, {k_val_i32}};
+
+        func_body main_fb{};
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 22);
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 0);
+        op(main_fb.code, wasm_op::call_indirect);
+        u32(main_fb.code, 0u);
+        u32(main_fb.code, 0u);
+        op(main_fb.code, wasm_op::i32_const);
+        i32(main_fb.code, 1);
+        op(main_fb.code, wasm_op::select);
+        op(main_fb.code, wasm_op::end);
+
+        func_body callee_fb{};
+        op(callee_fb.code, wasm_op::i32_const);
+        i32(callee_fb.code, 11);
+        op(callee_fb.code, wasm_op::end);
+
+        mb.types.push_back(ret_i32);
+        mb.function_type_indices.push_back(0u);
+        mb.function_bodies.push_back(::std::move(main_fb));
+        mb.function_type_indices.push_back(0u);
+        mb.function_bodies.push_back(::std::move(callee_fb));
+
+        mb.has_table = true;
+        mb.table_min = 1u;
+        mb.table_max = 1u;
+        mb.table_has_max = true;
+
+        element_segment seg{};
+        seg.table_index = 0u;
+        op(seg.offset_expr, wasm_op::i32_const);
+        i32(seg.offset_expr, 0);
+        op(seg.offset_expr, wasm_op::end);
+        seg.func_indices.push_back(1u);
+        mb.elements.push_back(::std::move(seg));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_illegal_else_module()
     {
         module_builder mb{};
@@ -312,6 +377,61 @@ namespace
         append_u8(fb.code, k_val_i32);  // (result i32)
         op(fb.code, wasm_op::i64_const);
         i64(fb.code, 0);
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_if_then_result_mismatch_polymorphic_overflow_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_val_i32);  // (result i32)
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);  // extra concrete value must still be rejected at `else`
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 0);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_if_then_result_mismatch_polymorphic_type_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+        auto i64 = [&](byte_vec& c, ::std::int64_t v) { append_i64_leb(c, v); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_val_i32);  // (result i32)
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i64_const);
+        i64(fb.code, 0);  // enough concrete values remain, so `else` must still type-check
         op(fb.code, wasm_op::else_);
         op(fb.code, wasm_op::i32_const);
         i32(fb.code, 0);
@@ -574,6 +694,101 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_local_set_type_mismatch_polymorphic_concrete_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+        auto i64 = [&](byte_vec& c, ::std::int64_t v) { append_i64_leb(c, v); };
+
+        // After `unreachable`, the operand stack is only polymorphic at the current
+        // block base. Concrete values pushed afterwards must still type-check.
+        func_type ty{{k_val_i32}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i64_const);
+        i64(fb.code, 0);
+        op(fb.code, wasm_op::local_set);
+        u32(fb.code, 0u);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_numeric_operand_underflow_at_block_base_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto i32 = [&](byte_vec& c, ::std::int32_t v) { append_i32_leb(c, v); };
+
+        // MVP blocks have no parameters, so values that existed before the block are below the
+        // current label base and cannot be consumed inside the block.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::i32_const);
+        i32(fb.code, 1);
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::i32_eqz);  // must underflow at the block base instead of consuming the outer i32
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_numeric_operand_underflow_in_nested_polymorphic_block_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // Stack-polymorphism from an outer `unreachable` must not leak into a nested block frame.
+        // The nested block starts reachable, so `i32.eqz` must underflow at the block base.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::i32_eqz);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_numeric_operand_underflow_in_polymorphic_else_frame_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // The outer frame is polymorphic, so the `if` condition may be unknown.
+        // However, the `else` control frame itself starts reachable and must not inherit the
+        // outer polymorphic state.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::if_);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::else_);
+        op(fb.code, wasm_op::i32_eqz);
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_local_tee_type_mismatch_module()
     {
         module_builder mb{};
@@ -631,8 +846,8 @@ namespace
         op(fb.code, wasm_op::local_get);
         u32(fb.code, 0u);
         op(fb.code, wasm_op::i32_load);
-        u32(fb.code, 2u);          // align=4
-        append_u8(fb.code, 0x80u); // truncated leb for offset
+        u32(fb.code, 2u);           // align=4
+        append_u8(fb.code, 0x80u);  // truncated leb for offset
         op(fb.code, wasm_op::end);
         (void)mb.add_func(::std::move(ty), ::std::move(fb));
         return mb.build();
@@ -771,6 +986,30 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_numeric_operand_type_mismatch_polymorphic_concrete_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+
+        // After `unreachable`, concrete values pushed above the current block base must still
+        // satisfy the operand type expected by the following numeric instruction.
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::f32_const);
+        append_f32_ieee(fb.code, 2.0f);
+        op(fb.code, wasm_op::i32_eqz);  // concrete f32 must not be treated as unknown
+        op(fb.code, wasm_op::drop);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_invalid_type_index_module()
     {
         module_builder mb{};
@@ -888,6 +1127,52 @@ namespace
         return mb.build();
     }
 
+    [[nodiscard]] byte_vec build_br_cond_type_not_i32_polymorphic_concrete_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+        auto i64 = [&](byte_vec& c, ::std::int64_t v) { append_i64_leb(c, v); };
+
+        func_type ty{{}, {}};
+        func_body fb{};
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_block_empty);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::i64_const);
+        i64(fb.code, 0);
+        op(fb.code, wasm_op::br_if);  // concrete i64 cond must still be rejected in polymorphic mode
+        u32(fb.code, 0u);
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
+    [[nodiscard]] byte_vec build_br_if_polymorphic_label_type_reification_module()
+    {
+        module_builder mb{};
+
+        auto op = [&](byte_vec& c, wasm_op o) { append_u8(c, u8(o)); };
+        auto u32 = [&](byte_vec& c, ::std::uint32_t v) { append_u32_leb(c, v); };
+
+        func_type ty{{}, {k_val_i32}};
+        func_body fb{};
+        op(fb.code, wasm_op::block);
+        append_u8(fb.code, k_val_i32);
+        op(fb.code, wasm_op::unreachable);
+        op(fb.code, wasm_op::br_if);
+        u32(fb.code, 0u);
+        op(fb.code, wasm_op::i64_add);  // W3C MVP: fallthrough stack re-materializes the block's i32 label value.
+        op(fb.code, wasm_op::end);
+        op(fb.code, wasm_op::end);
+        (void)mb.add_func(::std::move(ty), ::std::move(fb));
+
+        return mb.build();
+    }
+
     [[nodiscard]] byte_vec build_br_table_target_type_mismatch_module()
     {
         module_builder mb{};
@@ -929,115 +1214,126 @@ namespace
         optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
         optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
 
+        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_missing_end_module(), u8"uwvm2test_validate_missing_end", errc::missing_end, 1uz) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_trailing_code_after_end_module(), u8"uwvm2test_validate_trailing", errc::trailing_code_after_end) == 0);
         UWVM2TEST_REQUIRE(
-            compile_expect_truncated_code_end(build_missing_end_module(), u8"uwvm2test_validate_missing_end", errc::missing_end, 1uz) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_trailing_code_after_end_module(), u8"uwvm2test_validate_trailing", errc::trailing_code_after_end) == 0);
-        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_missing_block_type_module(),
-                                                           u8"uwvm2test_validate_missing_block_type",
-                                                           errc::missing_block_type,
-                                                           1uz) == 0);
+            compile_expect_truncated_code_end(build_missing_block_type_module(), u8"uwvm2test_validate_missing_block_type", errc::missing_block_type, 1uz) ==
+            0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_block_type_module(), u8"uwvm2test_validate_illegal_block_type", errc::illegal_block_type) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_opbase_module(), u8"uwvm2test_validate_illegal_opbase", errc::illegal_opbase) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_select_type_mismatch_module(), u8"uwvm2test_validate_select_ty", errc::select_type_mismatch) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_select_cond_type_not_i32_module(), u8"uwvm2test_validate_select_cond", errc::select_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_select_cond_type_not_i32_module(), u8"uwvm2test_validate_select_cond", errc::select_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_ok(build_call_indirect_then_select_module(), u8"uwvm2test_validate_call_indirect_then_select_ok") == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_else_module(), u8"uwvm2test_validate_illegal_else", errc::illegal_else) == 0);
-        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_if_cond_underflow_module(),
-                                                           u8"uwvm2test_validate_if_missing_block_type",
-                                                           errc::missing_block_type,
-                                                           1uz) == 0);
         UWVM2TEST_REQUIRE(
-            compile_expect(build_illegal_if_block_type_module(), u8"uwvm2test_validate_illegal_if_block_type", errc::illegal_block_type) == 0);
+            compile_expect_truncated_code_end(build_if_cond_underflow_module(), u8"uwvm2test_validate_if_missing_block_type", errc::missing_block_type, 1uz) ==
+            0);
+        UWVM2TEST_REQUIRE(compile_expect(build_illegal_if_block_type_module(), u8"uwvm2test_validate_illegal_if_block_type", errc::illegal_block_type) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_if_cond_underflow_module(), u8"uwvm2test_validate_if_underflow", errc::operand_stack_underflow) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_if_then_result_mismatch_module(), u8"uwvm2test_validate_if_then_mismatch", errc::if_then_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_then_result_mismatch_module(), u8"uwvm2test_validate_if_then_mismatch", errc::if_then_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_then_result_mismatch_polymorphic_overflow_module(),
+                                         u8"uwvm2test_validate_if_then_mismatch_poly_overflow",
+                                         errc::if_then_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_if_then_result_mismatch_polymorphic_type_module(),
+                                         u8"uwvm2test_validate_if_then_mismatch_poly_type",
+                                         errc::if_then_result_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_if_missing_else_module(), u8"uwvm2test_validate_if_missing_else", errc::if_missing_else) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_end_result_mismatch_count_module(), u8"uwvm2test_validate_end_res_mismatch_count", errc::end_result_mismatch) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_end_result_mismatch_type_module(), u8"uwvm2test_validate_end_res_mismatch_type", errc::end_result_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_end_result_mismatch_count_module(), u8"uwvm2test_validate_end_res_mismatch_count", errc::end_result_mismatch) ==
+                          0);
+        UWVM2TEST_REQUIRE(compile_expect(build_end_result_mismatch_type_module(), u8"uwvm2test_validate_end_res_mismatch_type", errc::end_result_mismatch) ==
+                          0);
         UWVM2TEST_REQUIRE(compile_expect(build_end_result_mismatch_polymorphic_overflow_module(),
                                          u8"uwvm2test_validate_end_res_mismatch_poly_overflow",
                                          errc::end_result_mismatch) == 0);
-        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_label_index_module(),
-                                                           u8"uwvm2test_validate_invalid_label",
-                                                           errc::invalid_label_index,
-                                                           2uz) == 0);
         UWVM2TEST_REQUIRE(
-            compile_expect_truncated_code_end(build_invalid_function_index_encoding_module(),
-                                             u8"uwvm2test_validate_invalid_funcidx_enc",
-                                             errc::invalid_function_index_encoding,
-                                             2uz) == 0);
+            compile_expect_truncated_code_end(build_invalid_label_index_module(), u8"uwvm2test_validate_invalid_label", errc::invalid_label_index, 2uz) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_function_index_encoding_module(),
+                                                            u8"uwvm2test_validate_invalid_funcidx_enc",
+                                                            errc::invalid_function_index_encoding,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_invalid_function_index_module(), u8"uwvm2test_validate_invalid_funcidx", errc::invalid_function_index) == 0);
-        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_local_index_module(),
-                                                           u8"uwvm2test_validate_invalid_localidx",
-                                                           errc::invalid_local_index,
-                                                           2uz) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect_truncated_code_end(build_invalid_local_index_module(), u8"uwvm2test_validate_invalid_localidx", errc::invalid_local_index, 2uz) ==
+            0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_global_get_index_module(),
-                                                           u8"uwvm2test_validate_invalid_globalget_idx",
-                                                           errc::invalid_global_index,
-                                                           2uz) == 0);
+                                                            u8"uwvm2test_validate_invalid_globalget_idx",
+                                                            errc::invalid_global_index,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_global_set_index_module(),
-                                                           u8"uwvm2test_validate_invalid_globalset_idx",
-                                                           errc::invalid_global_index,
-                                                           2uz) == 0);
+                                                            u8"uwvm2test_validate_invalid_globalset_idx",
+                                                            errc::invalid_global_index,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memory_size_index_module(),
-                                                           u8"uwvm2test_validate_invalid_memory_size_idx",
-                                                           errc::invalid_memory_index,
-                                                           2uz) == 0);
+                                                            u8"uwvm2test_validate_invalid_memory_size_idx",
+                                                            errc::invalid_memory_index,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memory_grow_index_module(),
-                                                           u8"uwvm2test_validate_invalid_memory_grow_idx",
-                                                           errc::invalid_memory_index,
-                                                           2uz) == 0);
+                                                            u8"uwvm2test_validate_invalid_memory_grow_idx",
+                                                            errc::invalid_memory_index,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_illegal_memory_size_index_module(), u8"uwvm2test_validate_illegal_memory_size_idx", errc::illegal_memory_index) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect(build_illegal_memory_grow_index_module(), u8"uwvm2test_validate_illegal_memory_grow_idx", errc::illegal_memory_index) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_memory_size_no_memory_module(), u8"uwvm2test_validate_memory_size_no_memory", errc::no_memory) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_memory_grow_no_memory_module(), u8"uwvm2test_validate_memory_grow_no_memory", errc::no_memory) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_memory_grow_underflow_module(), u8"uwvm2test_validate_memory_grow_underflow", errc::operand_stack_underflow) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_local_set_type_mismatch_module(), u8"uwvm2test_validate_local_set_mismatch", errc::local_set_type_mismatch) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_local_tee_type_mismatch_module(), u8"uwvm2test_validate_local_tee_mismatch", errc::local_tee_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_memory_size_no_memory_module(), u8"uwvm2test_validate_memory_size_no_memory", errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_memory_grow_no_memory_module(), u8"uwvm2test_validate_memory_grow_no_memory", errc::no_memory) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_memory_grow_underflow_module(), u8"uwvm2test_validate_memory_grow_underflow", errc::operand_stack_underflow) ==
+                          0);
+        UWVM2TEST_REQUIRE(compile_expect(build_local_set_type_mismatch_module(), u8"uwvm2test_validate_local_set_mismatch", errc::local_set_type_mismatch) ==
+                          0);
+        UWVM2TEST_REQUIRE(compile_expect(build_local_set_type_mismatch_polymorphic_concrete_module(),
+                                         u8"uwvm2test_validate_local_set_mismatch_poly_concrete",
+                                         errc::local_set_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_at_block_base_module(),
+                                         u8"uwvm2test_validate_numeric_underflow_block_base",
+                                         errc::operand_stack_underflow) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_in_nested_polymorphic_block_module(),
+                                         u8"uwvm2test_validate_numeric_underflow_nested_poly_block",
+                                         errc::operand_stack_underflow) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_underflow_in_polymorphic_else_frame_module(),
+                                         u8"uwvm2test_validate_numeric_underflow_poly_else_frame",
+                                         errc::operand_stack_underflow) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_local_tee_type_mismatch_module(), u8"uwvm2test_validate_local_tee_mismatch", errc::local_tee_type_mismatch) ==
+                          0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memarg_align_module(),
-                                                           u8"uwvm2test_validate_invalid_memarg_align",
-                                                           errc::invalid_memarg_align,
-                                                           4uz) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect_truncated_code_end(build_invalid_memarg_offset_module(),
-                                             u8"uwvm2test_validate_invalid_memarg_offset",
-                                             errc::invalid_memarg_offset,
-                                             5uz) == 0);
-        UWVM2TEST_REQUIRE(
-            compile_expect(build_store_value_type_mismatch_module(), u8"uwvm2test_validate_store_mismatch", errc::store_value_type_mismatch) == 0);
+                                                            u8"uwvm2test_validate_invalid_memarg_align",
+                                                            errc::invalid_memarg_align,
+                                                            4uz) == 0);
+        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_memarg_offset_module(),
+                                                            u8"uwvm2test_validate_invalid_memarg_offset",
+                                                            errc::invalid_memarg_offset,
+                                                            5uz) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_store_value_type_mismatch_module(), u8"uwvm2test_validate_store_mismatch", errc::store_value_type_mismatch) ==
+                          0);
         UWVM2TEST_REQUIRE(compile_expect(build_memory_grow_delta_type_not_i32_module(),
                                          u8"uwvm2test_validate_memory_grow_delta_ty",
                                          errc::memory_grow_delta_type_not_i32) == 0);
         UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_const_immediate_i32_module(),
-                                                           u8"uwvm2test_validate_invalid_i32_const",
-                                                           errc::invalid_const_immediate,
-                                                           2uz) == 0);
+                                                            u8"uwvm2test_validate_invalid_i32_const",
+                                                            errc::invalid_const_immediate,
+                                                            2uz) == 0);
         UWVM2TEST_REQUIRE(
-            compile_expect(build_numeric_operand_type_mismatch_module(), u8"uwvm2test_validate_numeric_ty_mismatch", errc::numeric_operand_type_mismatch) ==
-            0);
+            compile_expect(build_numeric_operand_type_mismatch_module(), u8"uwvm2test_validate_numeric_ty_mismatch", errc::numeric_operand_type_mismatch) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_numeric_operand_type_mismatch_polymorphic_concrete_module(),
+                                         u8"uwvm2test_validate_numeric_ty_mismatch_poly_concrete",
+                                         errc::numeric_operand_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(
             compile_expect_truncated_code_end(build_invalid_type_index_module(), u8"uwvm2test_validate_invalid_typeidx", errc::invalid_type_index, 2uz) == 0);
-        UWVM2TEST_REQUIRE(compile_expect_truncated_code_end(build_invalid_table_index_module(),
-                                                           u8"uwvm2test_validate_invalid_tableidx",
-                                                           errc::invalid_table_index,
-                                                           3uz) == 0);
+        UWVM2TEST_REQUIRE(
+            compile_expect_truncated_code_end(build_invalid_table_index_module(), u8"uwvm2test_validate_invalid_tableidx", errc::invalid_table_index, 3uz) ==
+            0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_table_index_module(), u8"uwvm2test_validate_illegal_tableidx", errc::illegal_table_index) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_illegal_type_index_module(), u8"uwvm2test_validate_illegal_typeidx", errc::illegal_type_index) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_br_value_type_mismatch_module(), u8"uwvm2test_validate_br_val_mismatch", errc::br_value_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(compile_expect(build_br_cond_type_not_i32_module(), u8"uwvm2test_validate_br_cond_ty", errc::br_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_br_cond_type_not_i32_polymorphic_concrete_module(),
+                                         u8"uwvm2test_validate_br_cond_ty_poly_concrete",
+                                         errc::br_cond_type_not_i32) == 0);
+        UWVM2TEST_REQUIRE(compile_expect(build_br_if_polymorphic_label_type_reification_module(),
+                                         u8"uwvm2test_validate_br_if_poly_label_reify",
+                                         errc::numeric_operand_type_mismatch) == 0);
         UWVM2TEST_REQUIRE(
-            compile_expect(build_br_table_target_type_mismatch_module(), u8"uwvm2test_validate_br_table_mismatch", errc::br_table_target_type_mismatch) ==
-            0);
+            compile_expect(build_br_table_target_type_mismatch_module(), u8"uwvm2test_validate_br_table_mismatch", errc::br_table_target_type_mismatch) == 0);
 
         return 0;
     }
