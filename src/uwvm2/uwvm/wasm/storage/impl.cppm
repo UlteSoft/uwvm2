@@ -31,6 +31,7 @@ export import :local_imported;
 export import :preloaded_dl;
 export import :weak_symbol;
 export import :preload_module_attribute;
+export import :memory_limit;
 export import :all_module;
 
 #ifndef UWVM_MODULE

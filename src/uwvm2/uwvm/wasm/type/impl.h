@@ -26,6 +26,7 @@
 # include "cwrapper.h"
 # include "para.h"
 # include "file.h"
+# include "memory_limit.h"
 # include "local_imported.h"
 # include "preload_module_attribute.h"
 # include "preload_api.h"

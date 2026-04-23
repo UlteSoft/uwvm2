@@ -1174,7 +1174,7 @@ inline void populate_runtime_memory_access_info_mmap_fields(runtime_memory_acces
         auto const* import_type_ptr{imported_memory_rec.import_type_ptr};
         if(import_type_ptr == nullptr || import_type_ptr->imports.type != validation_module_traits_t::external_types::memory) [[unlikely]] { return result; }
 
-        result.max_limit_memory_length = get_runtime_memory_max_limit_length_from_limits(import_type_ptr->imports.storage.memory.limits);
+        result.max_limit_memory_length = get_runtime_memory_max_limit_length_from_limits(imported_memory_rec.effective_limits);
 
         imported_memory_storage_t const* curr{::std::addressof(imported_memory_rec)};
         for(;;)
@@ -1193,6 +1193,7 @@ inline void populate_runtime_memory_access_info_mmap_fields(runtime_memory_acces
                     auto* defined_memory{curr->target.defined_ptr};
                     if(defined_memory == nullptr) [[unlikely]] { return {}; }
                     result.memory_p = ::std::addressof(defined_memory->memory);
+                    result.max_limit_memory_length = get_runtime_memory_max_limit_length_from_limits(defined_memory->effective_limits);
                     result.max_limit_memory_length = refine_runtime_memory_max_limit_length(defined_memory->memory, result.max_limit_memory_length);
                     result.custom_page_size_log2 = defined_memory->memory.custom_page_size_log2;
                     populate_runtime_memory_access_info_mmap_fields(result, defined_memory->memory);
@@ -1222,7 +1223,7 @@ inline void populate_runtime_memory_access_info_mmap_fields(runtime_memory_acces
     if(memory_type_ptr == nullptr) [[unlikely]] { return result; }
 
     result.memory_p = const_cast<runtime_native_memory_t*>(::std::addressof(local_memory_rec.memory));
-    result.max_limit_memory_length = get_runtime_memory_max_limit_length_from_limits(memory_type_ptr->limits);
+    result.max_limit_memory_length = get_runtime_memory_max_limit_length_from_limits(local_memory_rec.effective_limits);
     result.max_limit_memory_length = refine_runtime_memory_max_limit_length(local_memory_rec.memory, result.max_limit_memory_length);
     result.custom_page_size_log2 = local_memory_rec.memory.custom_page_size_log2;
     populate_runtime_memory_access_info_mmap_fields(result, local_memory_rec.memory);

@@ -436,7 +436,7 @@ auto const ensure_memory0_resolved{
                 ::fast_io::fast_terminate();
             }
 
-            resolved_memory0.max_limit_memory_length = max_limit_from_limits(import_type_ptr->imports.storage.memory.limits);
+            resolved_memory0.max_limit_memory_length = max_limit_from_limits(imported_mem0.effective_limits);
 
             // Follow import -> import -> ... chains until we reach a defined memory storage.
             imported_memory_storage_t const* curr{::std::addressof(imported_mem0)};
@@ -468,6 +468,7 @@ auto const ensure_memory0_resolved{
                             ::fast_io::fast_terminate();
                         }
                         resolved_memory0.memory_p = ::std::addressof(def->memory);
+                        resolved_memory0.max_limit_memory_length = max_limit_from_limits(def->effective_limits);
                         resolved_memory0.max_limit_memory_length = refine_max_limit_for_memory(def->memory, resolved_memory0.max_limit_memory_length);
                         resolved_memory0.resolved = true;
                         return;
@@ -497,7 +498,7 @@ auto const ensure_memory0_resolved{
 #endif
                 ::fast_io::fast_terminate();
             }
-            resolved_memory0.max_limit_memory_length = max_limit_from_limits(mem_type_ptr->limits);
+            resolved_memory0.max_limit_memory_length = max_limit_from_limits(local_mem0.effective_limits);
             resolved_memory0.max_limit_memory_length = refine_max_limit_for_memory(local_mem0.memory, resolved_memory0.max_limit_memory_length);
             resolved_memory0.resolved = true;
         }

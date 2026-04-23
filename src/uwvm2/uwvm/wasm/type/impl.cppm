@@ -26,6 +26,7 @@ export module uwvm2.uwvm.wasm.type;
 export import :cwrapper;
 export import :para;
 export import :file;
+export import :memory_limit;
 export import :local_imported;
 export import :preload_module_attribute;
 export import :preload_api;

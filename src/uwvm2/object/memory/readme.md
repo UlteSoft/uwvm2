@@ -350,6 +350,77 @@ Example:
 
 ---
 
+#### 5.8 Runtime Memory Limit Override
+
+uwvm also provides a per-module runtime memory-limit override:
+
+- Primary name: `--wasm-set-memory-limit`
+- Alias: `-Wmemlim`
+- Usage: `<module:str> [<index:size_t>|all] <min:size_t> (<max:size_t>)`
+
+This option is intentionally **not** a parser-side rewrite of the module.
+Instead:
+
+- the Wasm file is still parsed and validated against its original declared
+  memory limits;
+- the command line stores an embedder-side override policy;
+- runtime initialization materializes that policy into each module's
+  **local-defined** memory effective limits;
+- the interpreter / JIT use those effective limits when enforcing
+  `memory.grow`.
+
+The selector after `<module:str>` chooses which local-defined memory is
+targeted:
+
+- `all` applies a fallback override to every local-defined memory in that
+  module;
+- `<index:size_t>` applies to one specific local-defined memory;
+- specific memory indexes take precedence over `all` when both are present.
+
+Imported memories are not directly overridden by this switch. If an imported
+memory alias eventually resolves to a concrete local-defined memory, runtime
+execution observes that concrete memory's effective limit.
+
+Invalid targets are treated as configuration errors:
+
+- if `<module:str>` does not resolve to a runtime-initializable module,
+  initialization fails with a fatal error;
+- if `<index:size_t>` is outside the module's local-defined memory range,
+  initialization fails with a fatal error;
+- if the module defines no local-defined memories at all, the override is also
+  fatal.
+
+In other words, uwvm2 now distinguishes three layers:
+
+1. **Declared limits**
+   The original limits encoded in the Wasm module.
+
+2. **Effective runtime limits**
+   The per-module limits selected during runtime initialization after applying
+   `--wasm-set-memory-limit`.
+
+3. **Backend / architecture limits**
+   The final ceiling imposed by the selected host memory backend and address
+   model.
+
+If the override **widens** the declared limits (for example, removing a declared
+maximum or lowering the initial minimum), uwvm2 emits a **runtime warning**
+instead of silently pretending that the module remained standard-compliant.
+
+That warning is controlled by the existing runtime warning switches:
+
+- `--log-disable-warning runtime`
+- `--log-convert-warn-to-fatal runtime`
+
+When `--log-verbose` is enabled, runtime initialization also prints which
+override entries were discovered and which local-defined memory actually
+received each effective limit.
+
+This design keeps parser behavior stable while still giving embedders explicit
+control in constrained or experimental environments.
+
+---
+
 ### 6. References
 
 - WebAssembly Core Specification, execution semantics for `memory.grow` and

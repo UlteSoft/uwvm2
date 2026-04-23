@@ -314,6 +314,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::uwvm2::object::memory::linear::native_memory_t memory{};
 
         wasm_binfmt1_final_memory_type_t const* memory_type_ptr{};
+        ::uwvm2::uwvm::wasm::type::module_memory_limit_t effective_limits{};
     };
 
     struct imported_memory_storage_t
@@ -344,6 +345,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         // If resolved, the active `target` member is specified by `link_kind`.
         imported_memory_target_u target{};
         wasm_binfmt1_final_import_type_t const* import_type_ptr{};
+        ::uwvm2::uwvm::wasm::type::module_memory_limit_t effective_limits{};
         imported_memory_link_kind link_kind{imported_memory_link_kind::unresolved};
 
         // Is the opposite side of this imported memory also imported or custom?

@@ -38,6 +38,7 @@ export import :wasm_register_dl;
 export import :wasm_expose_wasip1_host_api;
 export import :wasm_set_preload_module_attribute;
 export import :wasm_depend_recursion_limit;
+export import :wasm_set_memory_limit;
 export import :wasm_set_parser_limit;
 export import :wasm_set_initializer_limit;
 export import :wasm_list_weak_symbol_module;

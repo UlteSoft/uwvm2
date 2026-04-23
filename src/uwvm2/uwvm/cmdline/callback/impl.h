@@ -38,6 +38,7 @@
 # include "wasm_expose_wasip1_host_api.h"
 # include "wasm_set_preload_module_attribute.h"
 # include "wasm_depend_recursion_limit.h"
+# include "wasm_set_memory_limit.h"
 # include "wasm_set_parser_limit.h"
 # include "wasm_set_initializer_limit.h"
 # include "wasm_list_weak_symbol_module.h"
