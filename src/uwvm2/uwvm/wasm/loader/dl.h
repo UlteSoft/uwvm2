@@ -85,7 +85,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
         if(set_preload_host_api_v1 != nullptr)
         {
-            auto const* const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
+            auto const preload_host_api_v1{::uwvm2::uwvm::wasm::type::uwvm_get_preload_host_api_v1()};
             if(preload_host_api_v1 != nullptr) { set_preload_host_api_v1(preload_host_api_v1); }
         }
     }

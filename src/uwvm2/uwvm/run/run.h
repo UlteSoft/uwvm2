@@ -101,19 +101,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                 if(func_index < import_n)
                 {
-                    auto const* const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
-                    auto const* const leaf{resolve_import_leaf(imp)};
+                    auto const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
+                    auto const leaf{resolve_import_leaf(imp)};
                     if(leaf == nullptr) [[unlikely]] { return false; }
 
                     // Allow imported entry only when it ultimately resolves to a wasm-defined function.
                     if(leaf->link_kind != func_link_kind::defined) { return false; }
-                    auto const* const f{leaf->target.defined_ptr};
+                    auto const f{leaf->target.defined_ptr};
                     if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
                     return is_void_to_void_ft(*f->function_type_ptr);
                 }
 
                 auto const local_idx{func_index - import_n};
-                auto const* const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
+                auto const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
                 if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
                 return is_void_to_void_ft(*f->function_type_ptr);
             }};

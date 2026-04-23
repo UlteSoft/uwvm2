@@ -2363,7 +2363,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: imported descriptors. "); }
 
-            auto const* module_memory_limit_override{
+            auto module_memory_limit_override{
                 ::uwvm2::uwvm::wasm::storage::find_configured_module_memory_limit_const(current_initializing_module_name)};
             auto const local_defined_memory_count{memorysec.memories.size()};
 

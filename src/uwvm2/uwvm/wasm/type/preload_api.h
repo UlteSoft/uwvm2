@@ -190,7 +190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     case uwvm_preload_memory_delivery_mmap_dynamic_bounds:
                     {
                         if(descriptor.mmap_view_begin == nullptr || descriptor.dynamic_length_atomic_object == nullptr) { return false; }
-                        auto const* const length_atomic{
+                        auto const length_atomic{
                             static_cast<::std::atomic_size_t const*>(descriptor.dynamic_length_atomic_object)};
                         auto const current_length{static_cast<::std::uint_least64_t>(length_atomic->load(::std::memory_order_acquire))};
                         if(!range_is_valid(current_length, offset, sizeof(value))) { return false; }

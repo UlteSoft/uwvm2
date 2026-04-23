@@ -1331,7 +1331,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::std::size_t host_offset{};
                     if(!validate_memory_copy_range(byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
 
-                    auto* const memory_begin_ptr{memory_begin(memory)};
+                    auto const memory_begin_ptr{memory_begin(memory)};
                     if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
 
                     ::std::memcpy(destination, memory_begin_ptr + host_offset, size);
@@ -1386,7 +1386,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
                     ::std::size_t host_offset{};
                     if(!validate_memory_copy_range(byte_length, offset, size, host_offset)) [[unlikely]] { return false; }
 
-                    auto* const memory_begin_ptr{memory_begin(memory)};
+                    auto const memory_begin_ptr{memory_begin(memory)};
                     if(memory_begin_ptr == nullptr && size != 0uz) [[unlikely]] { return false; }
 
                     ::std::memcpy(memory_begin_ptr + host_offset, source, size);

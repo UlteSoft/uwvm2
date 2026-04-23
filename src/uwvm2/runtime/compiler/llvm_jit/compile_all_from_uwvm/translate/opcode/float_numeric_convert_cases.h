@@ -17,9 +17,9 @@ case wasm1_code::f64_abs:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -77,9 +77,9 @@ case wasm1_code::f64_ceil:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -112,9 +112,9 @@ case wasm1_code::f64_floor:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -147,9 +147,9 @@ case wasm1_code::f64_trunc:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -182,9 +182,9 @@ case wasm1_code::f64_nearest:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -217,9 +217,9 @@ case wasm1_code::f64_sqrt:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{operand.value->getType()};
@@ -408,9 +408,9 @@ case wasm1_code::f64_copysign:
                llvm_operand_type,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    ::llvm::Type* overloaded_types[]{left.value->getType()};
@@ -457,9 +457,9 @@ case wasm1_code::i32_trunc_f32_s:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<float>(
@@ -485,9 +485,9 @@ case wasm1_code::i32_trunc_f64_s:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<double>(
@@ -513,9 +513,9 @@ case wasm1_code::i32_trunc_f32_u:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<float>(
@@ -541,9 +541,9 @@ case wasm1_code::i32_trunc_f64_u:
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<double>(
@@ -609,9 +609,9 @@ case wasm1_code::i64_trunc_f32_s:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<float>(*llvm_module,
@@ -642,9 +642,9 @@ case wasm1_code::i64_trunc_f64_s:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<double>(*llvm_module,
@@ -675,9 +675,9 @@ case wasm1_code::i64_trunc_f32_u:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<float>(*llvm_module,
@@ -708,9 +708,9 @@ case wasm1_code::i64_trunc_f64_u:
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
                {
-                   auto* insert_block{ir_builder.GetInsertBlock()};
-                   auto* function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto* llvm_module{function == nullptr ? nullptr : function->getParent()};
+                   auto insert_block{ir_builder.GetInsertBlock()};
+                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
                    if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
                    return emit_llvm_trunc_float_to_int<double>(*llvm_module,

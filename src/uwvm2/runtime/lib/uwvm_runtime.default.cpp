@@ -394,7 +394,7 @@ namespace uwvm2::runtime::lib
             auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(r.module_id)};
             if(local_idx >= mod_cache.size()) [[unlikely]] { return nullptr; }
 
-            auto const* const info{::std::addressof(mod_cache.index_unchecked(local_idx))};
+            auto const info{::std::addressof(mod_cache.index_unchecked(local_idx))};
             if(info->runtime_func != f) [[unlikely]] { return nullptr; }
             return info;
         }
@@ -1024,7 +1024,7 @@ namespace uwvm2::runtime::lib
                 if(sp > (::std::numeric_limits<::std::size_t>::max() - n)) [[unlikely]] { ::fast_io::fast_terminate(); }
                 auto const need{sp + n};
                 ensure_capacity(need);
-                auto* const p{base + sp};
+                auto const p{base + sp};
                 sp = need;
                 return p;
             }
@@ -1054,7 +1054,7 @@ namespace uwvm2::runtime::lib
             }
 
             constexpr ::std::size_t kMaxChain{4096uz};
-            auto const* curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(0uz))};
+            auto curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(0uz))};
             for(::std::size_t steps{}; steps != kMaxChain; ++steps)
             {
                 if(curr == nullptr) { return nullptr; }
@@ -1068,7 +1068,7 @@ namespace uwvm2::runtime::lib
                     }
                     case memory_link_kind::defined:
                     {
-                        auto const* const def{curr->target.defined_ptr};
+                        auto const def{curr->target.defined_ptr};
                         if(def == nullptr) { return nullptr; }
                         return ::std::addressof(def->memory);
                     }
@@ -1089,7 +1089,7 @@ namespace uwvm2::runtime::lib
         {
             // Best-effort binding: WASI functions will trap/return errors if a caller without memory[0] invokes them.
             // Always overwrite the pointer to avoid using a stale memory from a previous run.
-            auto const* const mem0{resolve_memory0_ptr(rt)};
+            auto const mem0{resolve_memory0_ptr(rt)};
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.wasip1_memory =
                 const_cast<::uwvm2::object::memory::linear::native_memory_t*>(mem0);
         }
@@ -1288,7 +1288,7 @@ namespace uwvm2::runtime::lib
             if(memory_index < imported_count)
             {
                 constexpr ::std::size_t kMaxChain{4096uz};
-                auto const* curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(memory_index))};
+                auto curr{::std::addressof(rt.imported_memory_vec_storage.index_unchecked(memory_index))};
 
                 for(::std::size_t steps{}; steps != kMaxChain; ++steps)
                 {
@@ -1303,7 +1303,7 @@ namespace uwvm2::runtime::lib
                         }
                         case memory_link_kind::defined:
                         {
-                            auto const* const defined{curr->target.defined_ptr};
+                            auto const defined{curr->target.defined_ptr};
                             if(defined == nullptr) [[unlikely]] { return false; }
                             return resolve_defined_preload_memory(defined->memory, resolved);
                         }
@@ -1367,7 +1367,7 @@ namespace uwvm2::runtime::lib
                                                                       resolved_preload_memory_t* resolved_out,
                                                                       preload_memory_delivery_t* delivery_out) noexcept
         {
-            auto const* const rt{get_active_preload_runtime_module()};
+            auto const rt{get_active_preload_runtime_module()};
             if(rt == nullptr) [[unlikely]] { return false; }
 
             resolved_preload_memory_t resolved{};
@@ -1403,7 +1403,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline ::std::size_t preload_memory_descriptor_count_impl() noexcept
         {
-            auto const* const rt{get_active_preload_runtime_module()};
+            auto const rt{get_active_preload_runtime_module()};
             if(rt == nullptr) [[unlikely]] { return 0uz; }
 
             auto const total{active_preload_total_memory_count(*rt)};
@@ -1416,7 +1416,7 @@ namespace uwvm2::runtime::lib
         {
             if(out == nullptr) [[unlikely]] { return false; }
 
-            auto const* const rt{get_active_preload_runtime_module()};
+            auto const rt{get_active_preload_runtime_module()};
             if(rt == nullptr) [[unlikely]] { return false; }
 
             auto const total{active_preload_total_memory_count(*rt)};
@@ -1449,7 +1449,7 @@ namespace uwvm2::runtime::lib
             {
                 case resolved_preload_memory_t::target_kind::native_defined:
                 {
-                    auto const* const memory{resolved.native_memory};
+                    auto const memory{resolved.native_memory};
                     if(memory == nullptr) [[unlikely]] { return false; }
                     return with_native_preload_copy_access(
                         *memory,
@@ -1469,7 +1469,7 @@ namespace uwvm2::runtime::lib
                 }
                 case resolved_preload_memory_t::target_kind::local_imported:
                 {
-                    auto* const local_imported{resolved.local_imported};
+                    auto const local_imported{resolved.local_imported};
                     if(local_imported == nullptr) [[unlikely]] { return false; }
                     return local_imported->memory_read_from_index(resolved.local_imported_index, offset, destination, size);
                 }
@@ -1493,7 +1493,7 @@ namespace uwvm2::runtime::lib
             {
                 case resolved_preload_memory_t::target_kind::native_defined:
                 {
-                    auto const* const memory{resolved.native_memory};
+                    auto const memory{resolved.native_memory};
                     if(memory == nullptr) [[unlikely]] { return false; }
                     return with_native_preload_copy_access(
                         *memory,
@@ -1513,7 +1513,7 @@ namespace uwvm2::runtime::lib
                 }
                 case resolved_preload_memory_t::target_kind::local_imported:
                 {
-                    auto* const local_imported{resolved.local_imported};
+                    auto const local_imported{resolved.local_imported};
                     if(local_imported == nullptr) [[unlikely]] { return false; }
                     return local_imported->memory_write_to_index(resolved.local_imported_index, offset, source, size);
                 }
@@ -1820,7 +1820,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline ::std::uint_least32_t find_canonical_type_id_for_sig(compiled_module_record const& rec, func_sig_view sig) noexcept
         {
-            auto const* const runtime_module{rec.runtime_module};
+            auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return invalid_llvm_jit_encoded_type_id(); }
 
             auto const type_begin{runtime_module->type_section_storage.type_section_begin};
@@ -1858,8 +1858,8 @@ namespace uwvm2::runtime::lib
 
             if(info.trivial_kind == trivial_kind_t::none) { return false; }
 
-            auto* const stack_top{*stack_top_ptr};
-            auto* const args_begin{stack_top - info.param_bytes};
+            auto const stack_top{*stack_top_ptr};
+            auto const args_begin{stack_top - info.param_bytes};
 
             auto const load_u32{[](::std::byte const* p) noexcept -> ::std::uint_least32_t
                                 {
@@ -2260,9 +2260,9 @@ namespace uwvm2::runtime::lib
             try
 #endif
             {
-                auto const* const info{reinterpret_cast<::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const*>(context_address)};
-                auto* const result_buffer{reinterpret_cast<::std::byte*>(result_buffer_address)};
-                auto const* const param_buffer{reinterpret_cast<::std::byte const*>(param_buffer_address)};
+                auto const info{reinterpret_cast<::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const*>(context_address)};
+                auto const result_buffer{reinterpret_cast<::std::byte*>(result_buffer_address)};
+                auto const param_buffer{reinterpret_cast<::std::byte const*>(param_buffer_address)};
 
                 if(info == nullptr || param_bytes != info->param_bytes || result_bytes != info->result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -2294,9 +2294,9 @@ namespace uwvm2::runtime::lib
             try
 #endif
             {
-                auto const* const tgt{reinterpret_cast<cached_import_target const*>(context_address)};
-                auto* const result_buffer{reinterpret_cast<::std::byte*>(result_buffer_address)};
-                auto const* const param_buffer{reinterpret_cast<::std::byte const*>(param_buffer_address)};
+                auto const tgt{reinterpret_cast<cached_import_target const*>(context_address)};
+                auto const result_buffer{reinterpret_cast<::std::byte*>(result_buffer_address)};
+                auto const param_buffer{reinterpret_cast<::std::byte const*>(param_buffer_address)};
 
                 if(tgt == nullptr || param_bytes != tgt->param_bytes || result_bytes != tgt->result_bytes ||
                    (result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]]
@@ -2323,7 +2323,7 @@ namespace uwvm2::runtime::lib
                     }
                     case cached_import_target::kind::local_imported:
                     {
-                        auto const* const local_imported_module{tgt->u.local_imported.module_ptr};
+                        auto const local_imported_module{tgt->u.local_imported.module_ptr};
                         if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                         local_imported_module->call_func_index(tgt->u.local_imported.index, result_buffer, const_cast<::std::byte*>(param_buffer));
                         return;
@@ -2331,7 +2331,7 @@ namespace uwvm2::runtime::lib
                     case cached_import_target::kind::dl:
                     case cached_import_target::kind::weak_symbol:
                     {
-                        auto const* const capi_ptr{tgt->u.capi_ptr};
+                        auto const capi_ptr{tgt->u.capi_ptr};
                         if(capi_ptr == nullptr || capi_ptr->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                         preload_call_context_guard preload_guard{tgt->preload_module_memory_attribute};
                         capi_ptr->func_ptr(result_buffer, const_cast<::std::byte*>(param_buffer));
@@ -2357,7 +2357,7 @@ namespace uwvm2::runtime::lib
             {
                 case resolved_func::kind::defined:
                 {
-                    auto const* const info{find_defined_func_info(rf.u.defined_ptr)};
+                    auto const info{find_defined_func_info(rf.u.defined_ptr)};
                     if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto& call_stack{get_call_stack()};
                     execute_compiled_defined(call_stack, info->runtime_func, info->compiled_func, info->param_bytes, info->result_bytes, caller_stack_top_ptr);
@@ -2472,7 +2472,7 @@ namespace uwvm2::runtime::lib
             for(::std::size_t caller_module_id{}; caller_module_id != g_runtime.modules.size(); ++caller_module_id)
             {
                 auto& caller_rec{g_runtime.modules.index_unchecked(caller_module_id)};
-                auto* const caller_runtime_module{const_cast<runtime_module_storage_t*>(caller_rec.runtime_module)};
+                auto const caller_runtime_module{const_cast<runtime_module_storage_t*>(caller_rec.runtime_module)};
                 if(caller_runtime_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 auto const all_table_count{caller_runtime_module->imported_table_vec_storage.size() +
@@ -2487,10 +2487,10 @@ namespace uwvm2::runtime::lib
                     auto& table_view{caller_runtime_module->llvm_jit_call_indirect_table_views.index_unchecked(table_index)};
                     table_view = {};
 
-                    auto const* const resolved_table{resolve_table(*caller_runtime_module, table_index)};
+                    auto const resolved_table{resolve_table(*caller_runtime_module, table_index)};
                     if(resolved_table == nullptr) { continue; }
 
-                    auto const* const provider_runtime_module{resolved_table->owner_module_rt_ptr};
+                    auto const provider_runtime_module{resolved_table->owner_module_rt_ptr};
                     if(provider_runtime_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                     auto const provider_module_id{find_runtime_module_id_from_storage_ptr(provider_runtime_module)};
@@ -2500,9 +2500,9 @@ namespace uwvm2::runtime::lib
                     target_vec.clear();
                     target_vec.resize(resolved_table->elems.size());
 
-                    auto const* const provider_import_begin{provider_runtime_module->imported_function_vec_storage.data()};
+                    auto const provider_import_begin{provider_runtime_module->imported_function_vec_storage.data()};
                     auto const provider_import_count{provider_runtime_module->imported_function_vec_storage.size()};
-                    auto const* const provider_import_cache{
+                    auto const provider_import_cache{
                         provider_module_id < g_import_call_cache.size() ? ::std::addressof(g_import_call_cache.index_unchecked(provider_module_id)) : nullptr};
                     if(provider_import_cache == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -2516,10 +2516,10 @@ namespace uwvm2::runtime::lib
                         {
                             case table_elem_type::func_ref_defined:
                             {
-                                auto const* const defined_func_ptr{elem.storage.defined_ptr};
+                                auto const defined_func_ptr{elem.storage.defined_ptr};
                                 if(defined_func_ptr == nullptr) { break; }
 
-                                auto const* const defined_info{find_defined_func_info(defined_func_ptr)};
+                                auto const defined_info{find_defined_func_info(defined_func_ptr)};
                                 if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                                 target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_defined_entry);
@@ -2529,7 +2529,7 @@ namespace uwvm2::runtime::lib
                             }
                             case table_elem_type::func_ref_imported:
                             {
-                                auto const* const imported_func_ptr{elem.storage.imported_ptr};
+                                auto const imported_func_ptr{elem.storage.imported_ptr};
                                 if(imported_func_ptr == nullptr) { break; }
                                 if(provider_import_begin == nullptr || imported_func_ptr < provider_import_begin ||
                                    imported_func_ptr >= provider_import_begin + provider_import_count) [[unlikely]]
@@ -2771,7 +2771,7 @@ namespace uwvm2::runtime::lib
             rec.llvm_jit_engine.reset();
             rec.llvm_jit_context_holder.reset();
 
-            auto const* const runtime_module{rec.runtime_module};
+            auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return false; }
 
             auto const local_func_count{runtime_module->local_defined_function_vec_storage.size()};
@@ -2856,7 +2856,7 @@ namespace uwvm2::runtime::lib
                 return false;
             }
 
-            auto* raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
+            auto raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
                                  .setEngineKind(::llvm::EngineKind::JIT)
                                  .setErrorStr(::std::addressof(engine_error))
                                  .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
@@ -2897,7 +2897,7 @@ namespace uwvm2::runtime::lib
                 {
                     if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                     {
-                        auto* found_function{llvm_jit_engine->FindFunctionNamed(function_name)};
+                        auto found_function{llvm_jit_engine->FindFunctionNamed(function_name)};
                         ::std::string function_type_text{};
                         if(found_function != nullptr)
                         {
@@ -2935,7 +2935,7 @@ namespace uwvm2::runtime::lib
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
 
             auto const& rec{g_runtime.modules.index_unchecked(module_id)};
-            auto const* const runtime_module{rec.runtime_module};
+            auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return false; }
 
             auto const import_n{runtime_module->imported_function_vec_storage.size()};
@@ -2980,10 +2980,10 @@ namespace uwvm2::runtime::lib
             if(wasm_module_id == SIZE_MAX) [[likely]]
             {
                 using call_info_t = ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info;
-                auto const* const info{reinterpret_cast<call_info_t const*>(func_index)};
+                auto const info{reinterpret_cast<call_info_t const*>(func_index)};
                 if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info->runtime_func)};
-                auto const* const cf{info->compiled_func};
+                auto const rf{static_cast<runtime_local_func_storage_t const*>(info->runtime_func)};
+                auto const cf{info->compiled_func};
                 if(rf == nullptr || cf == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                 if(try_execute_trivial_defined_call(*info, stack_top_ptr)) { return; }
@@ -3087,7 +3087,7 @@ namespace uwvm2::runtime::lib
             auto const type_total{static_cast<::std::size_t>(type_end - type_begin)};
             if(type_index >= type_total) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            auto const* const expected_ft_ptr{type_begin + type_index};
+            auto const expected_ft_ptr{type_begin + type_index};
             if(expected_ft_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             // Inline cache: the common hot case is a stable (table, selector, expected-type) triple inside a loop.
@@ -3107,7 +3107,7 @@ namespace uwvm2::runtime::lib
                             auto const& info{*ic.defined_info};
                             if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
                             call_stack_guard g{call_stack, info.module_id, info.function_index};
-                            auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
+                            auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                             if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                             execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                             return;
@@ -3228,7 +3228,7 @@ namespace uwvm2::runtime::lib
                     if(try_execute_trivial_defined_call(info, stack_top_ptr)) { return; }
 
                     call_stack_guard g{call_stack, info.module_id, info.function_index};
-                    auto const* const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
+                    auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                     return;
@@ -3960,7 +3960,7 @@ namespace uwvm2::runtime::lib
                     {
                         case resolved_func::kind::defined:
                         {
-                            auto const* const info{find_defined_func_info(rf.u.defined_ptr)};
+                            auto const info{find_defined_func_info(rf.u.defined_ptr)};
                             if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                             tgt.k = cached_import_target::kind::defined;
@@ -4159,7 +4159,7 @@ namespace uwvm2::runtime::lib
             auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(main_id)};
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& entry_info{mod_cache.index_unchecked(local_index)};
-            auto const* const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
+            auto const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
             if(entry_info.runtime_func != expected_rt) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             // We don't pass host arguments; require `() -> ()`.
@@ -4274,7 +4274,7 @@ namespace uwvm2::runtime::lib
 
         if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-        auto const* const runtime_module_storage_ptr{static_cast<runtime_module_storage_t const*>(runtime_module_ptr)};
+        auto const runtime_module_storage_ptr{static_cast<runtime_module_storage_t const*>(runtime_module_ptr)};
         auto const wasm_module_id{find_runtime_module_id_from_storage_ptr(runtime_module_storage_ptr)};
         if(wasm_module_id == ::std::numeric_limits<::std::size_t>::max()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
