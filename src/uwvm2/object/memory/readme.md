@@ -158,9 +158,211 @@ overcommit-enabled systems, `memory.grow` success still cannot guarantee that
 future writes will not trigger an out-of-memory kill; strict mode only affects
 how immediate growth failures are reported.
 
-#### 5.3 Usage
+#### 5.3 Standards alignment
+
+uwvm2's two `memory.grow` modes exist to preserve WebAssembly semantics across
+host operating systems that expose very different virtual-memory admission
+models.
+
+At the WebAssembly specification level:
+
+- `memory.grow` returns the **previous** memory size on success and `-1` on
+  failure.
+- Growth **must fail** if it would exceed the memory's declared maximum.
+- Growth **may also fail for other reasons**, because the instruction is
+  explicitly resource-dependent and therefore non-deterministic from the point
+  of view of the embedder.
+- On success, the newly added bytes are required to be zero-initialized.
+- None of this changes ordinary load/store semantics: out-of-bounds memory
+  accesses still trap in the normal WebAssembly way.
+
+In other words, WebAssembly does **not** require an engine to guarantee that a
+successful `memory.grow` implies future host-level physical availability in all
+environments. It only constrains the observable abstract result:
+
+- if growth succeeds, the module sees the old page count;
+- if growth fails, the module sees `-1`;
+- exceeding the declared maximum is never allowed to succeed.
+
+uwvm2 follows this contract in both modes. The difference between the two modes
+is **not** the Wasm-level memory model, but **when and how host allocation
+failure is surfaced**:
+
+- In **strict** mode, the engine tries to translate an immediate host-side
+  failure into an ordinary WebAssembly `memory.grow` failure result (`-1`).
+- In **fail-fast** mode, the engine prefers a simpler and more aggressive host
+  growth path. This is useful on systems where optimistic virtual-memory
+  admission is normal and where "success now, kill later on page touch" is an
+  unavoidable part of the host's behavior.
+
+This distinction is important because WebAssembly's abstract semantics sit on
+top of host kernels that do not agree on when memory pressure should be
+detected.
+
+#### 5.4 Why uwvm2 needs two `memory.grow` modes
+
+There is no single host policy that is simultaneously ideal for:
+
+- Linux systems with configurable overcommit,
+- Windows systems with explicit reserve/commit accounting,
+- BSD-family systems that do not expose Linux's standardized three-mode
+  contract,
+- embedded or allocator-backed environments without full virtual-memory
+  reservation semantics.
+
+As a result, uwvm2 intentionally separates two concerns:
+
+1. **WebAssembly correctness**
+   `memory.grow` must never exceed the Wasm-declared maximum or the engine's
+   architectural limit.
+
+2. **Host admission policy**
+   If the host refuses additional virtual memory, should uwvm2 convert that into
+   a normal Wasm `-1`, or should it treat the failure as fatal?
+
+The answer depends on the host:
+
+- On some hosts, immediate failure reporting is reliable and useful.
+- On others, an immediate "success" still does not promise future page
+  availability, so a recoverable Wasm failure result can only ever be
+  best-effort.
+
+Providing both modes lets uwvm2 remain portable without pretending that all
+operating systems offer the same strength of resource guarantees.
+
+#### 5.5 Host-policy adaptation
+
+##### Linux: three explicit overcommit regimes
+
+Linux is the clearest example of why `memory.grow` policy cannot be reduced to
+a single universal rule. The kernel exposes three overcommit modes through
+`vm.overcommit_memory`:
+
+- `0`: heuristic overcommit (default),
+- `1`: always overcommit,
+- `2`: do not overcommit; enforce a commit limit based on swap and a configured
+  RAM allowance.
+
+This matters directly to WebAssembly engines:
+
+- Under **mode 1**, a large anonymous reservation/commit can be admitted even
+  when future physical backing is not realistically available. This is the
+  classical sparse-array / optimistic-allocation environment.
+- Under **mode 0**, the kernel performs heuristic refusal of obvious excess, but
+  still allows overcommit in many ordinary cases.
+- Under **mode 2**, the system gives the strongest admission-time signal. This
+  is the Linux configuration in which translating host grow refusal into Wasm
+  `-1` is most meaningful.
+
+For uwvm2, the engineering consequence is straightforward:
+
+- **strict mode** is the best semantic match for Linux mode `2`, and is still a
+  reasonable best-effort policy in modes `0` and `1`;
+- **fail-fast mode** accepts that on optimistic Linux configurations, immediate
+  success may still be followed by later host OOM termination when pages are
+  actually touched.
+
+##### Windows: reserve/commit rather than Linux-style overcommit selection
+
+Windows does not present user space with the Linux `0/1/2` overcommit knob.
+Instead, its virtual-memory API separates **reservation** from **commit**:
+
+- `MEM_RESERVE` reserves address space without allocating physical storage or
+  paging-file backing;
+- `MEM_COMMIT` charges commit against the system's available backing and
+  guarantees zero-filled contents on first access, while still allocating actual
+  physical pages lazily when touched.
+
+For a Wasm runtime, this is a different model from Linux mode `1`:
+
+- admission is not governed by a public "always overcommit" policy switch;
+- the host exposes a much more explicit reserve/commit distinction;
+- commit failure is generally a meaningful signal that can be mapped to
+  `memory.grow == -1` in strict mode.
+
+That said, even Windows does not turn `memory.grow` into a universal future
+execution guarantee in the strong mathematical sense. It provides a more
+structured admission model, but uwvm2 still benefits from keeping the same two
+runtime policies for consistency across backends and platforms.
+
+##### BSD-family systems: host-defined admission, not Linux's 0/1/2 contract
+
+BSD-family kernels are precisely why uwvm2 documentation should avoid treating
+Linux overcommit policy as if it were universal.
+
+- **FreeBSD** exposes its own `vm.overcommit` sysctl, but its semantics are not
+  Linux's `0/1/2` API. The system always accounts swap reservation and can be
+  configured to fail allocation when reservation exceeds available backing.
+- **OpenBSD** and **NetBSD** document ordinary `mmap(..., MAP_ANON, ...)`
+  failure with `ENOMEM` when insufficient memory is available, but they do not
+  expose the same standardized three-mode public contract that Linux does.
+
+From a portable runtime-design perspective, the important conclusion is:
+
+- BSD-family environments should be treated as **host-policy-defined**
+  environments, not as instances of a single Linux-like overcommit taxonomy.
+
+In practical engineering discussions, this often puts BSD-like systems into the
+same bucket as "effectively overcommit-permissive or host-defined" hosts:
+portable user space cannot assume a Linux-mode-2-style admission contract
+across the family.
+
+That is why uwvm2 does **not** hard-code a single memory-growth policy around a
+particular OS family. Instead, it keeps two explicit engine policies:
+
+- one that prefers recoverable Wasm failure reporting when the host offers a
+  usable immediate failure signal;
+- one that prefers simpler fail-fast behavior when the host's VM policy makes a
+  recoverable result either impossible or operationally misleading.
+
+#### 5.6 What the two modes do and do not change
+
+The two `memory.grow` modes change **reporting strategy**, not the abstract
+memory model.
+
+They do change:
+
+- whether immediate host growth refusal is surfaced as Wasm `-1` or treated as
+  fatal,
+- how aggressively the runtime relies on the host's growth API,
+- how closely `memory.grow` failure reporting tracks host admission-time
+  resource checks.
+
+They do **not** change:
+
+- the WebAssembly page size,
+- maximum-size enforcement,
+- zero-initialization of newly grown memory,
+- out-of-bounds trap behavior for ordinary memory accesses,
+- the backend-neutral object-layer API exposed to the rest of uwvm2.
+
+This separation is intentional. `memory.grow` is not a hot-path arithmetic
+instruction; it is a heavy operation whose observable behavior depends in part
+on the host kernel. uwvm2 therefore optimizes this area for **portability and
+semantic clarity**, not for micro-optimizing a path that is cold by design.
+
+#### 5.7 Usage
 
 Example:
 
 - `uwvm --wasm-memory-grow-strict ...`
 - `uwvm -Wmemstrict ...`
+
+---
+
+### 6. References
+
+- WebAssembly Core Specification, execution semantics for `memory.grow` and
+  `growmem`:
+  - <https://webassembly.github.io/spec/core/exec/instructions.html>
+  - <https://webassembly.github.io/spec/core/exec/modules.html>
+- Linux kernel documentation, overcommit accounting:
+  - <https://docs.kernel.org/mm/overcommit-accounting.html>
+- Microsoft documentation for Windows virtual memory reserve/commit semantics:
+  - <https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2>
+  - <https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-memory_basic_information>
+- FreeBSD tuning manual (`vm.overcommit`):
+  - <https://man.freebsd.org/cgi/man.cgi?tuning>
+- OpenBSD and NetBSD `mmap(2)` manual pages:
+  - <https://man.openbsd.org/OpenBSD-7.1/mmap.2>
+  - <https://man.netbsd.org/mmap.2>
