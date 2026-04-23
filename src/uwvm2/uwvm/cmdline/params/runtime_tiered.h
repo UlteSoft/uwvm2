@@ -67,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if 0  /// @todo set to default
                 u8" (DEFAULT)"
 # endif
-                  u8" with the tiered UWVM interpreter/LLVM JIT backend."},
+                  u8" with the tiered uwvm interpreter + LLVM JIT backend."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_tiered_alias), 1uz}},
         .handle{::std::addressof(details::runtime_tiered_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed)},

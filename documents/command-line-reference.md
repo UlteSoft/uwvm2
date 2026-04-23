@@ -157,6 +157,18 @@ This is the single most important parsing rule in the CLI:
 - all remaining tokens are guest arguments,
 - none of the remaining tokens are parsed as `uwvm` parameters.
 
+### `--version`
+
+`--version` is an immediate-exit inspection command.
+
+Source behavior:
+
+- it prints a formatted build report rather than a single semantic-version line,
+- it includes build mode and, when compiled in, the detected install path,
+- it reports compiler, allocator, platform, ISA, and runtime information,
+- it enumerates compiled WebAssembly feature support,
+- it returns immediately without entering validation or execution.
+
 ## Debug Commands
 
 | Option | Alias | Arguments | Description | Availability |
@@ -167,6 +179,16 @@ Notes:
 
 - This option exists only when the project is built in debug mode.
 - It is meant for internal developer workflows rather than end-user use.
+
+### `--debug-test`
+
+This is a developer-facing immediate command compiled only in debug builds.
+
+Source behavior:
+
+- it is a pure flag and does not consume additional arguments,
+- it dispatches into an internal debug test path,
+- it is not intended to be a stable end-user interface.
 
 ## WebAssembly Commands
 
@@ -179,8 +201,56 @@ Notes:
 | `--wasm-register-dl` | `-Wdl` | `<dl:path> (<rename:str>)` | Load a native dynamic library and register its exports as a WebAssembly module, optionally under a custom module name. | Requires preload-DL support |
 | `--wasm-set-initializer-limit` | `-Wilim` | `<type:str> <limit:size_t>` | Override a specific runtime initializer reserve limit. | Hosted builds |
 | `--wasm-set-main-module-name` | `-Wname` | `<name:str>` | Override the main module name used by `uwvm`. | Hosted builds |
+| `--wasm-set-memory-limit` | `-Wmemlim` | `<module:str> [<index:size_t>\|all] <min:size_t> (<max:size_t>)` | Override runtime page limits for selected local-defined Wasm memories. | Hosted builds |
 | `--wasm-set-parser-limit` | `-Wplim` | `<type:str> <limit:size_t>` | Override a specific parser limit. | Hosted builds |
-| `--wasm-set-preload-module-attribute` | `-Wpreattr` | `<module:str> <memory-access:none\|copy\|mmap> (<memory_index:list>)` | Set preload-module memory access mode; optional `memory_index` list narrows the policy, otherwise all memories are affected. | Builds with preload-module attribute support |
+| `--wasm-set-preload-module-attribute` | `-Wpreattr` | `<module:str> <memory-access:none\|copy\|mmap> (<memory_index:list>)` | Set a preload module's memory access mode. Omitting `memory_index` applies the policy to all memories. | Builds with preload-module attribute support |
+
+### `--wasm-depend-recursion-limit`
+
+This option configures the recursion cap used by the dependency-resolution helper logic.
+
+Source behavior:
+
+- it parses exactly one `size_t` argument,
+- it writes the result into `uwvm::utils::depend::recursion_depth_limit`,
+- `0` means “unlimited”,
+- malformed numeric input is rejected immediately.
+
+### `--wasm-list-weak-symbol-module`
+
+This is an immediate inspection command for weak-symbol integration.
+
+Source behavior:
+
+- it first triggers weak-symbol module loading through `run::load_weak_symbol_modules()`,
+- on success, it prints each loaded weak-symbol module name,
+- on failure, it terminates immediately with an error,
+- it does not continue into normal execution after printing.
+
+### `--wasm-preload-library`
+
+This option loads a Wasm file during command-line processing and stores it in the preload-module set.
+
+Source behavior:
+
+- it expects a required Wasm file path and an optional rename token,
+- each invocation appends a new entry to `wasm::storage::preloaded_wasm`,
+- loading is performed immediately by `wasm::loader::load_wasm_file(...)`,
+- the optional rename is forwarded to the loader as the module-name override,
+- repeating the option is supported and accumulates multiple preloaded Wasm modules.
+
+### `--wasm-register-dl`
+
+This option is the native-DL counterpart of `--wasm-preload-library`.
+
+Source behavior:
+
+- it expects a required dynamic-library path and an optional rename token,
+- each invocation appends a new entry to `wasm::storage::preloaded_dl`,
+- loading is performed immediately by `wasm::loader::load_dl(...)`,
+- the optional rename is forwarded to the loader as the module-name override,
+- after a successful load, uwvm registers the preload-DL C-API functions for that entry,
+- repeating the option is supported and accumulates multiple preloaded native modules.
 
 ### `--wasm-set-main-module-name`
 
@@ -245,6 +315,28 @@ Behavior:
 - invalid numeric values are rejected,
 - accepted values are stored directly into `runtime::initializer::initializer_limit`.
 
+### `--wasm-set-memory-limit`
+
+This option records runtime memory-limit overrides keyed by Wasm module name.
+
+Source-enforced rules:
+
+- `<module>` must not be empty,
+- `<module>` must be a valid WebAssembly UTF-8 name,
+- the selector slot accepts either `all` or a single `<index:size_t>`,
+- `<min>` is required and must parse as `size_t`,
+- `<max>` is optional, but when present it must parse as `size_t`,
+- if `<max>` is present, it must be greater than or equal to `<min>`.
+
+Behavior:
+
+- the configuration is stored through `upsert_configured_module_memory_limit(module_name)`,
+- `all` sets the module-wide override used for every local-defined memory in that module,
+- a numeric selector updates only the chosen local-defined memory index,
+- imported memories are not the target of this option,
+- if `<max>` is omitted, the stored override records only the minimum and leaves the maximum in its default “not explicitly present” state,
+- actual target resolution happens later during runtime initialization, when the loaded module graph is available.
+
 ### `--wasm-set-preload-module-attribute`
 
 This option is more structured than the one-line `--help` output suggests.
@@ -266,22 +358,28 @@ Behavior:
 
 ### `--wasm-memory-grow-strict`
 
-This is a pure flag-style parameter. It toggles the global memory-growth policy flag and does not take a value.
+This is a pure flag-style parameter.
+
+Source behavior:
+
+- it toggles the global `memory.grow` strictness flag,
+- it does not take a value,
+- it affects runtime allocation behavior rather than parser behavior.
 
 ## Runtime Commands
 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
-| `--runtime-aot` | `-Raot` | None | Shortcut runtime: full compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
+| `--runtime-aot` | `-Raot` | None | Shortcut for full compile with the LLVM JIT backend. | Requires LLVM JIT |
 | `--runtime-compile-threads` | `-Rct` | `[default\|aggressive\|count:ssize_t]` | Configure the runtime compile-thread count, or choose the adaptive `default` / `aggressive` policy upper bound. | Hosted runtime builds |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>\|code_size <bytes:size_t>]` | Configure how full-compile groups local functions into translation tasks. Effective only when extra runtime compile threads are enabled. | Hosted runtime builds |
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
 | `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy\|lazy+verification\|full]` | Select the runtime mode explicitly. | Hosted runtime builds |
-| `--runtime-debug` | `-Rdebug` | None | Shortcut runtime: full compile plus debug interpreter. | Requires debug interpreter |
-| `--runtime-int` | `-Rint` | None | Shortcut runtime: lazy compile plus interpreter-only backend. | Requires interpreter backend |
-| `--runtime-jit` | `-Rjit` | None | Shortcut runtime: lazy compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
-| `--runtime-tiered` | `-Rtiered` | None | Shortcut runtime: lazy compile plus tiered interpreter/JIT backend. | Requires tiered backend |
+| `--runtime-debug` | `-Rdebug` | None | Shortcut for full compile with the debug interpreter backend. | Requires debug interpreter |
+| `--runtime-int` | `-Rint` | None | Shortcut for lazy compile with the uwvm interpreter backend. | Requires interpreter backend |
+| `--runtime-jit` | `-Rjit` | None | Shortcut for lazy compile with the LLVM JIT backend. | Requires LLVM JIT |
+| `--runtime-tiered` | `-Rtiered` | None | Shortcut for lazy compile with the tiered interpreter/LLVM JIT backend. | Requires tiered backend |
 
 ## Runtime Model and Conflict Rules
 
@@ -303,7 +401,9 @@ The runtime compiler enum is compiled conditionally and may contain:
 - `uwvm_interpreter_llvm_jit_tiered`
 - `llvm_jit_only`
 
-### Shortcut Mapping
+### Shortcut Runtime Options
+
+These five parameters are pure flag-style selectors. Each one writes both runtime-selection axes at once: the runtime mode and the runtime compiler backend.
 
 Shortcut runtime options are syntactic sugar over a concrete `(mode, compiler)` pair:
 
@@ -314,6 +414,13 @@ Shortcut runtime options are syntactic sugar over a concrete `(mode, compiler)` 
 | `--runtime-tiered` | `lazy_compile` | `uwvm_interpreter_llvm_jit_tiered` |
 | `--runtime-aot` | `full_compile` | `llvm_jit_only` |
 | `--runtime-debug` | `full_compile` | `debug_interpreter` |
+
+Operational notes:
+
+- they do not consume extra arguments,
+- they are intended for the common “pick a known runtime preset” workflow,
+- they do not compose with each other,
+- they also do not compose with `--runtime-custom-mode` or `--runtime-custom-compiler`.
 
 ### Conflict Rules
 
@@ -495,32 +602,89 @@ Behavior:
 - file opening follows symlinks,
 - on supported Windows NT-path-aware builds, `::NT::...` paths receive special handling and may emit `nt-path` warnings.
 
+### `--log-verbose`
+
+This is a pure flag-style parameter that enables additional diagnostic output across multiple subsystems.
+
+Source behavior:
+
+- it toggles the global `uwvm::io::show_verbose` flag,
+- loaders, runtime initialization, section-detail inspection, WASI environment setup, and socket preconfiguration all consult this flag,
+- enabling it increases explanatory progress logging but does not change execution semantics.
+
+### `--log-win32-use-ansi`
+
+This is a platform-specific output-formatting flag.
+
+Source behavior:
+
+- it toggles `uwvm::utils::ansies::log_win32_use_ansi_b`,
+- on supported Win32-oriented builds, diagnostics then prefer ANSI escape sequences for coloring,
+- the option only exists in builds where that legacy console-color choice is relevant.
+
 ## WASI Commands
 
 These options configure the hosted WASI integration, especially the built-in WASI Preview 1 environment.
 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
-| `--wasi-disable-utf8-check` | `-Iu8relax` | None | Disable UTF-8 validation for WASI-related command-line and runtime behavior. | Requires WASI support |
+| `--wasi-disable-utf8-check` | `-Iu8relax` | None | Disable WASI path/name UTF-8 checks for command-line and runtime behavior. | Requires WASI support |
 | `--wasip1-add-environment` | `-I1addenv` | `<env:str> <value:str>` | Add or replace an environment variable in the Preview 1 environment. | Requires local imported WASI Preview 1 support |
 | `--wasip1-delete-system-environment` | `-I1delsysenv` | `<env:str>` | Remove a host environment variable from inherited Preview 1 state. | Requires local imported WASI Preview 1 support |
-| `--wasip1-disable` | `-I1disable` | None | Disable preloading of the local Preview 1 module. | Requires local imported WASI Preview 1 support |
-| `--wasip1-expose-host-api` | `-I1exportapi` | None | Expose the stable WASI Preview 1 host API to preload modules such as DL and weak-symbol modules. | Requires local imported WASI Preview 1 support |
+| `--wasip1-disable` | `-I1disable` | None | Disable the built-in Preview 1 module. | Requires local imported WASI Preview 1 support |
+| `--wasip1-expose-host-api` | `-I1exportapi` | None | Expose the stable Preview 1 preload host API to preload modules. | Requires local imported WASI Preview 1 support |
 | `--wasip1-mount-dir` | `-I1dir` | `<wasi dir:str> <system dir:path>` | Mount a host directory into the Preview 1 sandbox. | Requires local imported WASI Preview 1 support |
 | `--wasip1-noinherit-system-environment` | `-I1nosysenv` | None | Disable host environment inheritance for Preview 1. | Requires local imported WASI Preview 1 support |
 | `--wasip1-set-argv0` | `-I1argv0` | `<argv0:str>` | Override guest `argv[0]` for Preview 1. | Requires local imported WASI Preview 1 support |
-| `--wasip1-set-fd-limit` | `-I1fdlim` | `<limit:size_t>` | Set the Preview 1 file descriptor limit. | Requires local imported WASI Preview 1 support |
-| `--wasip1-socket-tcp-connect` | `-I1tcpcon` | `<fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]` | Preconfigure a TCP client socket. | Requires Preview 1 socket support |
-| `--wasip1-socket-tcp-listen` | `-I1tcplisten` | `<fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]` | Preconfigure a TCP listening socket. | Requires Preview 1 socket support |
-| `--wasip1-socket-udp-bind` | `-I1udpbind` | `<fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]` | Preconfigure a UDP bind socket. | Requires Preview 1 socket support |
-| `--wasip1-socket-udp-connect` | `-I1udpcon` | `<fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]` | Preconfigure a UDP client socket. | Requires Preview 1 socket support |
+| `--wasip1-set-fd-limit` | `-I1fdlim` | `<limit:size_t>` | Set the Preview 1 file descriptor limit. `0` means the representable maximum. | Requires local imported WASI Preview 1 support |
+| `--wasip1-socket-tcp-connect` | `-I1tcpcon` | `<fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]` | Preconfigure a Preview 1 TCP client socket. | Requires Preview 1 socket support |
+| `--wasip1-socket-tcp-listen` | `-I1tcplisten` | `<fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]` | Preconfigure a Preview 1 TCP listening socket. | Requires Preview 1 socket support |
+| `--wasip1-socket-udp-bind` | `-I1udpbind` | `<fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]` | Preconfigure a Preview 1 UDP bound socket. | Requires Preview 1 socket support |
+| `--wasip1-socket-udp-connect` | `-I1udpcon` | `<fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]` | Preconfigure a Preview 1 UDP client socket. | Requires Preview 1 socket support |
 
 ### `--wasi-disable-utf8-check`
 
 Current source behavior:
 
 - when WASI Preview 1 is present, this sets `default_wasip1_env.disable_utf8_check = true`,
-- it is implemented as a flag-style option.
+- it is implemented as a flag-style option,
+- during command-line processing, it affects guest-path validation in `--wasip1-mount-dir`,
+- during Preview 1 runtime operation, it affects path/name UTF-8 validation in filesystem-style APIs,
+- it does **not** relax Wasm parser UTF-8 validation or Wasm module-name validation.
+
+### `--wasip1-add-environment`
+
+This option records an explicit guest-side environment assignment.
+
+Source behavior:
+
+- it expects `<env> <value>`,
+- `<env>` must not be empty,
+- `<env>` must not contain `=`,
+- the pair is stored in the additive environment override list,
+- it still applies even when host environment inheritance is disabled.
+
+### `--wasip1-delete-system-environment`
+
+This option records a removal rule for inherited host environment variables.
+
+Source behavior:
+
+- it expects exactly one `<env>` token,
+- `<env>` must not be empty,
+- `<env>` must not contain `=`,
+- the name is stored in the delete list used when building the inherited Preview 1 environment,
+- it does not prevent a later explicit `--wasip1-add-environment` from providing the same name.
+
+### `--wasip1-noinherit-system-environment`
+
+This is a pure flag-style option that changes how the initial Preview 1 environment is assembled.
+
+Source behavior:
+
+- it disables host environment inheritance for the built-in Preview 1 environment,
+- explicit additions from `--wasip1-add-environment` still apply,
+- delete rules become irrelevant when there is no inherited host environment to filter.
 
 ### Environment Inheritance and Overrides
 
@@ -554,6 +718,17 @@ In other words:
 - it disables the automatic preload path for the local WASI Preview 1 module,
 - it does not take any additional arguments.
 
+### `--wasip1-expose-host-api`
+
+This option enables the stable Preview 1 preload host API for preload modules.
+
+Source behavior:
+
+- it sets `wasm::storage::preload_expose_wasip1_host_api = true`,
+- when preload-DL support is present, it refreshes that exposure for already loaded preload DL modules,
+- when weak-symbol support is present, it also refreshes that exposure for already loaded weak-symbol modules,
+- it is therefore both a forward-looking configuration flag and an immediate refresh trigger for existing preload-module state.
+
 ### `--wasip1-set-argv0`
 
 This option stores a dedicated guest-facing `argv[0]` string.
@@ -565,6 +740,11 @@ Important distinction:
 
 These are different concepts.
 
+Operational note:
+
+- the override is stored in `wasip1_argv0_storage`,
+- remaining guest arguments still come from the tokens placed after `--run`.
+
 ### `--wasip1-set-fd-limit`
 
 Source behavior:
@@ -572,7 +752,8 @@ Source behavior:
 - parses a `size_t`,
 - rejects malformed values,
 - rejects values larger than the maximum representable WASI file-descriptor type when necessary,
-- treats `0` as “use the maximum representable fd value”.
+- treats `0` as “use the maximum representable fd value”,
+- stores the resolved limit in `default_wasip1_env.fd_storage.fd_limit`.
 
 ### `--wasip1-mount-dir`
 
@@ -582,6 +763,7 @@ Rules enforced by the callback:
 
 - `<wasi dir>` must not be empty,
 - a `<system dir>` must be provided and must be openable as a directory,
+- unless `--wasi-disable-utf8-check` is active, the guest-visible `<wasi dir>` must also satisfy the current UTF-8 path rules,
 - mount points are canonicalized for stable comparison,
 - trailing `/` is removed except for root,
 - relative and absolute WASI mount points are normalized differently,
@@ -603,6 +785,13 @@ Additional platform notes from the source:
 
 The socket options all begin with an explicit `<fd:i32>` argument and then parse an address form.
 
+Common source-level behavior:
+
+- `<fd>` is parsed immediately as a WASI file descriptor,
+- malformed or out-of-range fd values are rejected at parse time,
+- duplicate-fd conflicts are intentionally deferred until later environment initialization,
+- successful registrations may emit verbose logs when `--log-verbose` is enabled.
+
 Supported high-level patterns:
 
 | Option | Supported address forms |
@@ -617,6 +806,46 @@ Implementation detail for connect-style options:
 - the parser first tries direct IP parsing,
 - if IPv6 parsing fails in the relevant code path, it then attempts host-name resolution,
 - the resolved address is stored as a preopen socket entry.
+
+### `--wasip1-socket-tcp-listen`
+
+This option preconfigures a Preview 1 listening socket entry.
+
+Source behavior:
+
+- it expects an explicit `<fd:i32>` plus a listener address,
+- it accepts `ipv4:port`, `ipv6:port`, and, when compiled in, `unix <path>`,
+- it stores the resulting listener configuration in the default Preview 1 environment.
+
+### `--wasip1-socket-tcp-connect`
+
+This option preconfigures a Preview 1 outbound TCP socket entry.
+
+Source behavior:
+
+- it expects an explicit `<fd:i32>` plus a remote address,
+- it accepts `ipv4:port`, `ipv6:port`, hostname-like `dns:port`, and, when compiled in, `unix <path>`,
+- it stores the resulting connect configuration in the default Preview 1 environment.
+
+### `--wasip1-socket-udp-bind`
+
+This option preconfigures a Preview 1 UDP bind endpoint.
+
+Source behavior:
+
+- it expects an explicit `<fd:i32>` plus a bind address,
+- it accepts `ipv4:port`, `ipv6:port`, and, when compiled in, `unix <path>`,
+- it stores the resulting bind configuration in the default Preview 1 environment.
+
+### `--wasip1-socket-udp-connect`
+
+This option preconfigures a Preview 1 outbound UDP socket entry.
+
+Source behavior:
+
+- it expects an explicit `<fd:i32>` plus a remote address,
+- it accepts `ipv4:port`, `ipv6:port`, hostname-like `dns:port`, and, when compiled in, `unix <path>`,
+- it stores the resulting connect configuration in the default Preview 1 environment.
 
 ## Practical Examples
 
