@@ -35,10 +35,12 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/utils/ansies/impl.h>
 # include <uwvm2/utils/cmdline/impl.h>
+# include <uwvm2/utils/utf/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/cmdline/impl.h>
 # include <uwvm2/uwvm/cmdline/params/impl.h>
+# include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 #endif
@@ -90,6 +92,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"[error] ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Module name cannot be empty. Usage: ",
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasm_set_memory_limit),
+                                u8"\n\n");
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
+
+        // This option creates/updates configuration keyed by a Wasm module name,
+        // so validate it here instead of deferring to a later loader path.
+        if(auto const [module_name_pos, module_name_err]{
+               ::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
+                                                                module_name.cbegin(),
+                                                                module_name.cend())};
+           module_name_err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
+        {
+            static_cast<void>(module_name_pos);
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Invalid module name: \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                module_name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". WebAssembly names must be valid UTF-8. Reason: \"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::uwvm2::utils::utf::get_utf_error_description<char8_t>(module_name_err),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\". Usage: ",
                                 ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::wasm_set_memory_limit),
                                 u8"\n\n");
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
