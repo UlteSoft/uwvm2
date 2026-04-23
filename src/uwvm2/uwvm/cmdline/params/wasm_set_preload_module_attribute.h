@@ -60,12 +60,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_set_preload_module_attribute{
         .name{u8"--wasm-set-preload-module-attribute"},
-        .describe{u8"Set memory access attributes for a preload module (preloaded DL or weak-symbol module)."},
+        .describe{u8"Set a preload module's memory access mode; omit <memory_index:list> to apply it to all memories."},
         .usage{u8"<module:str> <memory-access:none|copy"
 #if defined(UWVM_SUPPORT_MMAP)
                u8"|mmap"
 #endif
-               u8"> (<memory-list:str>)"},
+               u8"> (<memory_index:list>)"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_set_preload_module_attribute_alias), 1uz}},
         .handle{::std::addressof(details::wasm_set_preload_module_attribute_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasm}};

@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_debug{
         .name{u8"--runtime-debug"},
-        .describe{u8"Shortcut selection of runtime: debug interpreter (full compile + debug-int)."},
+        .describe{u8"Shortcut for full compile with the debug interpreter backend."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_debug_alias), 1uz}},
         .handle{::std::addressof(details::runtime_debug_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed)},
@@ -81,4 +81,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

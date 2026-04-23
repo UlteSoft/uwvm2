@@ -180,7 +180,7 @@ Notes:
 | `--wasm-set-initializer-limit` | `-Wilim` | `<type:str> <limit:size_t>` | Override a specific runtime initializer reserve limit. | Hosted builds |
 | `--wasm-set-main-module-name` | `-Wname` | `<name:str>` | Override the main module name used by `uwvm`. | Hosted builds |
 | `--wasm-set-parser-limit` | `-Wplim` | `<type:str> <limit:size_t>` | Override a specific parser limit. | Hosted builds |
-| `--wasm-set-preload-module-attribute` | `-Wpreattr` | `<module:str> <memory-access:none\|copy\|mmap> (<memory-list:str>)` | Configure preload-module memory access behavior, optionally for selected memory indices only. | Builds with preload-module attribute support |
+| `--wasm-set-preload-module-attribute` | `-Wpreattr` | `<module:str> <memory-access:none\|copy\|mmap> (<memory_index:list>)` | Set preload-module memory access mode; optional `memory_index` list narrows the policy, otherwise all memories are affected. | Builds with preload-module attribute support |
 
 ### `--wasm-set-main-module-name`
 
@@ -253,14 +253,14 @@ Source-enforced rules:
 
 - `<module>` must not be empty,
 - `<memory-access>` must be one of `none`, `copy`, or `mmap`,
-- the optional third value can be:
+- the optional third value `<memory_index:list>` can be:
   - `all`, meaning all memories of that preload module,
   - or a comma-separated list of memory indices such as `0,1,2`.
 
 Behavior:
 
 - the configured attribute is stored in the preload-module attribute map,
-- `apply_to_all_memories` is set by default,
+- `apply_to_all_memories` is set by default, so omitting `<memory_index:list>` targets every memory,
 - if a memory index list is provided, only the selected indices are targeted,
 - after parsing, the attribute is immediately applied to already loaded modules via `apply_preload_module_memory_attribute_to_loaded_modules(...)`.
 

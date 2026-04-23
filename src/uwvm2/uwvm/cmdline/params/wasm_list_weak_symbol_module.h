@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_list_weak_symbol_module{
         .name{u8"--wasm-list-weak-symbol-module"},
-        .describe{u8"List all registered WASM weak-symbol modules."},
+        .describe{u8"List registered Wasm weak-symbol modules."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_list_weak_symbol_module_alias), 1uz}},
         .handle{::std::addressof(details::wasm_list_weak_symbol_module_callback)},
         .is_exist{::std::addressof(details::wasm_list_weak_symbol_module_is_exist)},

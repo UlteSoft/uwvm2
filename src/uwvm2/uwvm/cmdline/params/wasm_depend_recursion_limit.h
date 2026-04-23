@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_depend_recursion_limit{
         .name{u8"--wasm-depend-recursion-limit"},
-        .describe{u8"Set recursion depth limit for dependency check (0 = unlimited, default = 2048)."},
+        .describe{u8"Set the dependency-check recursion limit (0 = unlimited)."},
         .usage{u8"<depth:size_t>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_depend_recursion_limit_alias), 1uz}},
         .handle{::std::addressof(details::wasm_depend_recursion_limit_callback)},

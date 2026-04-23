@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter mode{.name{u8"--mode"},
-                                                             .describe{u8"Select operation mode, (DEFAULT: run)."},
+                                                             .describe{u8"Select the operation mode. Default: run."},
                                                              .usage{u8"[section-details|validation|run]"},
                                                              .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::mode_alias), 1uz}},
                                                              .handle{::std::addressof(details::mode_callback)},

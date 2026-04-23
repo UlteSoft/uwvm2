@@ -59,7 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_set_initializer_limit{
         .name{u8"--wasm-set-initializer-limit"},
-        .describe{u8"Set initializer reserve limit for WASM runtime."},
+        .describe{u8"Override a runtime initializer reserve limit."},
         .usage{u8"<type:str> <limit:size_t>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_set_initializer_limit_alias), 1uz}},
         .handle{::std::addressof(details::wasm_set_initializer_limit_callback)},
@@ -74,4 +74,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

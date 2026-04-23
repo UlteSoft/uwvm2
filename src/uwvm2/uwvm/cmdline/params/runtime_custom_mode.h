@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_mode{
         .name{u8"--runtime-custom-mode"},
-        .describe{u8"Custom selection of runtime mode."},
+        .describe{u8"Select the runtime compilation mode."},
         .usage{u8"[lazy|lazy+verification|full]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_custom_mode_alias), 1uz}},
         .handle{::std::addressof(details::runtime_custom_mode_callback)},
@@ -78,4 +78,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

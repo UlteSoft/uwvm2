@@ -59,8 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_set_memory_limit{
         .name{u8"--wasm-set-memory-limit"},
-        .describe{
-            u8"Override runtime memory page limits for local-defined WASM memories. Applied during runtime initialization; invalid module/index targets are fatal, while widening declared limits emits runtime warnings."},
+        .describe{u8"Override runtime page limits for selected local-defined Wasm memories."},
         .usage{u8"<module:str> [<index:size_t>|all] <min:size_t> (<max:size_t>)"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_set_memory_limit_alias), 1uz}},
         .handle{::std::addressof(details::wasm_set_memory_limit_callback)},

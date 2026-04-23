@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_compiler{
         .name{u8"--runtime-custom-compiler"},
-        .describe{u8"Custom selection of runtime compiler."},
+        .describe{u8"Select the runtime compiler backend."},
         .usage{u8"["
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                u8"int"
@@ -101,4 +101,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

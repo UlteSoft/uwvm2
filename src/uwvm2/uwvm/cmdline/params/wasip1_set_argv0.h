@@ -66,7 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_set_argv0{
         .name{u8"--wasip1-set-argv0"},
-        .describe{u8"Override WASI Preview 1 argv[0] while preserving argv[1...] from --run."},
+        .describe{u8"Override WASI Preview 1 argv[0]."},
         .usage{u8"<argv0:str>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_set_argv0_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_set_argv0_callback)},

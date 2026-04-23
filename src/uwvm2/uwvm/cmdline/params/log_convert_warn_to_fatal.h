@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter log_convert_warn_to_fatal{
         .name{u8"--log-convert-warn-to-fatal"},
-        .describe{u8"Convert specific warnings to fatal errors."},
+        .describe{u8"Treat selected warnings as fatal errors."},
         .usage{u8"[all|vm|parser|untrusted-dl"
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                u8"|dl"

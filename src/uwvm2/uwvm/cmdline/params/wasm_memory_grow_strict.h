@@ -53,8 +53,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_memory_grow_strict{
         .name{u8"--wasm-memory-grow-strict"},
-        .describe{
-            u8"Enable strict semantics for `memory.grow`. In strict mode, memory.grow returns false on allocation failure when overcommit is disabled. With overcommit enabled, allocation failures still abort the process via OOM."},
+        .describe{u8"Enable strict `memory.grow` semantics."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_memory_grow_strict_alias), 1uz}},
         .is_exist{::std::addressof(::uwvm2::object::memory::flags::grow_strict)},
         .cate{::uwvm2::utils::cmdline::categorization::wasm}};
