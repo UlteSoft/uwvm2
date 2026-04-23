@@ -80,6 +80,8 @@ Each release entry should record:
 - Stopped adding `-Wno-maybe-musttail-local-addr` on Apple platforms so the strict validation test targets can build under Apple Clang without failing on an unsupported warning-suppression flag.
 - Corrected `uwvm_int` `call_indirect` validation-stack bookkeeping so the table selector is no longer popped twice after validation has already consumed it, preventing false operand-stack underflow reports on later instructions in valid Wasm MVP modules.
 - Added strict regression coverage for a valid `call_indirect` followed by `select`, keeping the compiler-integrated `uwvm_int` validator aligned with the W3C WebAssembly MVP stack effect for indirect calls and parametric instructions.
+- Aligned `uwvm_int` native-memory `memory.grow` with the JIT/native Wasm failure model by rejecting definitely-over-limit growth requests up front and by refining interpreter-side grow limits against backend-specific native-memory maxima.
+- Expanded the object-layer memory documentation with a standards-oriented explanation of uwvm2's `strict` versus fail-fast `memory.grow` policies, including Linux overcommit modes, Windows reserve/commit semantics, and BSD-family host-policy differences.
 
 ### Release Fixes
 

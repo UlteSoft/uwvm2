@@ -367,6 +367,59 @@ auto const ensure_memory0_resolved{[&]() constexpr UWVM_THROWS
                                                                             return max_pages * wasm_page_bytes;
                                                                         }};
 
+                                       auto const backend_max_limit_from_memory{[&](native_memory_t const& memory) constexpr noexcept -> ::std::size_t
+                                                                                {
+#if defined(UWVM_SUPPORT_MMAP)
+                                                                                    if constexpr(native_memory_t::can_mmap)
+                                                                                    {
+                                                                                        if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+                                                                                        {
+                                                                                            switch(memory.status)
+                                                                                            {
+                                                                                                case ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32:
+                                                                                                {
+                                                                                                    constexpr auto max_full_protection_wasm32_length_half{
+                                                                                                        ::uwvm2::object::memory::linear::max_full_protection_wasm32_length / 2u};
+                                                                                                    return static_cast<::std::size_t>(max_full_protection_wasm32_length_half);
+                                                                                                }
+                                                                                                case ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64:
+                                                                                                {
+                                                                                                    return static_cast<::std::size_t>(
+                                                                                                        ::uwvm2::object::memory::linear::max_partial_protection_wasm64_length);
+                                                                                                }
+                                                                                                [[unlikely]] default:
+                                                                                                {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                                                                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                                                                                    return 0uz;
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                        else
+                                                                                        {
+                                                                                            return static_cast<::std::size_t>(
+                                                                                                ::uwvm2::object::memory::linear::max_partial_protection_wasm32_length);
+                                                                                        }
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        static_cast<void>(memory);
+                                                                                        return ::std::numeric_limits<::std::size_t>::max();
+                                                                                    }
+#else
+                                                                                    static_cast<void>(memory);
+                                                                                    return ::std::numeric_limits<::std::size_t>::max();
+#endif
+                                                                                }};
+
+                                       auto const refine_max_limit_for_memory{
+                                           [&](native_memory_t const& memory, ::std::size_t max_limit_memory_length) constexpr noexcept -> ::std::size_t
+                                           {
+                                               auto const backend_max_limit_length{backend_max_limit_from_memory(memory)};
+                                               return backend_max_limit_length < max_limit_memory_length ? backend_max_limit_length : max_limit_memory_length;
+                                           }};
+
                                        if(all_memory_count == 0u) [[unlikely]]
                                        {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
@@ -422,6 +475,8 @@ auto const ensure_memory0_resolved{[&]() constexpr UWVM_THROWS
                                                            ::fast_io::fast_terminate();
                                                        }
                                                        resolved_memory0.memory_p = ::std::addressof(def->memory);
+                                                       resolved_memory0.max_limit_memory_length =
+                                                           refine_max_limit_for_memory(def->memory, resolved_memory0.max_limit_memory_length);
                                                        resolved_memory0.resolved = true;
                                                        return;
                                                    }
@@ -451,6 +506,8 @@ auto const ensure_memory0_resolved{[&]() constexpr UWVM_THROWS
                                                ::fast_io::fast_terminate();
                                            }
                                            resolved_memory0.max_limit_memory_length = max_limit_from_limits(mem_type_ptr->limits);
+                                           resolved_memory0.max_limit_memory_length =
+                                               refine_max_limit_for_memory(local_mem0.memory, resolved_memory0.max_limit_memory_length);
                                            resolved_memory0.resolved = true;
                                        }
                                    }};
