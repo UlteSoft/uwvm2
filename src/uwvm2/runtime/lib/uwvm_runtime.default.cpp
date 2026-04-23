@@ -2599,6 +2599,56 @@ namespace uwvm2::runtime::lib
             }
         }
 
+        enum class default_runtime_scheduling_profile_t : unsigned
+        {
+            uwvm_int,
+            llvm_jit,
+            debug_int
+            /// @todo debug_llvm_jit
+            // Reserve an explicit future slot in the dispatch switch below when a debug-llvm-jit compiler mode is added.
+        };
+
+        [[nodiscard]] inline constexpr default_runtime_scheduling_profile_t
+            resolve_default_runtime_scheduling_profile(::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t compiler) noexcept
+        {
+            using runtime_compiler_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t;
+
+            switch(compiler)
+            {
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                case runtime_compiler_t::uwvm_interpreter_only:
+                {
+                    return default_runtime_scheduling_profile_t::uwvm_int;
+                }
+#endif
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+                case runtime_compiler_t::debug_interpreter:
+                {
+                    return default_runtime_scheduling_profile_t::debug_int;
+                }
+#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                case runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
+                {
+                    return default_runtime_scheduling_profile_t::llvm_jit;
+                }
+#endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                case runtime_compiler_t::llvm_jit_only:
+                {
+                    return default_runtime_scheduling_profile_t::llvm_jit;
+                }
+#endif
+                [[unlikely]] default:
+                {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                    ::std::unreachable();
+                }
+            }
+        }
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline bool runtime_compiler_requests_llvm_jit_translation() noexcept
         {
@@ -3458,12 +3508,44 @@ namespace uwvm2::runtime::lib
                 }
             }
 
+            constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t kTranslateOpt{get_curr_target_tranopt()};
+            auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
+            auto const default_runtime_scheduling_profile{resolve_default_runtime_scheduling_profile(runtime_compiler)};
+            auto const compile_llvm_jit_translation{runtime_compiler_requests_llvm_jit_translation()};
+
             using runtime_scheduling_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_t;
             using compile_task_split_policy_t = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_policy_t;
 
             auto const runtime_scheduling_policy{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_policy};
             auto const runtime_scheduling_size{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size};
             auto const runtime_scheduling_policy_existed{::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_existed};
+            auto const allow_default_runtime_scheduling_adjustment{[&]() constexpr noexcept
+                                                                   {
+                                                                       if(runtime_scheduling_policy_existed) { return false; }
+
+                                                                       switch(default_runtime_scheduling_profile)
+                                                                       {
+                                                                           case default_runtime_scheduling_profile_t::uwvm_int:
+                                                                           {
+                                                                               return true;
+                                                                           }
+                                                                           case default_runtime_scheduling_profile_t::llvm_jit:
+                                                                           {
+                                                                               return false;
+                                                                           }
+                                                                           case default_runtime_scheduling_profile_t::debug_int:
+                                                                           {
+                                                                               return true;
+                                                                           }
+                                                                           [[unlikely]] default:
+                                                                           {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                                                                               ::std::unreachable();
+                                                                           }
+                                                                       }
+                                                                   }()};
 
             auto const compile_task_split_conf{
                 runtime_scheduling_policy == runtime_scheduling_policy_t::function_count
@@ -3471,11 +3553,11 @@ namespace uwvm2::runtime::lib
                                                                                                                  compile_task_split_policy_t::function_count,
                                                                                                              .split_size = runtime_scheduling_size,
                                                                                                              .adjust_for_default_policy =
-                                                                                                                 !runtime_scheduling_policy_existed}
+                                                                                                                 allow_default_runtime_scheduling_adjustment}
                     : ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_task_split_config{.policy = compile_task_split_policy_t::code_size,
                                                                                                              .split_size = runtime_scheduling_size,
                                                                                                              .adjust_for_default_policy =
-                                                                                                                 !runtime_scheduling_policy_existed}
+                                                                                                                 allow_default_runtime_scheduling_adjustment}
             };
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -3513,9 +3595,6 @@ namespace uwvm2::runtime::lib
             }
 
             g_runtime.defined_func_cache.resize(g_runtime.modules.size());
-
-            constexpr ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t kTranslateOpt{get_curr_target_tranopt()};
-            auto const compile_llvm_jit_translation{runtime_compiler_requests_llvm_jit_translation()};
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
