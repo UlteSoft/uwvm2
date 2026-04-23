@@ -35,7 +35,6 @@
 # include "wasm_set_main_module_name.h"
 # include "wasm_preload_library.h"
 # include "wasm_register_dl.h"
-# include "wasm_expose_wasip1_host_api.h"
 # include "wasm_set_preload_module_attribute.h"
 # include "wasm_depend_recursion_limit.h"
 # include "wasm_set_memory_limit.h"
@@ -57,6 +56,7 @@
 
 // wasi
 # include "wasi_disable_utf8_check.h"
+# include "wasip1_expose_host_api.h"
 # include "wasip1_set_fd_limit.h"
 # include "wasip1_mount_dir.h"
 # include "wasip1_set_argv0.h"

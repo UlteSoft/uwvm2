@@ -31,7 +31,7 @@ module;
 # include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
 #endif
 
-export module uwvm2.uwvm.cmdline.params:wasm_expose_wasip1_host_api;
+export module uwvm2.uwvm.cmdline.params:wasip1_expose_host_api;
 
 import fast_io;
 import uwvm2.utils.container;
@@ -44,4 +44,4 @@ import uwvm2.utils.cmdline;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "wasm_expose_wasip1_host_api.h"
+#include "wasip1_expose_host_api.h"

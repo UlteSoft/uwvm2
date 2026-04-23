@@ -49,29 +49,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     namespace details
     {
-        inline bool wasm_expose_wasip1_host_api_is_exist{};  // [global]
-        inline constexpr ::uwvm2::utils::container::u8string_view wasm_expose_wasip1_host_api_alias{u8"-Wexi1api"};
+        inline bool wasip1_expose_host_api_is_exist{};  // [global]
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_expose_host_api_alias{u8"-I1exportapi"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasm_expose_wasip1_host_api_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type wasip1_expose_host_api_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                           ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                           ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)
 #   pragma clang diagnostic push
 #   pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #  endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasm_expose_wasip1_host_api{
-        .name{u8"--wasm-expose-wasip1-host-api"},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_expose_host_api{
+        .name{u8"--wasip1-expose-host-api"},
         .describe{u8"Expose the stable WASI Preview 1 host API to preload modules (DL / weak-symbol). Disabled by default."},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_expose_wasip1_host_api_alias), 1uz}},
-        .handle{::std::addressof(details::wasm_expose_wasip1_host_api_callback)},
-        .is_exist{::std::addressof(details::wasm_expose_wasip1_host_api_is_exist)},
-        .cate{::uwvm2::utils::cmdline::categorization::wasm}};
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_expose_host_api_alias), 1uz}},
+        .handle{::std::addressof(details::wasip1_expose_host_api_callback)},
+        .is_exist{::std::addressof(details::wasip1_expose_host_api_is_exist)},
+        .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
 #   pragma clang diagnostic pop
 #  endif

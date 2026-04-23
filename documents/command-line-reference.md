@@ -173,7 +173,6 @@ Notes:
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
 | `--wasm-depend-recursion-limit` | `-Wdeplim` | `<depth:size_t>` | Set the recursion depth limit for dependency checking. `0` means unlimited. The source comment and help text indicate a default of `2048`. | Hosted builds |
-| `--wasm-expose-wasip1-host-api` | `-Wexi1api` | None | Expose the stable WASI Preview 1 host API to preload modules such as DL and weak-symbol modules. | Requires local WASI Preview 1 support |
 | `--wasm-list-weak-symbol-module` | `-Wlsweak` | None | Print the list of registered weak-symbol modules. | Requires weak-symbol support |
 | `--wasm-memory-grow-strict` | `-Wmemstrict` | None | Enable strict `memory.grow` semantics. In strict mode, allocation failure returns false when overcommit is disabled. With overcommit enabled, OOM still aborts the process. | Builds with memory-growth policy support |
 | `--wasm-preload-library` | `-Wpre` | `<wasm:path> (<rename:str>)` | Preload a WebAssembly module as a dynamic library, optionally under a custom module name. | Hosted builds |
@@ -506,6 +505,7 @@ These options configure the hosted WASI integration, especially the built-in WAS
 | `--wasip1-add-environment` | `-I1addenv` | `<env:str> <value:str>` | Add or replace an environment variable in the Preview 1 environment. | Requires local imported WASI Preview 1 support |
 | `--wasip1-delete-system-environment` | `-I1delsysenv` | `<env:str>` | Remove a host environment variable from inherited Preview 1 state. | Requires local imported WASI Preview 1 support |
 | `--wasip1-disable` | `-I1disable` | None | Disable preloading of the local Preview 1 module. | Requires local imported WASI Preview 1 support |
+| `--wasip1-expose-host-api` | `-I1exportapi` | None | Expose the stable WASI Preview 1 host API to preload modules such as DL and weak-symbol modules. | Requires local imported WASI Preview 1 support |
 | `--wasip1-mount-dir` | `-I1dir` | `<wasi dir:str> <system dir:path>` | Mount a host directory into the Preview 1 sandbox. | Requires local imported WASI Preview 1 support |
 | `--wasip1-noinherit-system-environment` | `-I1nosysenv` | None | Disable host environment inheritance for Preview 1. | Requires local imported WASI Preview 1 support |
 | `--wasip1-set-argv0` | `-I1argv0` | `<argv0:str>` | Override guest `argv[0]` for Preview 1. | Requires local imported WASI Preview 1 support |

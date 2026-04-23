@@ -52,9 +52,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  else
     UWVM_GNU_COLD inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_expose_wasip1_host_api_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                            ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type wasip1_expose_host_api_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
         ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api = true;
 

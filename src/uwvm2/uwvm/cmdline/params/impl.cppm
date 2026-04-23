@@ -36,7 +36,6 @@ export import :debug_test;
 export import :wasm_set_main_module_name;
 export import :wasm_preload_library;
 export import :wasm_register_dl;
-export import :wasm_expose_wasip1_host_api;
 export import :wasm_set_preload_module_attribute;
 export import :wasm_depend_recursion_limit;
 export import :wasm_set_memory_limit;
@@ -59,6 +58,7 @@ export import :runtime_scheduling_policy;
 
 // wasi
 export import :wasi_disable_utf8_check;
+export import :wasip1_expose_host_api;
 export import :wasip1_set_fd_limit;
 export import :wasip1_mount_dir;
 export import :wasip1_set_argv0;

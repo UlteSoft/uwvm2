@@ -71,7 +71,7 @@ wat2wasm main.wat -o main.wasm
 
 ```sh
 uwvm -Rcc int -Rcm full \
-  --wasm-expose-wasip1-host-api \
+  --wasip1-expose-host-api \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world
@@ -83,7 +83,7 @@ If you want the guest-visible program name to differ from the wasm file path, ad
 
 ```sh
 uwvm -Rcc int -Rcm full \
-  --wasm-expose-wasip1-host-api \
+  --wasip1-expose-host-api \
   --wasip1-set-argv0 main \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
@@ -94,7 +94,7 @@ With that override, the guest sees `argv = ["main", "hello", "world"]`, and the 
 
 ### Negative path: do **not** expose WASI P1
 
-If you remove `--wasm-expose-wasip1-host-api`, the plugin still loads, but `probe_host_apis` returns a failure code and the verification wasm traps in its start function.
+If you remove `--wasip1-expose-host-api`, the plugin still loads, but `probe_host_apis` returns a failure code and the verification wasm traps in its start function.
 
 ```sh
 uwvm -Rcc int -Rcm full \
