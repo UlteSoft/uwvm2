@@ -51,8 +51,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         inline constexpr
 #endif
             ::uwvm2::utils::cmdline::parameter_return_type log_enable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 

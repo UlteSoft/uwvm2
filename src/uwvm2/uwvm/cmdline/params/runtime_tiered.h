@@ -64,7 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_tiered{
         .name{u8"--runtime-tiered"},
         .describe{u8"Shortcut selection of runtime"
-# if 0 /// @todo set to default
+# if 0  /// @todo set to default
                 u8" (DEFAULT)"
 # endif
                   u8": tiered (lazy compile + interpreter/llvm-jit tiered)."},

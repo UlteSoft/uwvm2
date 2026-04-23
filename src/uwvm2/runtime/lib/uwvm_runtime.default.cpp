@@ -2857,13 +2857,13 @@ namespace uwvm2::runtime::lib
             }
 
             auto raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
-                                 .setEngineKind(::llvm::EngineKind::JIT)
-                                 .setErrorStr(::std::addressof(engine_error))
-                                 .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
-                                 .setMCPU(host_cpu_name)
-                                 .setMAttrs(host_target_attributes)
-                                 .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
-                                 .create(target_machine.release())};
+                                .setEngineKind(::llvm::EngineKind::JIT)
+                                .setErrorStr(::std::addressof(engine_error))
+                                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                                .setMCPU(host_cpu_name)
+                                .setMAttrs(host_target_attributes)
+                                .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
+                                .create(target_machine.release())};
             if(raw_engine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]

@@ -229,7 +229,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_table_type_t = decltype(get_final_table_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
-    struct local_defined_table_storage_t 
+    struct local_defined_table_storage_t
     {
         ::uwvm2::utils::container::vector<local_defined_table_elem_storage_t> elems{};
         static_assert(::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<::uwvm2::utils::container::vector<local_defined_table_elem_storage_t>>);
@@ -306,7 +306,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
 
     using wasm_binfmt1_final_memory_type_t = decltype(get_final_memory_type_from_tuple(::uwvm2::uwvm::wasm::feature::wasm_binfmt1_features));
 
-    struct local_defined_memory_storage_t 
+    struct local_defined_memory_storage_t
     {
         // NOTE: `native_memory_t` is a real runtime object; its default constructor may allocate (e.g. mmap backend).
         // If you need a "module record" that is cheap to construct (no allocations) before instantiation,

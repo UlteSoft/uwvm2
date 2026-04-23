@@ -54,17 +54,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
     UWVM_GNU_COLD inline constexpr
 #endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasm_set_memory_limit_callback(
-            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type wasm_set_memory_limit_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
+                                                                                          para_begin,
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto currp1{para_curr + 1u};
         auto currp2{para_curr + 2u};
         auto currp3{para_curr + 3u};
 
-        if(currp1 == para_end || currp2 == para_end || currp3 == para_end ||
-           currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg ||
+        if(currp1 == para_end || currp2 == para_end || currp3 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg ||
            currp2->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg ||
            currp3->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
         {
@@ -98,10 +97,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         bool apply_to_all{};
         ::std::size_t parsed_index{};
-        if(target_text == u8"all")
-        {
-            apply_to_all = true;
-        }
+        if(target_text == u8"all") { apply_to_all = true; }
         else
         {
             auto const [next, err]{::fast_io::parse_by_scan(currp2->str.cbegin(), currp2->str.cend(), parsed_index)};
@@ -183,10 +179,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         auto& limit{::uwvm2::uwvm::wasm::storage::upsert_configured_module_memory_limit(module_name)};
-        ::uwvm2::uwvm::wasm::type::module_memory_limit_t parsed_limit{
-            .min = parsed_min,
-            .max = parsed_max_present ? parsed_max : ::uwvm2::uwvm::wasm::type::module_memory_limit_t::default_max,
-            .present_max = parsed_max_present};
+        ::uwvm2::uwvm::wasm::type::module_memory_limit_t parsed_limit{.min = parsed_min,
+                                                                      .max = parsed_max_present ? parsed_max
+                                                                                                : ::uwvm2::uwvm::wasm::type::module_memory_limit_t::default_max,
+                                                                      .present_max = parsed_max_present};
 
         if(apply_to_all)
         {

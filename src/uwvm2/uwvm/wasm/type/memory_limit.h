@@ -60,63 +60,78 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type
 
     template <::std::integral char_type, typename Stm>
     inline constexpr void print_define(::fast_io::io_reserve_type_t<char_type, module_memory_limit_section_details_wrapper_t>,
-                                       Stm&& stream,
+                                       Stm && stream,
                                        module_memory_limit_section_details_wrapper_t const wrapper)
     {
         if(wrapper.limits.present_max)
         {
             if constexpr(::std::same_as<char_type, char>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), "limits: {min: ", wrapper.limits.min, ", max: ", wrapper.limits.max, "}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 "limits: {min: ",
+                                                                 wrapper.limits.min,
+                                                                 ", max: ",
+                                                                 wrapper.limits.max,
+                                                                 "}");
             }
             else if constexpr(::std::same_as<char_type, wchar_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), L"limits: {min: ", wrapper.limits.min, L", max: ", wrapper.limits.max, L"}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 L"limits: {min: ",
+                                                                 wrapper.limits.min,
+                                                                 L", max: ",
+                                                                 wrapper.limits.max,
+                                                                 L"}");
             }
             else if constexpr(::std::same_as<char_type, char8_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), u8"limits: {min: ", wrapper.limits.min, u8", max: ", wrapper.limits.max, u8"}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 u8"limits: {min: ",
+                                                                 wrapper.limits.min,
+                                                                 u8", max: ",
+                                                                 wrapper.limits.max,
+                                                                 u8"}");
             }
             else if constexpr(::std::same_as<char_type, char16_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), u"limits: {min: ", wrapper.limits.min, u", max: ", wrapper.limits.max, u"}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 u"limits: {min: ",
+                                                                 wrapper.limits.min,
+                                                                 u", max: ",
+                                                                 wrapper.limits.max,
+                                                                 u"}");
             }
             else if constexpr(::std::same_as<char_type, char32_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), U"limits: {min: ", wrapper.limits.min, U", max: ", wrapper.limits.max, U"}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream),
+                                                                 U"limits: {min: ",
+                                                                 wrapper.limits.min,
+                                                                 U", max: ",
+                                                                 wrapper.limits.max,
+                                                                 U"}");
             }
         }
         else
         {
             if constexpr(::std::same_as<char_type, char>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), "limits: {min: ", wrapper.limits.min, ", max: unbounded}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), "limits: {min: ", wrapper.limits.min, ", max: unbounded}");
             }
             else if constexpr(::std::same_as<char_type, wchar_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), L"limits: {min: ", wrapper.limits.min, L", max: unbounded}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), L"limits: {min: ", wrapper.limits.min, L", max: unbounded}");
             }
             else if constexpr(::std::same_as<char_type, char8_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), u8"limits: {min: ", wrapper.limits.min, u8", max: unbounded}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u8"limits: {min: ", wrapper.limits.min, u8", max: unbounded}");
             }
             else if constexpr(::std::same_as<char_type, char16_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), u"limits: {min: ", wrapper.limits.min, u", max: unbounded}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), u"limits: {min: ", wrapper.limits.min, u", max: unbounded}");
             }
             else if constexpr(::std::same_as<char_type, char32_t>)
             {
-                ::fast_io::operations::print_freestanding<false>(
-                    ::std::forward<Stm>(stream), U"limits: {min: ", wrapper.limits.min, U", max: unbounded}");
+                ::fast_io::operations::print_freestanding<false>(::std::forward<Stm>(stream), U"limits: {min: ", wrapper.limits.min, U", max: unbounded}");
             }
         }
     }

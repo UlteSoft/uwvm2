@@ -57,7 +57,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept
     {
         ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api = true;
-        
+
 #  if defined(UWVM_SUPPORT_PRELOAD_DL)
         ::uwvm2::uwvm::wasm::loader::refresh_preloaded_dl_wasip1_host_api();
 #  endif

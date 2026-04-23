@@ -176,9 +176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return result;
         }
 
-        [[nodiscard]] inline constexpr bool runtime_memory_limits_widen_declared(
-            ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
-            runtime_memory_limits_t const& effective_limits) noexcept
+        [[nodiscard]] inline constexpr bool
+            runtime_memory_limits_widen_declared(::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
+                                                 runtime_memory_limits_t const& effective_limits) noexcept
         {
             if(effective_limits.min < static_cast<::std::size_t>(declared_limits.min)) { return true; }
 
@@ -191,11 +191,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return false;
         }
 
-        inline constexpr void emit_runtime_memory_limit_widen_warning(
-            ::uwvm2::utils::container::u8string_view memory_kind,
-            ::std::size_t memory_index,
-            ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
-            runtime_memory_limits_t const& effective_limits) noexcept
+        inline constexpr void emit_runtime_memory_limit_widen_warning(::uwvm2::utils::container::u8string_view memory_kind,
+                                                                      ::std::size_t memory_index,
+                                                                      ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
+                                                                      runtime_memory_limits_t const& effective_limits) noexcept
         {
             if(!::uwvm2::uwvm::io::show_runtime_warning) [[likely]] { return; }
 
@@ -325,8 +324,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         {
             if(override_limits == nullptr) [[likely]] { return {}; }
 
-            if(auto const it{override_limits->local_defined_memory_limits.find(local_memory_index)};
-               it != override_limits->local_defined_memory_limits.cend()) [[likely]]
+            if(auto const it{override_limits->local_defined_memory_limits.find(local_memory_index)}; it != override_limits->local_defined_memory_limits.cend())
+                [[likely]]
             {
                 return {::std::addressof(it->second), false};
             }
@@ -336,15 +335,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             return {};
         }
 
-        inline constexpr void emit_runtime_memory_limit_override_verbose(
-            ::std::size_t memory_index,
-            bool from_all,
-            ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
-            runtime_memory_limits_t const& effective_limits) noexcept
+        inline constexpr void emit_runtime_memory_limit_override_verbose(::std::size_t memory_index,
+                                                                         bool from_all,
+                                                                         ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
+                                                                         runtime_memory_limits_t const& effective_limits) noexcept
         {
             if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
-            auto const override_source{
-                from_all ? ::uwvm2::utils::container::u8string_view{u8"`all`"} : ::uwvm2::utils::container::u8string_view{u8"`memory_idx`"}};
+            auto const override_source{from_all ? ::uwvm2::utils::container::u8string_view{u8"`all`"}
+                                                : ::uwvm2::utils::container::u8string_view{u8"`memory_idx`"}};
 
             verbose_module_info(u8"Init: apply ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
@@ -369,7 +367,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         {
             for(auto const& [module_name, configured_limits]: ::uwvm2::uwvm::wasm::storage::configured_module_memory_limit)
             {
-                auto const module_name_view{::uwvm2::utils::container::u8string_view{module_name.data(), module_name.size()}};
+                auto const module_name_view{
+                    ::uwvm2::utils::container::u8string_view{module_name.data(), module_name.size()}
+                };
                 if(::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(module_name_view) ==
                    ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.cend()) [[unlikely]]
                 {
@@ -378,11 +378,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        [[nodiscard]] inline constexpr runtime_memory_limits_t resolve_effective_runtime_memory_limits(
-            ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
-            runtime_memory_limits_t const* override_limits,
-            ::uwvm2::utils::container::u8string_view memory_kind,
-            ::std::size_t memory_index) noexcept
+        [[nodiscard]] inline constexpr runtime_memory_limits_t
+            resolve_effective_runtime_memory_limits(::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
+                                                    runtime_memory_limits_t const* override_limits,
+                                                    ::uwvm2::utils::container::u8string_view memory_kind,
+                                                    ::std::size_t memory_index) noexcept
         {
             auto result{parser_memory_limits_to_runtime_limits(declared_limits)};
             if(override_limits == nullptr) [[likely]] { return result; }
@@ -2363,8 +2363,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: imported descriptors. "); }
 
-            auto module_memory_limit_override{
-                ::uwvm2::uwvm::wasm::storage::find_configured_module_memory_limit_const(current_initializing_module_name)};
+            auto module_memory_limit_override{::uwvm2::uwvm::wasm::storage::find_configured_module_memory_limit_const(current_initializing_module_name)};
             auto const local_defined_memory_count{memorysec.memories.size()};
 
             if(module_memory_limit_override != nullptr) [[unlikely]]
@@ -2386,10 +2385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                         u8"). ");
                 }
 
-                if(local_defined_memory_count == 0uz) [[unlikely]]
-                {
-                    fatal_runtime_memory_limit_no_local_defined_memory(*module_memory_limit_override);
-                }
+                if(local_defined_memory_count == 0uz) [[unlikely]] { fatal_runtime_memory_limit_no_local_defined_memory(*module_memory_limit_override); }
 
                 for(auto const& [memory_index, configured_limits]: module_memory_limit_override->local_defined_memory_limits)
                 {
@@ -2593,14 +2589,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     out.local_defined_memory_vec_storage.emplace_back();
                     auto& rec{out.local_defined_memory_vec_storage.back()};
                     rec.memory_type_ptr = ::std::addressof(memory_type);
-                    auto const local_defined_memory_limit_override{
-                        resolve_configured_local_defined_memory_limit(module_memory_limit_override, memory_idx)};
-                    rec.effective_limits = resolve_effective_runtime_memory_limits(
-                        memory_type.limits, local_defined_memory_limit_override.limits, u8"local-defined", memory_idx);
+                    auto const local_defined_memory_limit_override{resolve_configured_local_defined_memory_limit(module_memory_limit_override, memory_idx)};
+                    rec.effective_limits =
+                        resolve_effective_runtime_memory_limits(memory_type.limits, local_defined_memory_limit_override.limits, u8"local-defined", memory_idx);
                     if(local_defined_memory_limit_override.limits != nullptr) [[unlikely]]
                     {
-                        emit_runtime_memory_limit_override_verbose(
-                            memory_idx, local_defined_memory_limit_override.from_all, memory_type.limits, rec.effective_limits);
+                        emit_runtime_memory_limit_override_verbose(memory_idx,
+                                                                   local_defined_memory_limit_override.from_all,
+                                                                   memory_type.limits,
+                                                                   rec.effective_limits);
                     }
                     rec.memory.init_by_page_count(rec.effective_limits.min);
                     ++memory_idx;
@@ -5072,10 +5069,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             }
         }
 
-        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-        {
-            details::verbose_info(u8"initializer: Validate configured memory limit override target modules. ");
-        }
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { details::verbose_info(u8"initializer: Validate configured memory limit override target modules. "); }
         details::validate_configured_runtime_memory_limit_target_modules();
 
         // Best-effort linking between wasm file modules.
