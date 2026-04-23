@@ -30,6 +30,7 @@ function windows_target()
         end
         
         local static_link = get_config("static")
+        static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
 
         if is_mode("debug") then    
             if static_link then	
@@ -94,6 +95,7 @@ function windows_target()
         add_cxflags("-GR-") -- disable rtti
     
         local static_link = get_config("static")
+        static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
     
         if is_mode("debug") then
             add_cxflags("-GS") -- enable buffer overflow check

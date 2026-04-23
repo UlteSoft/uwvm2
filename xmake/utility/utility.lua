@@ -76,6 +76,11 @@ local function _normalize_dir(dir)
     return os.isdir(dir) and path.normalize(dir) or dir
 end
 
+local function _is_default_system_include_dir(dir)
+    local normalized = _normalize_dir(dir)
+    return normalized == "/usr/include" or normalized == "/usr/local/include"
+end
+
 local function _is_library_path(flag)
     if not flag or flag == "" or not flag:find("[/\\]") then
         return false
@@ -102,14 +107,20 @@ local function _parse_llvm_cxxflags(flags, result, seen)
             value, consumed = _extract_prefixed_value(argv, i, "/I")
         end
         if value then
-            _append_unique(result, seen, "sysincludedirs", _normalize_dir(value))
+            local include_dir = _normalize_dir(value)
+            if not _is_default_system_include_dir(include_dir) then
+                _append_unique(result, seen, "sysincludedirs", include_dir)
+            end
             i = i + 1 + consumed
             goto continue
         end
 
         value, consumed = _extract_prefixed_value(argv, i, "-isystem")
         if value then
-            _append_unique(result, seen, "sysincludedirs", _normalize_dir(value))
+            local include_dir = _normalize_dir(value)
+            if not _is_default_system_include_dir(include_dir) then
+                _append_unique(result, seen, "sysincludedirs", include_dir)
+            end
             i = i + 1 + consumed
             goto continue
         end
@@ -366,7 +377,10 @@ function get_llvm_jit_options()
     }
     local seen = {}
 
-    _append_unique(result, seen, "includedirs", _normalize_dir(includedir))
+    local normalized_includedir = _normalize_dir(includedir)
+    if not _is_default_system_include_dir(normalized_includedir) then
+        _append_unique(result, seen, "includedirs", normalized_includedir)
+    end
     _append_unique(result, seen, "linkdirs", _normalize_dir(libdir))
     _parse_llvm_cxxflags(cxxflags, result, seen)
     _parse_llvm_linkflags(system_libs, result, seen, "syslinks")
