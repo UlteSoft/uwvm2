@@ -376,7 +376,7 @@ Source behavior:
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
 | `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
 | `--runtime-custom-mode` | `-Rcm` | `[lazy\|lazy+verification\|full]` | Select the runtime mode explicitly. | Hosted runtime builds |
-| `--runtime-debug` | `-Rdebug` | None | Shortcut for full compile with the debug interpreter backend. | Requires debug interpreter |
+| `--runtime-debug-int` | `-RDint` | None | Shortcut for full compile with the debug interpreter backend. | Requires debug interpreter |
 | `--runtime-int` | `-Rint` | None | Shortcut for lazy compile with the uwvm interpreter backend. | Requires interpreter backend |
 | `--runtime-jit` | `-Rjit` | None | Shortcut for lazy compile with the LLVM JIT backend. | Requires LLVM JIT |
 | `--runtime-tiered` | `-Rtiered` | None | Shortcut for lazy compile with the tiered interpreter/LLVM JIT backend. | Requires tiered backend |
@@ -401,6 +401,11 @@ The runtime compiler enum is compiled conditionally and may contain:
 - `uwvm_interpreter_llvm_jit_tiered`
 - `llvm_jit_only`
 
+When no runtime-selection parameter is provided, the current default is:
+
+- mode = `full_compile`
+- compiler = `llvm_jit_only` when LLVM JIT is compiled in; otherwise `uwvm_interpreter_only`
+
 ### Shortcut Runtime Options
 
 These five parameters are pure flag-style selectors. Each one writes both runtime-selection axes at once: the runtime mode and the runtime compiler backend.
@@ -413,7 +418,7 @@ Shortcut runtime options are syntactic sugar over a concrete `(mode, compiler)` 
 | `--runtime-jit` | `lazy_compile` | `llvm_jit_only` |
 | `--runtime-tiered` | `lazy_compile` | `uwvm_interpreter_llvm_jit_tiered` |
 | `--runtime-aot` | `full_compile` | `llvm_jit_only` |
-| `--runtime-debug` | `full_compile` | `debug_interpreter` |
+| `--runtime-debug-int` | `full_compile` | `debug_interpreter` |
 
 Operational notes:
 

@@ -136,7 +136,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"|"
 #  endif
                                 ,
-                                u8"--runtime-debug"
+                                u8"--runtime-debug-int"
 # endif
                                 u8").\n"
                                 u8"uwvm: ",

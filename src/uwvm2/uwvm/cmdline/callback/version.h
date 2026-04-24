@@ -1033,6 +1033,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
         // runtime compiler
                             u8"  * Runtime Compiler:"
+#if !defined(UWVM_RUNTIME_HAS_BACKEND)
+                            u8" None"
+#endif
 #ifdef UWVM_RUNTIME_UWVM_INTERPRETER
                             u8" UWVM2-Interpreter"
 #endif
@@ -1045,13 +1048,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #ifdef UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED
                             u8", UWVM2-Interpreter + LLVM-JIT (Tiered)"
 #endif
+                            u8"\n"
+        // debug backend
+                            u8"  * Runtime Debug Compiler:"
 #ifdef UWVM_RUNTIME_DEBUG_INTERPRETER
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
-                            u8","
-# endif
                             u8" Debug Interpreter"
+#else
+                            u8" None"
 #endif
-                            u8"\n");
+                            u8"\n"
+        );
 
         // u2int para
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)

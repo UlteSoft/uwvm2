@@ -42,6 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_custom_compiler_alias{u8"-Rcc"};
@@ -92,6 +93,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
+#endif
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params
 

@@ -162,39 +162,39 @@ Controls whether UWVM2 uses C++ `thread_local` for per-thread runtime state.
 - **Example:**
   - `xmake f --use-thread-local=y`
 
-### `--enable-int=ENABLE-INT`
+### `--execution-int=EXECUTION-INT`
 
-Controls the interpreter backend selection.
+Controls the execution int backend selection.
 
 - **Default:** `default`
 - **Values:**
-  - `none`: Disable interpreter support (`UWVM_DISABLE_INT`).
-  - `default`: Enable and use the default interpreter (`UWVM_USE_DEFAULT_INT`).
-  - `uwvm-int`: Enable and use the UWVM interpreter (`UWVM_USE_UWVM_INT`).
+  - `none`: Disable the execution int backend (`UWVM_DISABLE_INT`).
+  - `default`: Enable and use the default execution int backend (`UWVM_USE_DEFAULT_INT`).
+  - `uwvm-int`: Enable and use the UWVM execution int backend (`UWVM_USE_UWVM_INT`).
 - **Example:**
-  - `xmake f --enable-int=uwvm-int`
+  - `xmake f --execution-int=uwvm-int`
 
-### `--enable-jit=ENABLE-JIT`
+### `--execution-jit=EXECUTION-JIT`
 
-Controls the JIT backend selection.
+Controls the execution jit backend selection.
 
 - **Default:** `default`
 - **Values:**
-  - `none`: Disable JIT support (`UWVM_DISABLE_JIT`).
-  - `default`: Enable and use the default JIT (`UWVM_USE_DEFAULT_JIT`).
-  - `llvm`: Enable and use LLVM as the JIT engine (`UWVM_USE_LLVM_JIT`).
+  - `none`: Disable the execution jit backend (`UWVM_DISABLE_JIT`).
+  - `default`: Enable and use the default execution jit backend (`UWVM_USE_DEFAULT_JIT`).
+  - `llvm`: Enable and use LLVM as the execution jit backend (`UWVM_USE_LLVM_JIT`).
 - **Notes:** When `default` or `llvm` is selected, `xmake` probes LLVM through `llvm-config` and imports the returned include paths, link paths, defines, system libraries, and LLVM libraries automatically. `none` skips this probe entirely. This JIT selection is separate from `--use-llvm-compiler`, which only controls the compiler toolchain. Ensure `llvm-config` is discoverable on `PATH`, or point `LLVM_CONFIG` to the executable explicitly.
 - **Example:**
-  - `xmake f --enable-jit=llvm --use-llvm-compiler=y`
+  - `xmake f --execution-jit=llvm --use-llvm-compiler=y`
 
-### `--enable-debug-int=[y|n]`
+### `--debug-int=[y|n]`
 
-Enables extra debug support for the interpreter (build-time define `UWVM_ENABLE_DEBUG_INT`).
+Controls whether the debug int backend is enabled (build-time define `UWVM_ENABLE_DEBUG_INT`).
 
 - **Default:** `y`
 - **Impact:** Intended for development/debug builds; may have runtime overhead or extra checks/logging depending on implementation.
 - **Example:**
-  - `xmake f --enable-debug-int=n`
+  - `xmake f --debug-int=n`
 
 ### `--enable-uwvm-int-combine-ops=MODE`
 
@@ -208,7 +208,7 @@ Controls “combined opcode” optimizations for `uwvm-int`.
   - `extra`: Enable soft + heavy + extra-heavy combinations.
 - **Impact:** Trades compiler/build complexity and code size for potential interpreter performance improvements.
 - **Example:**
-  - `xmake f --enable-int=uwvm-int --enable-uwvm-int-combine-ops=soft`
+  - `xmake f --execution-int=uwvm-int --enable-uwvm-int-combine-ops=soft`
 
 ### `--detailed-debug-check=[y|n]`
 

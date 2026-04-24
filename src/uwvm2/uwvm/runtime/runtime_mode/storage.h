@@ -46,10 +46,6 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if !defined(UWVM_RUNTIME_UWVM_INTERPRETER) && !defined(UWVM_RUNTIME_LLVM_JIT) && !defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-# error "No runtime backend selected. Include <uwvm2/uwvm/runtime/macro/push_macros.h> before this header (or enable interpreter/JIT in build flags)."
-#endif
-
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
     using ssize_t = ::std::make_signed_t<::std::size_t>;
@@ -133,28 +129,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
     /// @brief   The global runtime mode.
-    /// @details default = runtime-tiered
+    /// @details default = full_compile
+    /// @todo    set default to lazy_compile
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-#if 0  /// @todo    set to lazy_compile
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile
-#else
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
-#endif
-
     };  // [global]
 
-    // The debug interpreter is never used as a regular interpreter.
+     /// @todo    set default to uwvm_interpreter_llvm_jit_tiered
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
-#if 0  /// @todo    set to uwvm_interpreter_llvm_jit_tiered
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered
-# elif defined(UWVM_RUNTIME_LLVM_JIT)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
-# elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only
-# endif
 #else
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::none_backend
 #endif
     };  // [global]
 }

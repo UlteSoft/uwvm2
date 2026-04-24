@@ -47,14 +47,14 @@ export import :wasm_memory_grow_strict;
 // runtime
 export import :runtime_custom_mode;
 export import :runtime_custom_compiler;
-export import :runtime_debug;
-export import :runtime_int;
-export import :runtime_jit;
-export import :runtime_tiered;
-export import :runtime_aot;
 export import :runtime_compiler_log;
 export import :runtime_compile_threads;
 export import :runtime_scheduling_policy;
+export import :runtime_debug_int;
+export import :runtime_int;
+export import :runtime_jit;
+export import :runtime_aot;
+export import :runtime_tiered;
 
 // wasi
 export import :wasi_disable_utf8_check;

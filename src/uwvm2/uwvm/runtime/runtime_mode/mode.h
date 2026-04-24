@@ -44,11 +44,6 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if !defined(UWVM_RUNTIME_UWVM_INTERPRETER) && !defined(UWVM_RUNTIME_LLVM_JIT)
-// The debug interpreter is never used as a regular interpreter.
-# error "No runtime backend selected. Include <uwvm2/uwvm/runtime/macro/push_macros.h> before this header (or enable interpreter/JIT in build flags)."
-#endif
-
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 {
     enum class runtime_mode_t : unsigned
@@ -60,6 +55,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     enum class runtime_compiler_t : unsigned
     {
+#if !defined(UWVM_RUNTIME_HAS_BACKEND)
+        none_backend,
+#endif
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         uwvm_interpreter_only,
 #endif

@@ -29,16 +29,11 @@ module;
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
-export module uwvm2.uwvm.cmdline.callback:runtime_debug;
+export module uwvm2.uwvm.cmdline.params:runtime_debug_int;
 
 import fast_io;
 import uwvm2.utils.container;
-import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
-import uwvm2.uwvm.io;
-import uwvm2.uwvm.utils.ansies;
-import uwvm2.uwvm.cmdline;
-import uwvm2.uwvm.cmdline.params;
 import uwvm2.uwvm.runtime.runtime_mode;
 
 #ifndef UWVM_MODULE
@@ -48,5 +43,4 @@ import uwvm2.uwvm.runtime.runtime_mode;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "runtime_debug.h"
-
+#include "runtime_debug_int.h"

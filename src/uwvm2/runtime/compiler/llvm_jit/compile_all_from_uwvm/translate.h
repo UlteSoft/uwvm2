@@ -33,8 +33,9 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
-# if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
 #  include <llvm/IR/BasicBlock.h>
@@ -69,7 +70,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
-#if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,
@@ -81,13 +82,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm
 {
-#if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+#if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "translate/single_func.h"
 #endif
 }
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

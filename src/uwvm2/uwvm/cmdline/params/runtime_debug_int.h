@@ -46,7 +46,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view runtime_debug_alias{u8"-Rdebug"};
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_debug_alias{u8"-RDint"};
 # if defined(UWVM_MODULE)
         extern "C++"
 # else
@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  pragma clang diagnostic ignored "-Wbraced-scalar-init"
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_debug{
-        .name{u8"--runtime-debug"},
+        .name{u8"--runtime-debug-int"},
         .describe{u8"Shortcut for full compile with the debug interpreter backend."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_debug_alias), 1uz}},
         .handle{::std::addressof(details::runtime_debug_callback)},

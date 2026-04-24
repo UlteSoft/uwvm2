@@ -48,7 +48,6 @@
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
-# include <uwvm2/uwvm/runtime/storage/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT

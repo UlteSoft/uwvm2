@@ -30,6 +30,7 @@
 # include <utility>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 // import
 # include <fast_io.h>
@@ -2575,7 +2576,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 }
             }
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
             out.llvm_jit_call_indirect_table_views.resize(out.imported_table_vec_storage.size() + out.local_defined_table_vec_storage.size());
+#endif
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local memories. "); }
 
@@ -5118,5 +5121,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 #ifndef UWVM_MODULE
 // macro
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

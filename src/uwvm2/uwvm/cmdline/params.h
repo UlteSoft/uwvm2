@@ -74,6 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
 
             // runtime
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
 #if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
@@ -94,6 +95,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
+#endif
 
         // wasi
 #if defined(UWVM_IMPORT_WASI)

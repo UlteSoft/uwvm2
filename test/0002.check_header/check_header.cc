@@ -67,4 +67,5 @@ int main()
 #if defined(UWVM_INTERPRETER_OPFUNC_HOT_MACRO)
 # error "UWVM_INTERPRETER_OPFUNC_HOT_MACRO"
 #endif
+
 }

@@ -88,27 +88,27 @@ function def_build()
 		add_defines("UWVM_ENABLE_WASIX_VER_WASIP1_SOCKET")
 	end
 
-	local enable_int = get_config("enable-int")
-	if not enable_int or enable_int == "none" then
+	local execution_int = get_config("execution-int")
+	if not execution_int or execution_int == "none" then
 		add_defines("UWVM_DISABLE_INT")
-	elseif enable_int == "default" then
+	elseif execution_int == "default" then
 		add_defines("UWVM_USE_DEFAULT_INT")
-	elseif enable_int == "uwvm-int" then
+	elseif execution_int == "uwvm-int" then
 		add_defines("UWVM_USE_UWVM_INT")
 	end
 
-	local enable_jit = get_config("enable-jit")
-	if not enable_jit or enable_jit == "none" then
+	local execution_jit = get_config("execution-jit")
+	if not execution_jit or execution_jit == "none" then
 		add_defines("UWVM_DISABLE_JIT")
-	elseif enable_jit == "default" then
+	elseif execution_jit == "default" then
 		add_defines("UWVM_USE_DEFAULT_JIT")
 		add_options("llvm-jit-env")
-	elseif enable_jit == "llvm" then
+	elseif execution_jit == "llvm" then
 		add_defines("UWVM_USE_LLVM_JIT")
 		add_options("llvm-jit-env")
 	end
 
-	if enable_jit == "default" or enable_jit == "llvm" then
+	if execution_jit == "default" or execution_jit == "llvm" then
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()
@@ -125,7 +125,7 @@ function def_build()
 		end)
 	end
 
-	if (enable_jit == "default" or enable_jit == "llvm") and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
+	if (execution_jit == "default" or execution_jit == "llvm") and (is_plat("macosx") or is_plat("iphoneos") or is_plat("watchos")) then
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			-- Keep the runtime search path aligned with the LLVM installation
@@ -139,9 +139,11 @@ function def_build()
 		end)
 	end
 
-	local enable_debug_int = get_config("enable-debug-int")
-	if enable_debug_int then
+	local debug_int = get_config("debug-int")
+	if debug_int then
 		add_defines("UWVM_ENABLE_DEBUG_INT")
+	else
+		add_defines("UWVM_DISABLE_DEBUG_INT")
 	end
 
 	local heavy_combine_ops_mode = get_config("enable-uwvm-int-combine-ops")
@@ -382,15 +384,17 @@ target("uwvm")
 		add_files("src/uwvm2/uwvm/host_api.default.cpp")
 	end
 
-	-- uwvm_runtime (uwvm_runtime interpreter runtime unit)
-	if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
+	-- uwvm_runtime (shared full-compile runtime unit for int/jit backends)
+	if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
+		(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
 		add_deps("uwvm_runtime")
 	end
 
 target_end()
 
--- uwvm_runtime: build the interpreter/runtime execution unit separately so it can use its own FP flags.
-if get_config("enable-int") == "uwvm-int" or get_config("enable-int") == "default" then
+-- uwvm_runtime: build the shared full-compile runtime unit separately so it can use its own FP flags.
+if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
+	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
 	target("uwvm_runtime")
 		set_kind("object")
 		def_build()

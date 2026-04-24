@@ -48,6 +48,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 #else
@@ -154,6 +155,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             u8"\n\n");
         return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
     }
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE

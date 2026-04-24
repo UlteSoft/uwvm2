@@ -26,13 +26,13 @@
 #include <memory>
 // macro
 #include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
-
+// import
 #ifndef UWVM_MODULE
 # include <uwvm2/imported/wasi/wasip1/impl.h>
-# include <uwvm2/runtime/lib/uwvm_runtime.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
+# include <uwvm2/runtime/lib/uwvm_runtime.h>
 #endif
 
 // wasip1 host api wrappers
@@ -1053,6 +1053,7 @@ namespace uwvm2::uwvm::wasm::type
 
 namespace uwvm2::uwvm::wasm::type
 {
+#if !defined(UWVM_DISABLE_INT) || !defined(UWVM_DISABLE_JIT)
     extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept { return ::uwvm2::runtime::lib::preload_memory_descriptor_count_host_api(); }
 
     extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
@@ -1063,6 +1064,25 @@ namespace uwvm2::uwvm::wasm::type
 
     extern "C" bool uwvm_preload_memory_write(::std::size_t memory_index, ::std::uint_least64_t offset, void const* source, ::std::size_t size) noexcept
     { return ::uwvm2::runtime::lib::preload_memory_write_host_api(memory_index, offset, source, size); }
+#else
+    extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept { return 0uz; }
+
+    extern "C" bool uwvm_preload_memory_descriptor_at([[maybe_unused]] ::std::size_t descriptor_index,
+                                                      [[maybe_unused]] uwvm_preload_memory_descriptor_t* out) noexcept
+    { return false; }
+
+    extern "C" bool uwvm_preload_memory_read([[maybe_unused]] ::std::size_t memory_index,
+                                             [[maybe_unused]] ::std::uint_least64_t offset,
+                                             [[maybe_unused]] void* destination,
+                                             [[maybe_unused]] ::std::size_t size) noexcept
+    { return false; }
+
+    extern "C" bool uwvm_preload_memory_write([[maybe_unused]] ::std::size_t memory_index,
+                                              [[maybe_unused]] ::std::uint_least64_t offset,
+                                              [[maybe_unused]] void const* source,
+                                              [[maybe_unused]] ::std::size_t size) noexcept
+    { return false; }
+#endif
 
     extern "C" uwvm_preload_host_api_v1 const* uwvm_get_preload_host_api_v1() noexcept
     {
