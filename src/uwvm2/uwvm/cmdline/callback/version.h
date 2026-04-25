@@ -43,6 +43,9 @@
 # if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
 #  include <sgidefs.h>
 # endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <llvm/Config/llvm-config.h>
+# endif
 // imported
 # include <fast_io.h>
 # include <fast_io_crypto.h>
@@ -165,6 +168,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     template <typename Stm, ::uwvm2::parser::wasm::concepts::has_feature_name... Fs>
     inline constexpr void version_u8print_wasm_feature_from_tuple(Stm && stm, ::uwvm2::utils::container::tuple<Fs...>) noexcept
     { version_u8print_wasm_feature_impl<Stm, Fs...>(::std::forward<Stm>(stm)); }
+
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    template <typename Stm>
+    inline constexpr void version_u8print_llvm_jit_impl(Stm && stm) noexcept
+    {
+        ::fast_io::io::perr(::std::forward<Stm>(stm), u8"  * LLVM JIT Backend:\n",
+#if defined(LLVM_VERSION_STRING)
+                            u8"    - LLVM Version: ",
+                            ::fast_io::mnp::code_cvt(LLVM_VERSION_STRING),
+                            u8"\n"
+#elif defined(LLVM_VERSION_MAJOR) && defined(LLVM_VERSION_MINOR) && defined(LLVM_VERSION_PATCH)
+                            u8"    - LLVM Version: ",
+                            LLVM_VERSION_MAJOR,
+                            u8".",
+                            LLVM_VERSION_MINOR,
+                            u8".",
+                            LLVM_VERSION_PATCH,
+                            u8"\n"
+#else
+                            u8"    - LLVM Version: Unknown\n"
+#endif
+                            u8"\n");
+    }
+#endif
 
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
@@ -1246,8 +1273,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"  * UWVM Interpreter Parameters:\n"
                                 u8"    - Model: ",
                                 ::fast_io::mnp::cond(is_tail_call, u8"Tail-Call\n" , u8"Loop\n"),
-                                u8"      Diagram: ",
-                                ::fast_io::mnp::cond(is_tail_call, u8"op(ip)->next(ip)->... (musttail)\n" , u8"while{ decode+dispatch }\n"),
                                 u8"    - Fixed Args (slots 0..2): ip, operand_stack_top, local_base\n"
                                 u8"    - ABI/CC: ",
                                 abi_name);
@@ -1335,7 +1360,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #endif
         // LLVM JIT
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        
+        version_u8print_llvm_jit_impl(u8log_output_ul);
 #endif
         // ENDL
         ::fast_io::io::perrln(u8log_output_ul);
