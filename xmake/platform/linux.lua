@@ -28,6 +28,7 @@ function linux_target()
     end
 
     local static_link = get_config("static")
+    static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
     if static_link then	
         add_ldflags("-static", {force = true})
     end

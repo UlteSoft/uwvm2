@@ -1,4 +1,4 @@
-﻿if is_plat("cygwin") then
+if is_plat("cygwin") then
     -- Limited to i686, extended instruction set via march settings
     set_allowedarchs("x86_64", "i686", "aarch64", "arm", "arm64ec")
 end
@@ -43,6 +43,7 @@ function cygwin_target()
     end
 
     local static_link = get_config("static")
+    static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
     if static_link then	
         add_ldflags("-static", {force = true})
     end
