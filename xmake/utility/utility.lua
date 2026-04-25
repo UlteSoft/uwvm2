@@ -27,6 +27,8 @@ local llvm_jit_terminal_component_candidates = {
     "all-targetasmparsers"
 }
 
+local _run_llvm_config
+
 local function _endswith(str, suffix)
     return suffix == "" or str:sub(-#suffix) == suffix
 end
@@ -94,6 +96,137 @@ local function _is_library_path(flag)
         or _endswith(lower, ".lib")
 end
 
+local function _append_existing_libcxx_include_dir(result, seen, dir)
+    if not dir or dir == "" or not os.isdir(dir) then
+        return false
+    end
+
+    if not os.isfile(path.join(dir, "cstddef")) then
+        return false
+    end
+
+    _append_unique(result, seen, "sysincludedirs", path.normalize(dir))
+    return true
+end
+
+local function _append_existing_libcxx_link_dir(result, seen, dir)
+    if not dir or dir == "" or not os.isdir(dir) then
+        return false
+    end
+
+    if not (os.isfile(path.join(dir, "libc++.a"))
+        or os.isfile(path.join(dir, "libc++.dll.a"))
+        or os.isfile(path.join(dir, "c++.lib"))
+        or os.isfile(path.join(dir, "libc++.lib"))) then
+        return false
+    end
+
+    _append_unique(result, seen, "linkdirs", path.normalize(dir))
+    return true
+end
+
+local function _link_dir_has_library(dir, name)
+    return os.isfile(path.join(dir, "lib" .. name .. ".a"))
+        or os.isfile(path.join(dir, "lib" .. name .. ".dll.a"))
+        or os.isfile(path.join(dir, name .. ".lib"))
+        or os.isfile(path.join(dir, "lib" .. name .. ".lib"))
+end
+
+local function _append_unique_string(values, seen, value)
+    if not value or value == "" or seen[value] then
+        return
+    end
+
+    seen[value] = true
+    table.insert(values, value)
+end
+
+local function _add_llvm_libcxx_runtime_paths(result, seen, llvm_config, libdir)
+    local prefix = _run_llvm_config(llvm_config, { "--prefix" })
+    local host_target = _run_llvm_config(llvm_config, { "--host-target" })
+
+    local roots = {}
+    local root_seen = {}
+    local function add_root(root)
+        if root and root ~= "" then
+            _append_unique_string(roots, root_seen, path.normalize(root))
+        end
+    end
+
+    add_root(prefix)
+    if prefix and prefix ~= "" then
+        add_root(path.join(prefix, ".."))
+        add_root(path.join(prefix, "runtimes"))
+        add_root(path.join(prefix, "..", "runtimes"))
+    end
+    if libdir and libdir ~= "" then
+        add_root(path.join(libdir, ".."))
+        add_root(path.join(libdir, "..", "runtimes"))
+    end
+
+    local targets = {}
+    local target_seen = {}
+    local function add_target(target)
+        if target and target ~= "" and target ~= "detect" then
+            _append_unique_string(targets, target_seen, target)
+            _append_unique_string(targets, target_seen, target:gsub("%-unknown%-", "-"))
+        end
+    end
+
+    add_target(host_target)
+    add_target(get_config("llvm-target"))
+
+    local has_libcxx_include_dir = false
+    local function try_add_libcxx_include_dir(dir)
+        if not has_libcxx_include_dir and _append_existing_libcxx_include_dir(result, seen, dir) then
+            has_libcxx_include_dir = true
+        end
+    end
+
+    local libcxx_link_dirs = {}
+    local libcxx_link_dir_seen = {}
+    local function try_add_libcxx_link_dir(dir)
+        if _append_existing_libcxx_link_dir(result, seen, dir) then
+            local normalized = path.normalize(dir)
+            _append_unique_string(libcxx_link_dirs, libcxx_link_dir_seen, normalized)
+        end
+    end
+
+    for _, root in ipairs(roots) do
+        try_add_libcxx_include_dir(path.join(root, "include", "c++", "v1"))
+        try_add_libcxx_include_dir(path.join(root, "runtimes", "include", "c++", "v1"))
+        for _, target in ipairs(targets) do
+            try_add_libcxx_include_dir(path.join(root, target, "include", "c++", "v1"))
+        end
+
+        try_add_libcxx_link_dir(path.join(root, "lib"))
+        try_add_libcxx_link_dir(path.join(root, "runtimes", "lib"))
+        for _, target in ipairs(targets) do
+            try_add_libcxx_link_dir(path.join(root, "lib", target))
+            try_add_libcxx_link_dir(path.join(root, "runtimes", "lib", target))
+            try_add_libcxx_link_dir(path.join(root, target, "lib"))
+        end
+    end
+
+    if #libcxx_link_dirs ~= 0 then
+        _append_unique(result, seen, "ldflags", "-nostdlib++")
+        _append_unique(result, seen, "shflags", "-nostdlib++")
+        _append_unique(result, seen, "syslinks", "c++")
+        for _, dir in ipairs(libcxx_link_dirs) do
+            if _link_dir_has_library(dir, "c++abi") then
+                _append_unique(result, seen, "syslinks", "c++abi")
+                break
+            end
+        end
+        for _, dir in ipairs(libcxx_link_dirs) do
+            if _link_dir_has_library(dir, "unwind") then
+                _append_unique(result, seen, "syslinks", "unwind")
+                break
+            end
+        end
+    end
+end
+
 local function _parse_llvm_cxxflags(flags, result, seen)
     local argv = os.argv(flags or "")
     local i = 1
@@ -135,11 +268,24 @@ local function _parse_llvm_cxxflags(flags, result, seen)
             goto continue
         end
 
+        if flag:startswith("-stdlib=") then
+            local llvm_stdlib = flag:sub(#"-stdlib=" + 1)
+            local selected_stdlib = get_config("stdlib")
+            if llvm_stdlib ~= "" then
+                if selected_stdlib and selected_stdlib ~= "default" and selected_stdlib ~= llvm_stdlib then
+                    raise("LLVM JIT was built with -stdlib=%s, but --stdlib=%s was requested. Use the same C++ standard library as llvm-config.", llvm_stdlib, selected_stdlib)
+                end
+                result.llvm_stdlib = llvm_stdlib
+                _append_unique(result, seen, "cxxflags", flag)
+            end
+            i = i + 1
+            goto continue
+        end
+
         -- Keep project-level ownership of dialect / ABI knobs instead of blindly
         -- inheriting LLVM's build-time defaults.
         if flag:startswith("-std=")
             or flag:startswith("/std:")
-            or flag:startswith("-stdlib=")
             or flag == "-fno-exceptions"
             or flag == "-fexceptions"
             or flag == "-fno-rtti"
@@ -256,7 +402,7 @@ local function _find_llvm_config_tool()
     return find_tool("llvm-config", { version = true })
 end
 
-local function _run_llvm_config(llvm_config, args)
+_run_llvm_config = function(llvm_config, args)
     local result
     local errors
     result = try {
@@ -345,11 +491,13 @@ function get_llvm_jit_options()
         [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
 
     local cache_key = table.concat({
-        "llvm-jit-v3",
+        "llvm-jit-v6",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
-        get_config("arch") or ""
+        get_config("arch") or "",
+        get_config("stdlib") or "",
+        get_config("llvm-target") or ""
     }, "|")
 
     local cached = cache_info["llvm_jit"]
@@ -383,6 +531,9 @@ function get_llvm_jit_options()
     end
     _append_unique(result, seen, "linkdirs", _normalize_dir(libdir))
     _parse_llvm_cxxflags(cxxflags, result, seen)
+    if result.llvm_stdlib == "libc++" then
+        _add_llvm_libcxx_runtime_paths(result, seen, llvm_config, libdir)
+    end
     _parse_llvm_linkflags(system_libs, result, seen, "syslinks")
     _parse_llvm_linkflags(libs, result, seen, "links")
 
