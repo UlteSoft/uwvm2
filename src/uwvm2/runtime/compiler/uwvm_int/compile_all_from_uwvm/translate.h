@@ -35,6 +35,7 @@
 # include <type_traits>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/intrinsics/impl.h>
@@ -55,13 +56,16 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm
 {
 #include "translate/details.h"
 #include "translate/single_func.h"
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

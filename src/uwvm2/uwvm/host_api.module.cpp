@@ -19,6 +19,14 @@
  *                                      *
  ****************************************/
 
+// std
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+// macro
+#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
+
 import uwvm2.imported.wasi.wasip1;
 import uwvm2.runtime;
 import uwvm2.uwvm.imported.wasi.wasip1.storage;

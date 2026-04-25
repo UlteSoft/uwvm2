@@ -34,6 +34,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -47,6 +48,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
     using wasm1_code = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;
@@ -1416,9 +1418,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline consteval uwvm_interpreter_stacktop_remain_size_t get_remain_size_from_operand_stack(TypeRef & ... typeref) noexcept
     { return manipulate::get_remain_size_from_operand_stack<CompileOption, CurrStackTop, ValTuple>(typeref...); }
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

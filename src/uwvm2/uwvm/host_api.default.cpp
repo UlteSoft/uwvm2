@@ -20,14 +20,15 @@
  *                                      *
  ****************************************/
 
-// std
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-// macro
-#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
-// import
 #ifndef UWVM_MODULE
+// std
+# include <cstddef>
+# include <cstdint>
+# include <memory>
+// macro
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
+// import
 # include <uwvm2/imported/wasi/wasip1/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
@@ -1053,7 +1054,7 @@ namespace uwvm2::uwvm::wasm::type
 
 namespace uwvm2::uwvm::wasm::type
 {
-#if !defined(UWVM_DISABLE_INT) || !defined(UWVM_DISABLE_JIT)
+#if defined(UWVM_RUNTIME_HAS_BACKEND)
     extern "C" ::std::size_t uwvm_preload_memory_descriptor_count() noexcept { return ::uwvm2::runtime::lib::preload_memory_descriptor_count_host_api(); }
 
     extern "C" bool uwvm_preload_memory_descriptor_at(::std::size_t descriptor_index, uwvm_preload_memory_descriptor_t* out) noexcept
@@ -1099,4 +1100,7 @@ namespace uwvm2::uwvm::wasm::type
     }
 }  // namespace uwvm2::uwvm::wasm::type
 
-#include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
+#ifndef UWVM_MODULE
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_pop_macro.h>
+#endif

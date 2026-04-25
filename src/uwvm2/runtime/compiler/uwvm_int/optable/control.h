@@ -33,6 +33,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -43,12 +44,13 @@
 # include "storage.h"
 #endif
 
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
-
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
+#endif
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#if !(__cpp_pack_indexing >= 202311L)
+# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
 #endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
@@ -906,9 +908,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_return_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

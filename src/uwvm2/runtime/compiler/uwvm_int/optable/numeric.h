@@ -34,6 +34,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 # if ((defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)) && __has_include(<cfenv>)
 #  include <cfenv>
@@ -49,12 +50,13 @@
 # include "register_ring.h"
 #endif
 
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
-
 #ifndef UWVM_MODULE_EXPORT
 # define UWVM_MODULE_EXPORT
+#endif
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#if !(__cpp_pack_indexing >= 202311L)
+# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
 #endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
@@ -4182,9 +4184,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_f64_copysign_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

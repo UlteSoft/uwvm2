@@ -68,24 +68,22 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
-#if defined(UWVM_RUNTIME_LLVM_JIT)
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,
                                                  ::std::size_t result_bytes,
                                                  void const* param_buffer,
                                                  ::std::size_t param_bytes) noexcept;
-#endif
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm
 {
-#if defined(UWVM_RUNTIME_LLVM_JIT)
 # include "translate/single_func.h"
-#endif
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro

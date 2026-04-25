@@ -19,51 +19,49 @@
  *                                      *
  ****************************************/
 
+#ifndef UWVM_MODULE
 // std
-#include <algorithm>
-#include <atomic>
-#include <bit>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <limits>
-#include <new>
-#include <type_traits>
-#include <utility>
+# include <algorithm>
+# include <atomic>
+# include <bit>
+# include <cstddef>
+# include <cstdint>
+# include <cstring>
+# include <functional>
+# include <limits>
+# include <new>
+# include <type_traits>
+# include <utility>
 // macro
-#include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
-#include <uwvm2/utils/macro/push_macros.h>
-#include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
-#include <uwvm2/uwvm/runtime/macro/push_macros.h>
-
+# include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/utils/macro/push_macros.h>
+# include <uwvm2/imported/wasi/wasip1/feature/feature_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 // platform
-#if !UWVM_HAS_BUILTIN(__builtin_alloca) && (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__))
-# include <malloc.h>
-#elif !UWVM_HAS_BUILTIN(__builtin_alloca)
-# include <alloca.h>
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
-# include <llvm/Analysis/TargetTransformInfo.h>
-# include <llvm/ADT/StringMap.h>
-# include <llvm/ExecutionEngine/ExecutionEngine.h>
-# include <llvm/ExecutionEngine/MCJIT.h>
-# include <llvm/ExecutionEngine/SectionMemoryManager.h>
-# include <llvm/IR/LegacyPassManager.h>
-# include <llvm/Linker/Linker.h>
-# include <llvm/Support/SourceMgr.h>
-# include <llvm/Support/TargetSelect.h>
-# include <llvm/Target/TargetMachine.h>
-# include <llvm/TargetParser/Host.h>
-# include <llvm/Transforms/InstCombine/InstCombine.h>
-# include <llvm/Transforms/Scalar.h>
-# include <llvm/Transforms/Scalar/GVN.h>
-# include <llvm/Transforms/Utils.h>
-# include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
-#endif
+# if !UWVM_HAS_BUILTIN(__builtin_alloca) && (defined(_WIN32) && !defined(__WINE__) && !defined(__BIONIC__) && !defined(__CYGWIN__))
+#  include <malloc.h>
+# elif !UWVM_HAS_BUILTIN(__builtin_alloca)
+#  include <alloca.h>
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  include <llvm/Analysis/TargetTransformInfo.h>
+#  include <llvm/ADT/StringMap.h>
+#  include <llvm/ExecutionEngine/ExecutionEngine.h>
+#  include <llvm/ExecutionEngine/MCJIT.h>
+#  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/Linker/Linker.h>
+#  include <llvm/Support/SourceMgr.h>
+#  include <llvm/Support/TargetSelect.h>
+#  include <llvm/Target/TargetMachine.h>
+#  include <llvm/TargetParser/Host.h>
+#  include <llvm/Transforms/InstCombine/InstCombine.h>
+#  include <llvm/Transforms/Scalar.h>
+#  include <llvm/Transforms/Scalar/GVN.h>
+#  include <llvm/Transforms/Utils.h>
+# endif
 
-#ifndef UWVM_MODULE
 // import
 # include <fast_io.h>
 # include <uwvm2/parser/wasm/concepts/impl.h>
@@ -1624,11 +1622,11 @@ namespace uwvm2::runtime::lib
         {
             ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t res{};
 
-#if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
+# if !(defined(__pdp11) || (defined(__wasm__) && !defined(__wasm_tail_call__)))
             res.is_tail_call = true;
-#endif
+# endif
 
-#if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
+# if defined(__ARM_PCS_AAPCS64) || defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64) || defined(__arm64ec__) || defined(_M_ARM64EC)
             // aarch64: AAPCS64 (x0-x7 integer args, v0-v7 fp/simd args)
             // 3 fixed args: (ip, operand_stack_top, local_base) => occupy x0-x2
             // Use remaining integer args (x3-x7) for i32/i64 stack-top caching, and fp/simd args (v0-v7) for f32/f64/v128.
@@ -1636,134 +1634,134 @@ namespace uwvm2::runtime::lib
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
-#elif defined(__arm__) || defined(_M_ARM)
+# elif defined(__arm__) || defined(_M_ARM)
             // ARM32: AAPCS/EABI (r0-r3 integer args; hard-float variants may also use VFP regs).
             // After the 3 fixed interpreter args, there is at most 1 remaining core argument register (r3).
             // A full scalar+fp stack-top cache would largely spill to memory on most ABIs, negating the benefit.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
-#elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                     \
-    (!defined(_WIN32) || (defined(__GNUC__) || defined(__clang__)))
+# elif ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                                    \
+     (!defined(_WIN32) || (defined(__GNUC__) || defined(__clang__)))
             // x86_64: sysv abi
             // x86_64: sysv abi in ms abi
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 6uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 14uz;
-#elif defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                  \
-    !(defined(__GNUC__) || defined(__clang__))
+# elif defined(_WIN32) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&                 \
+     !(defined(__GNUC__) || defined(__clang__))
             // x86_64: Windows x64 (MS ABI) (rcx/rdx/r8/r9, xmm0-xmm3)
             // This ABI provides only 4 register argument slots total. After the 3 fixed interpreter args, only 1 slot remains (r9/xmm3).
             // Empirically, enabling a 1-slot scalar4-merged stack-top cache tends to regress overall performance
             // (register pressure + spills), so keep stack-top caching disabled by default here.
-# if 0
+#  if 0
             /// @deprecated MS ABI "1-slot" stack-top cache experiment.
             ///             Often regresses performance due to spills/register shuffling. Kept for reference.
             ///             Keep v128 caching off by default.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 4uz;
-# endif
-#elif defined(__i386__) || defined(_M_IX86)
+#  endif
+# elif defined(__i386__) || defined(_M_IX86)
             // i386: (usually) only 2 register argument slots under fastcall (ecx/edx), and we already need 3 fixed args.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
-#elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
+# elif defined(__powerpc64__) || defined(__ppc64__) || defined(__PPC64__) || defined(_ARCH_PPC64)
             // powerpc64: SysV ELF (r3-r10 integer args, VSX for fp/simd)
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = res.v128_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = res.v128_stack_top_end_pos = 16uz;
-#elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)
+# elif defined(__powerpc__) || defined(__ppc__) || defined(__PPC__) || defined(_ARCH_PPC)
             // powerpc32: AIX/SysV/EABI variants differ in i64/f64 passing (often reg-pairs) and hard-float rules.
             // Keep stack-top caching disabled by default for correctness across ABIs.
-#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
-# if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
+# elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 64)
+#  if defined(__riscv_float_abi_soft) || defined(__riscv_float_abi_single)
             // riscv64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring in the integer register file.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-# else
+#  else
             // riscv64: psABI (a0-a7 integer args, fa0-fa7 fp args). Keep v128 caching off by default:
             // `wasm_v128` argument passing is not consistently vector-reg based across toolchains/ABIs.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
-# endif
-#elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 32)
+#  endif
+# elif defined(__riscv) && defined(__riscv_xlen) && (__riscv_xlen == 32)
             // riscv32: i64/f64 are passed in register pairs and the effective register slots are tight.
             // Leave stack-top caching disabled here (SIZE_MAX/SIZE_MAX).
-#elif defined(__loongarch__) && defined(__loongarch64)
-# if defined(__loongarch_soft_float) || defined(__loongarch_single_float)
+# elif defined(__loongarch__) && defined(__loongarch64)
+#  if defined(__loongarch_soft_float) || defined(__loongarch_single_float)
             // loongarch64: soft-float / single-float (f64 may not be passed in fp regs). Use a scalar4-merged ring.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-# else
+#  else
             // loongarch64: LP64D (a0-a7 integer args, fa0-fa7 fp args). Keep v128 caching off by default:
             // `wasm_v128` argument passing may be lowered to GPR pairs/stack depending on ABI + vector extension.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 8uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 8uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 16uz;
-# endif
-#elif defined(__loongarch__)
+#  endif
+# elif defined(__loongarch__)
             // loongarch32: i64/f64 passing uses pairs / stack depending on ABI; keep caching disabled by default.
-#elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
+# elif defined(__mips__) || defined(__MIPS__) || defined(_MIPS_ARCH)
             // MIPS ABIs are slot-based: fp args are only register-passed while they remain within the ABI's argument slots.
             // We conservatively target the 8-slot N32/N64 ABIs; O32 has only 4 slots and cannot satisfy Wasm1's minimum ring sizes without heavy spilling.
-# if defined(__mips_n32) || defined(__mips_n64)
-#  if defined(__mips_soft_float)
+#  if defined(__mips_n32) || defined(__mips_n64)
+#   if defined(__mips_soft_float)
             // N32/N64 soft-float: use a scalar4-merged ring in the integer slots (fits in the 8 arg slots).
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#  else
+#   else
             // N32/N64 hard-float: keep total args within 8 slots so fp values still use FPRs.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
+#   endif
 #  endif
-# endif
-#elif defined(__s390x__)
+# elif defined(__s390x__)
             // s390x: Linux ABI (r2-r6 integer args, f0/f2/... fp args). Keep v128 caching off by default:
             // 16-byte vectors can be passed indirectly by pointer.
             res.i32_stack_top_begin_pos = res.i64_stack_top_begin_pos = 3uz;
             res.i32_stack_top_end_pos = res.i64_stack_top_end_pos = 6uz;
             res.f32_stack_top_begin_pos = res.f64_stack_top_begin_pos = 6uz;
             res.f32_stack_top_end_pos = res.f64_stack_top_end_pos = 8uz;
-#elif defined(__s390__) || defined(__SYSC_ZARCH__)
+# elif defined(__s390__) || defined(__SYSC_ZARCH__)
             // s390 (31-bit) / z/Architecture (non-s390x toolchains): i64/f64 passing is ABI-sensitive (often reg pairs).
             // Leave stack-top caching disabled by default.
-#elif defined(__sparc__)
+# elif defined(__sparc__)
             // SPARC: multiple ABIs (v8/v9, 32/64) with different fp arg rules. Leave caching disabled by default.
-#elif defined(__IA64__) || defined(_M_IA64) || defined(__ia64__) || defined(__itanium__)
+# elif defined(__IA64__) || defined(_M_IA64) || defined(__ia64__) || defined(__itanium__)
             // IA-64: Itanium ABI is rare today; keep caching disabled by default to avoid ABI mismatches.
-#elif defined(__alpha__)
+# elif defined(__alpha__)
             // Alpha: uncommon; leave caching disabled by default.
-#elif defined(__m68k__) || defined(__mc68000__)
+# elif defined(__m68k__) || defined(__mc68000__)
             // m68k: uncommon; leave caching disabled by default.
-#elif defined(__HPPA__)
+# elif defined(__HPPA__)
             // HPPA: uncommon; leave caching disabled by default.
-#elif defined(__e2k__)
+# elif defined(__e2k__)
             // E2K: uncommon; leave caching disabled by default.
-#elif defined(__XTENSA__)
+# elif defined(__XTENSA__)
             // Xtensa: embedded; leave caching disabled by default.
-#elif defined(__BFIN__)
+# elif defined(__BFIN__)
             // Blackfin: embedded; leave caching disabled by default.
-#elif defined(__convex__)
+# elif defined(__convex__)
             // Convex: historical; leave caching disabled by default.
-#elif defined(__370__) || defined(__THW_370__)
+# elif defined(__370__) || defined(__THW_370__)
             // System/370: historical; leave caching disabled by default.
-#elif defined(__pdp10) || defined(__pdp7) || defined(__pdp11)
+# elif defined(__pdp10) || defined(__pdp7) || defined(__pdp11)
             // PDP family: historical; leave caching disabled by default.
-#elif defined(__THW_RS6000) || defined(_IBMR2) || defined(_POWER) || defined(_ARCH_PWR) || defined(_ARCH_PWR2)
+# elif defined(__THW_RS6000) || defined(_IBMR2) || defined(_POWER) || defined(_ARCH_PWR) || defined(_ARCH_PWR2)
             // RS/6000: historical; leave caching disabled by default.
-#elif defined(__CUDA_ARCH__)
+# elif defined(__CUDA_ARCH__)
             // PTX (CUDA device code): stack-top caching is not applicable here.
-#elif defined(__sh__)
+# elif defined(__sh__)
             // SuperH: embedded; leave caching disabled by default.
-#elif defined(__AVR__)
+# elif defined(__AVR__)
             // AVR: embedded; leave caching disabled by default.
-#elif defined(__wasm__)
+# elif defined(__wasm__)
             // UWVM itself may be built as wasm32-wasi; stack-top caching via native ABI registers is not applicable here.
-#endif
+# endif
 
             return res;
         }
@@ -1840,7 +1838,8 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline constexpr ::std::uint_least32_t invalid_llvm_jit_encoded_type_id() noexcept
         { return (::std::numeric_limits<::std::uint_least32_t>::max)(); }
 
-        [[maybe_unused]] [[nodiscard]] inline ::std::uint_least32_t find_canonical_type_id_for_sig(compiled_module_record const& rec, func_sig_view sig) noexcept
+        [[maybe_unused]] [[nodiscard]] inline ::std::uint_least32_t find_canonical_type_id_for_sig(compiled_module_record const& rec,
+                                                                                                   func_sig_view sig) noexcept
         {
             auto const runtime_module{rec.runtime_module};
             if(runtime_module == nullptr) [[unlikely]] { return invalid_llvm_jit_encoded_type_id(); }
@@ -1977,16 +1976,14 @@ namespace uwvm2::runtime::lib
                 case trivial_kind_t::xor_add_const_i32:
                 {
                     if(info.result_bytes != 4uz || info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    store_u32(args_begin,
-                              static_cast<::std::uint_least32_t>(load_u32(args_begin) + (load_u32(args_begin + 4uz) ^ imm_u32)));
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(load_u32(args_begin) + (load_u32(args_begin + 4uz) ^ imm_u32)));
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }
                 case trivial_kind_t::sub_or_const_i32:
                 {
                     if(info.result_bytes != 4uz || info.param_bytes != 8uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    store_u32(args_begin,
-                              static_cast<::std::uint_least32_t>(load_u32(args_begin) - (load_u32(args_begin + 4uz) | imm_u32)));
+                    store_u32(args_begin, static_cast<::std::uint_least32_t>(load_u32(args_begin) - (load_u32(args_begin + 4uz) | imm_u32)));
                     *stack_top_ptr = args_begin + 4uz;
                     return true;
                 }
@@ -2008,8 +2005,8 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
-        [[maybe_unused]] [[nodiscard]] UWVM_ALWAYS_INLINE inline bool
-            try_execute_trivial_defined_call(compiled_defined_func_info const& info, ::std::byte** stack_top_ptr) noexcept
+        [[maybe_unused]] [[nodiscard]] UWVM_ALWAYS_INLINE inline bool try_execute_trivial_defined_call(compiled_defined_func_info const& info,
+                                                                                                       ::std::byte** stack_top_ptr) noexcept
         {
             auto const compiled_call_info{info.compiled_call_info};
             if(compiled_call_info == nullptr) [[unlikely]] { return false; }
@@ -2060,11 +2057,11 @@ namespace uwvm2::runtime::lib
 
             constexpr ::std::size_t kAllocaMaxBytesPerFrame{4096uz};
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
-#if defined(UWVM_USE_THREAD_LOCAL)
+# if defined(UWVM_USE_THREAD_LOCAL)
             bool const use_scratch{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
             ::std::size_t scratch_mark{};
             if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
-#else
+# else
             bool const use_heap{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
 
             auto const heap_alloc_aligned{[](::std::size_t n, ::std::size_t align, heap_buf_guard& g) noexcept -> ::std::byte*
@@ -2080,7 +2077,7 @@ namespace uwvm2::runtime::lib
                                               g.ptr = raw;
                                               return align_ptr_up(static_cast<::std::byte*>(raw), align);
                                           }};
-#endif
+# endif
 
             auto caller_stack_top{*caller_stack_top_ptr};
             auto const caller_args_begin{caller_stack_top - param_bytes};
@@ -2088,14 +2085,14 @@ namespace uwvm2::runtime::lib
             *caller_stack_top_ptr = caller_args_begin;
 
             ::std::byte* frame_alloc{};
-#if defined(UWVM_USE_THREAD_LOCAL)
+# if defined(UWVM_USE_THREAD_LOCAL)
             if(use_scratch) { frame_alloc = g_call_scratch.allocate_bytes(frame_alloc_n, kFrameAlign); }
             else
-#else
+# else
             heap_buf_guard frame_heap_guard{};
             if(use_heap) { frame_alloc = heap_alloc_aligned(frame_alloc_n, kFrameAlign, frame_heap_guard); }
             else
-#endif
+# endif
             {
                 frame_alloc = static_cast<::std::byte*>(UWVM_ALLOCA_BYTES(frame_alloc_n));
             }
@@ -2115,11 +2112,11 @@ namespace uwvm2::runtime::lib
 
             if(param_bytes > local_bytes_raw) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#else
+# else
                 ::fast_io::fast_terminate();
-#endif
+# endif
             }
 
             if(param_bytes != 0uz) { copy_bytes_small(local_base, caller_args_begin, param_bytes); }
@@ -2129,9 +2126,9 @@ namespace uwvm2::runtime::lib
             if(zero_n != 0uz) { zero_bytes_small(local_base + param_bytes, zero_n); }
 
             // Allocate operand stack with the exact max byte size computed by the compiler (byte-packed: i32/f32=4, i64/f64=8).
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(stack_cap_raw == 0uz && compiled_func->operand_stack_max != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
-#endif
+# endif
             if(stack_cap_raw < result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::std::byte* operand_base{};
@@ -2142,11 +2139,11 @@ namespace uwvm2::runtime::lib
                 operand_base = align_ptr_up(frame_alloc + local_alloc_n, kFrameAlign);
             }
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             // Operand stack is fully defined by writes along interpreter execution; it does not require zero-initialization.
             // Keep it zeroed only in detailed debug-check builds to catch any accidental reads of uninitialized operands.
             ::std::memset(operand_base, 0, (stack_cap_raw == 0uz ? 1uz : stack_cap_raw));
-#endif
+# endif
 
             ::std::byte const* ip{compiled_func->op.operands.data()};
             ::std::byte* stack_top{operand_base};
@@ -2176,9 +2173,9 @@ namespace uwvm2::runtime::lib
             copy_bytes_small(*caller_stack_top_ptr, operand_base, result_bytes);
             *caller_stack_top_ptr += result_bytes;
 
-#if defined(UWVM_USE_THREAD_LOCAL)
+# if defined(UWVM_USE_THREAD_LOCAL)
             if(use_scratch) { g_call_scratch.release(scratch_mark); }
-#endif
+# endif
         }
 #endif
 
@@ -2237,8 +2234,8 @@ namespace uwvm2::runtime::lib
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline bool try_get_runtime_llvm_jit_raw_defined_entry_address(::std::size_t module_id,
-                                                                                      ::std::size_t function_index,
-                                                                                      ::std::uintptr_t& function_address) noexcept
+                                                                                     ::std::size_t function_index,
+                                                                                     ::std::uintptr_t& function_address) noexcept
         {
             function_address = 0u;
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
@@ -2258,11 +2255,11 @@ namespace uwvm2::runtime::lib
         }
 
         [[nodiscard]] inline bool try_invoke_runtime_llvm_jit_raw_defined_entry(::std::size_t module_id,
-                                                                                 ::std::size_t function_index,
-                                                                                 void* result_buffer,
-                                                                                 ::std::size_t result_bytes,
-                                                                                 void const* param_buffer,
-                                                                                 ::std::size_t param_bytes) noexcept
+                                                                                ::std::size_t function_index,
+                                                                                void* result_buffer,
+                                                                                ::std::size_t result_bytes,
+                                                                                void const* param_buffer,
+                                                                                ::std::size_t param_bytes) noexcept
         {
             ::std::uintptr_t function_address{};
             if(!try_get_runtime_llvm_jit_raw_defined_entry_address(module_id, function_index, function_address)) { return false; }
@@ -2312,9 +2309,9 @@ namespace uwvm2::runtime::lib
                                                                      ::std::uintptr_t param_buffer_address,
                                                                      ::std::size_t param_bytes) noexcept
         {
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
             try
-#endif
+# endif
             {
                 auto const info{reinterpret_cast<::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const*>(context_address)};
                 auto const result_buffer{reinterpret_cast<::std::byte*>(result_buffer_address)};
@@ -2332,12 +2329,12 @@ namespace uwvm2::runtime::lib
                                                     result_buffer,
                                                     param_buffer);
             }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
             {
                 trap_fatal(trap_kind::uncatched_int_tag);
             }
-#endif
+# endif
         }
 #endif
 
@@ -2597,7 +2594,7 @@ namespace uwvm2::runtime::lib
                                 auto const defined_info{find_defined_func_info(defined_func_ptr)};
                                 if(defined_info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
                                 ::std::uintptr_t raw_defined_entry_address{};
                                 if(try_get_runtime_llvm_jit_raw_defined_entry_address(defined_info->module_id,
                                                                                       defined_info->function_index,
@@ -2607,17 +2604,17 @@ namespace uwvm2::runtime::lib
                                     target.context_address = 0u;
                                 }
                                 else
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                                 {
                                     target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_defined_entry);
                                     target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
                                 }
-#else
+# else
                                 {
                                     ::fast_io::fast_terminate();
                                 }
-#endif
+# endif
                                 target.encoded_type_id = find_canonical_type_id_for_sig(caller_rec, func_sig_from_defined(defined_info->runtime_func));
                                 break;
                             }
@@ -2772,8 +2769,7 @@ namespace uwvm2::runtime::lib
                 static_cast<llvm_jit_translate_details::validation_module_traits_t::wasm_u32>(func_index));
         }
 
-        [[nodiscard]] inline ::std::string get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module,
-                                                                                        ::std::size_t func_index)
+        [[nodiscard]] inline ::std::string get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index)
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             return llvm_jit_translate_details::get_llvm_wasm_raw_function_name(
@@ -3000,45 +2996,42 @@ namespace uwvm2::runtime::lib
             for(::std::size_t local_index{}; local_index != local_func_count; ++local_index)
             {
                 auto const function_index{import_func_count + local_index};
-                auto const resolve_function_address{
-                    [&](::std::string const& function_name) noexcept -> ::std::uintptr_t
-                    {
-                        auto const function_address{llvm_jit_engine->getFunctionAddress(function_name)};
-                        if(function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(function_address); }
+                auto const resolve_function_address{[&](::std::string const& function_name) noexcept -> ::std::uintptr_t
+                                                    {
+                                                        auto const function_address{llvm_jit_engine->getFunctionAddress(function_name)};
+                                                        if(function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(function_address); }
 
-                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                        {
-                            auto found_function{llvm_jit_engine->FindFunctionNamed(function_name)};
-                            ::std::string function_type_text{};
-                            if(found_function != nullptr)
-                            {
-                                ::llvm::raw_string_ostream function_type_stream(function_type_text);
-                                found_function->getFunctionType()->print(function_type_stream);
-                            }
-                            llvm_jit_materialize_error(u8"LLVM JIT could not resolve function address for module=\"",
-                                                       rec.module_name,
-                                                       u8"\", function=\"",
-                                                       ::fast_io::mnp::code_cvt(function_name),
-                                                       u8"\", found=",
-                                                       found_function != nullptr,
-                                                       u8", declaration=",
-                                                       found_function != nullptr && found_function->isDeclaration(),
-                                                       u8", linkage=",
-                                                       found_function != nullptr ? static_cast<unsigned>(found_function->getLinkage())
-                                                                                 : static_cast<unsigned>(::llvm::GlobalValue::ExternalLinkage),
-                                                       u8", type=",
-                                                       ::fast_io::mnp::code_cvt(function_type_text),
-                                                       u8".");
-                        }
-                        return 0u;
-                    }};
+                                                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                                                        {
+                                                            auto found_function{llvm_jit_engine->FindFunctionNamed(function_name)};
+                                                            ::std::string function_type_text{};
+                                                            if(found_function != nullptr)
+                                                            {
+                                                                ::llvm::raw_string_ostream function_type_stream(function_type_text);
+                                                                found_function->getFunctionType()->print(function_type_stream);
+                                                            }
+                                                            llvm_jit_materialize_error(u8"LLVM JIT could not resolve function address for module=\"",
+                                                                                       rec.module_name,
+                                                                                       u8"\", function=\"",
+                                                                                       ::fast_io::mnp::code_cvt(function_name),
+                                                                                       u8"\", found=",
+                                                                                       found_function != nullptr,
+                                                                                       u8", declaration=",
+                                                                                       found_function != nullptr && found_function->isDeclaration(),
+                                                                                       u8", linkage=",
+                                                                                       found_function != nullptr
+                                                                                           ? static_cast<unsigned>(found_function->getLinkage())
+                                                                                           : static_cast<unsigned>(::llvm::GlobalValue::ExternalLinkage),
+                                                                                       u8", type=",
+                                                                                       ::fast_io::mnp::code_cvt(function_type_text),
+                                                                                       u8".");
+                                                        }
+                                                        return 0u;
+                                                    }};
 
                 auto const function_name{get_runtime_llvm_jit_wasm_function_name(*runtime_module, function_index)};
                 auto const function_address{resolve_function_address(function_name)};
-                if(function_address == 0u) [[unlikely]]
-                {
-                    return false;
-                }
+                if(function_address == 0u) [[unlikely]] { return false; }
                 rec.llvm_jit_local_entry_addresses.index_unchecked(local_index) = function_address;
 
                 auto const raw_function_name{get_runtime_llvm_jit_wasm_raw_function_name(*runtime_module, function_index)};
@@ -3099,9 +3092,9 @@ namespace uwvm2::runtime::lib
 
         inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
             if(wasm_module_id == SIZE_MAX) [[likely]]
             {
                 using call_info_t = ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info;
@@ -3186,9 +3179,9 @@ namespace uwvm2::runtime::lib
         inline void
             call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
             if(wasm_module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& module_rec{g_runtime.modules.index_unchecked(wasm_module_id)};
             auto const& module{*module_rec.runtime_module};
@@ -3622,10 +3615,7 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::utils::container::u8string_view const runtime_full_translation_fixed_prefix{
                     compile_llvm_jit_translation ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will use "}
                                                  : ::uwvm2::utils::container::u8string_view{u8"Runtime full translation will use "}};
-                if(effective_extra_compile_threads == 0uz)
-                {
-                    runtime_compile_threads_verbose_info(runtime_full_translation_main_thread_message);
-                }
+                if(effective_extra_compile_threads == 0uz) { runtime_compile_threads_verbose_info(runtime_full_translation_main_thread_message); }
                 else if(adaptive_runtime_compile_threads_policy_active)
                 {
                     runtime_compile_threads_verbose_info(runtime_full_translation_parallel_prefix,
@@ -3709,14 +3699,14 @@ namespace uwvm2::runtime::lib
                                                                                                                  allow_default_runtime_scheduling_adjustment}
 #else
                     ? ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config{.policy =
-                                                                                                                  compile_task_split_policy_t::function_count,
-                                                                                                              .split_size = runtime_scheduling_size,
-                                                                                                              .adjust_for_default_policy =
-                                                                                                                  allow_default_runtime_scheduling_adjustment}
+                                                                                                                 compile_task_split_policy_t::function_count,
+                                                                                                             .split_size = runtime_scheduling_size,
+                                                                                                             .adjust_for_default_policy =
+                                                                                                                 allow_default_runtime_scheduling_adjustment}
                     : ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_config{.policy = compile_task_split_policy_t::code_size,
-                                                                                                              .split_size = runtime_scheduling_size,
-                                                                                                              .adjust_for_default_policy =
-                                                                                                                  allow_default_runtime_scheduling_adjustment}
+                                                                                                             .split_size = runtime_scheduling_size,
+                                                                                                             .adjust_for_default_policy =
+                                                                                                                 allow_default_runtime_scheduling_adjustment}
 #endif
             };
 
@@ -3801,8 +3791,8 @@ namespace uwvm2::runtime::lib
 #else
                 auto const thread_resolution_compile_task_split_conf{
                     ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::resolve_effective_compile_task_split_config(*rec.runtime_module,
-                                                                                                                              compile_task_split_conf,
-                                                                                                                              effective_extra_compile_threads)};
+                                                                                                                             compile_task_split_conf,
+                                                                                                                             effective_extra_compile_threads)};
 #endif
                 auto const runtime_scheduling_policy_adjusted_for_thread_resolution{
                     !runtime_scheduling_policy_existed && compile_task_split_conf.policy == compile_task_split_policy_t::code_size &&
@@ -3991,14 +3981,14 @@ namespace uwvm2::runtime::lib
                             llvm_jit_opt,
                             err,
                             effective_module_extra_compile_threads,
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                             {.policy = static_cast<::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_task_split_policy_t>(
                                  static_cast<unsigned>(effective_compile_task_split_conf.policy)),
                              .split_size = effective_compile_task_split_conf.split_size,
                              .adjust_for_default_policy = effective_compile_task_split_conf.adjust_for_default_policy}
-#else
+# else
                             effective_compile_task_split_conf
-#endif
+# endif
                         );
                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                         {
@@ -4250,34 +4240,32 @@ namespace uwvm2::runtime::lib
                 // Keep the verbose message enum-safe for int-only builds where
                 // `llvm_jit_only` is not part of `runtime_compiler_t`.
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-                auto const llvm_jit_full_compile{
-                    ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
-                    ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only};
+                auto const llvm_jit_full_compile{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                                                 ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only};
 #else
                 constexpr bool llvm_jit_full_compile{};
 #endif
 
                 // verbose
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
-                                    u8"[info]  ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    ::fast_io::mnp::cond(llvm_jit_full_compile,
-                                                         u8"llvm-jit full compilation done. (time=",
-                                                         u8"uwvm-int full translation done. (time="),
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                                    end_time - start_time,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"s). ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
-                                    u8"[",
-                                    ::uwvm2::uwvm::io::get_local_realtime(),
-                                    u8"] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                    u8"(verbose)\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::io::perr(
+                    ::uwvm2::uwvm::io::u8log_output,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                    u8"uwvm: ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                    u8"[info]  ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    ::fast_io::mnp::cond(llvm_jit_full_compile, u8"llvm-jit full compilation done. (time=", u8"uwvm-int full translation done. (time="),
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                    end_time - start_time,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8"s). ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                    u8"[",
+                    ::uwvm2::uwvm::io::get_local_realtime(),
+                    u8"] ",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                    u8"(verbose)\n",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }
 
             g_runtime.compiled_all.store(true, ::std::memory_order_release);
@@ -4455,18 +4443,18 @@ namespace uwvm2::runtime::lib
         UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(host_stack_base, stack_bytes, host_stack_guard);
         ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         try
-#endif
+# endif
         {
             call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
         {
             trap_fatal(trap_kind::uncatched_int_tag);
         }
-#endif
+# endif
 
         // Currently only main-thread execution exists. Clean up current thread state on exit to avoid state growth and
         // possible thread-id reuse issues. Do NOT `clear()` here: main-thread exit does not imply other threads exit.
@@ -4507,18 +4495,18 @@ namespace uwvm2::runtime::lib
 
         ::std::byte* stack_top_ptr{host_stack_base + input_bytes};
 
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         try
-#endif
+# endif
         {
             invoke_bridge(wasm_module_id, ::std::addressof(stack_top_ptr));
         }
-#ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error)
         {
             trap_fatal(trap_kind::uncatched_int_tag);
         }
-#endif
+# endif
 
         if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
     }
@@ -4532,7 +4520,7 @@ namespace uwvm2::runtime::lib
                                     void const* param_buffer,
                                     ::std::size_t param_bytes) noexcept
     {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         llvm_jit_invoke_raw_host_bridge_common(
             runtime_module_ptr,
             result_buffer,
@@ -4542,13 +4530,10 @@ namespace uwvm2::runtime::lib
             0uz,
             [](::std::byte*) noexcept {},
             [&](::std::size_t wasm_module_id, ::std::byte** stack_top_ptr) { call_bridge(wasm_module_id, func_index, stack_top_ptr); });
-#else
+# else
         compile_all_modules_if_needed();
 
-        if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]]
-        {
-            ::fast_io::fast_terminate();
-        }
+        if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         auto const runtime_module_storage_ptr{static_cast<runtime_module_storage_t const*>(runtime_module_ptr)};
         auto const wasm_module_id{find_runtime_module_id_from_storage_ptr(runtime_module_storage_ptr)};
@@ -4572,8 +4557,12 @@ namespace uwvm2::runtime::lib
             {
                 case cached_import_target::kind::defined:
                 {
-                    if(try_invoke_runtime_llvm_jit_raw_defined_entry(
-                           tgt.frame.module_id, tgt.frame.function_index, result_buffer, result_bytes, param_buffer, param_bytes))
+                    if(try_invoke_runtime_llvm_jit_raw_defined_entry(tgt.frame.module_id,
+                                                                     tgt.frame.function_index,
+                                                                     result_buffer,
+                                                                     result_bytes,
+                                                                     param_buffer,
+                                                                     param_bytes))
                     {
                         return;
                     }
@@ -4594,8 +4583,7 @@ namespace uwvm2::runtime::lib
                     auto const capi_ptr{tgt.u.capi_ptr};
                     if(capi_ptr == nullptr || capi_ptr->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     preload_call_context_guard preload_guard{tgt.preload_module_memory_attribute};
-                    capi_ptr->func_ptr(static_cast<::std::byte*>(result_buffer),
-                                       const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
+                    capi_ptr->func_ptr(static_cast<::std::byte*>(result_buffer), const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
                     return;
                 }
                 [[unlikely]] default:
@@ -4605,13 +4593,10 @@ namespace uwvm2::runtime::lib
             }
         }
 
-        if(try_invoke_runtime_llvm_jit_raw_defined_entry(wasm_module_id, func_index, result_buffer, result_bytes, param_buffer, param_bytes))
-        {
-            return;
-        }
+        if(try_invoke_runtime_llvm_jit_raw_defined_entry(wasm_module_id, func_index, result_buffer, result_bytes, param_buffer, param_bytes)) { return; }
 
         ::fast_io::fast_terminate();
-#endif
+# endif
     }
 #endif
 
