@@ -67,7 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_expose_host_api{
         .name{u8"--wasip1-expose-host-api"},
-        .describe{u8"Expose the stable WASI Preview 1 preload host API to preload modules."},
+        .describe{u8"Expose the stable WASI Preview 1 preload host API globally by default; module-specific settings may override it."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_expose_host_api_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_expose_host_api_callback)},
         .is_exist{::std::addressof(details::wasip1_expose_host_api_is_exist)},

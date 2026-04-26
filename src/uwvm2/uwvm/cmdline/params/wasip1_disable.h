@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_disable{
         .name{u8"--wasip1-disable"},
-        .describe{u8"Disable the built-in WASI Preview 1 module."},
+        .describe{u8"Disable the global-default built-in WASI Preview 1 module for wasm imports unless a module-specific setting re-enables it."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_disable_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_disable_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};

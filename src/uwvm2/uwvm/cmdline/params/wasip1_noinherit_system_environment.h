@@ -58,7 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_noinherit_system_environment{
         .name{u8"--wasip1-noinherit-system-environment"},
-        .describe{u8"Start WASI Preview 1 without inheriting host environment variables."},
+        .describe{u8"Start the global-default WASI Preview 1 environment without inheriting host environment variables."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_noinherit_system_environment_alias), 1uz}},
         .is_exist{::std::addressof(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_noinherit_system_environment)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};

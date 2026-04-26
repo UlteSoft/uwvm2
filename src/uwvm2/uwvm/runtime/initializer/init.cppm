@@ -48,6 +48,7 @@ import uwvm2.parser.wasm.binfmt.binfmt_ver1;
 import uwvm2.object;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.imported.wasi.wasip1.storage;
 import uwvm2.uwvm.wasm;
 import uwvm2.uwvm.runtime.storage;
 import :init_limit;

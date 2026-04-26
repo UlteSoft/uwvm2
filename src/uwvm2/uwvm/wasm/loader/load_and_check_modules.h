@@ -48,6 +48,7 @@
 # include <uwvm2/uwvm/utils/depend/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
 # include <uwvm2/uwvm/utils/memory/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
@@ -309,6 +310,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         ::uwvm2::uwvm::wasm::storage::all_module_export.clear();
         ::uwvm2::uwvm::wasm::storage::all_module_export.reserve(all_module_size);  // Reserve space for all modules to avoid reallocations
 
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+        auto const wasip1_import_visible_for_module{
+            [](auto curr_module_type, ::uwvm2::utils::container::u8string_view curr_module_name) constexpr noexcept -> bool
+            {
+                switch(curr_module_type)
+                {
+                    case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
+                    {
+                        if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+                               ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::main_wasm,
+                               curr_module_name)};
+                           override_state != nullptr && override_state->enabled_is_set) [[unlikely]]
+                        {
+                            return override_state->enabled;
+                        }
+                        return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
+                    }
+                    case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
+                    {
+                        if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+                               ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preload_wasm,
+                               curr_module_name)};
+                           override_state != nullptr && override_state->enabled_is_set) [[unlikely]]
+                        {
+                            return override_state->enabled;
+                        }
+                        return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
+                    }
+                    default:
+                    {
+                        return true;
+                    }
+                }
+            }};
+# endif
+#endif
+
         // Build dependency relationships
         for(auto const& curr_module: ::uwvm2::uwvm::wasm::storage::all_module)
         {
@@ -395,6 +434,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
                                 }
 
                                 // Check dependencies
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+                                if(import_module_name == u8"wasi_snapshot_preview1" &&
+                                   !wasip1_import_visible_for_module(curr_module.second.type, curr_module_name)) [[unlikely]]
+                                {
+                                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                        u8"uwvm: ",
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                        u8"[error] ",
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        u8"Missing module dependency: \"",
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        import_module_name,
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        u8"\" required by \"",
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                        curr_module_name,
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                        u8"\". The module-specific WASI Preview 1 setting disables this import.\n\n",
+                                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                                    return {load_and_check_modules_rtl::module_dependency_error, ::std::move(adjacency_list)};
+                                }
+# endif
+#endif
                                 auto const import_module{::uwvm2::uwvm::wasm::storage::all_module.find(import_module_name)};
                                 if(import_module == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]]
                                 {

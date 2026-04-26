@@ -77,6 +77,19 @@ uwvm -Rcc int -Rcm full \
   --run ./main.wasm hello world
 ```
 
+### Positive path: expose WASI P1 only for this module
+
+This is the new module-specific form. It keeps the global default unchanged and
+exposes the plugin-facing WASI P1 table only to `dl.example`.
+
+```sh
+uwvm -Rcc int -Rcm full \
+  --wasip1-module dl dl.example expose-host-api \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
+```
+
 ### Optional: override WASI `argv[0]`
 
 If you want the guest-visible program name to differ from the wasm file path, add `--wasip1-set-argv0` **before** `--run`:
@@ -92,12 +105,35 @@ uwvm -Rcc int -Rcm full \
 
 With that override, the guest sees `argv = ["main", "hello", "world"]`, and the plugin-side `args_sizes_get()` result changes accordingly.
 
+You can also scope that override to the plugin's own WASI environment:
+
+```sh
+uwvm -Rcc int -Rcm full \
+  --wasip1-module dl dl.example expose-host-api \
+  --wasip1-set-argv0 global-entry \
+  --wasip1-module dl dl.example set-argv0 dl \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
+```
+
 ### Negative path: do **not** expose WASI P1
 
 If you remove `--wasip1-expose-host-api`, the plugin still loads, but `probe_host_apis` returns a failure code and the verification wasm traps in its start function.
 
 ```sh
 uwvm -Rcc int -Rcm full \
+  --wasm-register-dl ./libregdl_c.dylib dl.example \
+  --wasm-set-preload-module-attribute dl.example copy all \
+  --run ./main.wasm hello world
+```
+
+The equivalent module-specific negative-path override is:
+
+```sh
+uwvm -Rcc int -Rcm full \
+  --wasip1-expose-host-api \
+  --wasip1-module dl dl.example hide-host-api \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world

@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-03-12
+ * @date        2026-04-25
  * @copyright   APL-2.0 License
  */
 
@@ -45,32 +45,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
-
     namespace details
     {
-        inline bool wasip1_set_argv0_is_exist{};  // [global]
-        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_set_argv0_alias{u8"-I1argv0"};
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_module_alias{u8"-I1module"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasip1_set_argv0_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                     ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                     ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type wasip1_module_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                  ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)
 #   pragma clang diagnostic push
 #   pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #  endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_set_argv0{
-        .name{u8"--wasip1-set-argv0"},
-        .describe{u8"Override the global-default WASI Preview 1 argv[0]."},
-        .usage{u8"<argv0:str>"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_set_argv0_alias), 1uz}},
-        .handle{::std::addressof(details::wasip1_set_argv0_callback)},
-        .is_exist{::std::addressof(details::wasip1_set_argv0_is_exist)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_module{
+        .name{u8"--wasip1-module"},
+        .describe{u8"Create or update one anonymous module-local WASI Preview 1 group."},
+        .usage{u8"<target:main|preload-wasm|dl|weak> (<module:str>) "
+               u8"<action:enable|disable|expose-host-api|hide-host-api|"
+               u8"noinherit-system-environment|inherit-system-environment|"
+               u8"disable-utf8-check|enable-utf8-check|"
+               u8"set-argv0|set-fd-limit|add-environment|delete-system-environment|"
+               u8"mount-dir|socket-tcp-listen|socket-tcp-connect|socket-udp-bind|socket-udp-connect> (...)"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_module_alias), 1uz}},
+        .handle{::std::addressof(details::wasip1_module_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
 #   pragma clang diagnostic pop
@@ -78,7 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
 # endif
 #endif
-}  // namespace uwvm2::uwvm::cmdline::params
+}
 
 #ifndef UWVM_MODULE
 // macro

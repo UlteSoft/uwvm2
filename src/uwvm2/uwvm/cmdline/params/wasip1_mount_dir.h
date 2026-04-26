@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_mount_dir{
         .name{u8"--wasip1-mount-dir"},
-        .describe{u8"Mount a host directory at a WASI Preview 1 guest path."},
+        .describe{u8"Mount a host directory at a global-default WASI Preview 1 guest path."},
         .usage{u8"<wasi dir:str> <system dir:path>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_mount_dir_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_mount_dir_callback)},

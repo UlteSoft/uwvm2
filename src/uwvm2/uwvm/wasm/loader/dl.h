@@ -47,6 +47,7 @@
 # include <uwvm2/uwvm/wasm/base/impl.h>
 # include <uwvm2/uwvm/wasm/type/impl.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/custom/impl.h>
 #endif
@@ -107,7 +108,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         }
 # endif
 
-        if(set_wasip1_host_api_v1 != nullptr) { set_wasip1_host_api_v1(::uwvm2::uwvm::wasm::type::uwvm_get_wasip1_host_api_v1()); }
+        auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+            ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preloaded_dl,
+            wd.module_name)};
+        auto const expose_host_api{
+            override_state != nullptr && override_state->expose_host_api_is_set ? override_state->expose_host_api
+                                                                                : ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
+
+        if(set_wasip1_host_api_v1 != nullptr)
+        {
+            if(expose_host_api)
+            {
+                ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_target_t wasip1_target_guard{
+                    ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preloaded_dl,
+                    wd.module_name};
+                set_wasip1_host_api_v1(::uwvm2::uwvm::wasm::type::uwvm_get_wasip1_host_api_v1());
+            }
+            else
+            {
+                set_wasip1_host_api_v1(nullptr);
+            }
+        }
     }
 
     inline constexpr void refresh_preloaded_dl_wasip1_host_api() noexcept

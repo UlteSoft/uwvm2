@@ -101,6 +101,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
     inline preload_capi_function_owner_map_t preload_capi_function_owner{};  // [global]
 
+    [[nodiscard]] inline preload_capi_function_owner_t const* find_preload_capi_function_owner(
+        ::uwvm2::uwvm::wasm::type::capi_function_t const* function) noexcept
+    {
+        if(function == nullptr) [[unlikely]] { return nullptr; }
+
+        auto const it{preload_capi_function_owner.find(function)};
+        if(it == preload_capi_function_owner.cend()) [[unlikely]] { return nullptr; }
+        return ::std::addressof(it->second);
+    }
+
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
     inline void register_preloaded_dl_capi_functions(::std::size_t module_index) noexcept
     {

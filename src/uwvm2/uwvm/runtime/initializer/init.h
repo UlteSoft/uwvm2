@@ -47,6 +47,7 @@
 # include <uwvm2/object/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/utils/ansies/impl.h>
+# include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
 # include "init_limit.h"
@@ -78,6 +79,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 u8"(verbose)\n",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         }
+
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+        [[nodiscard]] inline constexpr bool is_wasip1_import_visible_for_wasm_module(::uwvm2::utils::container::u8string_view consumer_module_name,
+                                                                                     ::uwvm2::utils::container::u8string_view import_module_name) noexcept
+        {
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+            if(import_module_name != u8"wasi_snapshot_preview1") [[likely]] { return true; }
+
+            auto const consumer_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(consumer_module_name)};
+            if(consumer_module_it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { return true; }
+
+            switch(consumer_module_it->second.type)
+            {
+                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
+                {
+                    if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+                           ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::main_wasm,
+                           consumer_module_name)};
+                       override_state != nullptr && override_state->enabled_is_set) [[unlikely]]
+                    {
+                        return override_state->enabled;
+                    }
+                    return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
+                }
+                case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
+                {
+                    if(auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
+                           ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preload_wasm,
+                           consumer_module_name)};
+                       override_state != nullptr && override_state->enabled_is_set) [[unlikely]]
+                    {
+                        return override_state->enabled;
+                    }
+                    return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
+                }
+                [[unlikely]] default:
+                {
+                    return true;
+                }
+            }
+# else
+            static_cast<void>(consumer_module_name);
+            static_cast<void>(import_module_name);
+            return true;
+# endif
+        }
+#endif
 
         // use for verbose output
         inline ::uwvm2::utils::container::u8string_view current_initializing_module_name{};  // [global]
@@ -3667,6 +3715,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                 for(auto& imp: curr_rt.imported_function_vec_storage)
                 {
                     auto const import_ptr{imp.import_type_ptr};
+                    if(import_ptr != nullptr &&
+                       !::uwvm2::uwvm::runtime::initializer::details::is_wasip1_import_visible_for_wasm_module(curr_module_name, import_ptr->module_name))
+                        [[unlikely]]
+                    {
+                        continue;
+                    }
                     auto const export_record{resolve_export_record(import_ptr)};
                     if(export_record == nullptr) [[unlikely]] { continue; }
 
@@ -4196,12 +4250,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         bool has_export_idx{};
                         ::std::size_t export_idx{};
                         ::std::size_t export_total{};
+                        bool wasip1_hidden_by_module_setting{};
 
                         auto const module_loaded{::uwvm2::uwvm::wasm::storage::all_module.find(import_ptr->module_name) !=
                                                  ::uwvm2::uwvm::wasm::storage::all_module.end()};
+#ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
+# if defined(UWVM_IMPORT_WASI_WASIP1)
+                        wasip1_hidden_by_module_setting =
+                            !::uwvm2::uwvm::runtime::initializer::details::is_wasip1_import_visible_for_wasm_module(curr_module_name, import_ptr->module_name);
+# endif
+#endif
 
                         auto const modexp_it{::uwvm2::uwvm::wasm::storage::all_module_export.find(import_ptr->module_name)};
-                        if(modexp_it == ::uwvm2::uwvm::wasm::storage::all_module_export.end())
+                        if(wasip1_hidden_by_module_setting) [[unlikely]]
+                        {
+                            reason = ::uwvm2::utils::container::u8string_view{u8"module-specific WASI Preview 1 setting disables this import"};
+                        }
+                        else if(modexp_it == ::uwvm2::uwvm::wasm::storage::all_module_export.end())
                         {
                             if(module_loaded) { reason = ::uwvm2::utils::container::u8string_view{u8"module has no exports"}; }
                             else

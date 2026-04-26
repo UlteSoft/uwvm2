@@ -103,6 +103,9 @@ namespace uwvm2::runtime::lib
         using local_imported_t = ::uwvm2::uwvm::wasm::type::local_imported_t;
         using preload_module_memory_attribute_t = ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t;
         using preload_memory_descriptor_t = ::uwvm2::uwvm::wasm::type::uwvm_preload_memory_descriptor_t;
+        using wasip1_env_type = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_env_type;
+        using wasip1_module_override_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t;
+        using wasip1_module_target_kind_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
@@ -273,6 +276,7 @@ namespace uwvm2::runtime::lib
 
             ::std::size_t module_id{invalid_module_id};
             preload_module_memory_attribute_t const* preload_module_memory_attribute{};
+            capi_function_t const* capi_function{};
         };
 
 #if defined(UWVM_USE_THREAD_LOCAL)
@@ -363,7 +367,8 @@ namespace uwvm2::runtime::lib
             preload_call_context_t* ctx{};
             preload_call_context_t saved{};
 
-            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute) noexcept :
+            inline explicit preload_call_context_guard(preload_module_memory_attribute_t const* attribute,
+                                                       capi_function_t const* function = nullptr) noexcept :
                 ctx{::std::addressof(get_preload_call_context())}, saved{*ctx}
             {
                 auto& call_stack{get_call_stack()};
@@ -373,6 +378,7 @@ namespace uwvm2::runtime::lib
                     ctx->module_id = preload_call_context_t::invalid_module_id;
                 }
                 ctx->preload_module_memory_attribute = attribute;
+                ctx->capi_function = function;
             }
 
             inline preload_call_context_guard(preload_call_context_guard const&) noexcept = delete;
@@ -1108,6 +1114,165 @@ namespace uwvm2::runtime::lib
             auto const mem0{resolve_memory0_ptr(rt)};
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env.wasip1_memory =
                 const_cast<::uwvm2::object::memory::linear::native_memory_t*>(mem0);
+        }
+
+        inline void bind_wasip1_memory_for_runtime_module(wasip1_env_type& env, runtime_module_storage_t const& rt) noexcept
+        {
+            auto const mem0{resolve_memory0_ptr(rt)};
+            env.wasip1_memory = const_cast<native_memory_t*>(mem0);
+        }
+
+        inline void bind_wasip1_memory_for_runtime_module_id(wasip1_env_type& env, ::std::size_t module_id) noexcept
+        {
+            if(module_id >= g_runtime.modules.size()) [[unlikely]]
+            {
+                env.wasip1_memory = nullptr;
+                return;
+            }
+
+            auto const runtime_module{g_runtime.modules.index_unchecked(module_id).runtime_module};
+            if(runtime_module == nullptr) [[unlikely]]
+            {
+                env.wasip1_memory = nullptr;
+                return;
+            }
+
+            bind_wasip1_memory_for_runtime_module(env, *runtime_module);
+        }
+
+        [[nodiscard]] inline wasip1_module_override_t* find_wasip1_override_for_runtime_module_id(::std::size_t module_id) noexcept
+        {
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return nullptr; }
+
+            auto const module_name{g_runtime.modules.index_unchecked(module_id).module_name};
+            auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+            if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { return nullptr; }
+
+            switch(it->second.type)
+            {
+                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm:
+                {
+                    return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override(
+                        wasip1_module_target_kind_t::main_wasm,
+                        module_name);
+                }
+                case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
+                {
+                    return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override(
+                        wasip1_module_target_kind_t::preload_wasm,
+                        module_name);
+                }
+                default:
+                {
+                    return nullptr;
+                }
+            }
+        }
+
+        [[nodiscard]] inline wasip1_env_type& resolve_wasip1_env_for_runtime_module_id(::std::size_t module_id) noexcept
+        {
+            if(auto const state{find_wasip1_override_for_runtime_module_id(module_id)}; state != nullptr) [[likely]] { return state->env; }
+            return ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env;
+        }
+
+        [[nodiscard]] inline bool is_wasip1_import_visible_for_runtime_module_id(::std::size_t module_id) noexcept
+        {
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return true; }
+
+            auto const module_name{g_runtime.modules.index_unchecked(module_id).module_name};
+            auto const module_it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+            if(module_it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { return true; }
+
+            switch(module_it->second.type)
+            {
+                case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm: [[fallthrough]];
+                case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
+                {
+                    if(auto const state{find_wasip1_override_for_runtime_module_id(module_id)}; state != nullptr && state->enabled_is_set) [[unlikely]]
+                    {
+                        return state->enabled;
+                    }
+                    return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1;
+                }
+                default:
+                {
+                    return true;
+                }
+            }
+        }
+
+        [[nodiscard]] inline wasip1_module_override_t* find_wasip1_override_for_preload_capi_function(capi_function_t const* function) noexcept
+        {
+            auto const owner{::uwvm2::uwvm::wasm::storage::find_preload_capi_function_owner(function)};
+            if(owner == nullptr) [[unlikely]] { return nullptr; }
+
+            switch(owner->kind)
+            {
+# if defined(UWVM_SUPPORT_PRELOAD_DL)
+                case ::uwvm2::uwvm::wasm::storage::preload_capi_function_owner_kind_t::preloaded_dl:
+                {
+                    if(owner->module_index >= ::uwvm2::uwvm::wasm::storage::preloaded_dl.size()) [[unlikely]] { return nullptr; }
+                    auto const module_name{::uwvm2::uwvm::wasm::storage::preloaded_dl.index_unchecked(owner->module_index).module_name};
+                    return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override(
+                        wasip1_module_target_kind_t::preloaded_dl,
+                        module_name);
+                }
+# endif
+# if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                case ::uwvm2::uwvm::wasm::storage::preload_capi_function_owner_kind_t::weak_symbol:
+                {
+                    if(owner->module_index >= ::uwvm2::uwvm::wasm::storage::weak_symbol.size()) [[unlikely]] { return nullptr; }
+                    auto const module_name{::uwvm2::uwvm::wasm::storage::weak_symbol.index_unchecked(owner->module_index).module_name};
+                    return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override(
+                        wasip1_module_target_kind_t::weak_symbol,
+                        module_name);
+                }
+# endif
+                default:
+                {
+                    return nullptr;
+                }
+            }
+        }
+
+        [[nodiscard]] inline wasip1_env_type& resolve_wasip1_env_for_preload_capi_function(capi_function_t const* function) noexcept
+        {
+            if(auto const state{find_wasip1_override_for_preload_capi_function(function)}; state != nullptr) [[likely]] { return state->env; }
+            return ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env;
+        }
+
+        [[nodiscard]] inline bool try_get_wasip1_target_for_preload_capi_function(capi_function_t const* function,
+                                                                                   wasip1_module_target_kind_t& target_kind,
+                                                                                   ::uwvm2::utils::container::u8string_view& module_name) noexcept
+        {
+            auto const owner{::uwvm2::uwvm::wasm::storage::find_preload_capi_function_owner(function)};
+            if(owner == nullptr) [[unlikely]] { return false; }
+
+            switch(owner->kind)
+            {
+# if defined(UWVM_SUPPORT_PRELOAD_DL)
+                case ::uwvm2::uwvm::wasm::storage::preload_capi_function_owner_kind_t::preloaded_dl:
+                {
+                    if(owner->module_index >= ::uwvm2::uwvm::wasm::storage::preloaded_dl.size()) [[unlikely]] { return false; }
+                    target_kind = wasip1_module_target_kind_t::preloaded_dl;
+                    module_name = ::uwvm2::uwvm::wasm::storage::preloaded_dl.index_unchecked(owner->module_index).module_name;
+                    return true;
+                }
+# endif
+# if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                case ::uwvm2::uwvm::wasm::storage::preload_capi_function_owner_kind_t::weak_symbol:
+                {
+                    if(owner->module_index >= ::uwvm2::uwvm::wasm::storage::weak_symbol.size()) [[unlikely]] { return false; }
+                    target_kind = wasip1_module_target_kind_t::weak_symbol;
+                    module_name = ::uwvm2::uwvm::wasm::storage::weak_symbol.index_unchecked(owner->module_index).module_name;
+                    return true;
+                }
+# endif
+                default:
+                {
+                    return false;
+                }
+            }
         }
 #endif
 
@@ -2199,6 +2364,12 @@ namespace uwvm2::runtime::lib
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(parbuf, para_bytes, par_guard);
             if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
 
+            auto& call_stack{get_call_stack()};
+            auto const caller_module_id{
+                call_stack.frames.empty() ? preload_call_context_t::invalid_module_id : call_stack.frames.back().module_id};
+            auto& wasip1_env{resolve_wasip1_env_for_runtime_module_id(caller_module_id)};
+            bind_wasip1_memory_for_runtime_module_id(wasip1_env, caller_module_id);
+            ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
             m->call_func_index(tgt.index, resbuf, parbuf);
 
             if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
@@ -2225,8 +2396,26 @@ namespace uwvm2::runtime::lib
             UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(parbuf, para_bytes, par_guard);
             if(para_bytes != 0uz) { ::std::memcpy(parbuf, caller_args_begin, para_bytes); }
 
-            preload_call_context_guard preload_guard{preload_module_memory_attribute};
-            f->func_ptr(resbuf, parbuf);
+            auto& call_stack{get_call_stack()};
+            auto const caller_module_id{
+                call_stack.frames.empty() ? preload_call_context_t::invalid_module_id : call_stack.frames.back().module_id};
+            auto& wasip1_env{resolve_wasip1_env_for_preload_capi_function(f)};
+            bind_wasip1_memory_for_runtime_module_id(wasip1_env, caller_module_id);
+
+            ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
+            wasip1_module_target_kind_t target_kind{};
+            ::uwvm2::utils::container::u8string_view target_module_name{};
+            auto const has_target{try_get_wasip1_target_for_preload_capi_function(f, target_kind, target_module_name)};
+            preload_call_context_guard preload_guard{preload_module_memory_attribute, f};
+            if(has_target)
+            {
+                ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_target_t wasip1_target_guard{target_kind, target_module_name};
+                f->func_ptr(resbuf, parbuf);
+            }
+            else
+            {
+                f->func_ptr(resbuf, parbuf);
+            }
 
             if(res_bytes != 0uz) { ::std::memcpy(*caller_stack_top_ptr, resbuf, res_bytes); }
             *caller_stack_top_ptr += res_bytes;
@@ -2394,6 +2583,9 @@ namespace uwvm2::runtime::lib
                     {
                         auto const local_imported_module{tgt->u.local_imported.module_ptr};
                         if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                        auto& wasip1_env{resolve_wasip1_env_for_runtime_module_id(tgt->frame.module_id)};
+                        bind_wasip1_memory_for_runtime_module_id(wasip1_env, tgt->frame.module_id);
+                        ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
                         local_imported_module->call_func_index(tgt->u.local_imported.index, result_buffer, const_cast<::std::byte*>(param_buffer));
                         return;
                     }
@@ -2402,8 +2594,22 @@ namespace uwvm2::runtime::lib
                     {
                         auto const capi_ptr{tgt->u.capi_ptr};
                         if(capi_ptr == nullptr || capi_ptr->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                        preload_call_context_guard preload_guard{tgt->preload_module_memory_attribute};
-                        capi_ptr->func_ptr(result_buffer, const_cast<::std::byte*>(param_buffer));
+                        auto& wasip1_env{resolve_wasip1_env_for_preload_capi_function(capi_ptr)};
+                        bind_wasip1_memory_for_runtime_module_id(wasip1_env, tgt->frame.module_id);
+                        ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
+                        wasip1_module_target_kind_t target_kind{};
+                        ::uwvm2::utils::container::u8string_view target_module_name{};
+                        auto const has_target{try_get_wasip1_target_for_preload_capi_function(capi_ptr, target_kind, target_module_name)};
+                        preload_call_context_guard preload_guard{tgt->preload_module_memory_attribute, capi_ptr};
+                        if(has_target)
+                        {
+                            ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_target_t wasip1_target_guard{target_kind, target_module_name};
+                            capi_ptr->func_ptr(result_buffer, const_cast<::std::byte*>(param_buffer));
+                        }
+                        else
+                        {
+                            capi_ptr->func_ptr(result_buffer, const_cast<::std::byte*>(param_buffer));
+                        }
                         return;
                     }
                     [[unlikely]] default:
@@ -4139,6 +4345,27 @@ namespace uwvm2::runtime::lib
                 for(::std::size_t i{}; i != import_n; ++i)
                 {
                     auto const imp{::std::addressof(rt->imported_function_vec_storage.index_unchecked(i))};
+                    if(imp->import_type_ptr != nullptr && imp->import_type_ptr->module_name == u8"wasi_snapshot_preview1" &&
+                       !is_wasip1_import_visible_for_runtime_module_id(mid)) [[unlikely]]
+                    {
+                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                            u8"uwvm: ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                            u8"[fatal] ",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"Runtime initializer: module-specific WASI Preview 1 setting disables import \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            imp->import_type_ptr->module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\" for module \"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            rec.module_name,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\".\n\n",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                        ::fast_io::fast_terminate();
+                    }
                     auto const rf{resolve_func_from_import_assuming_initialized(imp)};
 
                     cached_import_target tgt{};
@@ -4572,6 +4799,9 @@ namespace uwvm2::runtime::lib
                 {
                     auto const local_imported_module{tgt.u.local_imported.module_ptr};
                     if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto& wasip1_env{resolve_wasip1_env_for_runtime_module_id(tgt.frame.module_id)};
+                    bind_wasip1_memory_for_runtime_module_id(wasip1_env, tgt.frame.module_id);
+                    ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
                     local_imported_module->call_func_index(tgt.u.local_imported.index,
                                                            static_cast<::std::byte*>(result_buffer),
                                                            const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
@@ -4582,8 +4812,24 @@ namespace uwvm2::runtime::lib
                 {
                     auto const capi_ptr{tgt.u.capi_ptr};
                     if(capi_ptr == nullptr || capi_ptr->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    preload_call_context_guard preload_guard{tgt.preload_module_memory_attribute};
-                    capi_ptr->func_ptr(static_cast<::std::byte*>(result_buffer), const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
+                    auto& wasip1_env{resolve_wasip1_env_for_preload_capi_function(capi_ptr)};
+                    bind_wasip1_memory_for_runtime_module_id(wasip1_env, tgt.frame.module_id);
+                    ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t wasip1_env_guard{wasip1_env};
+                    wasip1_module_target_kind_t target_kind{};
+                    ::uwvm2::utils::container::u8string_view target_module_name{};
+                    auto const has_target{try_get_wasip1_target_for_preload_capi_function(capi_ptr, target_kind, target_module_name)};
+                    preload_call_context_guard preload_guard{tgt.preload_module_memory_attribute, capi_ptr};
+                    if(has_target)
+                    {
+                        ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_target_t wasip1_target_guard{target_kind, target_module_name};
+                        capi_ptr->func_ptr(static_cast<::std::byte*>(result_buffer),
+                                           const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
+                    }
+                    else
+                    {
+                        capi_ptr->func_ptr(static_cast<::std::byte*>(result_buffer),
+                                           const_cast<::std::byte*>(static_cast<::std::byte const*>(param_buffer)));
+                    }
                     return;
                 }
                 [[unlikely]] default:

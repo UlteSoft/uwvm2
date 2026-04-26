@@ -66,7 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_delete_system_environment{
         .name{u8"--wasip1-delete-system-environment"},
-        .describe{u8"Remove a host environment variable from WASI Preview 1 inheritance."},
+        .describe{u8"Remove a host environment variable from the global-default WASI Preview 1 inheritance set."},
         .usage{u8"<env:str>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_delete_system_environment_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_delete_system_environment_callback)},

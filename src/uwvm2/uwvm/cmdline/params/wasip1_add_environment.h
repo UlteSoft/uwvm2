@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_add_environment{
         .name{u8"--wasip1-add-environment"},
-        .describe{u8"Add or replace a WASI Preview 1 environment variable."},
+        .describe{u8"Add or replace a global-default WASI Preview 1 environment variable."},
         .usage{u8"<env:str> <value:str>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_add_environment_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_add_environment_callback)},

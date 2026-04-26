@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_socket_udp_connect{
         .name{u8"--wasip1-socket-udp-connect"},
-        .describe{u8"Connect a WASI Preview 1 UDP client socket."},
+        .describe{u8"Connect a global-default WASI Preview 1 UDP client socket."},
         .usage{u8"<fd:i32> [<ipv4|ipv6|dns>:<port>"
 #  if defined(UWVM_SUPPORT_UNIX_PATH_SOCKET)
                u8"|unix <path>"

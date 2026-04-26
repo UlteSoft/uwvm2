@@ -776,6 +776,95 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         return true;
     }
 
+    inline bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t& state) noexcept
+    {
+        using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
+        using u8string = ::uwvm2::utils::container::u8string;
+
+        state.env.wasip1_memory = nullptr;
+        state.env.trace_wasip1_call = default_wasip1_env.trace_wasip1_call;
+        state.env.disable_utf8_check = state.disable_utf8_check_is_set ? state.disable_utf8_check : default_wasip1_env.disable_utf8_check;
+        state.env.wasip1_proc_exit_func_ptr = default_wasip1_env.wasip1_proc_exit_func_ptr;
+        state.env.wasip1_proc_raise_func_ptr = default_wasip1_env.wasip1_proc_raise_func_ptr;
+        state.env.wasip1_sched_yield_func_ptr = default_wasip1_env.wasip1_sched_yield_func_ptr;
+        state.env.fd_storage.fd_limit = state.fd_limit_is_set ? state.fd_limit : default_wasip1_env.fd_storage.fd_limit;
+
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+        state.env.preopen_sockets = default_wasip1_env.preopen_sockets;
+        state.env.preopen_sockets.reserve(state.env.preopen_sockets.size() + state.preopen_sockets.size());
+        for(auto const& preopen_socket: state.preopen_sockets) { state.env.preopen_sockets.emplace_back(preopen_socket); }
+#  endif
+
+        auto const saved_noinherit_system_environment{wasip1_noinherit_system_environment};
+        auto saved_delete_system_environment{::std::move(wasip1_delete_system_environment)};
+        auto saved_add_environment{::std::move(wasip1_add_environment)};
+        auto saved_argv0_storage{::std::move(wasip1_argv0_storage)};
+        auto saved_environment_storage{::std::move(wasip1_environment_storage)};
+        auto saved_argument_storage{::std::move(wasip1_argument_storage)};
+
+        auto saved_default_mount_dir_roots{::std::move(default_wasip1_env.mount_dir_roots)};
+        auto saved_module_mount_dir_roots{::std::move(state.mount_dir_roots)};
+        auto saved_env_mount_dir_roots{::std::move(state.env.mount_dir_roots)};
+
+        auto const global_mount_dir_count{saved_default_mount_dir_roots.size()};
+        auto const module_mount_dir_count{saved_module_mount_dir_roots.size()};
+
+        ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> combined_delete_system_environment{};
+        combined_delete_system_environment.reserve(saved_delete_system_environment.size() + state.delete_system_environment.size());
+        for(auto const env_name: saved_delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
+        for(auto const env_name: state.delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
+
+        ::uwvm2::utils::container::vector<::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t> combined_add_environment{};
+        combined_add_environment.reserve(saved_add_environment.size() + state.add_environment.size());
+        for(auto const& env_pair: saved_add_environment) { combined_add_environment.emplace_back(env_pair); }
+        for(auto const& env_pair: state.add_environment) { combined_add_environment.emplace_back(env_pair); }
+
+        wasip1_noinherit_system_environment =
+            state.noinherit_system_environment_is_set ? state.noinherit_system_environment : saved_noinherit_system_environment;
+        wasip1_delete_system_environment = ::std::move(combined_delete_system_environment);
+        wasip1_add_environment = ::std::move(combined_add_environment);
+        wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{saved_argv0_storage};
+
+        state.env.mount_dir_roots = ::std::move(saved_default_mount_dir_roots);
+        state.env.mount_dir_roots.reserve(global_mount_dir_count + module_mount_dir_count);
+        for(auto& mount_root: saved_module_mount_dir_roots) { state.env.mount_dir_roots.emplace_back(::std::move(mount_root)); }
+
+        auto const init_ok{init_wasip1_environment(state.env)};
+
+        state.argument_storage = ::std::move(wasip1_argument_storage);
+        state.environment_storage = ::std::move(wasip1_environment_storage);
+
+        wasip1_noinherit_system_environment = saved_noinherit_system_environment;
+        wasip1_delete_system_environment = ::std::move(saved_delete_system_environment);
+        wasip1_add_environment = ::std::move(saved_add_environment);
+        wasip1_argv0_storage = ::std::move(saved_argv0_storage);
+        wasip1_argument_storage = ::std::move(saved_argument_storage);
+        wasip1_environment_storage = ::std::move(saved_environment_storage);
+
+        ::uwvm2::utils::container::vector<mount_dir_root_t> restored_default_mount_dir_roots{};
+        restored_default_mount_dir_roots.reserve(global_mount_dir_count);
+
+        ::uwvm2::utils::container::vector<mount_dir_root_t> restored_module_mount_dir_roots{};
+        restored_module_mount_dir_roots.reserve(module_mount_dir_count);
+
+        ::std::size_t mount_index{};
+        for(auto& mount_root: state.env.mount_dir_roots)
+        {
+            if(mount_index < global_mount_dir_count) { restored_default_mount_dir_roots.emplace_back(::std::move(mount_root)); }
+            else
+            {
+                restored_module_mount_dir_roots.emplace_back(::std::move(mount_root));
+            }
+            ++mount_index;
+        }
+
+        default_wasip1_env.mount_dir_roots = ::std::move(restored_default_mount_dir_roots);
+        state.mount_dir_roots = ::std::move(restored_module_mount_dir_roots);
+        state.env.mount_dir_roots = ::std::move(saved_env_mount_dir_roots);
+
+        return init_ok;
+    }
+
 # endif
 #endif
 }  // namespace uwvm2::uwvm::imported::wasi::wasip1::storage
