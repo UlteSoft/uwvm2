@@ -255,6 +255,69 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         return result;
     }
 
+    template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type, typename... Args>
+    inline void print_wasip1_trace_message(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type>& env, Args&&... args) noexcept
+    {
+        using trace_group_kind_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t;
+        using trace_output_target_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t;
+
+        auto const trace_target{env.trace_wasip1_output_target};
+
+        auto const emit{
+            [&](auto&& out) noexcept
+            {
+                switch(env.trace_wasip1_group_kind)
+                {
+                    case trace_group_kind_t::global:
+                    {
+                        ::fast_io::io::perr(out, u8"[wasip1] global ", args..., u8" (wasi-trace)\n");
+                        return;
+                    }
+                    case trace_group_kind_t::single:
+                    {
+                        ::fast_io::io::perr(out, u8"[wasip1] single ", args..., u8" (wasi-trace)\n");
+                        return;
+                    }
+                    case trace_group_kind_t::custom_group:
+                    {
+                        ::fast_io::io::perr(out,
+                                            u8"[wasip1] custom group:\"",
+                                            env.trace_wasip1_group_name_storage,
+                                            u8"\" ",
+                                            args...,
+                                            u8" (wasi-trace)\n");
+                        return;
+                    }
+                    [[unlikely]] default:
+                    {
+                        ::fast_io::io::perr(out, u8"[wasip1] ", args..., u8" (wasi-trace)\n");
+                        return;
+                    }
+                }
+            }};
+
+        switch(trace_target)
+        {
+            case trace_output_target_t::out:
+            {
+                emit(::fast_io::u8out());
+                break;
+            }
+            case trace_output_target_t::file:
+            {
+                emit(env.trace_wasip1_output_file);
+                break;
+            }
+            case trace_output_target_t::err: [[fallthrough]];
+            case trace_output_target_t::none: [[fallthrough]];
+            [[unlikely]] default:
+            {
+                emit(::fast_io::u8err());
+                break;
+            }
+        }
+    }
+
     inline constexpr ::uwvm2::imported::wasi::wasip1::abi::errno_t path_errno_from_fast_io_error(::fast_io::error e) noexcept
     {
 # if defined(_WIN32) && !defined(__CYGWIN__)

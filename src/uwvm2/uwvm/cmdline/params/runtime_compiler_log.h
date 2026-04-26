@@ -63,8 +63,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_compiler_log{
         .name{u8"--runtime-compiler-log"},
-        .describe{u8"Write runtime compiler logs to a file."},
-        .usage{u8"<file:path>"},
+        .describe{u8"Write runtime compiler logs to stdout, stderr, or a dedicated file."},
+        .usage{u8"[out|err|file <file:path>]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_compiler_log_alias), 1uz}},
         .handle{::std::addressof(details::runtime_compiler_log_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::io::enable_runtime_log)},

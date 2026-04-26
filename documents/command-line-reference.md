@@ -640,7 +640,7 @@ These options configure the hosted WASI integration, especially the built-in WAS
 | `--wasip1-delete-system-environment` | `-I1delsysenv` | `<env:str>` | Remove a host environment variable from the inherited global-default Preview 1 state. | Requires local imported WASI Preview 1 support |
 | `--wasip1-disable` | `-I1disable` | None | Disable the built-in Preview 1 module in the global default configuration. | Requires local imported WASI Preview 1 support |
 | `--wasip1-expose-host-api` | `-I1exportapi` | None | Expose the stable Preview 1 preload host API in the global default configuration. | Requires local imported WASI Preview 1 support |
-| `--wasip1-module` | `-I1module` | `<target:main\|preload-wasm\|dl\|weak> [<module:str>] <action:enable\|disable\|expose-host-api\|hide-host-api\|noinherit-system-environment\|inherit-system-environment\|disable-utf8-check\|enable-utf8-check\|set-argv0\|set-fd-limit\|add-environment\|delete-system-environment\|mount-dir\|socket-tcp-listen\|socket-tcp-connect\|socket-udp-bind\|socket-udp-connect> (...)` | Create or update one anonymous module-local Preview 1 group on top of the global default configuration. | Requires local imported WASI Preview 1 support |
+| `--wasip1-module` | `-I1module` | `<module:str> <action:enable\|disable\|expose-host-api\|hide-host-api\|noinherit-system-environment\|inherit-system-environment\|disable-utf8-check\|enable-utf8-check\|set-argv0\|set-fd-limit\|add-environment\|delete-system-environment\|mount-dir\|socket-tcp-listen\|socket-tcp-connect\|socket-udp-bind\|socket-udp-connect> (...)` | Create or update one anonymous module-local Preview 1 group on top of the global default configuration. | Requires local imported WASI Preview 1 support |
 | `--wasip1-module-group` | `-I1module-group` | `<module:str> <group:str> <action:enable\|disable\|expose-host-api\|hide-host-api\|noinherit-system-environment\|inherit-system-environment\|disable-utf8-check\|enable-utf8-check\|set-argv0\|set-fd-limit\|add-environment\|delete-system-environment\|mount-dir\|socket-tcp-listen\|socket-tcp-connect\|socket-udp-bind\|socket-udp-connect> (...)` | Bind one module name to a shared Preview 1 group and configure that shared group. | Requires local imported WASI Preview 1 support |
 | `--wasip1-mount-dir` | `-I1dir` | `<wasi dir:str> <system dir:path>` | Mount a host directory into the global-default Preview 1 sandbox. | Requires local imported WASI Preview 1 support |
 | `--wasip1-noinherit-system-environment` | `-I1nosysenv` | None | Disable host environment inheritance in the global-default Preview 1 configuration. | Requires local imported WASI Preview 1 support |
@@ -727,7 +727,7 @@ In other words:
 - it disables the automatic preload path for the local WASI Preview 1 module in the global default configuration,
 - it does not take any additional arguments.
 
-Module-specific `--wasip1-module main enable` or `--wasip1-module preload-wasm <name> enable` can still re-enable Preview 1 for the selected wasm module.
+Module-specific `--wasip1-module <name> enable` can still re-enable Preview 1 for the selected wasm module.
 
 ### `--wasip1-module`
 
@@ -735,29 +735,28 @@ This option creates or updates an anonymous Preview 1 group that belongs only to
 
 Canonical syntax forms:
 
-- `<target> [<module>] enable`
-- `<target> [<module>] disable`
-- `<target> [<module>] expose-host-api`
-- `<target> [<module>] hide-host-api`
-- `<target> [<module>] noinherit-system-environment`
-- `<target> [<module>] inherit-system-environment`
-- `<target> [<module>] disable-utf8-check`
-- `<target> [<module>] enable-utf8-check`
-- `<target> [<module>] set-argv0 <argv0:str>`
-- `<target> [<module>] set-fd-limit <limit:size_t>`
-- `<target> [<module>] add-environment <env:str> <value:str>`
-- `<target> [<module>] delete-system-environment <env:str>`
-- `<target> [<module>] mount-dir <wasi dir:str> <system dir:path>`
-- `<target> [<module>] socket-tcp-listen <fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]`
-- `<target> [<module>] socket-tcp-connect <fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]`
-- `<target> [<module>] socket-udp-bind <fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]`
-- `<target> [<module>] socket-udp-connect <fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]`
+- `<module:str> enable`
+- `<module:str> disable`
+- `<module:str> expose-host-api`
+- `<module:str> hide-host-api`
+- `<module:str> noinherit-system-environment`
+- `<module:str> inherit-system-environment`
+- `<module:str> disable-utf8-check`
+- `<module:str> enable-utf8-check`
+- `<module:str> set-argv0 <argv0:str>`
+- `<module:str> set-fd-limit <limit:size_t>`
+- `<module:str> add-environment <env:str> <value:str>`
+- `<module:str> delete-system-environment <env:str>`
+- `<module:str> mount-dir <wasi dir:str> <system dir:path>`
+- `<module:str> socket-tcp-listen <fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]`
+- `<module:str> socket-tcp-connect <fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]`
+- `<module:str> socket-udp-bind <fd:i32> [<ipv4\|ipv6>:<port>\|unix <path>]`
+- `<module:str> socket-udp-connect <fd:i32> [<ipv4\|ipv6\|dns>:<port>\|unix <path>]`
 
-Target syntax:
+Module syntax:
 
-- `main` does not take a module name and applies to the main wasm selected by `--run`,
-- `preload-wasm`, `dl`, and `weak` require a `<module:str>` token,
-- for non-`main` targets, the module name must be non-empty and must satisfy the same WebAssembly UTF-8 name validation used elsewhere in `uwvm2`.
+- the module name must be non-empty and must satisfy the same WebAssembly UTF-8 name validation used elsewhere in `uwvm2`,
+- for the main wasm, use its final module name. This may come from `--wasm-set-main-module-name`, from the wasm custom name section, or from the loaded file name fallback.
 
 Precedence:
 
@@ -769,12 +768,10 @@ Action behavior implemented in the source:
 
 | Action | Targets | Arguments | Effect |
 | --- | --- | --- | --- |
-| `enable` | `main`, `preload-wasm` | None | Re-enable built-in `wasi_snapshot_preview1` imports for the selected wasm module. |
-| `disable` | `main`, `preload-wasm` | None | Disable built-in `wasi_snapshot_preview1` imports for the selected wasm module. |
-| `enable` | `dl`, `weak` | None | Alias for `expose-host-api` on native preload modules. |
-| `disable` | `dl`, `weak` | None | Alias for `hide-host-api` on native preload modules. |
-| `expose-host-api` | `dl`, `weak` | None | Expose the plugin-facing Preview 1 host API table only to the selected native preload module. |
-| `hide-host-api` | `dl`, `weak` | None | Hide the plugin-facing Preview 1 host API table for the selected native preload module. |
+| `enable` | all | None | Re-enable built-in `wasi_snapshot_preview1` imports for wasm modules and expose the plugin-facing Preview 1 host API table for native preload modules. |
+| `disable` | all | None | Disable built-in `wasi_snapshot_preview1` imports for wasm modules and hide the plugin-facing Preview 1 host API table for native preload modules. |
+| `expose-host-api` | native preload modules | None | Expose the plugin-facing Preview 1 host API table for native preload modules. |
+| `hide-host-api` | native preload modules | None | Hide the plugin-facing Preview 1 host API table for native preload modules. |
 | `noinherit-system-environment` | all | None | Disable host environment inheritance for the selected module environment. |
 | `inherit-system-environment` | all | None | Re-enable host environment inheritance for the selected module environment. |
 | `disable-utf8-check` | all | None | Disable Preview 1 UTF-8 path/name checks for the selected module environment. |
@@ -791,8 +788,8 @@ Action behavior implemented in the source:
 
 Operational notes:
 
-- `main` and `preload-wasm` `enable`/`disable` are applied early enough to affect whether `wasi_snapshot_preview1` can be imported at all,
-- `dl` and `weak` host-API exposure is decided per module, not only from the global switch,
+- `enable` and `disable` are applied early enough to affect whether `wasi_snapshot_preview1` can be imported at all,
+- native preload host-API exposure is decided per module, not only from the global switch,
 - module-specific `mount-dir` and socket actions reuse the existing global parsers, so they keep the same validation rules and argument formats,
 - module-specific `disable-utf8-check` only changes the selected Preview 1 environment; it does **not** relax Wasm parser UTF-8 rules or bypass module-name validation for `--wasip1-module` itself.
 
@@ -1036,7 +1033,8 @@ uwvm \
 ```bash
 uwvm \
   --wasip1-disable \
-  --wasip1-module main enable \
+  --wasm-set-main-module-name app \
+  --wasip1-module app enable \
   --run app.wasm
 ```
 
@@ -1046,8 +1044,8 @@ uwvm \
 uwvm \
   --wasip1-disable \
   --wasip1-set-argv0 global-entry \
-  --wasip1-module preload-wasm lib.test enable \
-  --wasip1-module preload-wasm lib.test set-argv0 pre \
+  --wasip1-module lib.test enable \
+  --wasip1-module lib.test set-argv0 pre \
   --wasm-preload-library ./lib.wasm lib.test \
   --run ./main.wasm hello world
 ```
@@ -1056,7 +1054,7 @@ uwvm \
 
 ```bash
 uwvm \
-  --wasip1-module dl dl.example expose-host-api \
+  --wasip1-module dl.example expose-host-api \
   --wasm-register-dl ./libregdl.so dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world

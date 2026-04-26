@@ -47,33 +47,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_module_group_alias{u8"-I1module-group"};
+        inline bool wasip1_trace_is_exist{};  // [global]
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_trace_alias{u8"-I1trace"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasip1_module_group_callback(
-                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type wasip1_trace_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)
 #   pragma clang diagnostic push
 #   pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #  endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_module_group{
-        .name{u8"--wasip1-module-group"},
-        .describe{u8"Bind one module name to a named shared WASI Preview 1 group."},
-        .usage{u8"<module:str> <group:str> "
-               u8"<action:enable|disable|expose-host-api|hide-host-api|"
-               u8"noinherit-system-environment|inherit-system-environment|"
-               u8"disable-utf8-check|enable-utf8-check|trace|"
-               u8"set-argv0|set-fd-limit|add-environment|delete-system-environment|"
-               u8"mount-dir|socket-tcp-listen|socket-tcp-connect|socket-udp-bind|socket-udp-connect> (...)"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_module_group_alias), 1uz}},
-        .handle{::std::addressof(details::wasip1_module_group_callback)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_trace{
+        .name{u8"--wasip1-trace"},
+        .describe{u8"Route global-default WASI Preview 1 trace output to stdout, stderr, or a dedicated file."},
+        .usage{u8"[none|out|err|file <file:path>]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_trace_alias), 1uz}},
+        .handle{::std::addressof(details::wasip1_trace_callback)},
+        .is_exist{::std::addressof(details::wasip1_trace_is_exist)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
 #   pragma clang diagnostic pop
@@ -81,7 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
 # endif
 #endif
-}
+}  // namespace uwvm2::uwvm::cmdline::params
 
 #ifndef UWVM_MODULE
 // macro

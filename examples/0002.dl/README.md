@@ -84,7 +84,7 @@ exposes the plugin-facing WASI P1 table only to `dl.example`.
 
 ```sh
 uwvm -Rcc int -Rcm full \
-  --wasip1-module dl dl.example expose-host-api \
+  --wasip1-module dl.example expose-host-api \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world
@@ -109,9 +109,9 @@ You can also scope that override to the plugin's own WASI environment:
 
 ```sh
 uwvm -Rcc int -Rcm full \
-  --wasip1-module dl dl.example expose-host-api \
+  --wasip1-module dl.example expose-host-api \
   --wasip1-set-argv0 global-entry \
-  --wasip1-module dl dl.example set-argv0 dl \
+  --wasip1-module dl.example set-argv0 dl \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world
@@ -133,7 +133,7 @@ The equivalent module-specific negative-path override is:
 ```sh
 uwvm -Rcc int -Rcm full \
   --wasip1-expose-host-api \
-  --wasip1-module dl dl.example hide-host-api \
+  --wasip1-module dl.example hide-host-api \
   --wasm-register-dl ./libregdl_c.dylib dl.example \
   --wasm-set-preload-module-attribute dl.example copy all \
   --run ./main.wasm hello world

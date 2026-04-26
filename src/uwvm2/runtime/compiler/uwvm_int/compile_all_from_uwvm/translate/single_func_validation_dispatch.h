@@ -1,4 +1,4 @@
-// block type
+﻿// block type
 using value_type_enum = curr_operand_stack_value_type;
 static constexpr value_type_enum i32_result_arr[1u]{value_type_enum::i32};
 static constexpr value_type_enum i64_result_arr[1u]{value_type_enum::i64};

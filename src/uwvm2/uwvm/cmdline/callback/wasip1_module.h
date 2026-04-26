@@ -64,47 +64,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace wasip1_module_details
     {
-        using target_kind = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t;
         using override_state_t = ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t;
         using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
+        using trace_output_target_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t;
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         using preopen_socket_t = ::uwvm2::imported::wasi::wasip1::environment::preopen_socket_t;
 #  endif
-
-        [[nodiscard]] inline constexpr bool target_needs_module_name(target_kind kind) noexcept
-        {
-            return kind != target_kind::main_wasm;
-        }
-
-        [[nodiscard]] inline constexpr bool parse_target_kind(::uwvm2::utils::container::u8string_view text, target_kind& out) noexcept
-        {
-            if(text == u8"main")
-            {
-                out = target_kind::main_wasm;
-                return true;
-            }
-            if(text == u8"preload-wasm")
-            {
-                out = target_kind::preload_wasm;
-                return true;
-            }
-            if(text == u8"dl")
-            {
-                out = target_kind::preloaded_dl;
-                return true;
-            }
-            if(text == u8"weak")
-            {
-                out = target_kind::weak_symbol;
-                return true;
-            }
-            return false;
-        }
-
-        [[nodiscard]] inline constexpr bool target_is_native_preload(target_kind kind) noexcept
-        {
-            return kind == target_kind::preloaded_dl || kind == target_kind::weak_symbol;
-        }
 
         [[nodiscard]] inline bool validate_wasm_utf8_name(::uwvm2::utils::container::u8string_view text) noexcept
         {
@@ -320,37 +285,62 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             if(limit == 0uz) { limit = ::std::numeric_limits<fd_t>::max(); }
+            if(target.fd_limit_is_set && target.fd_limit != limit) [[unlikely]]
+            {
+                return print_usage_error(parameter, u8"Conflicting module action. Cannot set different fd limits for the same WASI Preview 1 target.");
+            }
             target.fd_limit = limit;
             target.fd_limit_is_set = true;
             return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
 
-        enum class enable_disable_mode_t : unsigned
+        [[nodiscard]] inline bool trace_configuration_matches(override_state_t const& target,
+                                                              trace_output_target_t trace_target,
+                                                              ::uwvm2::utils::container::u8string_view file_path) noexcept
         {
-            target_specific = 0u,
-            both
-        };
+            if(!target.trace_wasip1_call_is_set) [[unlikely]] { return true; }
+            if(target.trace_wasip1_call != (trace_target != trace_output_target_t::none)) [[unlikely]] { return false; }
+            if(target.trace_wasip1_output_target != trace_target) [[unlikely]] { return false; }
+            if(trace_target == trace_output_target_t::file) [[unlikely]] { return target.trace_wasip1_output_file_path_storage == file_path; }
+            return true;
+        }
 
-        inline constexpr void apply_enable_disable_action(override_state_t& target,
-                                                          enable_disable_mode_t mode,
-                                                          target_kind target_kind_value,
-                                                          bool enabled) noexcept
+        [[nodiscard]] inline bool has_deleted_environment(override_state_t const& target, ::uwvm2::utils::container::u8string_view env_name) noexcept
         {
-            if(mode == enable_disable_mode_t::target_specific)
+            for(auto const existing_env_name: target.delete_system_environment)
             {
-                if(target_is_native_preload(target_kind_value))
-                {
-                    target.expose_host_api = enabled;
-                    target.expose_host_api_is_set = true;
-                }
-                else
-                {
-                    target.enabled = enabled;
-                    target.enabled_is_set = true;
-                }
-                return;
+                if(existing_env_name == env_name) [[unlikely]] { return true; }
             }
+            return false;
+        }
 
+        [[nodiscard]] inline ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t const* find_added_environment(
+            override_state_t const& target,
+            ::uwvm2::utils::container::u8string_view env_name) noexcept
+        {
+            for(auto const& entry: target.add_environment)
+            {
+                if(entry.env == env_name) [[unlikely]] { return ::std::addressof(entry); }
+            }
+            return nullptr;
+        }
+
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+        [[nodiscard]] inline bool has_duplicate_preopen_socket_fd(override_state_t const& target) noexcept
+        {
+            for(auto curr{target.preopen_sockets.cbegin()}; curr != target.preopen_sockets.cend(); ++curr)
+            {
+                for(auto next{curr + 1}; next != target.preopen_sockets.cend(); ++next)
+                {
+                    if(curr->fd == next->fd) [[unlikely]] { return true; }
+                }
+            }
+            return false;
+        }
+#  endif
+
+        inline constexpr void apply_enable_disable_action(override_state_t& target, bool enabled) noexcept
+        {
             target.enabled = enabled;
             target.enabled_is_set = true;
             target.expose_host_api = enabled;
@@ -362,9 +352,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
             ::uwvm2::utils::cmdline::parameter_parsing_results* action_arg,
             ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-            override_state_t& target,
-            enable_disable_mode_t enable_disable_mode,
-            target_kind target_kind_value) noexcept
+            override_state_t& target) noexcept
         {
             using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
             using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
@@ -377,74 +365,247 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     for(auto curr{mark_begin}; curr <= last; ++curr) { curr->type = parameter_type::occupied_arg; }
                 }};
 
+            auto const set_bool_option{
+                [&](bool& option,
+                    bool& option_is_set,
+                    bool value,
+                    auto const& conflict_message) noexcept -> parameter_return_type
+                {
+                    if(option_is_set && option != value) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, conflict_message);
+                    }
+                    option = value;
+                    option_is_set = true;
+                    return parameter_return_type::def;
+                }};
+
+            auto const apply_module_enable_disable_action{
+                [&](bool enabled) noexcept -> parameter_return_type
+                {
+                    if(enabled)
+                    {
+                        if(auto const ret{set_bool_option(target.enabled,
+                                                          target.enabled_is_set,
+                                                          true,
+                                                          u8"Conflicting module action. Cannot combine enable and disable for the same WASI Preview 1 target.")};
+                           ret != parameter_return_type::def) [[unlikely]]
+                        {
+                            return ret;
+                        }
+                        if(auto const ret{set_bool_option(target.expose_host_api,
+                                                          target.expose_host_api_is_set,
+                                                          true,
+                                                          u8"Conflicting module action. Cannot combine enable and hide-host-api for the same WASI Preview 1 target.")};
+                           ret != parameter_return_type::def) [[unlikely]]
+                        {
+                            return ret;
+                        }
+                    }
+                    else
+                    {
+                        if(auto const ret{set_bool_option(target.enabled,
+                                                          target.enabled_is_set,
+                                                          false,
+                                                          u8"Conflicting module action. Cannot combine disable and enable for the same WASI Preview 1 target.")};
+                           ret != parameter_return_type::def) [[unlikely]]
+                        {
+                            return ret;
+                        }
+                        if(auto const ret{set_bool_option(target.expose_host_api,
+                                                          target.expose_host_api_is_set,
+                                                          false,
+                                                          u8"Conflicting module action. Cannot combine disable and expose-host-api for the same WASI Preview 1 target.")};
+                           ret != parameter_return_type::def) [[unlikely]]
+                        {
+                            return ret;
+                        }
+                    }
+                    apply_enable_disable_action(target, enabled);
+                    mark_consumed(action_arg);
+                    return parameter_return_type::def;
+                }};
+
             if(action == u8"enable")
             {
-                apply_enable_disable_action(target, enable_disable_mode, target_kind_value, true);
-                mark_consumed(action_arg);
-                return parameter_return_type::def;
+                return apply_module_enable_disable_action(true);
             }
 
             if(action == u8"disable")
             {
-                apply_enable_disable_action(target, enable_disable_mode, target_kind_value, false);
-                mark_consumed(action_arg);
-                return parameter_return_type::def;
+                return apply_module_enable_disable_action(false);
             }
 
             if(action == u8"expose-host-api")
             {
-                target.expose_host_api = true;
-                target.expose_host_api_is_set = true;
+                if(auto const ret{set_bool_option(target.expose_host_api,
+                                                  target.expose_host_api_is_set,
+                                                  true,
+                                                  u8"Conflicting module action. Cannot combine expose-host-api and hide-host-api for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             if(action == u8"hide-host-api")
             {
-                target.expose_host_api = false;
-                target.expose_host_api_is_set = true;
+                if(auto const ret{set_bool_option(target.expose_host_api,
+                                                  target.expose_host_api_is_set,
+                                                  false,
+                                                  u8"Conflicting module action. Cannot combine hide-host-api and expose-host-api for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             if(action == u8"noinherit-system-environment")
             {
-                target.noinherit_system_environment = true;
-                target.noinherit_system_environment_is_set = true;
+                if(auto const ret{set_bool_option(target.noinherit_system_environment,
+                                                  target.noinherit_system_environment_is_set,
+                                                  true,
+                                                  u8"Conflicting module action. Cannot combine noinherit-system-environment and inherit-system-environment for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             if(action == u8"inherit-system-environment")
             {
-                target.noinherit_system_environment = false;
-                target.noinherit_system_environment_is_set = true;
+                if(auto const ret{set_bool_option(target.noinherit_system_environment,
+                                                  target.noinherit_system_environment_is_set,
+                                                  false,
+                                                  u8"Conflicting module action. Cannot combine inherit-system-environment and noinherit-system-environment for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             if(action == u8"disable-utf8-check")
             {
-                target.disable_utf8_check = true;
-                target.disable_utf8_check_is_set = true;
+                if(auto const ret{set_bool_option(target.disable_utf8_check,
+                                                  target.disable_utf8_check_is_set,
+                                                  true,
+                                                  u8"Conflicting module action. Cannot combine disable-utf8-check and enable-utf8-check for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             if(action == u8"enable-utf8-check")
             {
-                target.disable_utf8_check = false;
-                target.disable_utf8_check_is_set = true;
+                if(auto const ret{set_bool_option(target.disable_utf8_check,
+                                                  target.disable_utf8_check_is_set,
+                                                  false,
+                                                  u8"Conflicting module action. Cannot combine enable-utf8-check and disable-utf8-check for the same WASI Preview 1 target.")};
+                   ret != parameter_return_type::def) [[unlikely]]
+                {
+                    return ret;
+                }
                 mark_consumed(action_arg);
                 return parameter_return_type::def;
             }
 
             auto extra1{action_arg + 1u};
+            if(action == u8"trace")
+            {
+                if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
+                {
+                    return print_usage_error(parameter, u8"Missing trace output target.");
+                }
+
+                auto const trace_target_text{::uwvm2::utils::container::u8string_view{extra1->str}};
+                auto set_trace_target{
+                    [&](trace_output_target_t trace_target, ::uwvm2::utils::cmdline::parameter_parsing_results* last) noexcept -> parameter_return_type
+                    {
+                        if(!trace_configuration_matches(target, trace_target, {})) [[unlikely]]
+                        {
+                            return print_usage_error(parameter,
+                                                     u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
+                        }
+                        target.trace_wasip1_call = trace_target != trace_output_target_t::none;
+                        target.trace_wasip1_call_is_set = true;
+                        target.trace_wasip1_output_target = trace_target;
+                        if(trace_target != trace_output_target_t::file) { target.trace_wasip1_output_file_path_storage.clear(); }
+                        mark_consumed(last);
+                        return parameter_return_type::def;
+                    }};
+
+                auto set_trace_file{
+                    [&](::uwvm2::utils::container::u8string_view file_path,
+                        ::uwvm2::utils::cmdline::parameter_parsing_results* last) noexcept -> parameter_return_type
+                    {
+                        if(file_path.empty()) [[unlikely]] { return print_usage_error(parameter, u8"Missing trace output file path."); }
+                        if(!trace_configuration_matches(target, trace_output_target_t::file, file_path)) [[unlikely]]
+                        {
+                            return print_usage_error(parameter,
+                                                     u8"Conflicting module action. Cannot set different trace outputs for the same WASI Preview 1 target.");
+                        }
+
+                        ::fast_io::u8native_file test_output{};
+                        if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(test_output, file_path)) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                u8"[error] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Unable to open WASI trace output file \"",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                file_path,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"\".\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            return parameter_return_type::return_m1_imme;
+                        }
+
+                        target.trace_wasip1_call = true;
+                        target.trace_wasip1_call_is_set = true;
+                        target.trace_wasip1_output_target = trace_output_target_t::file;
+                        target.trace_wasip1_output_file_path_storage = ::uwvm2::utils::container::u8string{file_path};
+                        mark_consumed(last);
+                        return parameter_return_type::def;
+                    }};
+
+                if(trace_target_text == u8"none") { return set_trace_target(trace_output_target_t::none, extra1); }
+                if(trace_target_text == u8"out") { return set_trace_target(trace_output_target_t::out, extra1); }
+                if(trace_target_text == u8"err") { return set_trace_target(trace_output_target_t::err, extra1); }
+                if(trace_target_text == u8"file")
+                {
+                    auto extra2{extra1 + 1u};
+                    if(extra2 == para_end || extra2->type != parameter_type::arg) [[unlikely]]
+                    {
+                        return print_usage_error(parameter, u8"Missing trace output file path.");
+                    }
+                    return set_trace_file(::uwvm2::utils::container::u8string_view{extra2->str}, extra2);
+                }
+                return set_trace_file(trace_target_text, extra1);
+            }
+
             if(action == u8"set-argv0")
             {
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]]
                 {
                     return print_usage_error(parameter, u8"Missing argv0.");
+                }
+                if(target.argv0_is_set && target.argv0_storage != extra1->str) [[unlikely]]
+                {
+                    return print_usage_error(parameter, u8"Conflicting module action. Cannot set different argv0 values for the same WASI Preview 1 target.");
                 }
                 target.argv0_storage = ::uwvm2::utils::container::u8string{extra1->str};
                 target.argv0_is_set = true;
@@ -476,6 +637,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 {
                     return print_usage_error(parameter, u8"Invalid environment variable name.");
                 }
+                if(find_added_environment(target, env_name) != nullptr) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Conflicting module action. Cannot combine delete-system-environment and add-environment for the same variable in one WASI Preview 1 target.");
+                }
 
                 target.delete_system_environment.emplace_back(env_name);
                 mark_consumed(extra1);
@@ -494,6 +660,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 if(env_name.empty() || env_name.find_character(u8'=') != ::fast_io::containers::npos) [[unlikely]]
                 {
                     return print_usage_error(parameter, u8"Invalid environment variable name.");
+                }
+                if(has_deleted_environment(target, env_name)) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Conflicting module action. Cannot combine add-environment and delete-system-environment for the same variable in one WASI Preview 1 target.");
+                }
+                if(auto const existing_entry{find_added_environment(target, env_name)};
+                   existing_entry != nullptr && existing_entry->value != ::uwvm2::utils::container::u8string_view{extra2->str}) [[unlikely]]
+                {
+                    return print_usage_error(parameter,
+                                             u8"Conflicting module action. Cannot set different values for the same environment variable in one WASI Preview 1 target.");
                 }
 
                 target.add_environment.emplace_back(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t{
@@ -540,6 +717,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             auto const ret{
                                 apply_socket_callback_to_override(target, parameter_name, socket_parameter, callback, extra1->str, extra2->str, extra3->str)};
                             if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
+                            if(has_duplicate_preopen_socket_fd(target)) [[unlikely]]
+                            {
+                                return print_usage_error(parameter,
+                                                         u8"Conflicting module action. Cannot assign the same WASI socket fd more than once in one WASI Preview 1 target.");
+                            }
                             mark_consumed(extra3);
                             return parameter_return_type::def;
                         }
@@ -547,6 +729,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         auto const ret{
                             apply_socket_callback_to_override(target, parameter_name, socket_parameter, callback, extra1->str, extra2->str)};
                         if(ret != parameter_return_type::def) [[unlikely]] { return ret; }
+                        if(has_duplicate_preopen_socket_fd(target)) [[unlikely]]
+                        {
+                            return print_usage_error(parameter,
+                                                     u8"Conflicting module action. Cannot assign the same WASI socket fd more than once in one WASI Preview 1 target.");
+                        }
                         mark_consumed(extra2);
                         return parameter_return_type::def;
                     }};
@@ -590,57 +777,35 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
     {
         using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
-        using target_kind = wasip1_module_details::target_kind;
-
-        auto target_arg{para_curr + 1u};
-        if(target_arg == para_end || target_arg->type != parameter_type::arg) [[unlikely]]
+        auto module_arg{para_curr + 1u};
+        if(module_arg == para_end || module_arg->type != parameter_type::arg) [[unlikely]]
         {
-            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Missing module target.");
+            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Missing module name.");
         }
 
-        target_kind target_kind_value{};
-        auto const target_text{::uwvm2::utils::container::u8string_view{target_arg->str}};
-        if(!wasip1_module_details::parse_target_kind(target_text, target_kind_value)) [[unlikely]]
+        auto const module_name{::uwvm2::utils::container::u8string_view{module_arg->str}};
+        if(module_name.empty()) [[unlikely]]
         {
-            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Invalid module target.");
+            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Module name cannot be empty.");
+        }
+        if(!wasip1_module_details::validate_wasm_utf8_name(module_name)) [[unlikely]]
+        {
+            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module,
+                                                            u8"Invalid module name. WebAssembly names must be valid UTF-8.");
         }
 
-        ::uwvm2::utils::container::u8string_view module_name{};
-        auto action_arg{target_arg + 1u};
-        if(wasip1_module_details::target_needs_module_name(target_kind_value))
-        {
-            if(action_arg == para_end || action_arg->type != parameter_type::arg) [[unlikely]]
-            {
-                return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Missing module name.");
-            }
-
-            module_name = ::uwvm2::utils::container::u8string_view{action_arg->str};
-            if(module_name.empty()) [[unlikely]]
-            {
-                return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Module name cannot be empty.");
-            }
-            if(!wasip1_module_details::validate_wasm_utf8_name(module_name)) [[unlikely]]
-            {
-                return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module,
-                                                                u8"Invalid module name. WebAssembly names must be valid UTF-8.");
-            }
-            ++action_arg;
-        }
-
+        auto action_arg{module_arg + 1u};
         if(action_arg == para_end || action_arg->type != parameter_type::arg) [[unlikely]]
         {
             return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module, u8"Missing module action.");
         }
 
-        auto& target{
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::upsert_wasip1_module_override(target_kind_value, module_name)};
+        auto& target{::uwvm2::uwvm::imported::wasi::wasip1::storage::upsert_targetless_wasip1_module_override(module_name)};
         return wasip1_module_details::apply_module_action(::uwvm2::uwvm::cmdline::params::wasip1_module,
-                                                          target_arg,
+                                                          module_arg,
                                                           action_arg,
                                                           para_end,
-                                                          target,
-                                                          wasip1_module_details::enable_disable_mode_t::target_specific,
-                                                          target_kind_value);
+                                                          target);
     }
 
 #  if defined(UWVM_MODULE)
@@ -683,11 +848,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module_group, u8"Group name cannot be empty.");
         }
-        if(!wasip1_module_details::validate_wasm_utf8_name(group_name)) [[unlikely]]
-        {
-            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_module_group,
-                                                            u8"Invalid group name. WebAssembly names must be valid UTF-8.");
-        }
 
         auto action_arg{group_arg + 1u};
         if(action_arg == para_end || action_arg->type != parameter_type::arg) [[unlikely]]
@@ -713,9 +873,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                                           module_arg,
                                                           action_arg,
                                                           para_end,
-                                                          *target,
-                                                          wasip1_module_details::enable_disable_mode_t::both,
-                                                          wasip1_module_details::target_kind::main_wasm);
+                                                          *target);
     }
 
 # endif

@@ -98,14 +98,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
-        auto currp1_str{currp1->str};
+        auto const log_output_arg{currp1->str};
+        auto log_output_path{log_output_arg};
+
+        if(log_output_arg == u8"out")
+        {
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_dup, ::fast_io::u8out());
+            ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::out;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
+        if(log_output_arg == u8"err")
+        {
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_dup, ::fast_io::u8err());
+            ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::err;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
+        if(log_output_arg != u8"file")
+        {
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                u8"[error] ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"Usage: ",
+                                ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
+                                u8"\n\n");
+            return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+        }
+        {
+            auto currp2{para_curr + 2u};
+            if(currp2 == para_end || currp2->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                    u8"[error] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Usage: ",
+                                    ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
+                                    u8"\n\n");
+                return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+            }
+
+            currp2->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
+            log_output_path = currp2->str;
+        }
 
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
-        if(currp1_str.starts_with(u8"::NT::"))
+        if(log_output_path.starts_with(u8"::NT::"))
         {
             // nt path
 
-            ::fast_io::u8cstring_view const currp1_str_nt_subview{::fast_io::containers::null_terminated, currp1_str.subview(6uz)};
+            ::fast_io::u8cstring_view const log_output_path_nt_subview{::fast_io::containers::null_terminated, log_output_path.subview(6uz)};
 
             if(::uwvm2::uwvm::io::show_nt_path_warning)
             {
@@ -119,7 +165,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Resolve to NT path: \"",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    currp1_str_nt_subview,
+                                    log_output_path_nt_subview,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"\".",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
@@ -147,7 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
             {
                 // allow symlink
-                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_kernel, currp1_str_nt_subview, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
+                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_kernel, log_output_path_nt_subview, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
             }
 # if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             catch(::fast_io::error e)
@@ -160,7 +206,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Unable to open log output file \"",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                    currp1_str_nt_subview,
+                                    log_output_path_nt_subview,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"\": ",
                                     e,
@@ -179,7 +225,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
             {
                 // allow symlink
-                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(currp1_str, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
+                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(log_output_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
             }
 # if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             catch(::fast_io::error e)
@@ -192,7 +238,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"Unable to open log output file \"",
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                    currp1_str,
+                                    log_output_path,
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                     u8"\": ",
                                     e,
@@ -206,12 +252,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // win9x and posix
 
 # if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
-        try
+            try
 # endif
-        {
-            // allow symlink
-            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(currp1_str, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
-        }
+            {
+                // allow symlink
+                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(log_output_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
+            }
 # if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
         catch(::fast_io::error e)
         {
@@ -223,7 +269,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"Unable to open log output file \"",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                currp1_str,
+                                log_output_path,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\": ",
                                 e,
@@ -238,6 +284,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
 #endif
 
+        ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::file;
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
 #endif

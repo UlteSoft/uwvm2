@@ -56,6 +56,7 @@
 
 // wasi
 # include "wasi_disable_utf8_check.h"
+# include "wasip1_trace.h"
 # include "wasip1_module.h"
 # include "wasip1_expose_host_api.h"
 # include "wasip1_set_fd_limit.h"

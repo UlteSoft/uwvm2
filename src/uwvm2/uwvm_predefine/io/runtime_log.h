@@ -35,10 +35,19 @@
 #ifdef UWVM
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 {
+    enum class runtime_log_output_target_t : unsigned
+    {
+        file = 0u,
+        out,
+        err
+    };
+
     /// @brief Record the runtime compiler's log
     inline bool enable_runtime_log{};  // [galobal]
+
+    inline runtime_log_output_target_t runtime_log_output_target{runtime_log_output_target_t::file};  // [global]
+
     inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8native_file>
         u8runtime_log_output{};  // [global] No global variable dependencies from other translation units
-
 }  // namespace uwvm2::utils
 #endif

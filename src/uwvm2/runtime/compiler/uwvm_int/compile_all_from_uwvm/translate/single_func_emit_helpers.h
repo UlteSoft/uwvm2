@@ -1,4 +1,4 @@
-bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
+﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
 // Verbose emit logging for offline analysis (enabled only when `-Rclog` is used).
 constexpr bool runtime_log_emit_opfuncs{true};
 constexpr bool runtime_log_emit_cf{true};
@@ -3012,4 +3012,3 @@ auto const emit_return_to{[&](bytecode_vec_t& dst) constexpr UWVM_THROWS
                               stacktop_flush_all_to_operand_stack(dst);
                               emit_opfunc_to(dst, translate::get_uwvmint_return_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                           }};
-

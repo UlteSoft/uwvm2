@@ -58,6 +58,7 @@ export import :runtime_tiered;
 
 // wasi
 export import :wasi_disable_utf8_check;
+export import :wasip1_trace;
 export import :wasip1_module;
 export import :wasip1_module_group;
 export import :wasip1_expose_host_api;

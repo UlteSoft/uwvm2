@@ -104,6 +104,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
         // wasip1
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_trace),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_module),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_module_group),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_expose_host_api),

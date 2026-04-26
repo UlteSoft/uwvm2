@@ -1,4 +1,4 @@
-case wasm1_code::br:
+﻿case wasm1_code::br:
 {
     // br     label_index ...
     // [safe] unsafe (could be the section_end)

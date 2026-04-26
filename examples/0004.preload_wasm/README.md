@@ -46,7 +46,7 @@ wat2wasm main.wat -o main.wasm
 This run demonstrates both features together:
 
 - global WASI P1 is disabled;
-- `lib.test` is explicitly re-enabled with `--wasip1-module preload-wasm ... enable`;
+- `lib.test` is explicitly re-enabled with `--wasip1-module lib.test enable`;
 - global `argv[0]` is set to `global-entry`;
 - `lib.test` overrides its own `argv[0]` to `pre`.
 
@@ -54,20 +54,28 @@ This run demonstrates both features together:
 uwvm -Rcc int -Rcm full \
   --wasip1-disable \
   --wasip1-set-argv0 global-entry \
-  --wasip1-module preload-wasm lib.test enable \
-  --wasip1-module preload-wasm lib.test set-argv0 pre \
+  --wasip1-module lib.test enable \
+  --wasip1-module lib.test set-argv0 pre \
   --wasm-preload-library ./lib.wasm lib.test \
   --run ./main.wasm hello world
 ```
 
 The process should exit successfully.
 
+When global WASI P1 remains enabled, the inverse form also works:
+
+```sh
+--wasip1-module lib.test disable
+```
+
+That disables WASI Preview 1 only for `lib.test` while leaving the global default unchanged.
+
 ## Negative path: omit module-level enable
 
 If you remove:
 
 ```sh
---wasip1-module preload-wasm lib.test enable
+--wasip1-module lib.test enable
 ```
 
 then `lib.test` can no longer import `wasi_snapshot_preview1`, and uwvm aborts
@@ -78,7 +86,7 @@ during initialization.
 If you keep the module enabled but remove:
 
 ```sh
---wasip1-module preload-wasm lib.test set-argv0 pre
+--wasip1-module lib.test set-argv0 pre
 ```
 
 then `lib.test` falls back to the global default `argv[0] = "global-entry"`,

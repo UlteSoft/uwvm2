@@ -65,10 +65,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_module{
         .name{u8"--wasip1-module"},
         .describe{u8"Create or update one anonymous module-local WASI Preview 1 group."},
-        .usage{u8"<target:main|preload-wasm|dl|weak> (<module:str>) "
+        .usage{u8"<module:str> "
                u8"<action:enable|disable|expose-host-api|hide-host-api|"
                u8"noinherit-system-environment|inherit-system-environment|"
-               u8"disable-utf8-check|enable-utf8-check|"
+               u8"disable-utf8-check|enable-utf8-check|trace|"
                u8"set-argv0|set-fd-limit|add-environment|delete-system-environment|"
                u8"mount-dir|socket-tcp-listen|socket-tcp-connect|socket-udp-bind|socket-udp-connect> (...)"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_module_alias), 1uz}},

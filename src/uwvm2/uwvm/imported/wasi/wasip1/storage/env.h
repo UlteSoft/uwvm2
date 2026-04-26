@@ -87,6 +87,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         bool argv0_is_set{};
         ::uwvm2::utils::container::u8string argv0_storage{};
 
+        bool trace_wasip1_call{};
+        bool trace_wasip1_call_is_set{};
+        ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t trace_wasip1_output_target{};
+        ::uwvm2::utils::container::u8string trace_wasip1_output_file_path_storage{};
+        ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t trace_wasip1_group_kind{
+            ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::single};
+        ::uwvm2::utils::container::u8string trace_wasip1_group_name_storage{};
+
         ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> delete_system_environment{};
         ::uwvm2::utils::container::vector<wasip1_add_environment_t> add_environment{};
         ::uwvm2::utils::container::vector<::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t> mount_dir_roots{};
@@ -102,7 +110,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         [[nodiscard]] inline bool has_override() const noexcept
         {
             return this->enabled_is_set || this->expose_host_api_is_set || this->noinherit_system_environment_is_set || this->disable_utf8_check_is_set ||
-                   this->fd_limit_is_set || this->argv0_is_set || !this->delete_system_environment.empty() || !this->add_environment.empty() ||
+                   this->fd_limit_is_set || this->argv0_is_set || this->trace_wasip1_call_is_set || !this->delete_system_environment.empty() ||
+                   !this->add_environment.empty() ||
                    !this->mount_dir_roots.empty()
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
                    || !this->preopen_sockets.empty()
@@ -145,12 +154,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     inline wasip1_group_state_storage_t configured_wasip1_groups{};  // [global]
     inline wasip1_group_index_map_t configured_named_wasip1_groups{};  // [global]
 
-    inline bool configured_main_wasip1_anonymous_group_is_set{};  // [global]
-    inline wasip1_group_index_t configured_main_wasip1_anonymous_group_index{invalid_wasip1_group_index};  // [global]
-    inline wasip1_group_index_map_t configured_preload_wasip1_anonymous_groups{};  // [global]
-    inline wasip1_group_index_map_t configured_preloaded_dl_wasip1_anonymous_groups{};  // [global]
-    inline wasip1_group_index_map_t configured_weak_symbol_wasip1_anonymous_groups{};  // [global]
-
+    inline wasip1_group_index_map_t configured_module_wasip1_anonymous_groups{};  // [global]
     inline wasip1_group_index_map_t configured_named_wasip1_module_groups{};  // [global]
 
 #  if defined(UWVM_USE_THREAD_LOCAL)
@@ -195,6 +199,45 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     inline wasip1_module_target_kind_t current_wasip1_target_kind{};  // [global]
     inline ::uwvm2::utils::container::u8string_view current_wasip1_target_module_name{};  // [global]
 #  endif
+
+    [[nodiscard]] inline bool reopen_wasip1_trace_output_file(::fast_io::u8native_file& output_file,
+                                                              ::uwvm2::utils::container::u8string_view path) noexcept
+    {
+#  if defined(_WIN32) && !defined(_WIN32_WINDOWS)
+        if(path.starts_with(u8"::NT::"))
+        {
+            ::fast_io::u8cstring_view const nt_path{::fast_io::containers::null_terminated, path.subview(6uz)};
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+            try
+#   endif
+            {
+                output_file = ::fast_io::u8native_file{::fast_io::io_kernel, nt_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow};
+                return true;
+            }
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+            catch(::fast_io::error)
+            {
+                return false;
+            }
+#   endif
+        }
+#  endif
+
+#  if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+        try
+#  endif
+        {
+            ::fast_io::u8cstring_view const file_path{::fast_io::containers::null_terminated, path};
+            output_file = ::fast_io::u8native_file{file_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow};
+            return true;
+        }
+#  if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+        catch(::fast_io::error)
+        {
+            return false;
+        }
+#  endif
+    }
 
     [[nodiscard]] inline wasip1_env_type& current_wasip1_env() noexcept
     {
@@ -283,6 +326,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                                                                               invalid_wasip1_group_index)};
         static_cast<void>(inserted);
         if(it->second == invalid_wasip1_group_index) [[unlikely]] { it->second = create_wasip1_group(); }
+        if(auto const state{find_wasip1_group_state(it->second)}; state != nullptr) [[likely]]
+        {
+            state->trace_wasip1_group_kind = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::custom_group;
+            state->trace_wasip1_group_name_storage = ::uwvm2::utils::container::u8string{group_name};
+        }
         return it->second;
     }
 
@@ -308,33 +356,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         return find_wasip1_group_index_in_map(configured_named_wasip1_module_groups, module_name);
     }
 
-    [[nodiscard]] inline wasip1_group_index_t find_wasip1_anonymous_module_group_index(wasip1_module_target_kind_t target_kind,
+    [[nodiscard]] inline wasip1_group_index_t find_targetless_wasip1_anonymous_module_group_index(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
+    {
+        return find_wasip1_group_index_in_map(configured_module_wasip1_anonymous_groups, module_name);
+    }
+
+    [[nodiscard]] inline wasip1_group_index_t find_wasip1_anonymous_module_group_index([[maybe_unused]] wasip1_module_target_kind_t target_kind,
                                                                                         ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
-        switch(target_kind)
-        {
-            case wasip1_module_target_kind_t::main_wasm:
-            {
-                if(!configured_main_wasip1_anonymous_group_is_set) [[unlikely]] { return invalid_wasip1_group_index; }
-                return configured_main_wasip1_anonymous_group_index;
-            }
-            case wasip1_module_target_kind_t::preload_wasm:
-            {
-                return find_wasip1_group_index_in_map(configured_preload_wasip1_anonymous_groups, module_name);
-            }
-            case wasip1_module_target_kind_t::preloaded_dl:
-            {
-                return find_wasip1_group_index_in_map(configured_preloaded_dl_wasip1_anonymous_groups, module_name);
-            }
-            case wasip1_module_target_kind_t::weak_symbol:
-            {
-                return find_wasip1_group_index_in_map(configured_weak_symbol_wasip1_anonymous_groups, module_name);
-            }
-            [[unlikely]] default:
-            {
-                return invalid_wasip1_group_index;
-            }
-        }
+        return find_targetless_wasip1_anonymous_module_group_index(module_name);
     }
 
     [[nodiscard]] inline wasip1_group_index_t find_wasip1_module_group_index(wasip1_module_target_kind_t target_kind,
@@ -361,60 +392,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         return find_wasip1_module_override(target_kind, module_name);
     }
 
-    [[nodiscard]] inline wasip1_group_state_t& upsert_wasip1_module_override(wasip1_module_target_kind_t target_kind,
-                                                                              ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline wasip1_group_state_t& upsert_targetless_wasip1_module_override(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
-        wasip1_group_index_t group_index{invalid_wasip1_group_index};
-        switch(target_kind)
-        {
-            case wasip1_module_target_kind_t::main_wasm:
-            {
-                if(!configured_main_wasip1_anonymous_group_is_set) [[unlikely]]
-                {
-                    configured_main_wasip1_anonymous_group_index = create_wasip1_group();
-                    configured_main_wasip1_anonymous_group_is_set = true;
-                }
-                group_index = configured_main_wasip1_anonymous_group_index;
-                break;
-            }
-            case wasip1_module_target_kind_t::preload_wasm:
-            {
-                auto const [it, inserted]{
-                    configured_preload_wasip1_anonymous_groups.try_emplace(::uwvm2::utils::container::u8string{module_name},
-                                                                           invalid_wasip1_group_index)};
-                static_cast<void>(inserted);
-                if(it->second == invalid_wasip1_group_index) [[unlikely]] { it->second = create_wasip1_group(); }
-                group_index = it->second;
-                break;
-            }
-            case wasip1_module_target_kind_t::preloaded_dl:
-            {
-                auto const [it, inserted]{
-                    configured_preloaded_dl_wasip1_anonymous_groups.try_emplace(::uwvm2::utils::container::u8string{module_name},
-                                                                                invalid_wasip1_group_index)};
-                static_cast<void>(inserted);
-                if(it->second == invalid_wasip1_group_index) [[unlikely]] { it->second = create_wasip1_group(); }
-                group_index = it->second;
-                break;
-            }
-            case wasip1_module_target_kind_t::weak_symbol:
-            {
-                auto const [it, inserted]{
-                    configured_weak_symbol_wasip1_anonymous_groups.try_emplace(::uwvm2::utils::container::u8string{module_name},
-                                                                               invalid_wasip1_group_index)};
-                static_cast<void>(inserted);
-                if(it->second == invalid_wasip1_group_index) [[unlikely]] { it->second = create_wasip1_group(); }
-                group_index = it->second;
-                break;
-            }
-            [[unlikely]] default:
-            {
-                ::fast_io::fast_terminate();
-            }
-        }
+        auto const [it, inserted]{
+            configured_module_wasip1_anonymous_groups.try_emplace(::uwvm2::utils::container::u8string{module_name}, invalid_wasip1_group_index)};
+        static_cast<void>(inserted);
+        if(it->second == invalid_wasip1_group_index) [[unlikely]] { it->second = create_wasip1_group(); }
 
-        auto const state{find_wasip1_group_state(group_index)};
+        auto const state{find_wasip1_group_state(it->second)};
         if(state == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+        state->trace_wasip1_group_kind = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::single;
+        state->trace_wasip1_group_name_storage.clear();
         return *state;
     }
 

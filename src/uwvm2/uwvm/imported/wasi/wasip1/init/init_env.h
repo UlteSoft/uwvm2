@@ -782,12 +782,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         using u8string = ::uwvm2::utils::container::u8string;
 
         state.env.wasip1_memory = nullptr;
-        state.env.trace_wasip1_call = default_wasip1_env.trace_wasip1_call;
+        if(state.trace_wasip1_call_is_set)
+        {
+            state.env.trace_wasip1_call = state.trace_wasip1_call;
+            state.env.trace_wasip1_output_target = state.trace_wasip1_output_target;
+            state.env.trace_wasip1_output_file_path_storage = state.trace_wasip1_output_file_path_storage;
+        }
+        else
+        {
+            state.env.trace_wasip1_call = default_wasip1_env.trace_wasip1_call;
+            state.env.trace_wasip1_output_target = default_wasip1_env.trace_wasip1_output_target;
+            state.env.trace_wasip1_output_file_path_storage = default_wasip1_env.trace_wasip1_output_file_path_storage;
+        }
+        state.env.trace_wasip1_group_kind = state.trace_wasip1_group_kind;
+        state.env.trace_wasip1_group_name_storage = state.trace_wasip1_group_name_storage;
         state.env.disable_utf8_check = state.disable_utf8_check_is_set ? state.disable_utf8_check : default_wasip1_env.disable_utf8_check;
         state.env.wasip1_proc_exit_func_ptr = default_wasip1_env.wasip1_proc_exit_func_ptr;
         state.env.wasip1_proc_raise_func_ptr = default_wasip1_env.wasip1_proc_raise_func_ptr;
         state.env.wasip1_sched_yield_func_ptr = default_wasip1_env.wasip1_sched_yield_func_ptr;
         state.env.fd_storage.fd_limit = state.fd_limit_is_set ? state.fd_limit : default_wasip1_env.fd_storage.fd_limit;
+
+        if(state.env.trace_wasip1_call &&
+           state.env.trace_wasip1_output_target == ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t::file &&
+           !::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(state.env.trace_wasip1_output_file,
+                                                                                             ::uwvm2::utils::container::u8string_view{
+                                                                                                 state.env.trace_wasip1_output_file_path_storage.data(),
+                                                                                                 state.env.trace_wasip1_output_file_path_storage.size()}))
+            [[unlikely]]
+        {
+            return false;
+        }
 
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
         state.env.preopen_sockets = default_wasip1_env.preopen_sockets;
