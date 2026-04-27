@@ -1182,7 +1182,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool is_current_wasip1_env_selected(wasip1_env_type& env) noexcept
         {
-            auto* const current_env_ptr{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env_ptr};
+            auto const current_env_ptr{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env_ptr};
             return current_env_ptr == ::std::addressof(env) ||
                    (current_env_ptr == nullptr && ::std::addressof(env) == ::std::addressof(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env));
         }
@@ -1190,13 +1190,6 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool try_prepare_default_global_wasip1_env_fast_path(::std::size_t module_id) noexcept
         {
             if(has_configured_wasip1_module_override_fast_path()) [[unlikely]] { return false; }
-
-            auto* const current_env_ptr{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env_ptr};
-            if(current_env_ptr != nullptr &&
-               current_env_ptr != ::std::addressof(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env)) [[unlikely]]
-            {
-                return false;
-            }
 
             if(default_wasip1_memory_runtime_module_id != module_id) [[unlikely]]
             {

@@ -99,7 +99,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 return ret;
             }
 
-            auto* target{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_named_wasip1_group(group_name)};
+            auto target{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_named_wasip1_group(group_name)};
             if(target == nullptr) [[unlikely]]
             {
                 return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 module group does not exist.");

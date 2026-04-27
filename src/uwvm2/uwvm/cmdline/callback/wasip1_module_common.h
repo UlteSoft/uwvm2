@@ -336,14 +336,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 #  endif
 
-        inline constexpr void apply_enable_disable_action(override_state_t& target, bool enabled) noexcept
-        {
-            target.enabled = enabled;
-            target.enabled_is_set = true;
-            target.expose_host_api = enabled;
-            target.expose_host_api_is_set = true;
-        }
-
         [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type apply_module_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* mark_action_end,
@@ -371,49 +363,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             auto const apply_module_enable_disable_action{
                 [&](bool enabled) noexcept -> parameter_return_type
                 {
-                    if(enabled)
+                    if(auto const ret{set_bool_option(
+                           target.enabled,
+                           target.enabled_is_set,
+                           enabled,
+                           u8"Duplicate or conflicting module action. Cannot combine or repeat enable/disable for the same WASI Preview 1 target.")};
+                       ret != parameter_return_type::def) [[unlikely]]
                     {
-                        if(auto const ret{
-                               set_bool_option(target.enabled,
-                                               target.enabled_is_set,
-                                               true,
-                                               u8"Duplicate or conflicting module action. Cannot combine or repeat enable/disable for the same WASI Preview 1 target.")};
-                           ret != parameter_return_type::def) [[unlikely]]
-                        {
-                            return ret;
-                        }
-                        if(auto const ret{
-                               set_bool_option(target.expose_host_api,
-                                               target.expose_host_api_is_set,
-                                               true,
-                                               u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
-                           ret != parameter_return_type::def) [[unlikely]]
-                        {
-                            return ret;
-                        }
+                        return ret;
                     }
-                    else
-                    {
-                        if(auto const ret{
-                               set_bool_option(target.enabled,
-                                               target.enabled_is_set,
-                                               false,
-                                               u8"Duplicate or conflicting module action. Cannot combine or repeat enable/disable for the same WASI Preview 1 target.")};
-                           ret != parameter_return_type::def) [[unlikely]]
-                        {
-                            return ret;
-                        }
-                        if(auto const ret{
-                               set_bool_option(target.expose_host_api,
-                                               target.expose_host_api_is_set,
-                                               false,
-                                               u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
-                           ret != parameter_return_type::def) [[unlikely]]
-                        {
-                            return ret;
-                        }
-                    }
-                    apply_enable_disable_action(target, enabled);
                     mark_consumed(mark_action_end);
                     return parameter_return_type::def;
                 }};

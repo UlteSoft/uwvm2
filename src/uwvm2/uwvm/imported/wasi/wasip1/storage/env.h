@@ -381,12 +381,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     [[nodiscard]] inline wasip1_group_index_t find_wasip1_module_group_index(wasip1_module_target_kind_t target_kind,
                                                                               ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
-        if(auto const anonymous_group_index{find_wasip1_anonymous_module_group_index(target_kind, module_name)};
-           anonymous_group_index != invalid_wasip1_group_index) [[unlikely]]
+        auto const anonymous_group_index{find_wasip1_anonymous_module_group_index(target_kind, module_name)};
+        auto const named_group_index{find_named_wasip1_module_group_index(module_name)};
+        if(anonymous_group_index != invalid_wasip1_group_index && named_group_index != invalid_wasip1_group_index &&
+           anonymous_group_index != named_group_index) [[unlikely]]
         {
-            return anonymous_group_index;
+            ::fast_io::fast_terminate();
         }
-        return find_named_wasip1_module_group_index(module_name);
+        if(anonymous_group_index != invalid_wasip1_group_index) [[unlikely]] { return anonymous_group_index; }
+        return named_group_index;
     }
 
     [[nodiscard]] inline wasip1_group_state_t* find_wasip1_module_override(wasip1_module_target_kind_t target_kind,

@@ -45,6 +45,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
     namespace details
     {
 #  if defined(UWVM_MODULE)
@@ -71,6 +72,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #   pragma clang diagnostic pop
 #  endif
 
+#  endif
 # endif
 #endif
 }

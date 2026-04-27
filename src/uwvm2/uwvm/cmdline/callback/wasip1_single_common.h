@@ -89,7 +89,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 return ret;
             }
 
-            auto* target{find_created_single(module_name)};
+            auto target{find_created_single(module_name)};
             if(target == nullptr) [[unlikely]]
             {
                 return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 single module does not exist.");

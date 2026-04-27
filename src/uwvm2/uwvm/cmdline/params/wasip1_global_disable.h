@@ -48,6 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     namespace details
     {
+        inline bool wasip1_global_disable_is_exist{};  // [global]
         inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_disable_alias{u8"--wasip1-disable", u8"-I1disable"};
 #  if defined(UWVM_MODULE)
         extern "C++"
@@ -68,6 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .describe{u8"Disable the global-default built-in WASI Preview 1 module for wasm imports unless a module-specific setting re-enables it."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_disable_alias.data(), details::wasip1_global_disable_alias.size()}},
         .handle{::std::addressof(details::wasip1_global_disable_callback)},
+        .is_exist{::std::addressof(details::wasip1_global_disable_is_exist)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
 #   pragma clang diagnostic pop

@@ -65,7 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ret;
         }
 
-        auto* target{::uwvm2::uwvm::imported::wasi::wasip1::storage::try_create_targetless_wasip1_module_override(module_name)};
+        auto target{::uwvm2::uwvm::imported::wasi::wasip1::storage::try_create_targetless_wasip1_module_override(module_name)};
         if(target == nullptr) [[unlikely]]
         {
             return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_single_create,

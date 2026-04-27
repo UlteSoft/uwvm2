@@ -771,8 +771,8 @@ Example:
 
 | Action | Arguments after target | Effect |
 | --- | --- | --- |
-| `enable` | None | Re-enable built-in `wasi_snapshot_preview1` imports and expose the plugin-facing Preview 1 host API table. |
-| `disable` | None | Disable built-in `wasi_snapshot_preview1` imports and hide the plugin-facing Preview 1 host API table. |
+| `enable` | None | Re-enable built-in `wasi_snapshot_preview1` imports for the selected target. |
+| `disable` | None | Disable built-in `wasi_snapshot_preview1` imports for the selected target. |
 | `expose-host-api` | None | Expose the plugin-facing Preview 1 host API table. |
 | `hide-host-api` | None | Hide the plugin-facing Preview 1 host API table. |
 | `noinherit-system-environment` | None | Disable host environment inheritance for the selected target environment. |
@@ -786,6 +786,8 @@ Example:
 | `delete-system-environment` | `<env:str>` | Remove one inherited host environment variable from the selected target environment. |
 | `mount-dir` | `<wasi dir:str> <system dir:path>` | Add a target-specific mount on top of the global default mount set. |
 | socket actions | socket-specific arguments | Add target-specific preopened sockets on top of the global default socket set. |
+
+The import visibility and preload host API exposure bits are independent. If a target does not set `expose-host-api` or `hide-host-api`, it inherits the global `--wasip1-global-expose-host-api` state.
 
 ### `--wasip1-global-expose-host-api`
 

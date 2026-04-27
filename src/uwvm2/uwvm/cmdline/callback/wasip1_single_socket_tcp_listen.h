@@ -46,6 +46,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
 
 #  if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
@@ -59,6 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return wasip1_single_details::apply_action(::uwvm2::uwvm::cmdline::params::wasip1_single_socket_tcp_listen, para_curr, para_end, u8"socket-tcp-listen");
     }
 
+#  endif
 # endif
 #endif
 }
