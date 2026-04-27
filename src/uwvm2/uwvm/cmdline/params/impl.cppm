@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -58,21 +58,58 @@ export import :runtime_tiered;
 
 // wasi
 export import :wasi_disable_utf8_check;
-export import :wasip1_trace;
-export import :wasip1_module;
-export import :wasip1_module_group;
-export import :wasip1_expose_host_api;
-export import :wasip1_set_fd_limit;
-export import :wasip1_mount_dir;
-export import :wasip1_set_argv0;
-export import :wasip1_noinherit_system_environment;
-export import :wasip1_delete_system_environment;
-export import :wasip1_add_environment;
-export import :wasip1_disable;
-export import :wasip1_socket_tcp_listen;
-export import :wasip1_socket_tcp_connect;
-export import :wasip1_socket_udp_bind;
-export import :wasip1_socket_udp_connect;
+export import :wasip1_global_trace;
+export import :wasip1_global_expose_host_api;
+export import :wasip1_global_disable;
+export import :wasip1_global_set_fd_limit;
+export import :wasip1_global_mount_dir;
+export import :wasip1_global_set_argv0;
+export import :wasip1_global_noinherit_system_environment;
+export import :wasip1_global_delete_system_environment;
+export import :wasip1_global_add_environment;
+export import :wasip1_global_socket_tcp_listen;
+export import :wasip1_global_socket_tcp_connect;
+export import :wasip1_global_socket_udp_bind;
+export import :wasip1_global_socket_udp_connect;
+export import :wasip1_single_create;
+export import :wasip1_single_enable;
+export import :wasip1_single_disable;
+export import :wasip1_single_expose_host_api;
+export import :wasip1_single_hide_host_api;
+export import :wasip1_single_noinherit_system_environment;
+export import :wasip1_single_inherit_system_environment;
+export import :wasip1_single_disable_utf8_check;
+export import :wasip1_single_enable_utf8_check;
+export import :wasip1_single_trace;
+export import :wasip1_single_set_argv0;
+export import :wasip1_single_set_fd_limit;
+export import :wasip1_single_add_environment;
+export import :wasip1_single_delete_system_environment;
+export import :wasip1_single_mount_dir;
+export import :wasip1_single_socket_tcp_listen;
+export import :wasip1_single_socket_tcp_connect;
+export import :wasip1_single_socket_udp_bind;
+export import :wasip1_single_socket_udp_connect;
+export import :wasip1_group_create;
+export import :wasip1_group_add_module;
+export import :wasip1_group_enable;
+export import :wasip1_group_disable;
+export import :wasip1_group_expose_host_api;
+export import :wasip1_group_hide_host_api;
+export import :wasip1_group_noinherit_system_environment;
+export import :wasip1_group_inherit_system_environment;
+export import :wasip1_group_disable_utf8_check;
+export import :wasip1_group_enable_utf8_check;
+export import :wasip1_group_trace;
+export import :wasip1_group_set_argv0;
+export import :wasip1_group_set_fd_limit;
+export import :wasip1_group_add_environment;
+export import :wasip1_group_delete_system_environment;
+export import :wasip1_group_mount_dir;
+export import :wasip1_group_socket_tcp_listen;
+export import :wasip1_group_socket_tcp_connect;
+export import :wasip1_group_socket_udp_bind;
+export import :wasip1_group_socket_udp_connect;
 
 // log
 export import :log_output;

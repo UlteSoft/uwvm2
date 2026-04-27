@@ -49,7 +49,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
-/// @note Note that this option does not affect WASI's argv0, if you need to set WASI's argv0, use `--wasip1-set-argv0` instead.
+/// @note Note that this option does not affect WASI's argv0, if you need to set WASI's argv0, use `--wasip1-global-set-argv0` instead.
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 #else
@@ -118,4 +118,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-
