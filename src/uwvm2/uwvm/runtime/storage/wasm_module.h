@@ -633,6 +633,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::storage
         ::uwvm2::utils::container::vector<imported_function_storage_t> imported_function_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_function_storage_t> local_defined_function_vec_storage{};
 
+        // Runtime-owned import descriptors for command-line import binding rewrites.
+        // Parser-owned descriptors are never mutated.
+        ::uwvm2::utils::container::vector<wasm_binfmt1_final_import_type_t> rewritten_import_vec_storage{};
+
         // table
         ::uwvm2::utils::container::vector<imported_table_storage_t> imported_table_vec_storage{};
         ::uwvm2::utils::container::vector<local_defined_table_storage_t> local_defined_table_vec_storage{};
@@ -671,6 +675,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t>> &&
+                                             ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t>> &&
@@ -703,6 +709,8 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_function_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t>> &&
+                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_import_type_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::imported_table_storage_t>> &&
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<

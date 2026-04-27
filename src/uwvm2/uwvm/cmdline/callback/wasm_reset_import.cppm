@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
+ * @date        2026-04-28
  * @copyright   APL-2.0 License
  */
 
@@ -20,18 +20,34 @@
  *                                      *
  ****************************************/
 
-#pragma once
+module;
+
+// std
+#include <cstddef>
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.callback:wasm_reset_import;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.ansies;
+import uwvm2.utils.cmdline;
+import uwvm2.utils.utf;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.wasm.feature;
+import uwvm2.uwvm.wasm.storage;
 
 #ifndef UWVM_MODULE
-# include "mode.h"
-# include "execute_wasm.h"
-# include "preloaded_wasm.h"
-# include "local_preload.h"
-# include "local_imported.h"
-# include "preloaded_dl.h"
-# include "weak_symbol.h"
-# include "preload_module_attribute.h"
-# include "memory_limit.h"
-# include "import_reset.h"
-# include "all_module.h"
+# define UWVM_MODULE
 #endif
+#ifndef UWVM_MODULE_EXPORT
+# define UWVM_MODULE_EXPORT export
+#endif
+
+#include "wasm_reset_import.h"

@@ -5,8 +5,10 @@ Source focus:
 - `src/uwvm2/uwvm/cmdline/params/wasm_*.h`
 - `src/uwvm2/uwvm/cmdline/callback/wasm_*.h`
 - `src/uwvm2/uwvm/wasm/loader/wasm_file.h`
+- `src/uwvm2/uwvm/wasm/loader/load_and_check_modules.h`
 - `src/uwvm2/uwvm/wasm/loader/dl.h`
 - `src/uwvm2/uwvm/wasm/storage/**`
+- `src/uwvm2/uwvm/runtime/initializer/init.h`
 - `src/uwvm2/uwvm/runtime/initializer/init_limit.h`
 
 ## Command Table
@@ -16,6 +18,7 @@ Source focus:
 | `--wasm-set-main-module-name` | `-Wname` | `<name:str>` | Once | Core Wasm | Override the internal name used for the main module. |
 | `--wasm-preload-library` | `-Wpre` | `<wasm:path> (<rename:str>)` | Repeatable | Core Wasm | Load a Wasm file immediately as a preload dynamic library. |
 | `--wasm-register-dl` | `-Wdl` | `<dl:path> (<rename:str>)` | Repeatable | `UWVM_SUPPORT_PRELOAD_DL` | Load a native dynamic library and register its C API exports as a Wasm module. |
+| `--wasm-reset-import` | `-Wresimp` | `<module:str> <import-module:str> <import-extern:str> <new-import-module:str> <new-import-extern:str>` | Repeatable | Core Wasm | Rewrite a Wasm file module's import binding during runtime initialization. |
 | `--wasm-set-preload-module-attribute` | `-Wpreattr` | `<module:str> <memory-access:none|copy|mmap> (<memory_index:list>)` | Repeatable | Core Wasm; `mmap` needs `UWVM_SUPPORT_MMAP` | Configure memory access behavior for preloaded modules. |
 | `--wasm-depend-recursion-limit` | `-Wdeplim` | `<depth:size_t>` | Once | Core Wasm | Set dependency-check recursion depth. `0` means unlimited. |
 | `--wasm-set-memory-limit` | `-Wmemlim` | `<module:str> [<index:size_t>|all] <min:size_t> (<max:size_t>)` | Repeatable | Core Wasm | Override runtime page limits for selected local-defined memories. |
@@ -31,11 +34,14 @@ Several commands key configuration by WebAssembly module name:
 - `--wasm-set-main-module-name`
 - `--wasm-preload-library <wasm> <rename>`
 - `--wasm-register-dl <dl> <rename>`
+- `--wasm-reset-import <module> ...`
 - `--wasm-set-memory-limit <module> ...`
 - `--wasm-set-preload-module-attribute <module> ...`
 - WASI single/group commands documented in [WASI Commands](wasi.md)
 
 For memory-limit and preload-attribute configuration, the module name must be non-empty and valid according to the Wasm text-format name handling used by the source. Invalid UTF-8 is rejected during command-line processing.
+
+For import-reset configuration, all five name arguments are validated as Wasm UTF-8 names during command-line processing.
 
 `--wasm-set-main-module-name` changes the VM's internal main-module name. It does not change WASI `argv[0]`. Use `--wasip1-global-set-argv0`, `--wasip1-single-set-argv0`, or `--wasip1-group-set-argv0` for guest-visible `argv[0]`.
 
@@ -126,6 +132,47 @@ Behavior:
 - Load failures are fatal for this command path.
 
 Use it to inspect weak-symbol registration in the current binary/runtime environment.
+
+## `--wasm-reset-import`
+
+Syntax:
+
+```bash
+uwvm --wasm-reset-import <module> <import-module> <import-extern> <new-import-module> <new-import-extern>
+```
+
+Behavior:
+
+- Requires exactly five name arguments.
+- All five arguments must be valid Wasm UTF-8 names.
+- `<module>` selects the Wasm file module instance whose imports should be rebound.
+- `<import-module>` and `<import-extern>` select an import in that module by its original Wasm import module/name pair.
+- `<new-import-module>` and `<new-import-extern>` are the effective import module/name pair used by runtime initialization and dependency checks.
+- The parser-owned Wasm import section is not mutated.
+- The runtime initializer creates runtime-owned import descriptors for matching imports and points runtime import records at those descriptors.
+- Export names are not rewritten. This option does not rename Wasm exports, preload-DL exports, or weak-symbol plugin exports.
+- To expose a new export-shaped interface, add an explicit bridge/adaptor module instead of renaming an existing export.
+- The target `<module>` must resolve to a runtime-supported Wasm file module.
+- Each configured rule must match at least one import in the selected module; otherwise runtime initialization terminates fatally.
+- With `--log-verbose`, each applied binding rewrite is logged during runtime initialization.
+
+Repeatability and replacement:
+
+- The option is repeatable.
+- Repeating the same `<module> <import-module> <import-extern>` replaces that rule's destination pair.
+- Different source import pairs on the same module accumulate as independent rules.
+
+Examples:
+
+```bash
+uwvm \
+  --wasm-preload-library host.wasm host.v2 \
+  --wasm-set-main-module-name app \
+  --wasm-reset-import app env clock_ms host.v2 clock_ms \
+  --run app.wasm
+```
+
+The `app` module still has its original parsed import in the parser result. Runtime initialization binds the import that was written as `env.clock_ms` to `host.v2.clock_ms`.
 
 ## `--wasm-depend-recursion-limit`
 

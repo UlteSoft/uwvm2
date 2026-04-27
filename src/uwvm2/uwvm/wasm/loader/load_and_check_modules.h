@@ -414,8 +414,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                             for(auto const& imports: exec_wasm_module_storage_importsec.imports)
                             {
-                                auto const import_module_name{imports.module_name};
-                                auto const import_extern_name{imports.extern_name};
+                                auto import_module_name{imports.module_name};
+                                auto import_extern_name{imports.extern_name};
+
+                                // Keep parser storage untouched. Early dependency diagnostics still need to observe
+                                // the same import binding view that runtime initialization will apply later.
+                                if(auto const import_reset{
+                                       ::uwvm2::uwvm::wasm::storage::find_configured_import_reset_const(curr_module_name, import_module_name, import_extern_name)};
+                                   import_reset != nullptr) [[unlikely]]
+                                {
+                                    import_module_name = ::uwvm2::utils::container::u8string_view{import_reset->new_import_module_name.data(),
+                                                                                                  import_reset->new_import_module_name.size()};
+                                    import_extern_name = ::uwvm2::utils::container::u8string_view{import_reset->new_import_extern_name.data(),
+                                                                                                  import_reset->new_import_extern_name.size()};
+                                }
 
                                 // Add dependency edge
                                 if(adjacency_list.contains(import_module_name))

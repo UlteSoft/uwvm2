@@ -64,6 +64,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_register_dl),
 #endif
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_reset_import),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_preload_module_attribute),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_memory_limit),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_parser_limit),
