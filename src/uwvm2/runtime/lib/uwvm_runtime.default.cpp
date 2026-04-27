@@ -781,6 +781,17 @@ namespace uwvm2::runtime::lib
 
         inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::vector<cached_import_target>> g_import_call_cache{};  // [global]
 
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+        struct cached_wasip1_runtime_module_context
+        {
+            wasip1_env_type* env{};
+            native_memory_t* memory0{};
+            bool import_visible{true};
+        };
+
+        inline ::uwvm2::utils::container::vector<cached_wasip1_runtime_module_context> g_wasip1_runtime_module_context_cache{};  // [global]
+#endif
+
         [[nodiscard]] inline constexpr ::std::size_t valtype_size(::std::uint_least8_t code) noexcept
         {
             switch(static_cast<wasm_value_type>(code))
@@ -1134,6 +1145,12 @@ namespace uwvm2::runtime::lib
 
         inline void bind_wasip1_memory_for_runtime_module_id(wasip1_env_type& env, ::std::size_t module_id) noexcept
         {
+            if(module_id < g_wasip1_runtime_module_context_cache.size()) [[likely]]
+            {
+                env.wasip1_memory = g_wasip1_runtime_module_context_cache.index_unchecked(module_id).memory0;
+                return;
+            }
+
             if(module_id >= g_runtime.modules.size()) [[unlikely]]
             {
                 env.wasip1_memory = nullptr;
@@ -1198,7 +1215,7 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] inline wasip1_module_override_t* find_wasip1_override_for_runtime_module_id(::std::size_t module_id) noexcept
+        [[nodiscard]] inline wasip1_module_override_t* find_wasip1_override_for_runtime_module_id_slow(::std::size_t module_id) noexcept
         {
             if(!has_configured_wasip1_module_override_fast_path()) [[likely]] { return nullptr; }
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return nullptr; }
@@ -1230,11 +1247,16 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline wasip1_env_type& resolve_wasip1_env_for_runtime_module_id(::std::size_t module_id) noexcept
         {
-            if(auto const state{find_wasip1_override_for_runtime_module_id(module_id)}; state != nullptr) [[likely]] { return state->env; }
+            if(module_id < g_wasip1_runtime_module_context_cache.size()) [[likely]]
+            {
+                if(auto const env{g_wasip1_runtime_module_context_cache.index_unchecked(module_id).env}; env != nullptr) [[likely]] { return *env; }
+            }
+
+            if(auto const state{find_wasip1_override_for_runtime_module_id_slow(module_id)}; state != nullptr) [[likely]] { return state->env; }
             return ::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env;
         }
 
-        [[nodiscard]] inline bool is_wasip1_import_visible_for_runtime_module_id(::std::size_t module_id) noexcept
+        [[nodiscard]] inline bool is_wasip1_import_visible_for_runtime_module_id_slow(::std::size_t module_id) noexcept
         {
             if(module_id >= g_runtime.modules.size()) [[unlikely]] { return true; }
             if(!has_configured_wasip1_module_override_fast_path()) [[likely]] { return ::uwvm2::uwvm::wasm::storage::local_preload_wasip1; }
@@ -1248,7 +1270,7 @@ namespace uwvm2::runtime::lib
                 case ::uwvm2::uwvm::wasm::type::module_type_t::exec_wasm: [[fallthrough]];
                 case ::uwvm2::uwvm::wasm::type::module_type_t::preloaded_wasm:
                 {
-                    if(auto const state{find_wasip1_override_for_runtime_module_id(module_id)}; state != nullptr && state->enabled_is_set) [[unlikely]]
+                    if(auto const state{find_wasip1_override_for_runtime_module_id_slow(module_id)}; state != nullptr && state->enabled_is_set) [[unlikely]]
                     {
                         return state->enabled;
                     }
@@ -1257,6 +1279,36 @@ namespace uwvm2::runtime::lib
                 default:
                 {
                     return true;
+                }
+            }
+        }
+
+        [[nodiscard]] inline bool is_wasip1_import_visible_for_runtime_module_id(::std::size_t module_id) noexcept
+        {
+            if(module_id < g_wasip1_runtime_module_context_cache.size()) [[likely]]
+            {
+                return g_wasip1_runtime_module_context_cache.index_unchecked(module_id).import_visible;
+            }
+
+            return is_wasip1_import_visible_for_runtime_module_id_slow(module_id);
+        }
+
+        inline void rebuild_wasip1_runtime_module_context_cache() noexcept
+        {
+            g_wasip1_runtime_module_context_cache.clear();
+            g_wasip1_runtime_module_context_cache.resize(g_runtime.modules.size());
+
+            for(::std::size_t module_id{}; module_id != g_runtime.modules.size(); ++module_id)
+            {
+                auto& ctx{g_wasip1_runtime_module_context_cache.index_unchecked(module_id)};
+                ctx.env = ::std::addressof(::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env);
+                if(auto const state{find_wasip1_override_for_runtime_module_id_slow(module_id)}; state != nullptr) { ctx.env = ::std::addressof(state->env); }
+
+                ctx.import_visible = is_wasip1_import_visible_for_runtime_module_id_slow(module_id);
+
+                if(auto const runtime_module{g_runtime.modules.index_unchecked(module_id).runtime_module}; runtime_module != nullptr) [[likely]]
+                {
+                    ctx.memory0 = const_cast<native_memory_t*>(resolve_memory0_ptr(*runtime_module));
                 }
             }
         }
@@ -4041,6 +4093,9 @@ namespace uwvm2::runtime::lib
             g_runtime.defined_func_cache.clear();
             g_runtime.defined_func_ptr_ranges.clear();
             g_import_call_cache.clear();
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+            g_wasip1_runtime_module_context_cache.clear();
+#endif
 
             auto const& rt_map{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage};
             g_runtime.modules.reserve(rt_map.size());
@@ -4058,6 +4113,9 @@ namespace uwvm2::runtime::lib
             }
 
             g_runtime.defined_func_cache.resize(g_runtime.modules.size());
+#if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+            rebuild_wasip1_runtime_module_context_cache();
+#endif
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
@@ -4620,8 +4678,10 @@ namespace uwvm2::runtime::lib
         if(main_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
 #if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
-        // Bind WASI Preview1 env to the main module's memory[0] before any guest-to-host call is made.
-        bind_default_wasip1_memory(*main_module, main_id);
+        // Keep the entry module's WASI environment selected across the hot run loop.
+        auto& entry_wasip1_env{resolve_wasip1_env_for_runtime_module_id(main_id)};
+        bind_wasip1_memory_for_selected_env(entry_wasip1_env, main_id);
+        ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t entry_wasip1_env_guard{entry_wasip1_env};
 #endif
 
         auto const import_n{main_module->imported_function_vec_storage.size()};
