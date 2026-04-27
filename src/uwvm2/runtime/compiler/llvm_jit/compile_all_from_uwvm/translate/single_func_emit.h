@@ -81,6 +81,33 @@ struct llvm_jit_memory_snapshot_values_t
     return ::llvm::ConstantExpr::getIntToPtr(host_address_value, pointer_type);
 }
 
+[[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_host_calling_conv() noexcept
+{
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !defined(__CYGWIN__)
+    return ::llvm::CallingConv::Win64;
+#else
+    return ::llvm::CallingConv::C;
+#endif
+}
+
+inline void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcept
+{
+    auto const calling_conv{get_llvm_jit_host_calling_conv()};
+    if(calling_conv != ::llvm::CallingConv::C) { function.setCallingConv(calling_conv); }
+}
+
+inline void apply_llvm_jit_host_calling_conv(::llvm::CallInst& call_inst) noexcept
+{
+    auto const calling_conv{get_llvm_jit_host_calling_conv()};
+    if(calling_conv != ::llvm::CallingConv::C) { call_inst.setCallingConv(calling_conv); }
+}
+
+inline ::llvm::CallInst* apply_llvm_jit_host_calling_conv(::llvm::CallInst* call_inst) noexcept
+{
+    if(call_inst != nullptr) { apply_llvm_jit_host_calling_conv(*call_inst); }
+    return call_inst;
+}
+
 [[nodiscard]] inline ::std::size_t get_runtime_wasm_value_type_abi_size(runtime_operand_stack_value_type value_type) noexcept
 {
     switch(get_runtime_wasm_value_type_encoding(value_type))
@@ -205,9 +232,8 @@ inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::run
     if(bridge_pointer == nullptr) [[unlikely]] { return; }
 
     auto trap_kind_type{function_type->getParamType(0u)};
-    ir_builder.CreateCall(function_type,
-                          bridge_pointer,
-                          {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))});
+    apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(
+        function_type, bridge_pointer, {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))}));
 }
 
 inline void emit_llvm_conditional_trap(::llvm::Module&, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind)
@@ -557,9 +583,13 @@ struct runtime_direct_callee_resolution_t
     auto callee_function{llvm_module.getFunction(callee_name)};
     if(callee_function == nullptr)
     {
-        return ::llvm::Function::Create(callee_function_type, ::llvm::Function::ExternalLinkage, callee_name, ::std::addressof(llvm_module));
+        callee_function =
+            ::llvm::Function::Create(callee_function_type, ::llvm::Function::ExternalLinkage, callee_name, ::std::addressof(llvm_module));
+        apply_llvm_jit_host_calling_conv(*callee_function);
+        return callee_function;
     }
     if(callee_function->getFunctionType() != callee_function_type) [[unlikely]] { return nullptr; }
+    apply_llvm_jit_host_calling_conv(*callee_function);
     return callee_function;
 }
 
@@ -1817,9 +1847,10 @@ template <typename FunctionPtr>
         get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
-    ir_builder.CreateCall(function_type,
-                          bridge_pointer,
-                          {::llvm::ConstantInt::get(llvm_size_type, module_id), ::llvm::ConstantInt::get(llvm_size_type, function_index)});
+    apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(
+        function_type,
+        bridge_pointer,
+        {::llvm::ConstantInt::get(llvm_size_type, module_id), ::llvm::ConstantInt::get(llvm_size_type, function_index)}));
     return true;
 }
 
@@ -1831,7 +1862,7 @@ template <typename FunctionPtr>
         get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame)};
     if(bridge_pointer == nullptr) [[unlikely]] { return false; }
 
-    ir_builder.CreateCall(function_type, bridge_pointer, {});
+    apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(function_type, bridge_pointer, {}));
     return true;
 }
 
@@ -2184,6 +2215,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         state.llvm_function->setLinkage(::llvm::Function::ExternalLinkage);
     }
     if(state.llvm_function == nullptr) [[unlikely]] { return false; }
+    apply_llvm_jit_host_calling_conv(*state.llvm_function);
 
     auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
     state.ir_builder = ::std::make_unique<::llvm::IRBuilder<>>(entry_block);
@@ -2312,6 +2344,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 raw_entry_function->setLinkage(::llvm::Function::ExternalLinkage);
             }
             if(raw_entry_function == nullptr) [[unlikely]] { return false; }
+            apply_llvm_jit_host_calling_conv(*raw_entry_function);
 
             auto const abi_layout{get_runtime_wasm_call_abi_layout(*function_type_ptr)};
             if(!abi_layout.valid) [[unlikely]] { return false; }
@@ -2383,7 +2416,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 param_offset += abi_size;
             }
 
-            auto typed_call{raw_ir_builder.CreateCall(llvm_function, call_arguments)};
+            auto typed_call{apply_llvm_jit_host_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
             if(abi_layout.result_count == 1uz)
             {
                 auto llvm_result_type{
@@ -3004,7 +3037,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
 
     auto callee_function{get_or_create_llvm_wasm_function_declaration(*llvm_module, llvm_context, runtime_module, func_index, wasm_function_type)};
     if(callee_function == nullptr) [[unlikely]] { return nullptr; }
-    return ir_builder.CreateCall(callee_function, call_arguments);
+    return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(callee_function, call_arguments));
 }
 
 template <typename BridgeFunction>
@@ -3023,7 +3056,7 @@ template <typename BridgeFunction>
 
     auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, bridge_function_type, bridge_function)};
     if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
-    return ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments);
+    return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
 }
 
 template <typename EmitBridgeCallFromBuffers>
@@ -3517,13 +3550,14 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
 
             auto raw_entry_function_ptr{
                 ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), "call_indirect.entry.ptr")};
-            return ir_builder.CreateCall(raw_entry_function_type,
-                                         raw_entry_function_ptr,
-                                         {context_address,
-                                          raw_call_buffers.result_buffer_address,
-                                          ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
-                                          raw_call_buffers.param_buffer_address,
-                                          ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)});
+            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(
+                raw_entry_function_type,
+                raw_entry_function_ptr,
+                {context_address,
+                 raw_call_buffers.result_buffer_address,
+                 ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
+                 raw_call_buffers.param_buffer_address,
+                 ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)}));
         })};
     if(!raw_bridge_result.valid) [[unlikely]] { return false; }
 
@@ -3647,7 +3681,7 @@ template <typename CreateValue>
         {
             auto bridge_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context, bridge_function_type, bridge_function)};
             if(bridge_pointer == nullptr) [[unlikely]] { return nullptr; }
-            return ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments);
+            return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(bridge_function_type, bridge_pointer, arguments));
         }};
 
     auto const emit_runtime_scalar_bridge_call{[&](runtime_operand_stack_value_type value_type,
