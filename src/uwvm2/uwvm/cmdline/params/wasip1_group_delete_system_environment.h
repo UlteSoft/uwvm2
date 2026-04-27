@@ -47,6 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_delete_system_environment_alias{u8"-I1Gdelsysenv"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -65,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-group-delete-system-environment"},
         .describe{u8"Delete one inherited host environment variable for one named group."},
         .usage{u8"<group:str> <env:str>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_delete_system_environment_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_group_delete_system_environment_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

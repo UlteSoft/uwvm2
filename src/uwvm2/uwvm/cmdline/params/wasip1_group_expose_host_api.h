@@ -47,6 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_expose_host_api_alias{u8"-I1Gexportapi"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -65,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-group-expose-host-api"},
         .describe{u8"Expose the Preview 1 preload host API to one named group."},
         .usage{u8"<group:str>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_expose_host_api_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_group_expose_host_api_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

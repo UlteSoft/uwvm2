@@ -47,6 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_enable_utf8_check_alias{u8"-I1Gu8strict"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -65,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-group-enable-utf8-check"},
         .describe{u8"Enable WASI Preview 1 UTF-8 checks for one named group."},
         .usage{u8"<group:str>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_enable_utf8_check_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_group_enable_utf8_check_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

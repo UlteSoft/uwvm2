@@ -77,27 +77,27 @@ The socket aliases above are available only when socket support is compiled. The
 
 All single commands require a module name. The module name must be non-empty and valid according to the Wasm text-format name validation path.
 
-| Command | Arguments | Repeatability | Behavior |
-| --- | --- | --- | --- |
-| `--wasip1-single-create` | `<module:str>` | Once per module | Create an anonymous per-module WASI target. Must appear before other single commands for that module. |
-| `--wasip1-single-enable` | `<module:str>` | Once per target with disable conflict | Enable WASI Preview 1 for that module. |
-| `--wasip1-single-disable` | `<module:str>` | Once per target with enable conflict | Disable WASI Preview 1 for that module. |
-| `--wasip1-single-expose-host-api` | `<module:str>` | Once per target with hide conflict | Expose the Preview 1 preload host API for that module. |
-| `--wasip1-single-hide-host-api` | `<module:str>` | Once per target with expose conflict | Hide the Preview 1 preload host API for that module. |
-| `--wasip1-single-inherit-system-environment` | `<module:str>` | Once per target with noinherit conflict | Force host environment inheritance for that module. |
-| `--wasip1-single-noinherit-system-environment` | `<module:str>` | Once per target with inherit conflict | Disable host environment inheritance for that module. |
-| `--wasip1-single-enable-utf8-check` | `<module:str>` | Once per target with disable conflict | Enable runtime WASI UTF-8 checks for that module. |
-| `--wasip1-single-disable-utf8-check` | `<module:str>` | Once per target with enable conflict | Disable runtime WASI UTF-8 checks for that module. |
-| `--wasip1-single-trace` | `<module:str> <none|out|err|file <file:path>>` | Once per target | Route that module's WASI trace output. A bare path is also accepted as file output. |
-| `--wasip1-single-set-argv0` | `<module:str> <argv0:str>` | Once per target | Override WASI `argv[0]` for that module. |
-| `--wasip1-single-set-fd-limit` | `<module:str> <limit:size_t>` | Once per target | Override the fd limit for that module. |
-| `--wasip1-single-add-environment` | `<module:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for that module. |
-| `--wasip1-single-delete-system-environment` | `<module:str> <env:str>` | Repeatable | Delete one inherited variable for that module. |
-| `--wasip1-single-mount-dir` | `<module:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one module-specific directory mount. |
-| `--wasip1-single-socket-tcp-listen` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one TCP listening socket for the target. |
-| `--wasip1-single-socket-tcp-connect` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected TCP socket for the target. |
-| `--wasip1-single-socket-udp-bind` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one bound UDP socket for the target. |
-| `--wasip1-single-socket-udp-connect` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected UDP socket for the target. |
+| Command | Alias | Arguments | Repeatability | Behavior |
+| --- | --- | --- | --- | --- |
+| `--wasip1-single-create` | `-I1Screate` | `<module:str>` | Once per module | Create an anonymous per-module WASI target. Must appear before other single commands for that module. |
+| `--wasip1-single-enable` | `-I1Senable` | `<module:str>` | Once per target with disable conflict | Enable WASI Preview 1 for that module. |
+| `--wasip1-single-disable` | `-I1Sdisable` | `<module:str>` | Once per target with enable conflict | Disable WASI Preview 1 for that module. |
+| `--wasip1-single-expose-host-api` | `-I1Sexportapi` | `<module:str>` | Once per target with hide conflict | Expose the Preview 1 preload host API for that module. |
+| `--wasip1-single-hide-host-api` | `-I1Shideapi` | `<module:str>` | Once per target with expose conflict | Hide the Preview 1 preload host API for that module. |
+| `--wasip1-single-inherit-system-environment` | `-I1Ssysenv` | `<module:str>` | Once per target with noinherit conflict | Force host environment inheritance for that module. |
+| `--wasip1-single-noinherit-system-environment` | `-I1Snosysenv` | `<module:str>` | Once per target with inherit conflict | Disable host environment inheritance for that module. |
+| `--wasip1-single-enable-utf8-check` | `-I1Su8strict` | `<module:str>` | Once per target with disable conflict | Enable runtime WASI UTF-8 checks for that module. |
+| `--wasip1-single-disable-utf8-check` | `-I1Su8relax` | `<module:str>` | Once per target with enable conflict | Disable runtime WASI UTF-8 checks for that module. |
+| `--wasip1-single-trace` | `-I1Strace` | `<module:str> <none|out|err|file <file:path>>` | Once per target | Route that module's WASI trace output. A bare path is also accepted as file output. |
+| `--wasip1-single-set-argv0` | `-I1Sargv0` | `<module:str> <argv0:str>` | Once per target | Override WASI `argv[0]` for that module. |
+| `--wasip1-single-set-fd-limit` | `-I1Sfdlim` | `<module:str> <limit:size_t>` | Once per target | Override the fd limit for that module. |
+| `--wasip1-single-add-environment` | `-I1Saddenv` | `<module:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for that module. |
+| `--wasip1-single-delete-system-environment` | `-I1Sdelsysenv` | `<module:str> <env:str>` | Repeatable | Delete one inherited variable for that module. |
+| `--wasip1-single-mount-dir` | `-I1Sdir` | `<module:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one module-specific directory mount. |
+| `--wasip1-single-socket-tcp-listen` | `-I1Stcplisten` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one TCP listening socket for the target. |
+| `--wasip1-single-socket-tcp-connect` | `-I1Stcpcon` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected TCP socket for the target. |
+| `--wasip1-single-socket-udp-bind` | `-I1Sudpbind` | `<module:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one bound UDP socket for the target. |
+| `--wasip1-single-socket-udp-connect` | `-I1Sudpcon` | `<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside target | Add one connected UDP socket for the target. |
 
 The single action callbacks first look up an existing single target. If `--wasip1-single-create <module>` has not already succeeded, later `--wasip1-single-* <module>` commands fail with a "single module does not exist" style error.
 
@@ -105,28 +105,28 @@ The single action callbacks first look up an existing single target. If `--wasip
 
 Group names must be non-empty. Unlike module names, group names are not validated through the Wasm UTF-8 name parser. Module names added to a group must be non-empty and valid Wasm UTF-8 names.
 
-| Command | Arguments | Repeatability | Behavior |
-| --- | --- | --- | --- |
-| `--wasip1-group-create` | `<group:str>` | Once per group | Create a named shared WASI target. |
-| `--wasip1-group-add-module` | `<group:str> <module:str>` | Repeatable | Bind one module name to an existing group. A module can be bound only once. |
-| `--wasip1-group-enable` | `<group:str>` | Once per group with disable conflict | Enable WASI Preview 1 for the group. |
-| `--wasip1-group-disable` | `<group:str>` | Once per group with enable conflict | Disable WASI Preview 1 for the group. |
-| `--wasip1-group-expose-host-api` | `<group:str>` | Once per group with hide conflict | Expose the Preview 1 preload host API for the group. |
-| `--wasip1-group-hide-host-api` | `<group:str>` | Once per group with expose conflict | Hide the Preview 1 preload host API for the group. |
-| `--wasip1-group-inherit-system-environment` | `<group:str>` | Once per group with noinherit conflict | Force host environment inheritance for the group. |
-| `--wasip1-group-noinherit-system-environment` | `<group:str>` | Once per group with inherit conflict | Disable host environment inheritance for the group. |
-| `--wasip1-group-enable-utf8-check` | `<group:str>` | Once per group with disable conflict | Enable runtime WASI UTF-8 checks for the group. |
-| `--wasip1-group-disable-utf8-check` | `<group:str>` | Once per group with enable conflict | Disable runtime WASI UTF-8 checks for the group. |
-| `--wasip1-group-trace` | `<group:str> <none|out|err|file <file:path>>` | Once per group | Route the group's WASI trace output. A bare path is also accepted as file output. |
-| `--wasip1-group-set-argv0` | `<group:str> <argv0:str>` | Once per group | Override WASI `argv[0]` for the group. |
-| `--wasip1-group-set-fd-limit` | `<group:str> <limit:size_t>` | Once per group | Override the fd limit for the group. |
-| `--wasip1-group-add-environment` | `<group:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for the group. |
-| `--wasip1-group-delete-system-environment` | `<group:str> <env:str>` | Repeatable | Delete one inherited variable for the group. |
-| `--wasip1-group-mount-dir` | `<group:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one group-specific directory mount. |
-| `--wasip1-group-socket-tcp-listen` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one TCP listening socket for the group. |
-| `--wasip1-group-socket-tcp-connect` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected TCP socket for the group. |
-| `--wasip1-group-socket-udp-bind` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one bound UDP socket for the group. |
-| `--wasip1-group-socket-udp-connect` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected UDP socket for the group. |
+| Command | Alias | Arguments | Repeatability | Behavior |
+| --- | --- | --- | --- | --- |
+| `--wasip1-group-create` | `-I1Gcreate` | `<group:str>` | Once per group | Create a named shared WASI target. |
+| `--wasip1-group-add-module` | `-I1Gaddmod` | `<group:str> <module:str>` | Repeatable | Bind one module name to an existing group. A module can be bound only once. |
+| `--wasip1-group-enable` | `-I1Genable` | `<group:str>` | Once per group with disable conflict | Enable WASI Preview 1 for the group. |
+| `--wasip1-group-disable` | `-I1Gdisable` | `<group:str>` | Once per group with enable conflict | Disable WASI Preview 1 for the group. |
+| `--wasip1-group-expose-host-api` | `-I1Gexportapi` | `<group:str>` | Once per group with hide conflict | Expose the Preview 1 preload host API for the group. |
+| `--wasip1-group-hide-host-api` | `-I1Ghideapi` | `<group:str>` | Once per group with expose conflict | Hide the Preview 1 preload host API for the group. |
+| `--wasip1-group-inherit-system-environment` | `-I1Gsysenv` | `<group:str>` | Once per group with noinherit conflict | Force host environment inheritance for the group. |
+| `--wasip1-group-noinherit-system-environment` | `-I1Gnosysenv` | `<group:str>` | Once per group with inherit conflict | Disable host environment inheritance for the group. |
+| `--wasip1-group-enable-utf8-check` | `-I1Gu8strict` | `<group:str>` | Once per group with disable conflict | Enable runtime WASI UTF-8 checks for the group. |
+| `--wasip1-group-disable-utf8-check` | `-I1Gu8relax` | `<group:str>` | Once per group with enable conflict | Disable runtime WASI UTF-8 checks for the group. |
+| `--wasip1-group-trace` | `-I1Gtrace` | `<group:str> <none|out|err|file <file:path>>` | Once per group | Route the group's WASI trace output. A bare path is also accepted as file output. |
+| `--wasip1-group-set-argv0` | `-I1Gargv0` | `<group:str> <argv0:str>` | Once per group | Override WASI `argv[0]` for the group. |
+| `--wasip1-group-set-fd-limit` | `-I1Gfdlim` | `<group:str> <limit:size_t>` | Once per group | Override the fd limit for the group. |
+| `--wasip1-group-add-environment` | `-I1Gaddenv` | `<group:str> <env:str> <value:str>` | Repeatable with per-name conflict checks | Add or replace one variable for the group. |
+| `--wasip1-group-delete-system-environment` | `-I1Gdelsysenv` | `<group:str> <env:str>` | Repeatable | Delete one inherited variable for the group. |
+| `--wasip1-group-mount-dir` | `-I1Gdir` | `<group:str> <wasi dir:str> <system dir:path>` | Repeatable with mount-overlap checks | Add one group-specific directory mount. |
+| `--wasip1-group-socket-tcp-listen` | `-I1Gtcplisten` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one TCP listening socket for the group. |
+| `--wasip1-group-socket-tcp-connect` | `-I1Gtcpcon` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected TCP socket for the group. |
+| `--wasip1-group-socket-udp-bind` | `-I1Gudpbind` | `<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one bound UDP socket for the group. |
+| `--wasip1-group-socket-udp-connect` | `-I1Gudpcon` | `<group:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]` | Repeatable, no duplicate fd inside group | Add one connected UDP socket for the group. |
 
 Group action commands fail if the group does not already exist. Use `--wasip1-group-create <group>` before `--wasip1-group-* <group> ...`.
 

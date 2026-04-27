@@ -48,6 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_single_socket_udp_connect_alias{u8"-I1Sudpcon"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -66,6 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-single-socket-udp-connect"},
         .describe{u8"Connect a WASI Preview 1 UDP socket for one single module."},
         .usage{u8"<module:str> <fd:i32> [<ipv4|ipv6|dns>:<port>|unix <path>]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_single_socket_udp_connect_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_single_socket_udp_connect_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

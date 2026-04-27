@@ -47,6 +47,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_single_trace_alias{u8"-I1Strace"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -65,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-single-trace"},
         .describe{u8"Route one single module's WASI Preview 1 trace output."},
         .usage{u8"<module:str> <none|out|err|file <file:path>>"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_single_trace_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_single_trace_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

@@ -48,6 +48,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_socket_udp_bind_alias{u8"-I1Gudpbind"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -66,6 +67,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-group-socket-udp-bind"},
         .describe{u8"Bind a WASI Preview 1 UDP socket for one named group."},
         .usage{u8"<group:str> <fd:i32> [<ipv4|ipv6>:<port>|unix <path>]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_socket_udp_bind_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_group_socket_udp_bind_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)
