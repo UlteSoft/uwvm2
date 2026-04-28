@@ -55,6 +55,7 @@ import uwvm2.imported.wasi.wasip1.abi;
 import uwvm2.imported.wasi.wasip1.fd_manager;
 import uwvm2.imported.wasi.wasip1.memory;
 import uwvm2.imported.wasi.wasip1.environment;
+import :base;
 import :posix;
 import :fd_advise;
 

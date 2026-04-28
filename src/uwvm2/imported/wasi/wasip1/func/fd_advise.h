@@ -54,6 +54,7 @@
 # include <uwvm2/imported/wasi/wasip1/fd_manager/impl.h>
 # include <uwvm2/imported/wasi/wasip1/memory/impl.h>
 # include <uwvm2/imported/wasi/wasip1/environment/impl.h>
+# include "base.h"
 # include "posix.h"
 #endif
 
