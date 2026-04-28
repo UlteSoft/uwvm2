@@ -1,5 +1,6 @@
 
-function darwin_target()
+function darwin_target(opt)
+    opt = opt or {}
 
 	local use_llvm_compiler = get_config("use-llvm-compiler")
 	if use_llvm_compiler then	
@@ -17,7 +18,7 @@ function darwin_target()
         add_cxflags(sysroot_cvt, {force = true})
         add_ldflags(sysroot_cvt, {force = true})
 
-        if use_llvm_compiler then
+        if use_llvm_compiler and not opt.skip_static_libcxx then
             local libcxx_archive = path.join(sysroot_para, "usr", "lib", "libc++.a")
             local libcxxabi_archive = path.join(sysroot_para, "usr", "lib", "libc++abi.a")
             if os.isfile(libcxx_archive) then

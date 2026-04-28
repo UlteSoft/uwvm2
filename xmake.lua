@@ -24,7 +24,8 @@ add_moduledirs("xmake")
 set_defaultmode("release")
 set_allowedmodes(support_rules_table)
 
-function def_build()
+function def_build(opt)
+	opt = opt or {}
 	if is_mode("debug") then
 		add_rules("debug")
 	elseif is_mode("release") then
@@ -185,7 +186,7 @@ function def_build()
 	elseif is_plat("linux") then
 		linux_target()
 	elseif is_plat("macosx", "iphoneos", "watchos") then
-		darwin_target()
+		darwin_target(opt)
 	elseif is_plat("djgpp") then
 		djgpp_target()
 	elseif is_plat("unix", "bsd", "freebsd", "dragonflybsd", "netbsd", "openbsd") then
@@ -321,7 +322,8 @@ end
 
 target("uwvm")
 	set_kind("binary")
-	def_build()
+	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
+	def_build({ skip_static_libcxx = uwvm_uses_llvm_jit })
 
 	-- uwvm uses precise floating-point model to ensure determinism.
 	set_fpmodels("precise") 
@@ -397,7 +399,7 @@ if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == 
 	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
 	target("uwvm_runtime")
 		set_kind("object")
-		def_build()
+		def_build({ skip_static_libcxx = true })
 			
 		-- Interpreter/runtime execution unit: disable observable floating-point side effects
 		-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
@@ -460,6 +462,10 @@ end
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
 	local is_0013_uwvm_int = (string.find(file, "test/0013.uwvm_int/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\", 1, true) ~= nil)
+	local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
+		(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
+	local is_llvm_jit_test = string.find(file, "llvm_jit", 1, true) ~= nil
+	local test_libfuzzer = get_config("test-libfuzzer")
 
 	if not (is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) then
 		local name = path.basename(file)
@@ -467,7 +473,13 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		local group = path.directory(file):gsub("\\\\", "/")
 		set_group(group)
 		set_kind("binary")
-		def_build()
+		def_build({ skip_static_libcxx = (is_libfuzzer and test_libfuzzer) or is_llvm_jit_test })
+
+		if ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) and
+			is_llvm_jit_test then
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+		end
 
 		-- uwvm uses precise floating-point model to ensure determinism.
 		set_fpmodels("precise")
@@ -529,15 +541,20 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_cxxflags("-Wno-error=undefined-inline")
 		end
 
-		local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
-			(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
-		local test_libfuzzer = get_config("test-libfuzzer")
-
 		if is_libfuzzer then
 			if get_config("use-llvm-compiler") and test_libfuzzer then
 				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
 				if need_wabt then
 					before_build(function(target)
+						local function wabt_uses_external_crypto(wabt_config)
+							if not os.isfile(wabt_config) then
+								return false
+							end
+
+							local config = io.readfile(wabt_config)
+							return config and config:find("#define HAVE_OPENSSL_SHA_H 1", 1, true) ~= nil
+						end
+
 						local function has_wabt(wabt_root)
 							local wabt_include = path.join(wabt_root, "include")
 							local wabt_build = path.join(wabt_root, "build")
@@ -547,7 +564,7 @@ for _, file in ipairs(os.files("test/**.cc")) do
 								os.isfile(path.join(wabt_build, "libwabt.dylib")) or
 								os.isfile(path.join(wabt_build, "wabt.lib"))
 
-							return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib
+							return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib and not wabt_uses_external_crypto(wabt_config)
 						end
 
 						if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
@@ -576,15 +593,18 @@ for _, file in ipairs(os.files("test/**.cc")) do
 								local build_dir = path.join(wabt_root, "build")
 								-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
 								-- when fed malformed inputs (important for fuzzing/differential validation).
-								os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF"})
+								-- Use WABT's internal SHA-256 implementation so Darwin cross sysroots do not need OpenSSL libcrypto.
+								os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF", "-DUSE_INTERNAL_SHA256=ON", "-DHAVE_OPENSSL_SHA_H=OFF"})
 								os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 							else
 								raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
 							end
 						end
 					end)
+				end
 
-					on_load(function(target)
+				after_load(function(target)
+					if need_wabt then
 						local function try_add_wabt(wabt_root, force)
 							local wabt_include = path.join(wabt_root, "include")
 							local wabt_build = path.join(wabt_root, "build")
@@ -598,10 +618,6 @@ for _, file in ipairs(os.files("test/**.cc")) do
 								target:add("includedirs", wabt_include, path.join(wabt_build, "include"))
 								target:add("linkdirs", wabt_build)
 								target:add("links", "wabt")
-								-- libwabt may depend on OpenSSL's libcrypto (e.g. SHA256)
-								if not is_plat("windows") then
-									target:add("syslinks", "crypto")
-								end
 								return true
 							end
 
@@ -613,8 +629,16 @@ for _, file in ipairs(os.files("test/**.cc")) do
 						if not try_add_wabt("build/test/third-parties/wabt", false) and not try_add_wabt("wabt", false) then
 							try_add_wabt("build/test/third-parties/wabt", true)
 						end
-					end)
-				end
+					end
+
+					if target:is_plat("macosx") or target:is_plat("iphoneos") or target:is_plat("watchos") then
+						local clang_runtime_dir = os.iorunv("clang", {"--print-runtime-dir"})
+						clang_runtime_dir = clang_runtime_dir and string.trim(clang_runtime_dir) or nil
+						if clang_runtime_dir and clang_runtime_dir ~= "" and os.isdir(clang_runtime_dir) then
+							target:add("runenvs", "DYLD_LIBRARY_PATH", clang_runtime_dir)
+						end
+					end
+				end)
 
 				add_cxflags("-fsanitize=fuzzer", { force = true })
 				add_ldflags("-fsanitize=fuzzer", { force = true })
@@ -622,8 +646,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				local rss     = os.getenv("FUZZ_RSS") or "512"
 				local maxtime = os.getenv("FUZZ_MAX_TIME") or "10"
 				local maxlen  = os.getenv("FUZZ_MAX_LEN") or "1024"
+				local timeout = os.getenv("FUZZ_TIMEOUT") or "5"
 				add_tests("fuzz",
-					{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen } })    -- xmake test -g libfuzzer
+					{ group = "libfuzzer", runargs = { "-rss_limit_mb=" .. rss, "-max_total_time=" .. maxtime, "-max_len=" .. maxlen, "-timeout=" .. timeout } })    -- xmake test -g libfuzzer
 				add_files(file)
 			elseif not get_config("use-llvm-compiler") and test_libfuzzer then
 				raise("Libfuzzer is not supported on this platform, please use llvm toolchain.")
