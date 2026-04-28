@@ -112,6 +112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::io::weak_symbol_warning_fatal = true;
 #endif
             ::uwvm2::uwvm::io::depend_warning_fatal = true;
+            ::uwvm2::uwvm::io::wasip1_warning_fatal = true;
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
             ::uwvm2::uwvm::io::nt_path_warning_fatal = true;
 #endif
@@ -131,6 +132,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         else if(currp1_str == u8"weak-symbol") { ::uwvm2::uwvm::io::weak_symbol_warning_fatal = true; }
 #endif
         else if(currp1_str == u8"depend") { ::uwvm2::uwvm::io::depend_warning_fatal = true; }
+        else if(currp1_str == u8"wasip1") { ::uwvm2::uwvm::io::wasip1_warning_fatal = true; }
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
         else if(currp1_str == u8"nt-path") { ::uwvm2::uwvm::io::nt_path_warning_fatal = true; }
 #endif

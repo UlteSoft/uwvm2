@@ -1,4 +1,4 @@
-// block type
+﻿// block type
 using value_type_enum = curr_operand_stack_value_type;
 static constexpr value_type_enum i32_result_arr[1u]{value_type_enum::i32};
 static constexpr value_type_enum i64_result_arr[1u]{value_type_enum::i64};
@@ -198,10 +198,7 @@ auto const validate_mem_load{[&](::uwvm2::utils::container::u8string_view op_nam
                                      ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                  }
 
-                                 if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
-                                 {
-                                     report_operand_stack_underflow(op_begin, op_name, 1uz);
-                                 }
+                                 if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, 1uz); }
 
                                  if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && addr.type != wasm_value_type_u::i32) [[unlikely]]
                                  {
@@ -304,10 +301,7 @@ auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_na
                                       ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
                                   }
 
-                                  if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
-                                  {
-                                      report_operand_stack_underflow(op_begin, op_name, 2uz);
-                                  }
+                                  if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]] { report_operand_stack_underflow(op_begin, op_name, 2uz); }
 
                                   auto const value{try_pop_concrete_operand()};
                                   auto const addr{try_pop_concrete_operand()};
@@ -350,110 +344,165 @@ struct resolved_memory0_t
 
 resolved_memory0_t resolved_memory0{};
 
-auto const ensure_memory0_resolved{[&]() constexpr UWVM_THROWS
-                                   {
-                                       if(resolved_memory0.resolved) { return; }
+auto const ensure_memory0_resolved{
+    [&]() constexpr UWVM_THROWS
+    {
+        if(resolved_memory0.resolved) { return; }
 
-                                       // Convert Wasm memory max pages into a byte-length bound for `native_memory_t::grow_*`.
-                                       auto const max_limit_from_limits{[&](auto const& limits) constexpr noexcept -> ::std::size_t
-                                                                        {
-                                                                            if(!limits.present_max) { return ::std::numeric_limits<::std::size_t>::max(); }
-                                                                            ::std::size_t const max_pages{static_cast<::std::size_t>(limits.max)};
-                                                                            constexpr ::std::size_t wasm_page_bytes{65536uz};
-                                                                            if(max_pages > (::std::numeric_limits<::std::size_t>::max() / wasm_page_bytes))
-                                                                            {
-                                                                                return ::std::numeric_limits<::std::size_t>::max();
-                                                                            }
-                                                                            return max_pages * wasm_page_bytes;
-                                                                        }};
+        // Convert Wasm memory max pages into a byte-length bound for `native_memory_t::grow_*`.
+        auto const max_limit_from_limits{[&](auto const& limits) constexpr noexcept -> ::std::size_t
+                                         {
+                                             if(!limits.present_max) { return ::std::numeric_limits<::std::size_t>::max(); }
+                                             ::std::size_t const max_pages{static_cast<::std::size_t>(limits.max)};
+                                             constexpr ::std::size_t wasm_page_bytes{65536uz};
+                                             if(max_pages > (::std::numeric_limits<::std::size_t>::max() / wasm_page_bytes))
+                                             {
+                                                 return ::std::numeric_limits<::std::size_t>::max();
+                                             }
+                                             return max_pages * wasm_page_bytes;
+                                         }};
 
-                                       if(all_memory_count == 0u) [[unlikely]]
-                                       {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                           ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+        auto const backend_max_limit_from_memory{
+            [&](native_memory_t const& memory) constexpr noexcept -> ::std::size_t
+            {
+#if defined(UWVM_SUPPORT_MMAP)
+                if constexpr(native_memory_t::can_mmap)
+                {
+                    if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
+                    {
+                        switch(memory.status)
+                        {
+                            case ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm32:
+                            {
+                                constexpr auto max_full_protection_wasm32_length_half{::uwvm2::object::memory::linear::max_full_protection_wasm32_length / 2u};
+                                return static_cast<::std::size_t>(max_full_protection_wasm32_length_half);
+                            }
+                            case ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64:
+                            {
+                                return static_cast<::std::size_t>(::uwvm2::object::memory::linear::max_partial_protection_wasm64_length);
+                            }
+                            [[unlikely]] default:
+                            {
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+# endif
+                                return 0uz;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return static_cast<::std::size_t>(::uwvm2::object::memory::linear::max_partial_protection_wasm32_length);
+                    }
+                }
+                else
+                {
+                    static_cast<void>(memory);
+                    return ::std::numeric_limits<::std::size_t>::max();
+                }
+#else
+                static_cast<void>(memory);
+                return ::std::numeric_limits<::std::size_t>::max();
 #endif
-                                           ::fast_io::fast_terminate();
-                                       }
+            }};
 
-                                       if(imported_memory_count != 0u)
-                                       {
-                                           using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
-                                           using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
-
-                                           auto const& imported_mem0{curr_module.imported_memory_vec_storage.index_unchecked(0uz)};
-                                           auto const import_type_ptr{imported_mem0.import_type_ptr};
-                                           if(import_type_ptr == nullptr) [[unlikely]]
-                                           {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
-                                               ::fast_io::fast_terminate();
-                                           }
-
-                                           resolved_memory0.max_limit_memory_length = max_limit_from_limits(import_type_ptr->imports.storage.memory.limits);
-
-                                           // Follow import -> import -> ... chains until we reach a defined memory storage.
-                                           imported_memory_storage_t const* curr{::std::addressof(imported_mem0)};
-                                           for(;;)
-                                           {
-                                               if(curr == nullptr) [[unlikely]]
+        auto const refine_max_limit_for_memory{[&](native_memory_t const& memory, ::std::size_t max_limit_memory_length) constexpr noexcept -> ::std::size_t
                                                {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                                   ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
-                                                   ::fast_io::fast_terminate();
-                                               }
+                                                   auto const backend_max_limit_length{backend_max_limit_from_memory(memory)};
+                                                   return backend_max_limit_length < max_limit_memory_length ? backend_max_limit_length
+                                                                                                             : max_limit_memory_length;
+                                               }};
 
-                                               switch(curr->link_kind)
-                                               {
-                                                   case memory_link_kind::imported:
-                                                   {
-                                                       curr = curr->target.imported_ptr;
-                                                       continue;
-                                                   }
-                                                   case memory_link_kind::defined:
-                                                   {
-                                                       auto def{curr->target.defined_ptr};
-                                                       if(def == nullptr) [[unlikely]]
-                                                       {
+        if(all_memory_count == 0u) [[unlikely]]
+        {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                                           ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                                                           ::fast_io::fast_terminate();
-                                                       }
-                                                       resolved_memory0.memory_p = ::std::addressof(def->memory);
-                                                       resolved_memory0.resolved = true;
-                                                       return;
-                                                   }
-                                                   case memory_link_kind::local_imported:
-                                                       [[fallthrough]];
-                                                   [[unlikely]] default:
-                                                   {
+            ::fast_io::fast_terminate();
+        }
+
+        if(imported_memory_count != 0u)
+        {
+            using imported_memory_storage_t = ::uwvm2::uwvm::runtime::storage::imported_memory_storage_t;
+            using memory_link_kind = imported_memory_storage_t::imported_memory_link_kind;
+
+            auto const& imported_mem0{curr_module.imported_memory_vec_storage.index_unchecked(0uz)};
+            auto const import_type_ptr{imported_mem0.import_type_ptr};
+            if(import_type_ptr == nullptr) [[unlikely]]
+            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                                       ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                                                       ::fast_io::fast_terminate();
-                                                   }
-                                               }
-                                           }
-                                       }
-                                       else
-                                       {
-                                           // Wasm1 MVP: at most one memory. This backend compiles memory index 0.
-                                           auto& local_mem0{curr_module.local_defined_memory_vec_storage.index_unchecked(0uz)};
-                                           resolved_memory0.memory_p = const_cast<native_memory_t*>(::std::addressof(local_mem0.memory));
-                                           auto const mem_type_ptr{local_mem0.memory_type_ptr};
-                                           if(mem_type_ptr == nullptr) [[unlikely]]
-                                           {
+                ::fast_io::fast_terminate();
+            }
+
+            resolved_memory0.max_limit_memory_length = max_limit_from_limits(imported_mem0.effective_limits);
+
+            // Follow import -> import -> ... chains until we reach a defined memory storage.
+            imported_memory_storage_t const* curr{::std::addressof(imported_mem0)};
+            for(;;)
+            {
+                if(curr == nullptr) [[unlikely]]
+                {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                               ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+                    ::uwvm2::utils::debug::trap_and_inform_bug_pos();
 #endif
-                                               ::fast_io::fast_terminate();
-                                           }
-                                           resolved_memory0.max_limit_memory_length = max_limit_from_limits(mem_type_ptr->limits);
-                                           resolved_memory0.resolved = true;
-                                       }
-                                   }};
+                    ::fast_io::fast_terminate();
+                }
+
+                switch(curr->link_kind)
+                {
+                    case memory_link_kind::imported:
+                    {
+                        curr = curr->target.imported_ptr;
+                        continue;
+                    }
+                    case memory_link_kind::defined:
+                    {
+                        auto def{curr->target.defined_ptr};
+                        if(def == nullptr) [[unlikely]]
+                        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                            ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                            ::fast_io::fast_terminate();
+                        }
+                        resolved_memory0.memory_p = ::std::addressof(def->memory);
+                        resolved_memory0.max_limit_memory_length = max_limit_from_limits(def->effective_limits);
+                        resolved_memory0.max_limit_memory_length = refine_max_limit_for_memory(def->memory, resolved_memory0.max_limit_memory_length);
+                        resolved_memory0.resolved = true;
+                        return;
+                    }
+                    case memory_link_kind::local_imported:
+                        [[fallthrough]];
+                    [[unlikely]] default:
+                    {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                        ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                        ::fast_io::fast_terminate();
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Wasm1 MVP: at most one memory. This backend compiles memory index 0.
+            auto& local_mem0{curr_module.local_defined_memory_vec_storage.index_unchecked(0uz)};
+            resolved_memory0.memory_p = const_cast<native_memory_t*>(::std::addressof(local_mem0.memory));
+            auto const mem_type_ptr{local_mem0.memory_type_ptr};
+            if(mem_type_ptr == nullptr) [[unlikely]]
+            {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                ::uwvm2::utils::debug::trap_and_inform_bug_pos();
+#endif
+                ::fast_io::fast_terminate();
+            }
+            resolved_memory0.max_limit_memory_length = max_limit_from_limits(local_mem0.effective_limits);
+            resolved_memory0.max_limit_memory_length = refine_max_limit_for_memory(local_mem0.memory, resolved_memory0.max_limit_memory_length);
+            resolved_memory0.resolved = true;
+        }
+    }};
 
 auto const resolve_global_storage_ptr{[&](wasm_u32 global_index) constexpr UWVM_THROWS -> wasm_global_storage_t*
                                       {

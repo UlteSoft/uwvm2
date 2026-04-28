@@ -161,25 +161,25 @@ option("use-thread-local", function()
     set_default(true)
 end)
 
-option("enable-int", function()
+option("execution-int", function()
     set_description
     (
-        "enable interpreter",
-        [[    none: disable interpreter.]],
-        [[    defualt: use default interpreter.]],
-        [[    uwvm-int: use uwvm interpreter.]]
+        "select execution int backend",
+        [[    none: disable execution int backend.]],
+        [[    default: use default execution int backend.]],
+        [[    uwvm-int: use uwvm execution int backend.]]
     )
     set_default("default")
     set_values("none", "default", "uwvm-int")
 end)
 
-option("enable-jit", function()
+option("execution-jit", function()
     set_description
     (
-        "enable just-in-time compilation",
-        [[    none: disable jit.]],
-        [[    defualt: use default jit engine.]],
-        [[    llvm: use llvm jit engine.]]
+        "select execution jit backend",
+        [[    none: disable execution jit backend.]],
+        [[    default: use default execution jit backend.]],
+        [[    llvm: use llvm execution jit backend.]]
     )
     set_default("default")
     set_values("none", "default", "llvm")
@@ -188,10 +188,10 @@ end)
 option("llvm-jit-env", function()
     set_default(true)
     set_showmenu(false)
-    add_deps("enable-jit")
+    add_deps("execution-jit")
     after_check(function(option)
-        local enable_jit = get_config("enable-jit")
-        if enable_jit ~= "default" and enable_jit ~= "llvm" then
+        local execution_jit = get_config("execution-jit")
+        if execution_jit ~= "default" and execution_jit ~= "llvm" then
             return
         end
         import("utility.utility")
@@ -213,20 +213,22 @@ option("llvm-jit-env", function()
         }) do
             local values = llvm_jit_options[field]
             if values then
-                if field == "ldflags" or field == "shflags" then
-                    option:add(field, values, { force = true })
-                else
-                    option:add(field, values)
+                for _, value in ipairs(values) do
+                    if field == "ldflags" or field == "shflags" then
+                        option:add(field, value, { force = true })
+                    else
+                        option:add(field, value)
+                    end
                 end
             end
         end
     end)
 end)
 
-option("enable-debug-int", function()
+option("debug-int", function()
     set_description
     (
-        "enable debug interpreter",
+        "select debug int backend",
         "default = true"
     )
     set_default(true)

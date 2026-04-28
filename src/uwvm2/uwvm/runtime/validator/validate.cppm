@@ -49,7 +49,6 @@ import uwvm2.validation;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.wasm;
-import uwvm2.uwvm.runtime.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

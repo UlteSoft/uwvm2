@@ -25,11 +25,6 @@
 
 // #pragma once
 
-// macro checkers
-#if defined(UWVM_DISABLE_INT) && defined(UWVM_DISABLE_JIT)
-# error "Both interpreter and JIT are disabled. Please enable at least one of them."
-#endif
-
 // macro definitions
 #pragma push_macro("UWVM_RUNTIME_UWVM_INTERPRETER")
 #undef UWVM_RUNTIME_UWVM_INTERPRETER
@@ -63,6 +58,19 @@
 
 #pragma push_macro("UWVM_RUNTIME_DEBUG_INTERPRETER")
 #undef UWVM_RUNTIME_DEBUG_INTERPRETER
-#ifdef UWVM_ENABLE_DEBUG_INT
+// debug-int and uwvm-int are different integers and do not interfere with each other
+#if defined(UWVM_ENABLE_DEBUG_INT)
 # define UWVM_RUNTIME_DEBUG_INTERPRETER
+#endif
+
+#pragma push_macro("UWVM_RUNTIME_HAS_BACKEND")
+#undef UWVM_RUNTIME_HAS_BACKEND
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# define UWVM_RUNTIME_HAS_BACKEND
+#endif
+
+#pragma push_macro("UWVM_RUNTIME_HAS_DEBUGGER_BACKEND")
+#undef UWVM_RUNTIME_HAS_DEBUGGER_BACKEND
+#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# define UWVM_RUNTIME_HAS_DEBUGGER_BACKEND
 #endif

@@ -67,6 +67,10 @@ namespace
         {
             auto const candidate{dir / "uwvm"};
             if(::std::filesystem::exists(candidate)) [[likely]] { return candidate; }
+#ifdef _WIN32
+            auto const windows_candidate{dir / "uwvm.exe"};
+            if(::std::filesystem::exists(windows_candidate)) [[likely]] { return windows_candidate; }
+#endif
             if(dir == dir.root_path()) [[unlikely]] { return {}; }
             dir = dir.parent_path();
         }

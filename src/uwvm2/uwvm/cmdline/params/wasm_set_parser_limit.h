@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasm_set_parser_limit{
         .name{u8"--wasm-set-parser-limit"},
-        .describe{u8"Set parser limit for WASM module."},
+        .describe{u8"Override a parser limit for Wasm modules."},
         .usage{u8"<type:str> <limit:size_t>"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_set_parser_limit_alias), 1uz}},
         .handle{::std::addressof(details::wasm_set_parser_limit_callback)},

@@ -49,6 +49,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool show_weak_symbol_warning{true};  // [global]
 # endif
     inline bool show_depend_warning{true};  // [global]
+    inline bool show_wasip1_warning{};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
     inline bool show_nt_path_warning{true};  // [global]
 # endif
@@ -69,6 +70,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool weak_symbol_warning_fatal{};  // [global]
 # endif
     inline bool depend_warning_fatal{};  // [global]
+    inline bool wasip1_warning_fatal{};  // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
     inline bool nt_path_warning_fatal{};  // [global]
 # endif

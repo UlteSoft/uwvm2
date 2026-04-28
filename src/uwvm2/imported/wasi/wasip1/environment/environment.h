@@ -116,6 +116,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
     using wasip1_proc_raise_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32) noexcept;
     using wasip1_sched_yield_ptr_t = ::uwvm2::imported::wasi::wasip1::abi::errno_t (*)() noexcept;
 
+    enum class trace_wasip1_output_target_t : unsigned
+    {
+        none = 0u,
+        out,
+        err,
+        file
+    };
+
+    enum class trace_wasip1_group_kind_t : unsigned
+    {
+        global = 0u,
+        single,
+        custom_group
+    };
+
 #if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
     enum class handle_type_e : unsigned
     {
@@ -179,6 +194,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::environment
         wasip1_sched_yield_ptr_t wasip1_sched_yield_func_ptr{};
 
         bool trace_wasip1_call{};
+        trace_wasip1_output_target_t trace_wasip1_output_target{};
+        ::uwvm2::utils::container::u8string trace_wasip1_output_file_path_storage{};
+        ::fast_io::u8native_file trace_wasip1_output_file{};
+        trace_wasip1_group_kind_t trace_wasip1_group_kind{trace_wasip1_group_kind_t::global};
+        ::uwvm2::utils::container::u8string trace_wasip1_group_name_storage{};
         bool disable_utf8_check{};
     };
 

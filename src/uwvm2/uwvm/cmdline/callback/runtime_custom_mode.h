@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 #else
@@ -116,7 +117,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 u8"|"
 # endif
                 ,
-                u8"--runtime-debug"
+                u8"--runtime-debug-int"
 #endif
                 u8").\n"
                 u8"uwvm: ",
@@ -195,6 +196,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE

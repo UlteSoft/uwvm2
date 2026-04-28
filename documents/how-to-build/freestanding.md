@@ -123,7 +123,7 @@ Currently there is **no dedicated `freestanding` platform** in `xmake.lua`. Inst
 However, some existing xmake options and platform helpers are still informative:
 
 - `xmake/option.lua`
-  - `--enable-int=[none|default|uwvm-int]` controls whether the interpreter is built when it is available.
+  - `--execution-int=[none|default|uwvm-int]` selects the execution interpreter backend when it is available.
   - `--use-llvm-compiler=y` switches to the LLVM/Clang toolchain.
   - `--sysroot=...` and `--target=...` configure cross‑compilation.
 - `xmake/platform/none.lua`

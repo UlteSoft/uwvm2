@@ -62,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter log_disable_warning{
         .name{u8"--log-disable-warning"},
-        .describe{u8"Turn off the warning output of the uwvm."},
+        .describe{u8"Disable selected warning categories."},
         .usage{u8"[all|vm|untrusted-dl"
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
                u8"|dl"

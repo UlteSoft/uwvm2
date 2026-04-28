@@ -54,6 +54,7 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/push_macros.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/container/impl.h>
@@ -74,12 +75,13 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) && !defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
-# error "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS requires UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS."
-#endif
-#if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) && !defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-# error "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS requires UWVM_ENABLE_UWVM_INT_COMBINE_OPS (do not auto-define it in headers)."
-#endif
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) && !defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#  error "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS requires UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS."
+# endif
+# if defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS) && !defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+#  error "UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS requires UWVM_ENABLE_UWVM_INT_COMBINE_OPS (do not auto-define it in headers)."
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
@@ -1841,9 +1843,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
 #endif
 }  // namespace uwvm2::runtime::compiler::uwvm_int::optable
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/runtime/compiler/uwvm_int/macro/pop_macros.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

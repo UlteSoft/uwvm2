@@ -24,6 +24,8 @@ module;
 // std
 #include <cstddef>
 #include <cstdint>
+// macro
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 export module uwvm2.runtime;
 

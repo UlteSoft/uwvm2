@@ -23,9 +23,9 @@
  *                                      *
  ****************************************/
 
-// macro
-#include <uwvm2/utils/macro/push_macros.h>
 #ifndef UWVM_MODULE
+// macro
+# include <uwvm2/utils/macro/push_macros.h>
 // import
 # include <uwvm2/uwvm/crtmain/impl.h>
 #endif
@@ -50,6 +50,8 @@ UWVM_GNU_USED int main(
 #endif
 }
 
+#ifndef UWVM_MODULE
 // This cpp may not be the end of the translation unit, it may be included in other cpp files. So it needs to be pop.
 // macro
-#include <uwvm2/utils/macro/pop_macros.h>
+# include <uwvm2/utils/macro/pop_macros.h>
+#endif

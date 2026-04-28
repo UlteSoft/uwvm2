@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -84,6 +84,57 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }  // namespace posix
 #  endif
 
+    inline void uwvm_wasip1_proc_exit_func_ptr_overload(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 code) noexcept
+    {
+        using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+        constexpr wasm_u32 wasi_proc_exit_code_upper_bound{126u};
+        auto const raw_code{static_cast<wasm_u32>(code)};
+
+        if(::uwvm2::uwvm::io::show_wasip1_warning && raw_code >= wasi_proc_exit_code_upper_bound) [[unlikely]]
+        {
+            // Output the main information and memory indication
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                // 1
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"[warn]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"WASI Preview 1 proc_exit exit code out of range [0, 126): ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                raw_code,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8".",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8" (wasip1)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            if(::uwvm2::uwvm::io::wasip1_warning_fatal) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(wasip1)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
+
+#  if defined(__linux__)
+        ::fast_io::fast_exit(static_cast<int>(code));
+#  elif defined(_WIN32)
+        // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
+        ::fast_io::win32::ExitProcess(static_cast<::std::uint_least32_t>(raw_code));
+#  else
+        ::uwvm2::imported::wasi::wasip1::func::posix::exit(static_cast<int>(code));
+#  endif
+    }
+
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
     /// @note Socket descriptors are currently not auto-discovered or preconfigured here. In particular, this
     ///       function does not modify the host's SIGPIPE handling or per-socket flags (such as SO_NOSIGPIPE).
@@ -92,6 +143,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
     {
+        env.wasip1_proc_exit_func_ptr = ::uwvm2::uwvm::imported::wasi::wasip1::storage::uwvm_wasip1_proc_exit_func_ptr_overload;
+
         [[maybe_unused]] auto const print_init_error{
             [](::uwvm2::utils::container::u8string_view msg) constexpr noexcept
             {
@@ -774,6 +827,120 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         if(fd_limit_before == 0uz) [[unlikely]] { env.fd_storage.fd_limit = fd_limit; }
 
         return true;
+    }
+
+    inline bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t& state) noexcept
+    {
+        using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
+        using u8string = ::uwvm2::utils::container::u8string;
+
+        state.env.wasip1_memory = nullptr;
+        if(state.trace_wasip1_call_is_set)
+        {
+            state.env.trace_wasip1_call = state.trace_wasip1_call;
+            state.env.trace_wasip1_output_target = state.trace_wasip1_output_target;
+            state.env.trace_wasip1_output_file_path_storage = state.trace_wasip1_output_file_path_storage;
+        }
+        else
+        {
+            state.env.trace_wasip1_call = default_wasip1_env.trace_wasip1_call;
+            state.env.trace_wasip1_output_target = default_wasip1_env.trace_wasip1_output_target;
+            state.env.trace_wasip1_output_file_path_storage = default_wasip1_env.trace_wasip1_output_file_path_storage;
+        }
+        state.env.trace_wasip1_group_kind = state.trace_wasip1_group_kind;
+        state.env.trace_wasip1_group_name_storage = state.trace_wasip1_group_name_storage;
+        state.env.disable_utf8_check = state.disable_utf8_check_is_set ? state.disable_utf8_check : default_wasip1_env.disable_utf8_check;
+        state.env.wasip1_proc_exit_func_ptr = default_wasip1_env.wasip1_proc_exit_func_ptr;
+        state.env.wasip1_proc_raise_func_ptr = default_wasip1_env.wasip1_proc_raise_func_ptr;
+        state.env.wasip1_sched_yield_func_ptr = default_wasip1_env.wasip1_sched_yield_func_ptr;
+        state.env.fd_storage.fd_limit = state.fd_limit_is_set ? state.fd_limit : default_wasip1_env.fd_storage.fd_limit;
+
+        if(state.env.trace_wasip1_call &&
+           state.env.trace_wasip1_output_target == ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t::file &&
+           !::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(state.env.trace_wasip1_output_file,
+                                                                                             ::uwvm2::utils::container::u8string_view{
+                                                                                                 state.env.trace_wasip1_output_file_path_storage.data(),
+                                                                                                 state.env.trace_wasip1_output_file_path_storage.size()},
+                                                                                             false))
+            [[unlikely]]
+        {
+            return false;
+        }
+
+#  if defined(UWVM_IMPORT_WASI_WASIP1_SUPPORT_SOCKET)
+        state.env.preopen_sockets = default_wasip1_env.preopen_sockets;
+        state.env.preopen_sockets.reserve(state.env.preopen_sockets.size() + state.preopen_sockets.size());
+        for(auto const& preopen_socket: state.preopen_sockets) { state.env.preopen_sockets.emplace_back(preopen_socket); }
+#  endif
+
+        auto const saved_noinherit_system_environment{wasip1_noinherit_system_environment};
+        auto saved_delete_system_environment{::std::move(wasip1_delete_system_environment)};
+        auto saved_add_environment{::std::move(wasip1_add_environment)};
+        auto saved_argv0_storage{::std::move(wasip1_argv0_storage)};
+        auto saved_environment_storage{::std::move(wasip1_environment_storage)};
+        auto saved_argument_storage{::std::move(wasip1_argument_storage)};
+
+        auto saved_default_mount_dir_roots{::std::move(default_wasip1_env.mount_dir_roots)};
+        auto saved_module_mount_dir_roots{::std::move(state.mount_dir_roots)};
+        auto saved_env_mount_dir_roots{::std::move(state.env.mount_dir_roots)};
+
+        auto const global_mount_dir_count{saved_default_mount_dir_roots.size()};
+        auto const module_mount_dir_count{saved_module_mount_dir_roots.size()};
+
+        ::uwvm2::utils::container::vector<::uwvm2::utils::container::u8string_view> combined_delete_system_environment{};
+        combined_delete_system_environment.reserve(saved_delete_system_environment.size() + state.delete_system_environment.size());
+        for(auto const env_name: saved_delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
+        for(auto const env_name: state.delete_system_environment) { combined_delete_system_environment.emplace_back(env_name); }
+
+        ::uwvm2::utils::container::vector<::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_add_environment_t> combined_add_environment{};
+        combined_add_environment.reserve(saved_add_environment.size() + state.add_environment.size());
+        for(auto const& env_pair: saved_add_environment) { combined_add_environment.emplace_back(env_pair); }
+        for(auto const& env_pair: state.add_environment) { combined_add_environment.emplace_back(env_pair); }
+
+        wasip1_noinherit_system_environment =
+            state.noinherit_system_environment_is_set ? state.noinherit_system_environment : saved_noinherit_system_environment;
+        wasip1_delete_system_environment = ::std::move(combined_delete_system_environment);
+        wasip1_add_environment = ::std::move(combined_add_environment);
+        wasip1_argv0_storage = state.argv0_is_set ? u8string{state.argv0_storage} : u8string{saved_argv0_storage};
+
+        state.env.mount_dir_roots = ::std::move(saved_default_mount_dir_roots);
+        state.env.mount_dir_roots.reserve(global_mount_dir_count + module_mount_dir_count);
+        for(auto& mount_root: saved_module_mount_dir_roots) { state.env.mount_dir_roots.emplace_back(::std::move(mount_root)); }
+
+        auto const init_ok{init_wasip1_environment(state.env)};
+
+        state.argument_storage = ::std::move(wasip1_argument_storage);
+        state.environment_storage = ::std::move(wasip1_environment_storage);
+
+        wasip1_noinherit_system_environment = saved_noinherit_system_environment;
+        wasip1_delete_system_environment = ::std::move(saved_delete_system_environment);
+        wasip1_add_environment = ::std::move(saved_add_environment);
+        wasip1_argv0_storage = ::std::move(saved_argv0_storage);
+        wasip1_argument_storage = ::std::move(saved_argument_storage);
+        wasip1_environment_storage = ::std::move(saved_environment_storage);
+
+        ::uwvm2::utils::container::vector<mount_dir_root_t> restored_default_mount_dir_roots{};
+        restored_default_mount_dir_roots.reserve(global_mount_dir_count);
+
+        ::uwvm2::utils::container::vector<mount_dir_root_t> restored_module_mount_dir_roots{};
+        restored_module_mount_dir_roots.reserve(module_mount_dir_count);
+
+        ::std::size_t mount_index{};
+        for(auto& mount_root: state.env.mount_dir_roots)
+        {
+            if(mount_index < global_mount_dir_count) { restored_default_mount_dir_roots.emplace_back(::std::move(mount_root)); }
+            else
+            {
+                restored_module_mount_dir_roots.emplace_back(::std::move(mount_root));
+            }
+            ++mount_index;
+        }
+
+        default_wasip1_env.mount_dir_roots = ::std::move(restored_default_mount_dir_roots);
+        state.mount_dir_roots = ::std::move(restored_module_mount_dir_roots);
+        state.env.mount_dir_roots = ::std::move(saved_env_mount_dir_roots);
+
+        return init_ok;
     }
 
 # endif

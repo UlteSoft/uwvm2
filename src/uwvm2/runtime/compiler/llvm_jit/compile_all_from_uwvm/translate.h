@@ -33,11 +33,14 @@
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_push_macro.h>
+# include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
-# if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
+#  include <llvm/IR/Attributes.h>
 #  include <llvm/IR/BasicBlock.h>
+#  include <llvm/IR/CallingConv.h>
 #  include <llvm/IR/Constants.h>
 #  include <llvm/IR/Function.h>
 #  include <llvm/IR/IRBuilder.h>
@@ -67,27 +70,45 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#if defined(UWVM_RUNTIME_LLVM_JIT)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
-#if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
+    enum class llvm_jit_trap_kind : ::std::uint_least32_t
+    {
+        unreachable,
+        invalid_conversion_to_integer,
+        integer_divide_by_zero,
+        integer_overflow,
+        call_indirect_table_out_of_bounds,
+        call_indirect_null_element,
+        call_indirect_type_mismatch,
+        memory_out_of_bounds,
+        runtime_invariant_failure
+    };
+
+    extern "C++" [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
+
+    extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
+
+    extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;
+
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,
                                                  ::std::size_t result_bytes,
                                                  void const* param_buffer,
                                                  ::std::size_t param_bytes) noexcept;
-#endif
 }
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm
 {
-#if defined(UWVM_USE_DEFAULT_JIT) || defined(UWVM_USE_LLVM_JIT)
 # include "translate/single_func.h"
-#endif
 }
+#endif
 
 #ifndef UWVM_MODULE
 // macro
+# include <uwvm2/uwvm/runtime/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif

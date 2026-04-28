@@ -156,7 +156,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             ///       to `func_type.res` (when non-void). No extra helper calls or layers of indirection are expected.
             inline static constexpr void call(local_imported_function_type& func_type) noexcept
             {
-                auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
+                auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env()};
 
                 if constexpr(::std::is_void_v<Ret>)
                 {
@@ -193,7 +193,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             ///       to `func_type.res` (when non-void). No extra helper calls or layers of indirection are expected.
             inline static constexpr void call(local_imported_function_type& func_type) noexcept
             {
-                auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
+                auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env()};
 
                 if constexpr(::std::is_void_v<Ret>)
                 {

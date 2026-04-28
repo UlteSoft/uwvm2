@@ -26,6 +26,7 @@ module;
 
 #include <uwvm2/utils/macro/push_macros.h>
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+#include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
 export module uwvm2.uwvm.cmdline.params:runtime_compiler_log;
 

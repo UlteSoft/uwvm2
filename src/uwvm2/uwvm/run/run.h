@@ -34,9 +34,7 @@
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 # include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#  include <uwvm2/runtime/lib/uwvm_runtime.h>
-# endif
+# include <uwvm2/runtime/lib/uwvm_runtime.h>
 // import
 # include <fast_io.h>
 # include <uwvm2/utils/ansies/impl.h>
@@ -63,6 +61,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND)
     inline ::std::size_t resolve_default_first_entry_function_index(::uwvm2::utils::container::u8string_view main_module_name) noexcept
     {
         using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
@@ -101,19 +100,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                 if(func_index < import_n)
                 {
-                    auto const* const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
-                    auto const* const leaf{resolve_import_leaf(imp)};
+                    auto const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
+                    auto const leaf{resolve_import_leaf(imp)};
                     if(leaf == nullptr) [[unlikely]] { return false; }
 
                     // Allow imported entry only when it ultimately resolves to a wasm-defined function.
                     if(leaf->link_kind != func_link_kind::defined) { return false; }
-                    auto const* const f{leaf->target.defined_ptr};
+                    auto const f{leaf->target.defined_ptr};
                     if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
                     return is_void_to_void_ft(*f->function_type_ptr);
                 }
 
                 auto const local_idx{func_index - import_n};
-                auto const* const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
+                auto const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
                 if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
                 return is_void_to_void_ft(*f->function_type_ptr);
             }};
@@ -546,6 +545,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
         return resolved_compile_threads;
     }
+#endif
 
     inline int run() noexcept
     {
@@ -620,6 +620,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
         }
 
+#if !defined(UWVM_RUNTIME_HAS_BACKEND)
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"This build was configured without executable runtime backends. Only validation and section details are available.\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        return static_cast<int>(::uwvm2::uwvm::run::retval::parameter_error);
+#else
         // run vm
 
         // check import exist and detect cycles
@@ -822,6 +833,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
 
         return static_cast<int>(::uwvm2::uwvm::run::retval::ok);
+#endif
     }
 }  // namespace uwvm2::uwvm::run
 

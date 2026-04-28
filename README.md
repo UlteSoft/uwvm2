@@ -62,10 +62,6 @@ $ uwvm <param0> <param1> ... --run <wasm> <argv1> <argv2> ...
 ```bash
 $ uwvm --wasip1-mount-dir <wasi dir> <system dir> ... --run ...
 ```
-* Expose WASI Preview 1 to preload plugins
-```bash
-$ uwvm --wasm-expose-wasip1-host-api --wasm-register-dl <plugin> <module> --run ...
-```
 
 ## How to build
 * Windows (aka. unknown-windows-msvc). See [windows.md](documents/how-to-build/windows.md)

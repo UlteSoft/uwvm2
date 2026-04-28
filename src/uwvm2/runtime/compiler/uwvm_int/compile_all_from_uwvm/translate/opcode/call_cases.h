@@ -161,7 +161,18 @@ case wasm1_code::call:
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
     ::std::size_t call_module_id{options.curr_wasm_id};
     ::std::size_t call_function_imm{func_index_uz};
-    if(func_index_uz >= import_func_count)
+    if(func_index_uz < import_func_count)
+    {
+        auto const direct_callee{details::resolve_runtime_import_direct_defined_call(curr_module, func_index_uz)};
+        if(direct_callee.direct_callable && direct_callee.function_type_ptr != nullptr &&
+           details::runtime_wasm_function_types_equal(*direct_callee.function_type_ptr, callee_type))
+        {
+            auto const info_ptr{::std::addressof(storage.local_defined_call_info.index_unchecked(direct_callee.local_defined_index))};
+            call_module_id = SIZE_MAX;
+            call_function_imm = reinterpret_cast<::std::size_t>(info_ptr);
+        }
+    }
+    else
     {
         auto const local_idx{func_index_uz - import_func_count};
         auto const info_ptr{::std::addressof(storage.local_defined_call_info.index_unchecked(local_idx))};

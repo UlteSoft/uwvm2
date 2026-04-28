@@ -54,7 +54,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter log_verbose{
         .name{u8"--log-verbose"},
-        .describe{u8"Make log output verbose."},
+        .describe{u8"Enable verbose logging."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::log_verbose_alias), 1uz}},
         .is_exist{::std::addressof(::uwvm2::uwvm::io::show_verbose)},
         .cate{::uwvm2::utils::cmdline::categorization::log}};
@@ -68,4 +68,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

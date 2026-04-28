@@ -42,6 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_custom_compiler_alias{u8"-Rcc"};
@@ -61,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_compiler{
         .name{u8"--runtime-custom-compiler"},
-        .describe{u8"Custom selection of runtime compiler."},
+        .describe{u8"Select the runtime compiler backend."},
         .usage{u8"["
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                u8"int"
@@ -93,6 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(__clang__)
 # pragma clang diagnostic pop
 #endif
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params
 
 #ifndef UWVM_MODULE
@@ -101,4 +103,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

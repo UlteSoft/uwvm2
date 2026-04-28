@@ -59,7 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  pragma clang diagnostic ignored "-Wbraced-scalar-init"
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter debug_test{.name{u8"--debug-test"},
-                                                                   .describe{u8"Custom Debug Test (Only exists in debug mode)."},
+                                                                   .describe{u8"Run a debug-only test hook."},
                                                                    .handle{::std::addressof(details::debug_test_callback)},
                                                                    .is_exist{::std::addressof(details::debug_test_is_exist)},
                                                                    .cate{::uwvm2::utils::cmdline::categorization::debug}};
@@ -73,4 +73,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

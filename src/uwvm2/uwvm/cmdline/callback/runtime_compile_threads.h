@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
 #if defined(UWVM_MODULE)
     extern "C++"
 #else
@@ -87,15 +88,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     UWVM_GNU_COLD inline constexpr
 #endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_compile_threads_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
-                                                                                             para_begin,
-                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
+                                                                                            para_begin,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto currp1{para_curr + 1u};
 
-        if(currp1 == para_end ||
-           (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg &&
-            currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg)) [[unlikely]]
+        if(currp1 == para_end || (currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg &&
+                                  currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg)) [[unlikely]]
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -167,6 +167,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             u8"\n\n");
         return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
     }
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE

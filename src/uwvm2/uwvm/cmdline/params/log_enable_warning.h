@@ -51,8 +51,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         inline constexpr
 #endif
             ::uwvm2::utils::cmdline::parameter_return_type log_enable_warning_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                       ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
@@ -62,8 +62,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter log_enable_warning{
         .name{u8"--log-enable-warning"},
-        .describe{u8"Turn on the warning output of the uwvm."},
-        .usage{u8"[all|parser]"},
+        .describe{u8"Enable selected warning categories."},
+        .usage{u8"[all|parser|wasip1]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::log_enable_warning_alias), 1uz}},
         .handle{::std::addressof(details::log_enable_warning_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::log}};

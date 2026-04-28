@@ -12,6 +12,104 @@ namespace details
 
     using trivial_call_inline_kind = ::uwvm2::runtime::compiler::uwvm_int::optable::trivial_defined_call_kind;
 
+    [[nodiscard]] inline constexpr bool runtime_wasm_function_types_equal(
+        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& a,
+        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& b) noexcept
+    {
+        auto const a_param_count{static_cast<::std::size_t>(a.parameter.end - a.parameter.begin)};
+        auto const b_param_count{static_cast<::std::size_t>(b.parameter.end - b.parameter.begin)};
+        auto const a_result_count{static_cast<::std::size_t>(a.result.end - a.result.begin)};
+        auto const b_result_count{static_cast<::std::size_t>(b.result.end - b.result.begin)};
+
+        if(a_param_count != b_param_count || a_result_count != b_result_count) { return false; }
+
+        for(::std::size_t i{}; i != a_param_count; ++i)
+        {
+            if(a.parameter.begin[i] != b.parameter.begin[i]) { return false; }
+        }
+        for(::std::size_t i{}; i != a_result_count; ++i)
+        {
+            if(a.result.begin[i] != b.result.begin[i]) { return false; }
+        }
+        return true;
+    }
+
+    struct runtime_import_direct_defined_call_resolution_t
+    {
+        bool direct_callable{};
+        ::std::size_t local_defined_index{};
+        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
+    };
+
+    [[nodiscard]] inline runtime_import_direct_defined_call_resolution_t
+        resolve_runtime_import_direct_defined_call(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                  ::std::size_t import_func_index) noexcept
+    {
+        using imported_function_storage_t = ::uwvm2::uwvm::runtime::storage::imported_function_storage_t;
+        using function_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;
+
+        runtime_import_direct_defined_call_resolution_t result{};
+
+        auto const import_func_count{runtime_module.imported_function_vec_storage.size()};
+        if(import_func_index >= import_func_count) { return result; }
+
+        auto const local_func_count{runtime_module.local_defined_function_vec_storage.size()};
+        auto const local_func_begin{runtime_module.local_defined_function_vec_storage.data()};
+
+        imported_function_storage_t const* curr{::std::addressof(runtime_module.imported_function_vec_storage.index_unchecked(import_func_index))};
+        for(::std::size_t steps{};; ++steps)
+        {
+            if(steps > 8192uz || curr == nullptr) [[unlikely]] { return {}; }
+
+            switch(curr->link_kind)
+            {
+                case function_link_kind::imported:
+                {
+                    curr = curr->target.imported_ptr;
+                    continue;
+                }
+                case function_link_kind::defined:
+                {
+                    auto const defined_func_ptr{curr->target.defined_ptr};
+                    if(defined_func_ptr == nullptr) [[unlikely]] { return {}; }
+
+                    result.function_type_ptr = defined_func_ptr->function_type_ptr;
+                    if(result.function_type_ptr == nullptr) [[unlikely]] { return {}; }
+
+                    if(local_func_begin == nullptr || defined_func_ptr < local_func_begin || defined_func_ptr >= local_func_begin + local_func_count)
+                    {
+                        return result;
+                    }
+
+                    result.direct_callable = true;
+                    result.local_defined_index = static_cast<::std::size_t>(defined_func_ptr - local_func_begin);
+                    return result;
+                }
+                case function_link_kind::local_imported:
+                case function_link_kind::unresolved:
+                {
+                    return result;
+                }
+#if defined(UWVM_SUPPORT_PRELOAD_DL)
+                case function_link_kind::dl:
+                {
+                    return result;
+                }
+#endif
+#if defined(UWVM_SUPPORT_WEAK_SYMBOL)
+                case function_link_kind::weak_symbol:
+                {
+                    return result;
+                }
+#endif
+                [[unlikely]] default:
+                {
+                    return {};
+                }
+            }
+        }
+    }
+
     struct trivial_call_inline_match
     {
         trivial_call_inline_kind kind{};
@@ -645,4 +743,3 @@ namespace details
         make_interpreter_tuple(::std::index_sequence<Is...>) noexcept
     { return {}; }
 }  // namespace details
-

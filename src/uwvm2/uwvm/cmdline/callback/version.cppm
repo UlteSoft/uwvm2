@@ -42,6 +42,9 @@ module;
 #if (defined(__MIPS__) || defined(__mips__) || defined(_MIPS_ARCH))
 # include <sgidefs.h>
 #endif
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+# include <llvm/Config/llvm-config.h>
+#endif
 
 export module uwvm2.uwvm.cmdline.callback:version;
 

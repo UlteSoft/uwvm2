@@ -40,7 +40,16 @@ xmake build uwvm
 
 ```sh
 ./build/.../uwvm -Rcc int -Rcm full \
-  --wasm-expose-wasip1-host-api \
+  --wasip1-expose-host-api \
+  --wasm-set-preload-module-attribute weak.example copy all \
+  --run ./main.wasm hello world
+```
+
+Module-specific exposure works the same way:
+
+```sh
+./build/.../uwvm -Rcc int -Rcm full \
+  --wasip1-module weak.example expose-host-api \
   --wasm-set-preload-module-attribute weak.example copy all \
   --run ./main.wasm hello world
 ```
@@ -48,5 +57,6 @@ xmake build uwvm
 ## Notes
 
 - `--wasm-set-preload-module-attribute` applies to weak-symbol modules exactly like preload DL modules.
-- If you omit `--wasm-expose-wasip1-host-api`, `probe_host_apis` returns a failure code and the verification wasm traps.
+- If you omit `--wasip1-expose-host-api`, `probe_host_apis` returns a failure code and the verification wasm traps.
+- The module-specific form `--wasip1-module weak.example hide-host-api` can explicitly turn the API back off even when the global default is on.
 - The C and C++ examples intentionally mirror the DL example so you can compare only the registration layer.

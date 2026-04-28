@@ -61,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # pragma clang diagnostic ignored "-Wbraced-scalar-init"
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter help{.name{u8"--help"},
-                                                             .describe{u8"Get help information."},
+                                                             .describe{u8"Show help information."},
                                                              .usage{u8"([all|global|debug|wasm|log|runtime"
 #if defined(UWVM_IMPORT_WASI)
                                                                     u8"|wasi"

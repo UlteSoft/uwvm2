@@ -23,7 +23,7 @@
 #pragma once
 
 #ifndef UWVM_MODULE
-//std
+// std
 # include <memory>
 // macro
 # include <uwvm2/utils/macro/push_macros.h>
@@ -41,16 +41,15 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 {
-    using configured_preload_module_attribute_map_t = ::uwvm2::utils::container::unordered_flat_map<
-        ::uwvm2::utils::container::u8string,
-        ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t,
-        ::uwvm2::utils::container::pred::u8string_view_hash,
-        ::uwvm2::utils::container::pred::u8string_view_equal>;
+    using configured_preload_module_attribute_map_t =
+        ::uwvm2::utils::container::unordered_flat_map<::uwvm2::utils::container::u8string,
+                                                      ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t,
+                                                      ::uwvm2::utils::container::pred::u8string_view_hash,
+                                                      ::uwvm2::utils::container::pred::u8string_view_equal>;
 
-    inline configured_preload_module_attribute_map_t configured_preload_module_attribute{}; // [global]
+    inline configured_preload_module_attribute_map_t configured_preload_module_attribute{};  // [global]
 
-    [[nodiscard]] inline auto find_configured_preload_module_attribute(
-        ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline auto find_configured_preload_module_attribute(::uwvm2::utils::container::u8string_view module_name) noexcept
         -> ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t*
     {
         if(auto it{configured_preload_module_attribute.find(module_name)}; it != configured_preload_module_attribute.end()) [[likely]]
@@ -60,8 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline auto find_configured_preload_module_attribute_const(
-        ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline auto find_configured_preload_module_attribute_const(::uwvm2::utils::container::u8string_view module_name) noexcept
         -> ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t const*
     {
         if(auto const it{configured_preload_module_attribute.find(module_name)}; it != configured_preload_module_attribute.cend()) [[likely]]
@@ -71,8 +69,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t&
-        upsert_configured_preload_module_attribute(::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline ::uwvm2::uwvm::wasm::type::preload_module_memory_attribute_t& upsert_configured_preload_module_attribute(
+        ::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         auto const [it, inserted]{configured_preload_module_attribute.try_emplace(::uwvm2::utils::container::u8string{module_name})};
         static_cast<void>(inserted);
@@ -98,11 +96,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         ::std::size_t module_index{};
     };
 
-    using preload_capi_function_owner_map_t = ::uwvm2::utils::container::unordered_flat_map<
-        ::uwvm2::uwvm::wasm::type::capi_function_t const*,
-        preload_capi_function_owner_t>;
+    using preload_capi_function_owner_map_t =
+        ::uwvm2::utils::container::unordered_flat_map<::uwvm2::uwvm::wasm::type::capi_function_t const*, preload_capi_function_owner_t>;
 
-    inline preload_capi_function_owner_map_t preload_capi_function_owner{}; // [global]
+    inline preload_capi_function_owner_map_t preload_capi_function_owner{};  // [global]
+
+    [[nodiscard]] inline preload_capi_function_owner_t const* find_preload_capi_function_owner(
+        ::uwvm2::uwvm::wasm::type::capi_function_t const* function) noexcept
+    {
+        if(function == nullptr) [[unlikely]] { return nullptr; }
+
+        auto const it{preload_capi_function_owner.find(function)};
+        if(it == preload_capi_function_owner.cend()) [[unlikely]] { return nullptr; }
+        return ::std::addressof(it->second);
+    }
 
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
     inline void register_preloaded_dl_capi_functions(::std::size_t module_index) noexcept
@@ -118,9 +125,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
         for(::std::size_t i{}; i != size; ++i)
         {
-            preload_capi_function_owner.insert_or_assign(begin + i,
-                                                         preload_capi_function_owner_t{.kind = preload_capi_function_owner_kind_t::preloaded_dl,
-                                                                                       .module_index = module_index});
+            preload_capi_function_owner.insert_or_assign(
+                begin + i,
+                preload_capi_function_owner_t{.kind = preload_capi_function_owner_kind_t::preloaded_dl, .module_index = module_index});
         }
     }
 #endif
@@ -139,9 +146,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
         for(::std::size_t i{}; i != size; ++i)
         {
-            preload_capi_function_owner.insert_or_assign(begin + i,
-                                                         preload_capi_function_owner_t{.kind = preload_capi_function_owner_kind_t::weak_symbol,
-                                                                                       .module_index = module_index});
+            preload_capi_function_owner.insert_or_assign(
+                begin + i,
+                preload_capi_function_owner_t{.kind = preload_capi_function_owner_kind_t::weak_symbol, .module_index = module_index});
         }
     }
 #endif

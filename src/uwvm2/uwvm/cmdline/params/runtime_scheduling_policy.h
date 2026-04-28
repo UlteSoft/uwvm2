@@ -42,6 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
+#if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_scheduling_policy_alias{u8"-Rsp"};
@@ -61,7 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_scheduling_policy{
         .name{u8"--runtime-scheduling-policy"},
-        .describe{u8"Set the runtime scheduling policy. Effective only when extra runtime compile threads are enabled."},
+        .describe{u8"Set the scheduling policy for extra runtime compile threads."},
         .usage{u8"[func_count <count:size_t>|code_size <bytes:size_t>]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_scheduling_policy_alias), 1uz}},
         .handle{::std::addressof(details::runtime_scheduling_policy_callback)},
@@ -69,6 +70,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 #if defined(__clang__)
 # pragma clang diagnostic pop
+#endif
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params
 
