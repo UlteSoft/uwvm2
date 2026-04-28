@@ -34,6 +34,7 @@ function djgpp_target()
     end
 
     add_cxflags("-fno-rtti") -- disable rtti
+    add_cxflags("-Wno-maybe-musttail-local-addr", {force = true})
     
     if not is_mode("debug") then
         add_cxflags("-fno-unwind-tables") -- disable unwind tables

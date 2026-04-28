@@ -105,6 +105,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         {
             [[nodiscard]] inline constexpr scheduled_task get_return_object() noexcept { return scheduled_task{handle_type::from_promise(*this)}; }
 
+            [[nodiscard]] inline static constexpr scheduled_task get_return_object_on_allocation_failure() noexcept { return {}; }
+
             [[nodiscard]] inline constexpr ::std::suspend_always initial_suspend() const noexcept { return {}; }
 
             [[nodiscard]] inline constexpr ::std::suspend_always final_suspend() const noexcept { return {}; }
@@ -225,7 +227,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline constexpr native_thread_pool(native_thread_pool const&) noexcept = delete;
         inline constexpr native_thread_pool& operator= (native_thread_pool const&) noexcept = delete;
 
-        inline constexpr native_thread_pool(native_thread_pool&& other) noexcept
+        inline constexpr native_thread_pool([[maybe_unused]] native_thread_pool&& other) noexcept
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
             : workers{::std::move(other.workers)},
               worker_count{::std::exchange(other.worker_count, 0uz)}

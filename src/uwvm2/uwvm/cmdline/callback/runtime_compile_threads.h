@@ -116,7 +116,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using runtime_compile_threads_type = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_type;
         using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
 
-        runtime_compile_threads_type compile_threads;  // No initialization necessary
+        runtime_compile_threads_type compile_threads{};
         auto const [next, err]{::fast_io::parse_by_scan(currp1_str.cbegin(), currp1_str.cend(), compile_threads)};
 
         if(err == ::fast_io::parse_code::ok && next == currp1_str.cend())
