@@ -448,6 +448,8 @@ namespace uwvm2::runtime::lib
             call_indirect_table_out_of_bounds,
             call_indirect_null_element,
             call_indirect_type_mismatch,
+            memory_out_of_bounds,
+            runtime_invariant_failure,
             // uncatched int error (wasm 3.0, exception)
             uncatched_int_tag
 
@@ -484,6 +486,14 @@ namespace uwvm2::runtime::lib
                 case trap_kind::call_indirect_type_mismatch:
                 {
                     return ::uwvm2::utils::container::u8string_view{u8"call_indirect: signature mismatch"};
+                }
+                case trap_kind::memory_out_of_bounds:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"memory access out of bounds"};
+                }
+                case trap_kind::runtime_invariant_failure:
+                {
+                    return ::uwvm2::utils::container::u8string_view{u8"runtime invariant failure"};
                 }
                 case trap_kind::uncatched_int_tag:
                 {
@@ -2621,8 +2631,6 @@ namespace uwvm2::runtime::lib
             if(!try_get_runtime_llvm_jit_raw_defined_entry_address(module_id, function_index, function_address)) { return false; }
 
             using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
-            auto& call_stack{get_call_stack()};
-            call_stack_guard g{call_stack, module_id, function_index};
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn(0u, pointer_to_uintptr(result_buffer), result_bytes, pointer_to_uintptr(param_buffer), param_bytes);
             return true;
@@ -2715,7 +2723,6 @@ namespace uwvm2::runtime::lib
                 }
 
                 auto& call_stack{get_call_stack()};
-                call_stack_guard g{call_stack, tgt->frame.module_id, tgt->frame.function_index};
 
                 switch(tgt->k)
                 {
@@ -2750,6 +2757,7 @@ namespace uwvm2::runtime::lib
                     {
                         auto const local_imported_module{tgt->u.local_imported.module_ptr};
                         if(local_imported_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                        call_stack_guard g{call_stack, tgt->frame.module_id, tgt->frame.function_index};
                         call_local_imported_with_wasip1_env(
                             *local_imported_module,
                             tgt->u.local_imported.index,
@@ -2763,6 +2771,7 @@ namespace uwvm2::runtime::lib
                     {
                         auto const capi_ptr{tgt->u.capi_ptr};
                         if(capi_ptr == nullptr || capi_ptr->func_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                        call_stack_guard g{call_stack, tgt->frame.module_id, tgt->frame.function_index};
                         call_capi_with_wasip1_env(
                             *capi_ptr,
                             tgt->preload_module_memory_attribute,
@@ -3429,8 +3438,6 @@ namespace uwvm2::runtime::lib
             if(function_address == 0u) [[unlikely]] { return false; }
 
             using entry_fn_t = void (*)();
-            auto& call_stack{get_call_stack()};
-            call_stack_guard g{call_stack, module_id, function_index};
             auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
             entry_fn();
             return true;
@@ -4665,6 +4672,60 @@ namespace uwvm2::runtime::lib
         }
 
     }  // namespace
+
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+    [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind k) noexcept
+    {
+        switch(k)
+        {
+            case llvm_jit_trap_kind::unreachable:
+            {
+                trap_fatal(trap_kind::unreachable);
+            }
+            case llvm_jit_trap_kind::invalid_conversion_to_integer:
+            {
+                trap_fatal(trap_kind::invalid_conversion_to_integer);
+            }
+            case llvm_jit_trap_kind::integer_divide_by_zero:
+            {
+                trap_fatal(trap_kind::integer_divide_by_zero);
+            }
+            case llvm_jit_trap_kind::integer_overflow:
+            {
+                trap_fatal(trap_kind::integer_overflow);
+            }
+            case llvm_jit_trap_kind::call_indirect_table_out_of_bounds:
+            {
+                trap_fatal(trap_kind::call_indirect_table_out_of_bounds);
+            }
+            case llvm_jit_trap_kind::call_indirect_null_element:
+            {
+                trap_fatal(trap_kind::call_indirect_null_element);
+            }
+            case llvm_jit_trap_kind::call_indirect_type_mismatch:
+            {
+                trap_fatal(trap_kind::call_indirect_type_mismatch);
+            }
+            case llvm_jit_trap_kind::memory_out_of_bounds:
+            {
+                trap_fatal(trap_kind::memory_out_of_bounds);
+            }
+            case llvm_jit_trap_kind::runtime_invariant_failure:
+            {
+                trap_fatal(trap_kind::runtime_invariant_failure);
+            }
+            [[unlikely]] default:
+            {
+                trap_fatal(trap_kind::runtime_invariant_failure);
+            }
+        }
+    }
+
+    void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept
+    { get_call_stack().push(call_stack_frame{module_id, function_index}); }
+
+    void llvm_jit_pop_call_stack_frame() noexcept { get_call_stack().pop(); }
+#endif
 
     void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept
     {

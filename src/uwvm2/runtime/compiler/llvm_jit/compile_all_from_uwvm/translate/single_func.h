@@ -4,6 +4,7 @@ struct local_func_storage_t
     ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* wasm_code_ptr{};
     ::std::byte const* code_begin{};
     ::std::byte const* code_end{};
+    ::std::size_t module_id{};
     ::std::size_t function_index{};
     ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* runtime_module_ptr{};
 };
@@ -1075,6 +1076,7 @@ namespace details
                                                                            llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr) UWVM_THROWS
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
+        local_func_storage.module_id = options.curr_wasm_id;
         validate_runtime_local_func(validation_module, local_func_storage, err, emitted_llvm_jit_ir_storage);
         return local_func_storage;
     }

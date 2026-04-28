@@ -71,6 +71,25 @@
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
+    enum class llvm_jit_trap_kind : ::std::uint_least32_t
+    {
+        unreachable,
+        invalid_conversion_to_integer,
+        integer_divide_by_zero,
+        integer_overflow,
+        call_indirect_table_out_of_bounds,
+        call_indirect_null_element,
+        call_indirect_type_mismatch,
+        memory_out_of_bounds,
+        runtime_invariant_failure
+    };
+
+    extern "C++" [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
+
+    extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
+
+    extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;
+
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,

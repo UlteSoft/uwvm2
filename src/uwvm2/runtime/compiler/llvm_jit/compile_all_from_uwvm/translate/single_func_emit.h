@@ -184,7 +184,33 @@ struct llvm_jit_memory_snapshot_values_t
 [[nodiscard]] inline ::llvm::Constant* get_llvm_f64_constant_from_bits(::llvm::LLVMContext& llvm_context, ::std::uint_least64_t bits)
 { return ::llvm::ConstantFP::get(::llvm::Type::getDoubleTy(llvm_context), ::llvm::APFloat(::llvm::APFloat::IEEEdouble(), ::llvm::APInt(64u, bits))); }
 
-inline void emit_llvm_conditional_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition)
+[[nodiscard]] inline ::llvm::FunctionType* get_llvm_runtime_trap_bridge_function_type(::llvm::LLVMContext& llvm_context) noexcept
+{
+    auto trap_kind_type{::llvm::Type::getIntNTy(
+        llvm_context,
+        static_cast<unsigned>(sizeof(::uwvm2::runtime::lib::llvm_jit_trap_kind) * 8u))};
+    return ::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {trap_kind_type}, false);
+}
+
+inline void emit_llvm_runtime_trap(::llvm::IRBuilder<>& ir_builder, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind)
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto function_type{get_llvm_runtime_trap_bridge_function_type(llvm_context)};
+    if(function_type == nullptr) [[unlikely]] { return; }
+
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto llvm_address{::llvm::ConstantInt::get(llvm_intptr_type,
+                                               reinterpret_cast<::std::uintptr_t>(::uwvm2::runtime::lib::llvm_jit_runtime_trap))};
+    auto bridge_pointer{::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type))};
+    if(bridge_pointer == nullptr) [[unlikely]] { return; }
+
+    auto trap_kind_type{function_type->getParamType(0u)};
+    ir_builder.CreateCall(function_type,
+                          bridge_pointer,
+                          {::llvm::ConstantInt::get(trap_kind_type, static_cast<::std::uint_least64_t>(trap_kind))});
+}
+
+inline void emit_llvm_conditional_trap(::llvm::Module&, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind trap_kind)
 {
     if(condition == nullptr) [[unlikely]] { return; }
 
@@ -199,30 +225,41 @@ inline void emit_llvm_conditional_trap(::llvm::Module& llvm_module, ::llvm::IRBu
     ir_builder.CreateCondBr(condition, trap_block, continue_block);
 
     ir_builder.SetInsertPoint(trap_block);
-    auto trap_intrinsic{::llvm::Intrinsic::getOrInsertDeclaration(::std::addressof(llvm_module), ::llvm::Intrinsic::trap, {})};
-    ir_builder.CreateCall(trap_intrinsic);
+    emit_llvm_runtime_trap(ir_builder, trap_kind);
     ir_builder.CreateUnreachable();
 
     ir_builder.SetInsertPoint(continue_block);
 }
 
+inline void emit_llvm_conditional_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* condition)
+{
+    emit_llvm_conditional_trap(llvm_module, ir_builder, condition, ::uwvm2::runtime::lib::llvm_jit_trap_kind::runtime_invariant_failure);
+}
+
 inline void emit_llvm_divide_by_zero_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* divisor)
 {
     if(divisor == nullptr) [[unlikely]] { return; }
-    emit_llvm_conditional_trap(llvm_module, ir_builder, ir_builder.CreateICmpEQ(divisor, ::llvm::ConstantInt::get(divisor->getType(), 0u)));
+    emit_llvm_conditional_trap(llvm_module,
+                               ir_builder,
+                               ir_builder.CreateICmpEQ(divisor, ::llvm::ConstantInt::get(divisor->getType(), 0u)),
+                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::integer_divide_by_zero);
 }
 
 inline void emit_llvm_signed_div_overflow_trap(::llvm::Module& llvm_module, ::llvm::IRBuilder<>& ir_builder, ::llvm::Value* dividend, ::llvm::Value* divisor)
 {
     if(dividend == nullptr || divisor == nullptr) [[unlikely]] { return; }
 
+    emit_llvm_divide_by_zero_trap(llvm_module, ir_builder, divisor);
+
     auto const bit_width{get_llvm_integer_bit_width(dividend)};
     auto int_type{::llvm::cast<::llvm::IntegerType>(dividend->getType())};
     auto signed_min{::llvm::ConstantInt::get(int_type, ::llvm::APInt::getSignedMinValue(bit_width))};
     auto neg_one{::llvm::ConstantInt::getSigned(int_type, -1)};
-    auto divisor_zero{ir_builder.CreateICmpEQ(divisor, ::llvm::ConstantInt::get(divisor->getType(), 0u))};
     auto signed_overflow{ir_builder.CreateAnd(ir_builder.CreateICmpEQ(dividend, signed_min), ir_builder.CreateICmpEQ(divisor, neg_one))};
-    emit_llvm_conditional_trap(llvm_module, ir_builder, ir_builder.CreateOr(divisor_zero, signed_overflow));
+    emit_llvm_conditional_trap(llvm_module,
+                               ir_builder,
+                               signed_overflow,
+                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::integer_overflow);
 }
 
 [[nodiscard]] inline ::llvm::Value* emit_llvm_signed_remainder_with_wasm_semantics(::llvm::Module& llvm_module,
@@ -341,12 +378,18 @@ template <typename Float>
     if(dest_type == nullptr || operand == nullptr) [[unlikely]] { return nullptr; }
 
     auto is_nan{ir_builder.CreateFCmpUNO(operand, operand)};
-    emit_llvm_conditional_trap(llvm_module, ir_builder, is_nan);
+    emit_llvm_conditional_trap(llvm_module,
+                               ir_builder,
+                               is_nan,
+                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::invalid_conversion_to_integer);
 
     auto min_bound{::llvm::ConstantFP::get(operand->getType(), static_cast<double>(min_bounds))};
     auto max_bound{::llvm::ConstantFP::get(operand->getType(), static_cast<double>(max_bounds))};
     auto is_overflow{ir_builder.CreateOr(ir_builder.CreateFCmpOGE(operand, max_bound), ir_builder.CreateFCmpOLE(operand, min_bound))};
-    emit_llvm_conditional_trap(llvm_module, ir_builder, is_overflow);
+    emit_llvm_conditional_trap(llvm_module,
+                               ir_builder,
+                               is_overflow,
+                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::invalid_conversion_to_integer);
 
     return is_signed ? ir_builder.CreateFPToSI(operand, dest_type) : ir_builder.CreateFPToUI(operand, dest_type);
 }
@@ -1304,7 +1347,10 @@ inline void llvm_jit_store_little_endian_integer(::std::byte* memory_ptr, UInt v
     ::std::memcpy(memory_ptr, ::std::addressof(value), sizeof(UInt));
 }
 
-[[noreturn]] inline void llvm_jit_memory_bridge_trap() noexcept { ::fast_io::fast_terminate(); }
+[[noreturn]] inline void llvm_jit_memory_bridge_trap() noexcept
+{
+    ::uwvm2::runtime::lib::llvm_jit_runtime_trap(::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
+}
 
 template <typename MemoryT, typename Fn>
 [[nodiscard]] inline bool llvm_jit_try_checked_memory_access(MemoryT const& memory,
@@ -1760,6 +1806,35 @@ template <typename FunctionPtr>
     return ::llvm::ConstantExpr::getIntToPtr(llvm_address, get_llvm_pointer_type(function_type));
 }
 
+[[nodiscard]] inline bool emit_runtime_local_func_llvm_jit_call_stack_push(::llvm::IRBuilder<>& ir_builder,
+                                                                           ::std::size_t module_id,
+                                                                           ::std::size_t function_index)
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto llvm_size_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::size_t) * 8u))};
+    auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), {llvm_size_type, llvm_size_type}, false)};
+    auto bridge_pointer{
+        get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_push_call_stack_frame)};
+    if(bridge_pointer == nullptr) [[unlikely]] { return false; }
+
+    ir_builder.CreateCall(function_type,
+                          bridge_pointer,
+                          {::llvm::ConstantInt::get(llvm_size_type, module_id), ::llvm::ConstantInt::get(llvm_size_type, function_index)});
+    return true;
+}
+
+[[nodiscard]] inline bool emit_runtime_local_func_llvm_jit_call_stack_pop(::llvm::IRBuilder<>& ir_builder)
+{
+    auto& llvm_context{ir_builder.getContext()};
+    auto function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context), false)};
+    auto bridge_pointer{
+        get_llvm_runtime_bridge_function_pointer(llvm_context, function_type, ::uwvm2::runtime::lib::llvm_jit_pop_call_stack_frame)};
+    if(bridge_pointer == nullptr) [[unlikely]] { return false; }
+
+    ir_builder.CreateCall(function_type, bridge_pointer, {});
+    return true;
+}
+
 template <typename Immediate>
 [[nodiscard]] inline bool parse_wasm_leb128_immediate(::std::byte const*& code_curr, ::std::byte const* code_end, Immediate& immediate)
 {
@@ -2112,6 +2187,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
     state.ir_builder = ::std::make_unique<::llvm::IRBuilder<>>(entry_block);
+    if(!emit_runtime_local_func_llvm_jit_call_stack_push(*state.ir_builder, local_func_storage.module_id, local_func_storage.function_index))
+        [[unlikely]]
+    {
+        return false;
+    }
 
     state.local_pointers.reserve(state.local_types.size());
     for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
@@ -2178,8 +2258,16 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto& ir_builder{*state.ir_builder};
 
     ir_builder.SetInsertPoint(state.return_block);
-    if(state.func_result_count_uz == 0uz) { ir_builder.CreateRetVoid(); }
-    else if(state.return_phi != nullptr && state.return_phi->getNumIncomingValues() != 0u) { ir_builder.CreateRet(state.return_phi); }
+    if(state.func_result_count_uz == 0uz)
+    {
+        if(!emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
+        ir_builder.CreateRetVoid();
+    }
+    else if(state.return_phi != nullptr && state.return_phi->getNumIncomingValues() != 0u)
+    {
+        if(!emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
+        ir_builder.CreateRet(state.return_phi);
+    }
     else
     {
         if(state.return_phi != nullptr) { state.return_phi->eraseFromParent(); }
@@ -2424,9 +2512,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto current_block{ir_builder.GetInsertBlock()};
     if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
 
-    auto trap_intrinsic{
-        ::llvm::Intrinsic::getOrInsertDeclaration(::std::addressof(*state.llvm_module), ::llvm::Intrinsic::trap, {})};
-    ir_builder.CreateCall(trap_intrinsic);
+    emit_llvm_runtime_trap(ir_builder, ::uwvm2::runtime::lib::llvm_jit_trap_kind::unreachable);
     ir_builder.CreateUnreachable();
     enter_runtime_local_func_llvm_jit_unreachable_control_context(state);
     return true;
@@ -3399,10 +3485,14 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             auto table_data_address{ir_builder.CreateLoad(llvm_intptr_type, table_data_address_ptr, "call_indirect.table.data.addr")};
             auto table_size{ir_builder.CreateLoad(llvm_intptr_type, table_size_ptr, "call_indirect.table.size")};
 
-            emit_llvm_conditional_trap(*llvm_module, ir_builder, ir_builder.CreateICmpUGE(selector_index, table_size));
             emit_llvm_conditional_trap(*llvm_module,
                                        ir_builder,
-                                       ir_builder.CreateICmpEQ(table_data_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+                                       ir_builder.CreateICmpUGE(selector_index, table_size),
+                                       ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_table_out_of_bounds);
+            emit_llvm_conditional_trap(*llvm_module,
+                                       ir_builder,
+                                       ir_builder.CreateICmpEQ(table_data_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
+                                       ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_null_element);
 
             auto target_base_ptr{
                 ir_builder.CreateIntToPtr(table_data_address, get_llvm_pointer_type(raw_target_struct_type), "call_indirect.target.base.ptr")};
@@ -3415,9 +3505,15 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             auto context_address{ir_builder.CreateLoad(llvm_intptr_type, context_address_ptr, "call_indirect.context.addr")};
             auto encoded_type_id{ir_builder.CreateLoad(llvm_i32_type, encoded_type_id_ptr, "call_indirect.type.id")};
 
-            emit_llvm_conditional_trap(*llvm_module, ir_builder, ir_builder.CreateICmpEQ(entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+            emit_llvm_conditional_trap(*llvm_module,
+                                       ir_builder,
+                                       ir_builder.CreateICmpEQ(entry_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)),
+                                       ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_null_element);
             emit_llvm_conditional_trap(
-                *llvm_module, ir_builder, ir_builder.CreateICmpNE(encoded_type_id, ::llvm::ConstantInt::get(llvm_i32_type, expected_type_id)));
+                *llvm_module,
+                ir_builder,
+                ir_builder.CreateICmpNE(encoded_type_id, ::llvm::ConstantInt::get(llvm_i32_type, expected_type_id)),
+                ::uwvm2::runtime::lib::llvm_jit_trap_kind::call_indirect_type_mismatch);
 
             auto raw_entry_function_ptr{
                 ir_builder.CreateIntToPtr(entry_address, get_llvm_pointer_type(raw_entry_function_type), "call_indirect.entry.ptr")};
@@ -3749,7 +3845,8 @@ template <typename CreateValue>
                     emit_llvm_conditional_trap(
                         *llvm_module,
                         ir_builder,
-                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)));
+                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
+                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
                 }
                 else if(memory0_access_info.mmap_uses_partial_protection)
                 {
@@ -3782,7 +3879,8 @@ template <typename CreateValue>
                     emit_llvm_conditional_trap(
                         *llvm_module,
                         ir_builder,
-                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)));
+                        ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
+                        ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
                     ir_builder.CreateBr(partial_continue_block);
                     ir_builder.SetInsertPoint(partial_continue_block);
                 }
@@ -3816,7 +3914,10 @@ template <typename CreateValue>
                  byte_length_slot})};
             if(snapshot_ok == nullptr) [[unlikely]] { return result; }
 
-            emit_llvm_conditional_trap(*llvm_module, ir_builder, ir_builder.CreateNot(snapshot_ok));
+            emit_llvm_conditional_trap(*llvm_module,
+                                       ir_builder,
+                                       ir_builder.CreateNot(snapshot_ok),
+                                       ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
             result.memory_begin_address = ir_builder.CreateLoad(llvm_intptr_type, memory_begin_slot, "local_imported.memory.begin.addr");
             result.byte_length = ir_builder.CreateLoad(llvm_intptr_type, byte_length_slot, "local_imported.memory.byte_length");
             return result;
@@ -3872,7 +3973,8 @@ template <typename CreateValue>
                 emit_llvm_conditional_trap(
                     *llvm_module,
                     ir_builder,
-                    ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)));
+                    ir_builder.CreateOr(ir_builder.CreateOr(effective_negative, effective_too_large), ir_builder.CreateOr(memory_too_small, access_oob)),
+                    ::uwvm2::runtime::lib::llvm_jit_trap_kind::memory_out_of_bounds);
 
                 auto effective_offset_intptr{ir_builder.CreateIntCast(effective_offset, llvm_intptr_type, false)};
                 auto memory_address{ir_builder.CreateAdd(snapshot.memory_begin_address, effective_offset_intptr, "local_imported.memory.addr.int")};
