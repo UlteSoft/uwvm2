@@ -26,7 +26,7 @@
   BOOST_PRAGMA_MESSAGE("Using SwitchToThread() in sp_thread_yield")
 #endif
 
-#include "/sp_win32_sleep.hpp"
+#include "sp_win32_sleep.hpp"
 
 namespace boost
 {
@@ -83,7 +83,7 @@ inline void sp_thread_yield() noexcept
   BOOST_PRAGMA_MESSAGE("Using sp_thread_pause() in sp_thread_yield")
 #endif
 
-#include "/sp_thread_pause.hpp"
+#include "sp_thread_pause.hpp"
 
 namespace boost
 {

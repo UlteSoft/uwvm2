@@ -3135,7 +3135,8 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool runtime_compiler_requires_llvm_jit_execution() noexcept
         { return ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only; }
 
-        [[nodiscard]] inline ::std::string get_runtime_llvm_jit_wasm_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index)
+        [[nodiscard]] inline ::uwvm2::utils::container::string
+            get_runtime_llvm_jit_wasm_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index)
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             return llvm_jit_translate_details::get_llvm_wasm_function_name(
@@ -3143,7 +3144,8 @@ namespace uwvm2::runtime::lib
                 static_cast<llvm_jit_translate_details::validation_module_traits_t::wasm_u32>(func_index));
         }
 
-        [[nodiscard]] inline ::std::string get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index)
+        [[nodiscard]] inline ::uwvm2::utils::container::string
+            get_runtime_llvm_jit_wasm_raw_function_name(runtime_module_storage_t const& runtime_module, ::std::size_t func_index)
         {
             namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
             return llvm_jit_translate_details::get_llvm_wasm_raw_function_name(
@@ -3163,26 +3165,37 @@ namespace uwvm2::runtime::lib
             return success;
         }
 
-        [[nodiscard]] inline auto get_llvm_jit_host_target_attributes()
+        [[nodiscard]] inline ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> get_llvm_jit_host_target_attribute_storage()
         {
-            ::llvm::SmallVector<::std::string, 16> mattrs{};
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> mattrs{};
             auto host_features{::llvm::sys::getHostCPUFeatures()};
             if(!host_features.empty())
             {
+                mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
                     auto prefix{feature_enabled ? '+' : '-'};
-                    mattrs.push_back(::std::string(1u, prefix) + feature_name.str());
+                    mattrs.push_back(::uwvm2::utils::container::concat_uwvm(
+                        prefix,
+                        ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
                 }
             }
             return mattrs;
         }
 
+        inline void append_llvm_jit_host_target_attribute_refs(
+            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+            ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs)
+        {
+            namespace llvm_jit_translate_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+            attr_refs.clear();
+            attr_refs.reserve(attr_storage.size());
+            for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
+        }
+
         [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
         {
-            ::std::string verify_error{};
-            ::llvm::raw_string_ostream verify_stream(verify_error);
-            if(::llvm::verifyModule(module, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
+            if(::llvm::verifyModule(module)) [[unlikely]] { return false; }
 
             ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
             function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
@@ -3203,9 +3216,7 @@ namespace uwvm2::runtime::lib
             }
             function_pass_manager.doFinalization();
 
-            ::std::string optimized_verify_error{};
-            ::llvm::raw_string_ostream optimized_verify_stream(optimized_verify_error);
-            return !::llvm::verifyModule(module, ::std::addressof(optimized_verify_stream));
+            return !::llvm::verifyModule(module);
         }
 
         [[nodiscard]] inline bool try_materialize_runtime_module_llvm_jit(compiled_module_record& rec) noexcept
@@ -3288,33 +3299,28 @@ namespace uwvm2::runtime::lib
                 return false;
             }
 
-            auto const target_triple{::llvm::sys::getDefaultTargetTriple()};
-            auto const host_cpu_name{::llvm::sys::getHostCPUName().str()};
-            auto const host_target_attributes{get_llvm_jit_host_target_attributes()};
+            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+            auto const host_target_attribute_storage{get_llvm_jit_host_target_attribute_storage()};
+            ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
+            append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
 
-            ::std::string engine_error{};
             ::llvm::EngineBuilder target_builder{};
-            target_builder.setErrorStr(::std::addressof(engine_error))
-                .setEngineKind(::llvm::EngineKind::JIT)
+            target_builder.setEngineKind(::llvm::EngineKind::JIT)
                 .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
-            ::std::unique_ptr<::llvm::TargetMachine> target_machine{
-                target_builder.selectTarget(::llvm::Triple(target_triple), "", host_cpu_name, host_target_attributes)};
+            ::std::unique_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
             if(target_machine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
-                    llvm_jit_materialize_error(u8"LLVM JIT target selection failed for module=\"",
-                                               rec.module_name,
-                                               u8"\": ",
-                                               ::fast_io::mnp::code_cvt(engine_error));
+                    llvm_jit_materialize_error(u8"LLVM JIT target selection failed for module=\"", rec.module_name, u8"\".");
                 }
                 return false;
             }
 
-            merged_module->setTargetTriple(::llvm::Triple(target_triple));
+            merged_module->setTargetTriple(target_machine->getTargetTriple());
             merged_module->setDataLayout(target_machine->createDataLayout());
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
@@ -3335,7 +3341,6 @@ namespace uwvm2::runtime::lib
 
             auto raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
                                 .setEngineKind(::llvm::EngineKind::JIT)
-                                .setErrorStr(::std::addressof(engine_error))
                                 .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
@@ -3345,10 +3350,7 @@ namespace uwvm2::runtime::lib
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
-                    llvm_jit_materialize_error(u8"LLVM JIT engine creation failed for module=\"",
-                                               rec.module_name,
-                                               u8"\": ",
-                                               ::fast_io::mnp::code_cvt(engine_error));
+                    llvm_jit_materialize_error(u8"LLVM JIT engine creation failed for module=\"", rec.module_name, u8"\".");
                 }
                 return false;
             }
@@ -3370,18 +3372,27 @@ namespace uwvm2::runtime::lib
             for(::std::size_t local_index{}; local_index != local_func_count; ++local_index)
             {
                 auto const function_index{import_func_count + local_index};
-                auto const resolve_function_address{[&](::std::string const& function_name) noexcept -> ::std::uintptr_t
+                auto const resolve_function_address{[&](::uwvm2::utils::container::string const& function_name) noexcept -> ::std::uintptr_t
                                                     {
-                                                        auto const function_address{llvm_jit_engine->getFunctionAddress(function_name)};
-                                                        if(function_address != 0u) [[likely]] { return static_cast<::std::uintptr_t>(function_address); }
+                                                        namespace llvm_jit_translate_details =
+                                                            ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
+                                                        auto found_function{
+                                                            llvm_jit_engine->FindFunctionNamed(llvm_jit_translate_details::get_llvm_string_ref(function_name))};
+                                                        if(found_function != nullptr && !found_function->isDeclaration()) [[likely]]
+                                                        {
+                                                            auto const function_address{llvm_jit_engine->getPointerToFunction(found_function)};
+                                                            if(function_address != nullptr) [[likely]]
+                                                            {
+                                                                return reinterpret_cast<::std::uintptr_t>(function_address);
+                                                            }
+                                                        }
 
                                                         if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                                                         {
-                                                            auto found_function{llvm_jit_engine->FindFunctionNamed(function_name)};
-                                                            ::std::string function_type_text{};
+                                                            ::uwvm2::utils::container::string function_type_text{};
                                                             if(found_function != nullptr)
                                                             {
-                                                                ::llvm::raw_string_ostream function_type_stream(function_type_text);
+                                                                llvm_jit_translate_details::raw_uwvm_string_ostream function_type_stream(function_type_text);
                                                                 found_function->getFunctionType()->print(function_type_stream);
                                                             }
                                                             llvm_jit_materialize_error(u8"LLVM JIT could not resolve function address for module=\"",

@@ -1177,16 +1177,16 @@ namespace details
         {
             if(task_module_storage.llvm_context_holder == nullptr || task_module_storage.llvm_module == nullptr) [[unlikely]] { return false; }
 
-            ::std::string serialized_bitcode{};
+            ::uwvm2::utils::container::string serialized_bitcode{};
             {
                 // Reparse each fragment into the merged context before linking. Direct
                 // cross-context linking hit unstable intrinsic remangling on this toolchain.
-                ::llvm::raw_string_ostream bitcode_stream(serialized_bitcode);
+                raw_uwvm_string_ostream bitcode_stream(serialized_bitcode);
                 ::llvm::WriteBitcodeToFile(*task_module_storage.llvm_module, bitcode_stream);
             }
 
             auto parsed_task_module_expected{
-                ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(serialized_bitcode, task_module_storage.llvm_module->getModuleIdentifier()),
+                ::llvm::parseBitcodeFile(::llvm::MemoryBufferRef(get_llvm_string_ref(serialized_bitcode), task_module_storage.llvm_module->getName()),
                                          merged_llvm_context)};
             if(!parsed_task_module_expected) [[unlikely]]
             {

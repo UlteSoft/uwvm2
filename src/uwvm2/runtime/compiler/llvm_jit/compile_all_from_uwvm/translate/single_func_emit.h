@@ -45,6 +45,26 @@ struct llvm_jit_memory_snapshot_values_t
     ::llvm::Value* byte_length{};
 };
 
+[[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string_view str) noexcept
+{ return ::llvm::StringRef{str.data(), str.size()}; }
+
+[[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string const& str) noexcept
+{ return get_llvm_string_ref(::uwvm2::utils::container::string_view{str.data(), str.size()}); }
+
+class raw_uwvm_string_ostream : public ::llvm::raw_ostream
+{
+    ::uwvm2::utils::container::string& output;
+
+    void write_impl(char const* ptr, ::std::size_t size) override { output.append(ptr, size); }
+
+    [[nodiscard]] ::std::uint64_t current_pos() const override { return output.size(); }
+
+public:
+    explicit raw_uwvm_string_ostream(::uwvm2::utils::container::string& str) : ::llvm::raw_ostream{true}, output{str} {}
+
+    void reserveExtraSpace(::std::uint64_t extra_size) override { output.reserve(static_cast<::std::size_t>(this->tell() + extra_size)); }
+};
+
 [[nodiscard]] inline constexpr ::std::uint_least8_t get_runtime_wasm_value_type_encoding(runtime_operand_stack_value_type value_type) noexcept
 { return static_cast<::std::uint_least8_t>(static_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_byte>(value_type)); }
 
@@ -576,32 +596,40 @@ struct runtime_direct_callee_resolution_t
     }
 }
 
-[[nodiscard]] inline ::std::string get_llvm_runtime_module_symbol_prefix(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module)
-{ return ::std::string{"uwvm_m_"} + ::std::to_string(reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))); }
-
-[[nodiscard]] inline ::std::string get_llvm_wasm_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                               validation_module_traits_t::wasm_u32 func_index)
+[[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_runtime_module_symbol_prefix(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module)
 {
-    auto const func_index_uz{static_cast<::std::size_t>(func_index)};
-    return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_func_" + ::std::to_string(func_index_uz);
+    return ::uwvm2::utils::container::concat_uwvm("uwvm_m_",
+                                                  reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module)));
 }
 
-[[nodiscard]] inline ::std::string get_llvm_wasm_raw_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                   validation_module_traits_t::wasm_u32 func_index)
+[[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_wasm_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                validation_module_traits_t::wasm_u32 func_index)
 {
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
-    return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_raw_func_" + ::std::to_string(func_index_uz);
+    return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_func_", func_index_uz);
 }
 
-[[nodiscard]] inline ::std::string get_llvm_wasm_function_ir_module_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                                         validation_module_traits_t::wasm_u32 func_index)
+[[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_wasm_raw_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                    validation_module_traits_t::wasm_u32 func_index)
 {
     auto const func_index_uz{static_cast<::std::size_t>(func_index)};
-    return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_ir_module_for_func_" + ::std::to_string(func_index_uz);
+    return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_raw_func_", func_index_uz);
 }
 
-[[nodiscard]] inline ::std::string get_llvm_wasm_ir_module_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module)
-{ return get_llvm_runtime_module_symbol_prefix(runtime_module) + "_ir_module"; }
+[[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_wasm_function_ir_module_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                          validation_module_traits_t::wasm_u32 func_index)
+{
+    auto const func_index_uz{static_cast<::std::size_t>(func_index)};
+    return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_ir_module_for_func_", func_index_uz);
+}
+
+[[nodiscard]] inline ::uwvm2::utils::container::string get_llvm_wasm_ir_module_name(
+    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module)
+{ return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_ir_module"); }
 
 [[nodiscard]] inline ::llvm::FunctionType*
     get_llvm_function_type_from_wasm_function_type(::llvm::LLVMContext& llvm_context,
@@ -618,11 +646,13 @@ struct runtime_direct_callee_resolution_t
     if(callee_function_type == nullptr) [[unlikely]] { return nullptr; }
 
     auto const callee_name{get_llvm_wasm_function_name(runtime_module, func_index)};
-    auto callee_function{llvm_module.getFunction(callee_name)};
+    auto callee_function{llvm_module.getFunction(get_llvm_string_ref(callee_name))};
     if(callee_function == nullptr)
     {
-        callee_function =
-            ::llvm::Function::Create(callee_function_type, ::llvm::Function::ExternalLinkage, callee_name, ::std::addressof(llvm_module));
+        callee_function = ::llvm::Function::Create(callee_function_type,
+                                                   ::llvm::Function::ExternalLinkage,
+                                                   get_llvm_string_ref(callee_name),
+                                                   ::std::addressof(llvm_module));
         apply_llvm_jit_wasm_calling_conv(*callee_function);
         return callee_function;
     }
@@ -2169,7 +2199,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
     module_storage.llvm_context_holder = ::std::make_unique<::llvm::LLVMContext>();
     if(module_storage.llvm_context_holder == nullptr) [[unlikely]] { return false; }
 
-    module_storage.llvm_module = ::std::make_unique<::llvm::Module>(get_llvm_wasm_ir_module_name(runtime_module), *module_storage.llvm_context_holder);
+    auto const llvm_module_name{get_llvm_wasm_ir_module_name(runtime_module)};
+    module_storage.llvm_module = ::std::make_unique<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
     return module_storage.llvm_module != nullptr;
 }
 
@@ -2242,10 +2273,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
     auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
     auto const function_name{get_llvm_wasm_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
-    state.llvm_function = state.llvm_module->getFunction(function_name);
+    state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(function_name));
     if(state.llvm_function == nullptr)
     {
-        state.llvm_function = ::llvm::Function::Create(llvm_function_type, ::llvm::Function::ExternalLinkage, function_name, state.llvm_module);
+        state.llvm_function =
+            ::llvm::Function::Create(llvm_function_type, ::llvm::Function::ExternalLinkage, get_llvm_string_ref(function_name), state.llvm_module);
     }
     else
     {
@@ -2370,11 +2402,14 @@ struct runtime_local_func_llvm_jit_emit_state_t
             if(raw_entry_function_type == nullptr) [[unlikely]] { return false; }
 
             auto const raw_entry_function_name{get_llvm_wasm_raw_function_name(*runtime_module_ptr, function_index)};
-            auto raw_entry_function{llvm_module->getFunction(raw_entry_function_name)};
+            auto raw_entry_function{llvm_module->getFunction(get_llvm_string_ref(raw_entry_function_name))};
             if(raw_entry_function == nullptr)
             {
                 raw_entry_function =
-                    ::llvm::Function::Create(raw_entry_function_type, ::llvm::Function::ExternalLinkage, raw_entry_function_name, llvm_module);
+                    ::llvm::Function::Create(raw_entry_function_type,
+                                             ::llvm::Function::ExternalLinkage,
+                                             get_llvm_string_ref(raw_entry_function_name),
+                                             llvm_module);
             }
             else
             {
@@ -2468,18 +2503,14 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
             raw_ir_builder.CreateRetVoid();
 
-            ::std::string raw_verify_error{};
-            ::llvm::raw_string_ostream raw_verify_stream(raw_verify_error);
-            if(::llvm::verifyFunction(*raw_entry_function, ::std::addressof(raw_verify_stream))) [[unlikely]] { return false; }
+            if(::llvm::verifyFunction(*raw_entry_function)) [[unlikely]] { return false; }
             return true;
         }};
 
     if(!emit_runtime_local_func_llvm_jit_raw_entry_wrapper()) [[unlikely]] { return false; }
 
-    ::std::string verify_error{};
-    ::llvm::raw_string_ostream verify_stream(verify_error);
-    if(::llvm::verifyFunction(*state.llvm_function, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
-    if(::llvm::verifyModule(*state.llvm_module, ::std::addressof(verify_stream))) [[unlikely]] { return false; }
+    if(::llvm::verifyFunction(*state.llvm_function)) [[unlikely]] { return false; }
+    if(::llvm::verifyModule(*state.llvm_module)) [[unlikely]] { return false; }
     return true;
 }
 

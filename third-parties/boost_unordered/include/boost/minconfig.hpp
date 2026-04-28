@@ -128,10 +128,13 @@
 #endif
 
 #define BOOST_HAS_NRVO
+
+#if !defined(__DJGPP__) && !defined(__MSDOS__)
 #define BOOST_HAS_THREADS
 
 #if !defined(_MSC_VER)
 #define BOOST_HAS_PTHREADS
 #define BOOST_HAS_NANOSLEEP
 #define BOOST_HAS_SCHED_YIELD
+#endif
 #endif

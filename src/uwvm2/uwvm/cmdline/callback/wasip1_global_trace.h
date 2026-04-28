@@ -91,7 +91,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         [[nodiscard]] inline parameter_return_type apply_trace_target_to_default_env(
             ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
         {
             auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
             auto const target_text{::uwvm2::utils::container::u8string_view{target_arg->str}};

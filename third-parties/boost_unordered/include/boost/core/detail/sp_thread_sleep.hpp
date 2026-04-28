@@ -26,7 +26,7 @@
   BOOST_PRAGMA_MESSAGE("Using Sleep(1) in sp_thread_sleep")
 #endif
 
-#include "/sp_win32_sleep.hpp"
+#include "sp_win32_sleep.hpp"
 
 namespace boost
 {
@@ -101,7 +101,7 @@ inline void sp_thread_sleep() noexcept
   BOOST_PRAGMA_MESSAGE("Using sp_thread_yield() in sp_thread_sleep")
 #endif
 
-#include "/sp_thread_yield.hpp"
+#include "sp_thread_yield.hpp"
 
 namespace boost
 {
