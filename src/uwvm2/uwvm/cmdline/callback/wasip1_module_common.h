@@ -499,6 +499,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         return parameter_return_type::def;
                     }};
 
+                if(trace_target_text == u8"none") { return set_trace_target(trace_output_target_t::none, extra1); }
+                if(trace_target_text == u8"out") { return set_trace_target(trace_output_target_t::out, extra1); }
+                if(trace_target_text == u8"err") { return set_trace_target(trace_output_target_t::err, extra1); }
+
+#  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
+      !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
                 auto set_trace_file{
                     [&](::uwvm2::utils::container::u8string_view file_path,
                         ::uwvm2::utils::cmdline::parameter_parsing_results* last) noexcept -> parameter_return_type
@@ -541,9 +547,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         return parameter_return_type::def;
                     }};
 
-                if(trace_target_text == u8"none") { return set_trace_target(trace_output_target_t::none, extra1); }
-                if(trace_target_text == u8"out") { return set_trace_target(trace_output_target_t::out, extra1); }
-                if(trace_target_text == u8"err") { return set_trace_target(trace_output_target_t::err, extra1); }
                 if(trace_target_text == u8"file")
                 {
                     auto extra2{extra1 + 1u};
@@ -554,6 +557,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                     return set_trace_file(::uwvm2::utils::container::u8string_view{extra2->str}, extra2);
                 }
                 return set_trace_file(trace_target_text, extra1);
+#  else
+                return print_usage_error(parameter, u8"Invalid trace output target.");
+#  endif
             }
 
             if(action == u8"set-argv0")

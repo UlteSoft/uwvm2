@@ -84,6 +84,57 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     }  // namespace posix
 #  endif
 
+    inline void uwvm_wasip1_proc_exit_func_ptr_overload(::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 code) noexcept
+    {
+        using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+        constexpr wasm_u32 wasi_proc_exit_code_upper_bound{126u};
+        auto const raw_code{static_cast<wasm_u32>(code)};
+
+        if(::uwvm2::uwvm::io::show_wasip1_warning && raw_code >= wasi_proc_exit_code_upper_bound) [[unlikely]]
+        {
+            // Output the main information and memory indication
+            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                // 1
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                u8"uwvm: ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                u8"[warn]  ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"WASI Preview 1 proc_exit exit code out of range [0, 126): ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                raw_code,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8".",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                u8" (wasip1)\n",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+            if(::uwvm2::uwvm::io::wasip1_warning_fatal) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Convert warnings to fatal errors. ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(wasip1)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
+
+#  if defined(__linux__)
+        ::fast_io::fast_exit(static_cast<int>(code));
+#  elif defined(_WIN32)
+        // It is not recommended to implement NT, as it requires simultaneously closing DLLs and other components.
+        ::fast_io::win32::ExitProcess(static_cast<::std::uint_least32_t>(raw_code));
+#  else
+        ::uwvm2::imported::wasi::wasip1::func::posix::exit(static_cast<int>(code));
+#  endif
+    }
+
     /// @note This can only be used when initialization occurs before WASM execution, so no locks are added here.
     /// @note Socket descriptors are currently not auto-discovered or preconfigured here. In particular, this
     ///       function does not modify the host's SIGPIPE handling or per-socket flags (such as SO_NOSIGPIPE).
@@ -92,6 +143,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type>
     inline constexpr bool init_wasip1_environment(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env) noexcept
     {
+        env.wasip1_proc_exit_func_ptr = ::uwvm2::uwvm::imported::wasi::wasip1::storage::uwvm_wasip1_proc_exit_func_ptr_overload;
+
         [[maybe_unused]] auto const print_init_error{
             [](::uwvm2::utils::container::u8string_view msg) constexpr noexcept
             {
@@ -807,7 +860,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
            !::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(state.env.trace_wasip1_output_file,
                                                                                              ::uwvm2::utils::container::u8string_view{
                                                                                                  state.env.trace_wasip1_output_file_path_storage.data(),
-                                                                                                 state.env.trace_wasip1_output_file_path_storage.size()}))
+                                                                                                 state.env.trace_wasip1_output_file_path_storage.size()},
+                                                                                             false))
             [[unlikely]]
         {
             return false;

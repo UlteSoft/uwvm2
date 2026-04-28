@@ -99,6 +99,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         auto const log_output_arg{currp1->str};
+
+#if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&               \
+    !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
         auto log_output_path{log_output_arg};
 
         if(log_output_arg == u8"out")
@@ -249,7 +252,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # endif
         }
 #else
-        // win9x and posix
+        // posix
 
 # if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             try
@@ -282,10 +285,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 # endif
-#endif
+# endif
 
         ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::file;
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
+#else
+        // on AVR only support cstdout and cstderr
+        if(log_output_arg == u8"out")
+        {
+# if defined(__AVR__)
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8c_stdout());
+# else
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8out());
+# endif
+            ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::out;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
+        if(log_output_arg == u8"err")
+        {
+# if defined(__AVR__)
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8c_stderr());
+# else
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8err());
+# endif
+            ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::err;
+            return ::uwvm2::utils::cmdline::parameter_return_type::def;
+        }
+
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                            u8"[error] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"Usage: ",
+                            ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
+                            u8"\n\n");
+        return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
+#endif
     }
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params::details

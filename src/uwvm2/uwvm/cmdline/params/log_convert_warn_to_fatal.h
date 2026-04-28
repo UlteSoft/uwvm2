@@ -70,7 +70,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_SUPPORT_WEAK_SYMBOL)
                u8"|weak-symbol"
 #endif
-               u8"|depend"
+               u8"|depend|wasip1"
 #if defined(_WIN32) && !defined(_WIN32_WINDOWS)
                u8"|nt-path"
 #endif

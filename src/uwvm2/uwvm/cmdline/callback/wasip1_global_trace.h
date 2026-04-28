@@ -126,6 +126,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 return parameter_return_type::def;
             }
 
+#if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&               \
+    !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
             if(target_text != u8"file") [[unlikely]] { return print_usage_error(u8"Invalid trace output target."); }
 
             auto file_arg{target_arg + 1u};
@@ -139,7 +141,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             if(file_path.empty()) [[unlikely]] { return print_usage_error(u8"Missing trace output file path."); }
 
             ::fast_io::u8native_file test_output{};
-            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(test_output, file_path)) [[unlikely]]
+            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(test_output, file_path, false)) [[unlikely]]
             {
                 return print_open_error(file_path);
             }
@@ -157,6 +159,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             return parameter_return_type::def;
+#else
+            return print_usage_error(u8"Invalid trace output target.");
+#endif
         }
     }  // namespace wasip1_global_trace_details
 

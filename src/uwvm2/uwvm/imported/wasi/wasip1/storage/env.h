@@ -41,6 +41,8 @@
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/imported/wasi/wasip1/impl.h>
 # include <uwvm2/object/memory/linear/impl.h>
+# include <uwvm2/uwvm/io/impl.h>
+# include <uwvm2/uwvm/utils/ansies/impl.h>
 #endif
 
 #ifndef UWVM_MODULE_EXPORT
@@ -201,41 +203,85 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 #  endif
 
     [[nodiscard]] inline bool reopen_wasip1_trace_output_file(::fast_io::u8native_file& output_file,
-                                                              ::uwvm2::utils::container::u8string_view path) noexcept
+                                                              ::uwvm2::utils::container::u8string_view path,
+                                                              bool nt_path_warning = true) noexcept
     {
-#  if defined(_WIN32) && !defined(_WIN32_WINDOWS)
+        static_cast<void>(nt_path_warning);
+
+#  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
+      !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+#   if defined(_WIN32) && !defined(_WIN32_WINDOWS)
         if(path.starts_with(u8"::NT::"))
         {
             ::fast_io::u8cstring_view const nt_path{::fast_io::containers::null_terminated, path.subview(6uz)};
-#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+
+            if(nt_path_warning && ::uwvm2::uwvm::io::show_nt_path_warning)
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    u8"[warn]  ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Resolve to NT path: \"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    nt_path,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\".",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8" (nt-path)\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+
+                if(::uwvm2::uwvm::io::nt_path_warning_fatal) [[unlikely]]
+                {
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                        u8"[fatal] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"Convert warnings to fatal errors. ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(nt-path)\n\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                    ::fast_io::fast_terminate();
+                }
+            }
+
+#    if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             try
-#   endif
+#    endif
             {
                 output_file = ::fast_io::u8native_file{::fast_io::io_kernel, nt_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow};
                 return true;
             }
-#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#    if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             catch(::fast_io::error)
             {
                 return false;
             }
-#   endif
+#    endif
         }
-#  endif
+#   endif
 
-#  if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
         try
-#  endif
+#   endif
         {
             ::fast_io::u8cstring_view const file_path{::fast_io::containers::null_terminated, path};
             output_file = ::fast_io::u8native_file{file_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow};
             return true;
         }
-#  if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
         catch(::fast_io::error)
         {
             return false;
         }
+#   endif
+#  else
+        static_cast<void>(output_file);
+        static_cast<void>(path);
+        return false;
 #  endif
     }
 

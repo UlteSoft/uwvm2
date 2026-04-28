@@ -65,7 +65,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_single_trace{
         .name{u8"--wasip1-single-trace"},
         .describe{u8"Route one single module's WASI Preview 1 trace output."},
-        .usage{u8"<module:str> <none|out|err|file <file:path>>"},
+        .usage{
+#  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
+      !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+            u8"<module:str> <none|out|err|file <file:path>>"
+#  else
+            u8"<module:str> <none|out|err>"
+#  endif
+        },
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_single_trace_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_single_trace_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};

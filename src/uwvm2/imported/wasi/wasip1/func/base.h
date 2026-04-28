@@ -300,19 +300,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         {
             case trace_output_target_t::out:
             {
+# if defined(__AVR__)
+                emit(::fast_io::u8c_stdout());
+# else
                 emit(::fast_io::u8out());
+# endif
                 break;
             }
             case trace_output_target_t::file:
             {
+# if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&              \
+     !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
                 emit(env.trace_wasip1_output_file);
+# elif defined(__AVR__)
+                emit(::fast_io::u8c_stderr());
+# else
+                emit(::fast_io::u8err());
+# endif
                 break;
             }
             case trace_output_target_t::err: [[fallthrough]];
             case trace_output_target_t::none: [[fallthrough]];
             [[unlikely]] default:
             {
+# if defined(__AVR__)
+                emit(::fast_io::u8c_stderr());
+# else
                 emit(::fast_io::u8err());
+# endif
                 break;
             }
         }

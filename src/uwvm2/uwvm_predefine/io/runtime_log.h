@@ -45,9 +45,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     /// @brief Record the runtime compiler's log
     inline bool enable_runtime_log{};  // [galobal]
 
-    inline runtime_log_output_target_t runtime_log_output_target{runtime_log_output_target_t::file};  // [global]
+    inline runtime_log_output_target_t runtime_log_output_target{
+# if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&              \
+     !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+        runtime_log_output_target_t::file
+# else
+        runtime_log_output_target_t::err
+# endif
+    };  // [global]
 
+# if defined(__AVR__)
+    // avr does not have posix
+    inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8c_io_observer> u8runtime_log_output{
+        ::fast_io::u8c_stderr()};  // [global] No global variable dependencies from other translation units
+# elif ((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) || (defined(__MSDOS__) || defined(__DJGPP__)) ||                                  \
+     (defined(__NEWLIB__) && !defined(__CYGWIN__)) || defined(_PICOLIBC__) || defined(__wasm__)
+    // win9x cannot dup stderr
+    inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8native_io_observer> u8runtime_log_output{
+        ::fast_io::u8err()};  // [global] No global variable dependencies from other translation units
+# else
     inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8native_file>
         u8runtime_log_output{};  // [global] No global variable dependencies from other translation units
+# endif
 }  // namespace uwvm2::utils
 #endif

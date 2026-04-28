@@ -89,8 +89,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         if(auto currp1_str{currp1->str}; currp1_str == u8"all")
         {
             ::uwvm2::uwvm::io::show_parser_warning = true;
+            ::uwvm2::uwvm::io::show_wasip1_warning = true;
         }
         else if(currp1_str == u8"parser") { ::uwvm2::uwvm::io::show_parser_warning = true; }
+        else if(currp1_str == u8"wasip1") { ::uwvm2::uwvm::io::show_wasip1_warning = true; }
         else
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

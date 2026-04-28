@@ -42,6 +42,8 @@ import uwvm2.utils.debug;
 import uwvm2.utils.container;
 import uwvm2.imported.wasi.wasip1;
 import uwvm2.object.memory.linear;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
