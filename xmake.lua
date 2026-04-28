@@ -113,16 +113,7 @@ function def_build(opt)
 		on_load(function(target)
 			local utility = import("utility.utility", { anonymous = true })
 			local llvm_jit_options = utility.get_llvm_jit_options()
-			local llvm_config = llvm_jit_options.llvm_config or "llvm-config"
-			local native_codegen_linkflags = os.iorunv(llvm_config, { "--libs", "native", "nativecodegen" }) or ""
-			for _, flag in ipairs(os.argv(native_codegen_linkflags)) do
-				if flag:startswith("-l") and #flag > 2 then
-					local link = flag:startswith("-l:") and flag:sub(4) or flag:sub(3)
-					target:add("links", link)
-				elseif flag:startswith("-L") and #flag > 2 then
-					target:add("linkdirs", flag:sub(3))
-				end
-			end
+			utility.add_linkflags_to_target(target, llvm_jit_options.native_codegen_linkflags, "links")
 		end)
 	end
 
@@ -546,6 +537,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 				local need_wabt = (string.find(file, "wabt", 1, true) ~= nil)
 				if need_wabt then
 					before_build(function(target)
+						local utility = import("utility.utility", { anonymous = true })
+						local require_static_wabt = utility.is_static_non_system_mode()
+
 						local function wabt_uses_external_crypto(wabt_config)
 							if not os.isfile(wabt_config) then
 								return false
@@ -559,10 +553,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							local wabt_include = path.join(wabt_root, "include")
 							local wabt_build = path.join(wabt_root, "build")
 							local wabt_config = path.join(wabt_build, "include/wabt/config.h")
-							local has_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or
-								os.isfile(path.join(wabt_build, "libwabt.so")) or
-								os.isfile(path.join(wabt_build, "libwabt.dylib")) or
-								os.isfile(path.join(wabt_build, "wabt.lib"))
+							local has_static_lib = os.isfile(path.join(wabt_build, "libwabt.a")) or os.isfile(path.join(wabt_build, "wabt.lib"))
+							local has_lib = has_static_lib or
+								(not require_static_wabt and (os.isfile(path.join(wabt_build, "libwabt.so")) or os.isfile(path.join(wabt_build, "libwabt.dylib"))))
 
 							return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib and not wabt_uses_external_crypto(wabt_config)
 						end
@@ -605,6 +598,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
 				after_load(function(target)
 					if need_wabt then
+						local utility = import("utility.utility", { anonymous = true })
+						local require_static_wabt = utility.is_static_non_system_mode()
+
 						local function try_add_wabt(wabt_root, force)
 							local wabt_include = path.join(wabt_root, "include")
 							local wabt_build = path.join(wabt_root, "build")
@@ -617,7 +613,18 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							if force or (os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib) then
 								target:add("includedirs", wabt_include, path.join(wabt_build, "include"))
 								target:add("linkdirs", wabt_build)
-								target:add("links", "wabt")
+								if require_static_wabt then
+									local wabt_archive = utility.find_static_library("wabt", wabt_build)
+									if not wabt_archive and force then
+										wabt_archive = path.join(wabt_build, target:is_plat("windows") and "wabt.lib" or "libwabt.a")
+									end
+									if not wabt_archive then
+										return false
+									end
+									target:add("ldflags", wabt_archive, { force = true })
+								else
+									target:add("links", "wabt")
+								end
 								return true
 							end
 

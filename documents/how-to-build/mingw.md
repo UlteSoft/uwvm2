@@ -35,7 +35,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`compiler` uses global `-static` where supported)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--mingw-min` Minimum windows compatible version (see below for all values)
 4. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
@@ -54,7 +54,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`compiler` uses global `-static` where supported)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--mingw-min` Minimum windows compatible version (see below for all values)
 4. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
@@ -117,7 +117,7 @@ Additionally, running on Windows 9x may require extra prerequisite components (d
 https://github.com/UlteSoft/uwvm2-prerequisites/tree/master/win95
 
 ## Note
-If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=y` for static linking will resolve the issue.
+If you encounter a crash when the program exits and this occurs with ASAN enabled, it is due to mingw's libstdcxx not supporting cross-module TLS. In this case, adding `--static=compiler` for compiler-controlled static linking will resolve the issue.
 
 ```
 =================================================================

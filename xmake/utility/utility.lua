@@ -78,6 +78,36 @@ local function _normalize_dir(dir)
     return os.isdir(dir) and path.normalize(dir) or dir
 end
 
+local function _normalize_static_link_mode(mode)
+    if mode == nil then
+        return "none"
+    end
+    mode = tostring(mode)
+    if mode == "none" or mode == "non-system" or mode == "compiler" then
+        return mode
+    end
+
+    raise([[Invalid --static value "%s"; expected one of: none, non-system, compiler.]], tostring(mode))
+end
+
+---Get the normalized --static mode.
+---@return string -- "none", "non-system", or "compiler"
+function get_static_link_mode()
+    return _normalize_static_link_mode(get_config("static"))
+end
+
+---Whether --static selects the compiler/toolchain -static strategy.
+---@return boolean
+function is_static_compiler_mode()
+    return get_static_link_mode() == "compiler"
+end
+
+---Whether --static selects explicit non-system static libraries.
+---@return boolean
+function is_static_non_system_mode()
+    return get_static_link_mode() == "non-system"
+end
+
 local function _is_default_system_include_dir(dir)
     local normalized = _normalize_dir(dir)
     return normalized == "/usr/include" or normalized == "/usr/local/include"
@@ -94,6 +124,55 @@ local function _is_library_path(flag)
         or _endswith(lower, ".dylib")
         or _endswith(lower, ".tbd")
         or _endswith(lower, ".lib")
+end
+
+---Find a static archive for a logical library name.
+---@param link string
+---@param linkdirs string[] | string | nil
+---@return string | nil
+function find_static_library(link, linkdirs)
+    if not link or link == "" then
+        return nil
+    end
+
+    local name = link
+    if name:startswith("-l:") then
+        name = name:sub(4)
+    elseif name:startswith("-l") and #name > 2 then
+        name = name:sub(3)
+    end
+
+    local lower = name:lower()
+    if _is_library_path(name) then
+        if os.isfile(name) and (_endswith(lower, ".a") or _endswith(lower, ".lib")) then
+            return path.normalize(name)
+        end
+        return nil
+    end
+
+    local patterns = {}
+    if _endswith(lower, ".a") or _endswith(lower, ".lib") then
+        table.insert(patterns, name)
+    else
+        if is_plat("windows") then
+            table.insert(patterns, name .. ".lib")
+            table.insert(patterns, "lib" .. name .. ".lib")
+        else
+            table.insert(patterns, "lib" .. name .. ".a")
+            table.insert(patterns, name .. ".a")
+        end
+    end
+
+    for _, linkdir in ipairs(table.wrap(linkdirs)) do
+        if linkdir and linkdir ~= "" then
+            for _, pattern in ipairs(patterns) do
+                local libfile = path.join(linkdir, pattern)
+                if os.isfile(libfile) then
+                    return path.normalize(libfile)
+                end
+            end
+        end
+    end
 end
 
 local function _append_existing_libcxx_include_dir(result, seen, dir)
@@ -380,6 +459,41 @@ local function _parse_llvm_linkflags(flags, result, seen, link_field)
     end
 end
 
+---Parse linker flags in the same way as LLVM JIT detection and add them to a target.
+---@param target any
+---@param flags string | nil
+---@param link_field string | nil
+function add_linkflags_to_target(target, flags, link_field)
+    if not target or not flags or flags == "" then
+        return
+    end
+
+    local result = {}
+    local seen = {}
+    _parse_llvm_linkflags(flags, result, seen, link_field or "links")
+
+    for _, field in ipairs({
+        "linkdirs",
+        "frameworkdirs",
+        "frameworks",
+        "links",
+        "syslinks",
+        "ldflags",
+        "shflags"
+    }) do
+        local values = result[field]
+        if values then
+            for _, value in ipairs(values) do
+                if field == "ldflags" or field == "shflags" then
+                    target:add(field, value, { force = true })
+                else
+                    target:add(field, value)
+                end
+            end
+        end
+    end
+end
+
 local function _find_llvm_config_tool()
     local env_program = os.getenv("LLVM_CONFIG")
     if env_program and env_program ~= "" then
@@ -418,7 +532,42 @@ _run_llvm_config = function(llvm_config, args)
     return result and string.trim(result) or nil, errors
 end
 
-local function _resolve_llvm_jit_components(llvm_config)
+local function _llvm_link_query_args(link_static, query, components)
+    local args = {}
+    if link_static then
+        table.insert(args, "--link-static")
+        if query == "--libfiles" then
+            table.insert(args, "--quote-paths")
+        end
+    end
+    table.insert(args, query)
+    for _, component in ipairs(components) do
+        table.insert(args, component)
+    end
+    return args
+end
+
+local function _llvm_library_query(link_static)
+    return link_static and "--libfiles" or "--libs"
+end
+
+local function _raise_llvm_link_query_error(llvm_config, args, errors)
+    raise([[Failed to query "%s %s".
+%s]],
+        llvm_config.program,
+        table.concat(args, " "),
+        errors and tostring(errors):trim() or "llvm-config returned no output.")
+end
+
+local function _run_required_llvm_link_query(llvm_config, args)
+    local output, errors = _run_llvm_config(llvm_config, args)
+    if not output or output == "" then
+        _raise_llvm_link_query_error(llvm_config, args, errors)
+    end
+    return output
+end
+
+local function _resolve_llvm_jit_components(llvm_config, link_static)
     local components_text = _run_llvm_config(llvm_config, { "--components" })
     local available = {}
     for _, component in ipairs(os.argv(components_text or "")) do
@@ -451,16 +600,13 @@ local function _resolve_llvm_jit_components(llvm_config)
         components = { "all-targets" }
     })
 
+    local last_errors
     for _, candidate in ipairs(candidate_sets) do
-        local args = { "--libs" }
-        for _, component in ipairs(llvm_jit_base_components) do
-            table.insert(args, component)
+        local args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), table.join(llvm_jit_base_components, candidate.components))
+        local libs_output, errors = _run_llvm_config(llvm_config, args)
+        if errors then
+            last_errors = tostring(errors):trim()
         end
-        for _, component in ipairs(candidate.components) do
-            table.insert(args, component)
-        end
-
-        local libs_output = _run_llvm_config(llvm_config, args)
         if libs_output then
             local components = {}
             for _, component in ipairs(llvm_jit_base_components) do
@@ -477,9 +623,11 @@ local function _resolve_llvm_jit_components(llvm_config)
     for _, candidate in ipairs(candidate_sets) do
         table.insert(candidate_names, candidate.name)
     end
-    raise([[Unable to resolve LLVM JIT library components from "%s". Tried candidates: %s]],
+    raise([[Unable to resolve%s LLVM JIT library components from "%s". Tried candidates: %s%s]],
+        link_static and " static" or "",
         llvm_config.program,
-        table.concat(candidate_names, ", "))
+        table.concat(candidate_names, ", "),
+        last_errors and ("\nLast llvm-config error:\n" .. last_errors) or "")
 end
 
 ---Get normalized LLVM JIT build/link options from llvm-config
@@ -489,15 +637,18 @@ function get_llvm_jit_options()
     local llvm_config = _find_llvm_config_tool()
     assert(llvm_config and llvm_config.program,
         [[Cannot find "llvm-config". Put it on PATH or set the LLVM_CONFIG environment variable before configuring with --enable-jit=default or --enable-jit=llvm.]])
+    local static_mode = get_static_link_mode()
+    local link_static = static_mode == "non-system"
 
     local cache_key = table.concat({
-        "llvm-jit-v6",
+        "llvm-jit-v7",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
         get_config("arch") or "",
         get_config("stdlib") or "",
-        get_config("llvm-target") or ""
+        get_config("llvm-target") or "",
+        static_mode
     }, "|")
 
     local cached = cache_info["llvm_jit"]
@@ -508,8 +659,8 @@ function get_llvm_jit_options()
     local includedir = _run_llvm_config(llvm_config, { "--includedir" })
     local libdir = _run_llvm_config(llvm_config, { "--libdir" })
     local cxxflags = _run_llvm_config(llvm_config, { "--cxxflags" })
-    local system_libs = _run_llvm_config(llvm_config, { "--system-libs" }) or ""
-    local components, libs = _resolve_llvm_jit_components(llvm_config)
+    local system_libs = _run_llvm_config(llvm_config, link_static and { "--link-static", "--system-libs" } or { "--system-libs" }) or ""
+    local components, libs = _resolve_llvm_jit_components(llvm_config, link_static)
 
     assert(includedir and includedir ~= "",
         string.format([[Failed to query "%s --includedir"]], llvm_config.program))
@@ -521,7 +672,8 @@ function get_llvm_jit_options()
     local result = {
         llvm_config = llvm_config.program,
         llvm_version = llvm_config.version,
-        llvm_components = components
+        llvm_components = components,
+        static_mode = static_mode
     }
     local seen = {}
 
@@ -541,8 +693,22 @@ function get_llvm_jit_options()
     -- target codegen family from wide component sets such as the all-target
     -- asmparser aggregates. Re-add them explicitly so MCJIT-backed runtime
     -- linking remains stable across LLVM distributions.
-    local explicit_jit_libs = _run_llvm_config(llvm_config, { "--libs", "executionengine", "mcjit", "native", "nativecodegen" }) or ""
+    local explicit_jit_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
+        "executionengine",
+        "mcjit",
+        "native",
+        "nativecodegen"
+    })
+    local explicit_jit_libs = link_static and _run_required_llvm_link_query(llvm_config, explicit_jit_args)
+        or (_run_llvm_config(llvm_config, explicit_jit_args) or "")
     _parse_llvm_linkflags(explicit_jit_libs, result, seen, "links")
+
+    local native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
+        "native",
+        "nativecodegen"
+    })
+    result.native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
+        or (_run_llvm_config(llvm_config, native_codegen_args) or "")
 
     cprint("detecting for llvm-jit ... ${color.success}%s (%s), component set: %s",
         llvm_config.program,

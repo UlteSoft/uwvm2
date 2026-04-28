@@ -37,7 +37,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`non-system` avoids Darwin's unsupported global `-static`)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 4. `--apple-platform` Set Apple platform target and minimum OS version (see below)
@@ -56,7 +56,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`non-system` avoids Darwin's unsupported global `-static`)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 4. `--apple-platform` Set Apple platform target and minimum OS version (see below)
@@ -139,4 +139,4 @@ xmake i -o <install_path>
 
 ## Caveat
 1. Add `--use-llvm-compiler` when you want to build with the LLVM/Clang compiler toolchain. This only selects the compiler toolchain and does not enable LLVM JIT by itself.
-2. Currently llvm does not have static linking on darwin.
+2. Darwin does not support the global `-static` strategy used by `--static=compiler`. Use `--static=non-system` for release builds when your non-platform dependencies, such as LLVM, provide static archives.

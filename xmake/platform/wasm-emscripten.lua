@@ -29,9 +29,7 @@ function wasm_emscripten_target()
         add_cxflags("-fno-ident") -- also strip ident data
     end
 
-    local static_link = get_config("static")
-    static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
-    if static_link then	
+    if uwvm_static_mode_is_compiler() then
         add_ldflags("-static", {force = true})
     end
 
