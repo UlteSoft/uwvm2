@@ -3422,25 +3422,8 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool try_invoke_runtime_llvm_jit_defined_entry(::std::size_t module_id, ::std::size_t function_index) noexcept
         {
-            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
-
-            auto const& rec{g_runtime.modules.index_unchecked(module_id)};
-            auto const runtime_module{rec.runtime_module};
-            if(runtime_module == nullptr) [[unlikely]] { return false; }
-
-            auto const import_n{runtime_module->imported_function_vec_storage.size()};
-            if(function_index < import_n) { return false; }
-
-            auto const local_index{function_index - import_n};
-            if(local_index >= rec.llvm_jit_local_entry_addresses.size() || !rec.llvm_jit_ready) { return false; }
-
-            auto const function_address{rec.llvm_jit_local_entry_addresses.index_unchecked(local_index)};
-            if(function_address == 0u) [[unlikely]] { return false; }
-
-            using entry_fn_t = void (*)();
-            auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
-            entry_fn();
-            return true;
+            // Enter generated code through the raw wrapper so the C++ boundary keeps the host ABI even when typed Wasm bodies use a private ABI.
+            return try_invoke_runtime_llvm_jit_raw_defined_entry(module_id, function_index, nullptr, 0uz, nullptr, 0uz);
         }
 
 #else

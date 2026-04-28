@@ -38,6 +38,7 @@
 # if defined(UWVM_RUNTIME_LLVM_JIT)
 #  include <llvm/Bitcode/BitcodeReader.h>
 #  include <llvm/Bitcode/BitcodeWriter.h>
+#  include <llvm/IR/Attributes.h>
 #  include <llvm/IR/BasicBlock.h>
 #  include <llvm/IR/CallingConv.h>
 #  include <llvm/IR/Constants.h>

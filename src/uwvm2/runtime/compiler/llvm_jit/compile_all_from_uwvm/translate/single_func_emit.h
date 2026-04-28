@@ -83,29 +83,67 @@ struct llvm_jit_memory_snapshot_values_t
 
 [[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_host_calling_conv() noexcept
 {
-#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !defined(__CYGWIN__)
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
     return ::llvm::CallingConv::Win64;
 #else
     return ::llvm::CallingConv::C;
 #endif
 }
 
-inline void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcept
+[[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_wasm_calling_conv() noexcept
 {
-    auto const calling_conv{get_llvm_jit_host_calling_conv()};
-    if(calling_conv != ::llvm::CallingConv::C) { function.setCallingConv(calling_conv); }
+    // Private JIT-to-JIT calls can use a faster ABI than the public C++/raw-entry boundary.
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    return ::llvm::CallingConv::X86_64_SysV;
+#elif defined(__i386__) || defined(_M_IX86)
+    return ::llvm::CallingConv::X86_FastCall;
+#else
+    return ::llvm::CallingConv::C;
+#endif
 }
 
-inline void apply_llvm_jit_host_calling_conv(::llvm::CallInst& call_inst) noexcept
+inline void apply_llvm_jit_platform_function_attrs([[maybe_unused]] ::llvm::Function& function) noexcept
 {
-    auto const calling_conv{get_llvm_jit_host_calling_conv()};
-    if(calling_conv != ::llvm::CallingConv::C) { call_inst.setCallingConv(calling_conv); }
+#if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
+    function.addFnAttr(::llvm::Attribute::NoRedZone);
+#endif
+}
+
+inline void apply_llvm_jit_calling_conv(::llvm::Function& function, ::llvm::CallingConv::ID calling_conv) noexcept
+{
+    function.setCallingConv(calling_conv);
+    apply_llvm_jit_platform_function_attrs(function);
+}
+
+inline void apply_llvm_jit_calling_conv(::llvm::CallInst& call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
+{
+    call_inst.setCallingConv(calling_conv);
+}
+
+inline ::llvm::CallInst* apply_llvm_jit_calling_conv(::llvm::CallInst* call_inst, ::llvm::CallingConv::ID calling_conv) noexcept
+{
+    if(call_inst != nullptr) { apply_llvm_jit_calling_conv(*call_inst, calling_conv); }
+    return call_inst;
+}
+
+inline void apply_llvm_jit_host_calling_conv(::llvm::Function& function) noexcept
+{
+    apply_llvm_jit_calling_conv(function, get_llvm_jit_host_calling_conv());
 }
 
 inline ::llvm::CallInst* apply_llvm_jit_host_calling_conv(::llvm::CallInst* call_inst) noexcept
 {
-    if(call_inst != nullptr) { apply_llvm_jit_host_calling_conv(*call_inst); }
-    return call_inst;
+    return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_host_calling_conv());
+}
+
+inline void apply_llvm_jit_wasm_calling_conv(::llvm::Function& function) noexcept
+{
+    apply_llvm_jit_calling_conv(function, get_llvm_jit_wasm_calling_conv());
+}
+
+inline ::llvm::CallInst* apply_llvm_jit_wasm_calling_conv(::llvm::CallInst* call_inst) noexcept
+{
+    return apply_llvm_jit_calling_conv(call_inst, get_llvm_jit_wasm_calling_conv());
 }
 
 [[nodiscard]] inline ::std::size_t get_runtime_wasm_value_type_abi_size(runtime_operand_stack_value_type value_type) noexcept
@@ -585,11 +623,11 @@ struct runtime_direct_callee_resolution_t
     {
         callee_function =
             ::llvm::Function::Create(callee_function_type, ::llvm::Function::ExternalLinkage, callee_name, ::std::addressof(llvm_module));
-        apply_llvm_jit_host_calling_conv(*callee_function);
+        apply_llvm_jit_wasm_calling_conv(*callee_function);
         return callee_function;
     }
     if(callee_function->getFunctionType() != callee_function_type) [[unlikely]] { return nullptr; }
-    apply_llvm_jit_host_calling_conv(*callee_function);
+    apply_llvm_jit_wasm_calling_conv(*callee_function);
     return callee_function;
 }
 
@@ -2215,7 +2253,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
         state.llvm_function->setLinkage(::llvm::Function::ExternalLinkage);
     }
     if(state.llvm_function == nullptr) [[unlikely]] { return false; }
-    apply_llvm_jit_host_calling_conv(*state.llvm_function);
+    apply_llvm_jit_wasm_calling_conv(*state.llvm_function);
 
     auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
     state.ir_builder = ::std::make_unique<::llvm::IRBuilder<>>(entry_block);
@@ -2416,7 +2454,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                 param_offset += abi_size;
             }
 
-            auto typed_call{apply_llvm_jit_host_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
+            auto typed_call{apply_llvm_jit_wasm_calling_conv(raw_ir_builder.CreateCall(llvm_function, call_arguments))};
             if(abi_layout.result_count == 1uz)
             {
                 auto llvm_result_type{
@@ -3037,7 +3075,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
 
     auto callee_function{get_or_create_llvm_wasm_function_declaration(*llvm_module, llvm_context, runtime_module, func_index, wasm_function_type)};
     if(callee_function == nullptr) [[unlikely]] { return nullptr; }
-    return apply_llvm_jit_host_calling_conv(ir_builder.CreateCall(callee_function, call_arguments));
+    return apply_llvm_jit_wasm_calling_conv(ir_builder.CreateCall(callee_function, call_arguments));
 }
 
 template <typename BridgeFunction>
