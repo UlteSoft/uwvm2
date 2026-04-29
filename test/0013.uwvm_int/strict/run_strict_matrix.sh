@@ -7,6 +7,21 @@ cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
 
+mkdir -p -- "${ROOT_DIR}/build"
+LOCK_DIR="${UWVM_STRICT_LOCK_DIR:-${ROOT_DIR}/build/uwvm_int_strict.lock}"
+if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
+  echo "ERR: another uwvm_int strict run appears to be active: ${LOCK_DIR}" >&2
+  echo "ERR: remove the lock only after confirming no xmake/uwvm_int test process is still running." >&2
+  exit 9
+fi
+printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+cleanup_lock() {
+  rm -rf -- "${LOCK_DIR}"
+}
+trap cleanup_lock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 if [[ -z "${SYSROOT:-}" ]]; then
   echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
   exit 2
@@ -14,16 +29,22 @@ fi
 
 # Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
 # Example: export UWVM_XMAKE_JOBS=4
-XMAKE_JOBS_ARGS=()
 if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
   if [[ "${UWVM_XMAKE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
-    XMAKE_JOBS_ARGS=(-j "${UWVM_XMAKE_JOBS}")
     echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
   else
     echo "ERR: UWVM_XMAKE_JOBS must be a positive integer, got: ${UWVM_XMAKE_JOBS}" >&2
     exit 2
   fi
 fi
+
+xmake_build() {
+  if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
+    xmake b -v -j "${UWVM_XMAKE_JOBS}" "$@"
+  else
+    xmake b -v "$@"
+  fi
+}
 
 # macOS: when using a custom clang toolchain + sanitizer policies, dyld may not find
 # `libclang_rt.{asan,lsan,ubsan}_osx_dynamic.dylib` unless we point it at clang's runtime dir.
@@ -43,10 +64,10 @@ COMMON_F_FLAGS=(
   --use-llvm-compiler=y
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
-  --enable-test-0013-uwvm-int=y
+  --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=n
-  --enable-int=uwvm-int
+  --static=none
+  --execution-int=uwvm-int
 )
 
 SAN_POLICIES_FLAGS=(
@@ -125,10 +146,10 @@ if [[ "${#STRICT_TARGETS[@]}" -gt 0 ]]; then
         "${SAN_POLICIES_FLAGS[@]}"
       if [[ "$#" -gt 0 ]]; then
         for t in "${STRICT_TARGETS[@]}"; do
-          xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+          xmake_build "${t}"
         done
       else
-        xmake b -v "${XMAKE_JOBS_ARGS[@]}" -g "${STRICT_DIR}/*"
+        xmake_build -g "${STRICT_DIR}/*"
       fi
       for t in "${STRICT_TARGETS[@]}"; do
         xmake r "${t}"
@@ -145,7 +166,7 @@ if [[ "${#VALIDATE_TARGETS[@]}" -gt 0 ]]; then
     --enable-uwvm-int-delay-local=heavy
   xmake -v
   for t in "${VALIDATE_TARGETS[@]}"; do
-    xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+    xmake_build "${t}"
     xmake r "${t}"
   done
 fi

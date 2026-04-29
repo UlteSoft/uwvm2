@@ -7,6 +7,21 @@ cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
 
+mkdir -p -- "${ROOT_DIR}/build"
+LOCK_DIR="${UWVM_STRICT_LOCK_DIR:-${ROOT_DIR}/build/uwvm_int_strict.lock}"
+if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
+  echo "ERR: another uwvm_int strict run appears to be active: ${LOCK_DIR}" >&2
+  echo "ERR: remove the lock only after confirming no xmake/uwvm_int test process is still running." >&2
+  exit 9
+fi
+printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+cleanup_lock() {
+  rm -rf -- "${LOCK_DIR}"
+}
+trap cleanup_lock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 if [[ -z "${SYSROOT:-}" ]]; then
   echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
   exit 2
@@ -14,16 +29,22 @@ fi
 
 # Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
 # Example: export UWVM_XMAKE_JOBS=4
-XMAKE_JOBS_ARGS=()
 if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
   if [[ "${UWVM_XMAKE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
-    XMAKE_JOBS_ARGS=(-j "${UWVM_XMAKE_JOBS}")
     echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
   else
     echo "ERR: UWVM_XMAKE_JOBS must be a positive integer, got: ${UWVM_XMAKE_JOBS}" >&2
     exit 2
   fi
 fi
+
+xmake_build() {
+  if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
+    xmake b -v -j "${UWVM_XMAKE_JOBS}" "$@"
+  else
+    xmake b -v "$@"
+  fi
+}
 
 TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
 LLVM_BIN="${TOOLCHAIN_ROOT}/llvm/bin"
@@ -52,10 +73,10 @@ COMMON_F_FLAGS=(
   --ccache=n
   "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
-  --enable-test-0013-uwvm-int=y
+  --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=n
-  --enable-int=uwvm-int
+  --static=none
+  --execution-int=uwvm-int
   "--enable-uwvm-int-combine-ops=${UWVM_STRICT_COVERAGE_COMBINE_MODE:-heavy}"
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}"
 )
@@ -110,7 +131,7 @@ export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
 echo "=== uwvm_int strict coverage: build+run strict targets (profile) ==="
 if [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
   for t in "${STRICT_TARGETS[@]}"; do
-    xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+    xmake_build "${t}"
   done
 else
   batch_idx=0
@@ -119,7 +140,7 @@ else
     batch=("${STRICT_TARGETS[@]:i:COVER_BATCH_SIZE}")
     echo "--- strict coverage build batch ${batch_idx}: ${#batch[@]} targets ---"
     for t in "${batch[@]}"; do
-      xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+      xmake_build "${t}"
     done
   done
 fi
