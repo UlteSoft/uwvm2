@@ -66,8 +66,8 @@ COMMON_F_FLAGS=(
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=none
-  --execution-int=uwvm-int
+  --static=n
+  --enable-int=uwvm-int
 )
 
 SAN_POLICIES_FLAGS=(

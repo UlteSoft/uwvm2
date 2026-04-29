@@ -62,8 +62,8 @@ COMMON_F_FLAGS=(
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=none
-  --execution-int=uwvm-int
+  --static=n
+  --enable-int=uwvm-int
   "--enable-uwvm-int-combine-ops=${UWVM_STRICT_BASIC_COMBINE_MODE:-heavy}"
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_BASIC_DELAY_MODE:-heavy}"
 )
