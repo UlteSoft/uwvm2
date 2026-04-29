@@ -758,7 +758,7 @@ namespace
             constexpr auto exp_i32_gt_s = optable::translate::get_uwvmint_br_if_i32_gt_s_fptr_from_tuple<opt>(curr, tuple);
             constexpr auto exp_i32_le_u = optable::translate::get_uwvmint_br_if_i32_le_u_fptr_from_tuple<opt>(curr, tuple);
             constexpr auto exp_i32_and_nz = optable::translate::get_uwvmint_br_if_i32_and_nz_fptr_from_tuple<opt>(curr, tuple);
-            constexpr auto exp_i64_eqz = optable::translate::get_uwvmint_br_if_i64_eqz_fptr_from_tuple<opt>(curr, tuple);
+            constexpr auto exp_i64_eqz = optable::translate::get_uwvmint_br_if_i64_local_eqz_fptr_from_tuple<opt>(curr, tuple);
             constexpr auto exp_i64_gt_u = optable::translate::get_uwvmint_br_if_i64_gt_u_fptr_from_tuple<opt>(curr, tuple);
 
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_ne));

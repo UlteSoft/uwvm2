@@ -900,6 +900,7 @@ case wasm1_code::i32_store:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -931,12 +932,14 @@ case wasm1_code::i64_store:
         }
     }
 #endif
+
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -974,12 +977,14 @@ case wasm1_code::f32_store:
         break;
     }
 #endif
+
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
     {
+        flush_conbine_pending(); 
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1024,7 +1029,8 @@ case wasm1_code::f64_store:
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
-    {
+    { 
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1075,6 +1081,7 @@ case wasm1_code::i32_store8:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1148,6 +1155,7 @@ case wasm1_code::i32_store16:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1167,6 +1175,7 @@ case wasm1_code::i64_store8:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1186,6 +1195,7 @@ case wasm1_code::i64_store16:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1224,6 +1234,7 @@ case wasm1_code::i64_store32:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1249,6 +1260,13 @@ case wasm1_code::memory_size:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
+    // Wasm MVP encodes the reserved memidx operand of `memory.size` as unsigned LEB128.
+    // Validation here must follow the same rule as the core validator:
+    // parse a well-formed LEB128 `u32`, then require that the decoded value is zero.
+    //
+    // Do not tighten this to a literal `0x00` byte check. The W3C binary integer grammar permits
+    // non-canonical zero encodings with trailing-zero continuation bytes as long as the LEB128 is
+    // otherwise well-formed within the width bounds.
     wasm_u32 memidx;
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
     auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
@@ -1271,6 +1289,7 @@ case wasm1_code::memory_size:
     // [ safe           ] unsafe (could be the section_end)
     //                    ^^ code_curr
 
+    // The MVP restriction is semantic: only memory index 0 is legal here.
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;
@@ -1318,6 +1337,8 @@ case wasm1_code::memory_grow:
     // [ safe    ] unsafe (could be the section_end)
     //             ^^ code_curr
 
+    // `memory.grow` has the same reserved memidx encoding rule as `memory.size`.
+    // We must validate the decoded LEB128 value, not assume the encoding is a single raw byte.
     wasm_u32 memidx;
     using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
     auto const [mem_next, mem_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
@@ -1340,6 +1361,7 @@ case wasm1_code::memory_grow:
     // [        safe    ] unsafe (could be the section_end)
     //                    ^^ code_curr
 
+    // Again, check the decoded memidx rather than the exact byte pattern.
     if(memidx != 0u) [[unlikely]]
     {
         err.err_curr = op_begin;

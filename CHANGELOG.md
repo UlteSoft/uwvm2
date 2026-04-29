@@ -54,6 +54,8 @@ Each release entry should record:
 
 ### Beta Fixes
 
+- Corrected `uwvm_int` byref store lowering so delayed combine operands are flushed before plain `i32`/`i64`/`f32`/`f64` store and narrow-store opfuncs, preserving Wasm MVP address/value stack order when tail-call store fusions are not selected.
+- Hardened strict `uwvm_int` regression coverage for byref store pending-flush paths, `br_if` i64 local-eqz fusion expectations, extra-heavy i32 sum-loop execution, and strict test helper build hygiene.
 - Corrected `uwvm_int` `br_if` fallthrough typing in polymorphic Wasm MVP control-flow so single-result label values are re-materialized on the non-taken path, keeping the compiler-integrated translator aligned with the W3C stack-polymorphism algorithm and with the standalone validator/LLVM JIT validator behavior.
 - Corrected `local_set` type checking in both validation and `uwvm_int` translation for polymorphic control-flow regions so values pushed after `unreachable` are still validated as concrete operands instead of bypassing type mismatch diagnostics.
 - Added strict regression coverage for polymorphic `local_set` mismatch cases, including delayed combine/local-update translation paths in `uwvm_int`.
