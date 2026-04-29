@@ -88,6 +88,7 @@ fi
 
 STRICT_TARGETS=()
 VALIDATE_TARGETS=()
+FULL_TARGET_SET=false
 
 if [[ "$#" -gt 0 ]]; then
   for t in "$@"; do
@@ -98,6 +99,7 @@ if [[ "$#" -gt 0 ]]; then
     fi
   done
 else
+  FULL_TARGET_SET=true
   while IFS= read -r f; do
     b="$(basename -- "${f}" .cc)"
     if [[ "${f}" == *"/validate/"* || "${b}" == uwvm_int_validate_* ]]; then
@@ -153,12 +155,12 @@ if [[ "${#STRICT_TARGETS[@]}" -gt 0 ]]; then
         "--enable-uwvm-int-combine-ops=${combine}" \
         "--enable-uwvm-int-delay-local=${delay}" \
         "${SAN_POLICIES_FLAGS[@]}"
-      if [[ "$#" -gt 0 ]]; then
+      if [[ "${FULL_TARGET_SET}" == "true" ]]; then
+        xmake_build -g "${STRICT_DIR}/*"
+      else
         for t in "${STRICT_TARGETS[@]}"; do
           xmake_build "${t}"
         done
-      else
-        xmake_build -g "${STRICT_DIR}/*"
       fi
       for t in "${STRICT_TARGETS[@]}"; do
         xmake r "${t}"
@@ -173,9 +175,13 @@ if [[ "${#VALIDATE_TARGETS[@]}" -gt 0 ]]; then
   xmake f "${COMMON_F_FLAGS[@]}" \
     --enable-uwvm-int-combine-ops=heavy \
     --enable-uwvm-int-delay-local=heavy
-  xmake -v
+  if [[ "${FULL_TARGET_SET}" == "true" ]]; then
+    xmake_build -g "${STRICT_DIR}/validate"
+  fi
   for t in "${VALIDATE_TARGETS[@]}"; do
-    xmake_build "${t}"
+    if [[ "${FULL_TARGET_SET}" != "true" ]]; then
+      xmake_build "${t}"
+    fi
     xmake r "${t}"
   done
 fi

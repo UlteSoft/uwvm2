@@ -76,9 +76,11 @@ export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
 export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-coverage}"
 
 STRICT_TARGETS=()
+FULL_TARGET_SET=false
 if [[ "$#" -gt 0 ]]; then
   STRICT_TARGETS=("$@")
 else
+  FULL_TARGET_SET=true
   while IFS= read -r f; do
     STRICT_TARGETS+=("$(basename -- "${f}" .cc)")
   done < <(find "${STRICT_DIR}" -type f -name '*.cc' | sort)
@@ -105,10 +107,17 @@ echo "=== uwvm_int strict basic full: configure ===" | tee -a "${LOG_FILE}"
 xmake f -c >> "${LOG_FILE}" 2>&1
 xmake f "${COMMON_F_FLAGS[@]}" >> "${LOG_FILE}" 2>&1
 
+if [[ "${FULL_TARGET_SET}" == "true" ]]; then
+  echo "=== uwvm_int strict basic full: build all strict targets ===" | tee -a "${LOG_FILE}"
+  xmake_build -g "${STRICT_DIR}/*" >> "${LOG_FILE}" 2>&1
+fi
+
 for i in "${!STRICT_TARGETS[@]}"; do
   t="${STRICT_TARGETS[$i]}"
-  printf "\n=== [%03d/%03d] build %s ===\n" "$((i + 1))" "${#STRICT_TARGETS[@]}" "$t" | tee -a "${LOG_FILE}"
-  xmake_build "$t" >> "${LOG_FILE}" 2>&1
+  if [[ "${FULL_TARGET_SET}" != "true" ]]; then
+    printf "\n=== [%03d/%03d] build %s ===\n" "$((i + 1))" "${#STRICT_TARGETS[@]}" "$t" | tee -a "${LOG_FILE}"
+    xmake_build "$t" >> "${LOG_FILE}" 2>&1
+  fi
 
   exe="$(xmake show -t "$t" | perl -pe 's/\e\[[0-9;]*m//g' | sed -n 's/^[[:space:]]*targetfile:[[:space:]]*//p' | head -n1 || true)"
   if [[ -z "${exe}" || ! -f "${ROOT_DIR}/${exe}" ]]; then

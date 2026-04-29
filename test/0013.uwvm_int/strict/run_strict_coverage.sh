@@ -132,9 +132,11 @@ if [[ ! "${COVER_BATCH_SIZE}" =~ ^[0-9]+$ ]]; then
 fi
 
 STRICT_TARGETS=()
+FULL_TARGET_SET=false
 if [[ "$#" -gt 0 ]]; then
   STRICT_TARGETS=("$@")
 else
+  FULL_TARGET_SET=true
   while IFS= read -r f; do
     STRICT_TARGETS+=("$(basename -- "${f}" .cc)")
   done < <(find "${STRICT_DIR}" -type f -name '*.cc' | sort)
@@ -162,7 +164,10 @@ xmake f "${COMMON_F_FLAGS[@]}" --cxflags="${COVER_CXFLAGS}" --ldflags="${COVER_L
 export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
 
 echo "=== uwvm_int strict coverage: build+run strict targets (profile) ==="
-if [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
+if [[ "${FULL_TARGET_SET}" == "true" ]]; then
+  echo "--- strict coverage build all strict targets ---"
+  xmake_build -g "${STRICT_DIR}/*"
+elif [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
   for t in "${STRICT_TARGETS[@]}"; do
     xmake_build "${t}"
   done
