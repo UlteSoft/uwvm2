@@ -900,7 +900,9 @@ case wasm1_code::i32_store:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -939,7 +941,9 @@ case wasm1_code::i64_store:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -984,7 +988,9 @@ case wasm1_code::f32_store:
     }
     else
     {
-        flush_conbine_pending(); 
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
+        flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1029,8 +1035,10 @@ case wasm1_code::f64_store:
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
-    { 
+    {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1081,7 +1089,9 @@ case wasm1_code::i32_store8:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1155,7 +1165,9 @@ case wasm1_code::i32_store16:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1175,7 +1187,9 @@ case wasm1_code::i64_store8:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1195,7 +1209,9 @@ case wasm1_code::i64_store16:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1234,7 +1250,9 @@ case wasm1_code::i64_store32:
     }
     else
     {
+#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         flush_conbine_pending();
+#endif
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
