@@ -286,6 +286,10 @@ namespace
         auto const exp_local_get_i32 = optable::translate::get_uwvmint_local_get_i32_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_set_i64 = optable::translate::get_uwvmint_local_set_i64_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_get_i64 = optable::translate::get_uwvmint_local_get_i64_fptr_from_tuple<Opt>(curr, tuple);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
+        auto const exp_i64_add_localget_rhs =
+            optable::translate::get_uwvmint_i64_binop_localget_rhs_fptr_from_tuple<Opt, optable::numeric_details::int_binop::add>(curr, tuple);
+#endif
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
@@ -303,7 +307,11 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_plain_load));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_set_i64));
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i64) || bytecode_contains_fptr(bc2, exp_i64_add_localget_rhs));
+#else
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i64));
+#endif
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_plain_load));
