@@ -273,7 +273,15 @@ namespace
                                            .results) == ctz32(u));
         }
 
-        for(::std::int64_t v : {0ll, 1ll, 2ll, 3ll, 7ll, 8ll, -1ll, static_cast<::std::int64_t>(0x8000000000000000ull), 0x0123456789abcdefll})
+        for(::std::int64_t v : {static_cast<::std::int64_t>(0),
+                                static_cast<::std::int64_t>(1),
+                                static_cast<::std::int64_t>(2),
+                                static_cast<::std::int64_t>(3),
+                                static_cast<::std::int64_t>(7),
+                                static_cast<::std::int64_t>(8),
+                                static_cast<::std::int64_t>(-1),
+                                static_cast<::std::int64_t>(0x8000000000000000ull),
+                                static_cast<::std::int64_t>(0x0123456789abcdefull)})
         {
             ::std::uint64_t const u = static_cast<::std::uint64_t>(v);
 
