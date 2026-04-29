@@ -247,9 +247,9 @@ namespace
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
         auto const& bc2 = cm.local_funcs.index_unchecked(2).op.operands;
         auto const& bc3 = cm.local_funcs.index_unchecked(3).op.operands;
-        auto const& bc4 = cm.local_funcs.index_unchecked(4).op.operands;
+        [[maybe_unused]] auto const& bc4 = cm.local_funcs.index_unchecked(4).op.operands;
         auto const& bc5 = cm.local_funcs.index_unchecked(5).op.operands;
-        auto const& bc6 = cm.local_funcs.index_unchecked(6).op.operands;
+        [[maybe_unused]] auto const& bc6 = cm.local_funcs.index_unchecked(6).op.operands;
         auto const& bc7 = cm.local_funcs.index_unchecked(7).op.operands;
         auto const& bc8 = cm.local_funcs.index_unchecked(8).op.operands;
         auto const& bc9 = cm.local_funcs.index_unchecked(9).op.operands;

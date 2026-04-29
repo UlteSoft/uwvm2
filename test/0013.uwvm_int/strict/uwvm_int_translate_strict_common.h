@@ -31,6 +31,14 @@
 # error "Module testing is not currently supported"
 #endif
 
+#ifndef UWVM_THROWS
+# if defined(__cpp_herbception)
+#  define UWVM_THROWS throws
+# else
+#  define UWVM_THROWS
+# endif
+#endif
+
 namespace uwvm2test::uwvm_int_strict
 {
     using wasm_op = ::uwvm2::parser::wasm::standard::wasm1::opcode::op_basic;

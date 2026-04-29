@@ -900,6 +900,7 @@ case wasm1_code::i32_store:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -931,12 +932,14 @@ case wasm1_code::i64_store:
         }
     }
 #endif
+
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -974,12 +977,14 @@ case wasm1_code::f32_store:
         break;
     }
 #endif
+
     if constexpr(CompileOption.is_tail_call)
     {
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
     {
+        flush_conbine_pending(); 
         emit_opfunc_to(bytecode, translate::get_uwvmint_f32_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1024,7 +1029,8 @@ case wasm1_code::f64_store:
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, *resolved_memory0.memory_p, interpreter_tuple));
     }
     else
-    {
+    { 
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_f64_store_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1075,6 +1081,7 @@ case wasm1_code::i32_store8:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1148,6 +1155,7 @@ case wasm1_code::i32_store16:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i32_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1167,6 +1175,7 @@ case wasm1_code::i64_store8:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store8_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1186,6 +1195,7 @@ case wasm1_code::i64_store16:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store16_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
@@ -1224,6 +1234,7 @@ case wasm1_code::i64_store32:
     }
     else
     {
+        flush_conbine_pending();
         emit_opfunc_to(bytecode, translate::get_uwvmint_i64_store32_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
     }
     emit_imm_to(bytecode, resolved_memory0.memory_p);
