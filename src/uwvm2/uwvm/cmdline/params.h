@@ -80,6 +80,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             // runtime
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
+#if 0  // Release V2.0.1.1: runtime shortcut modes are hidden until their execution paths are implemented.
 #if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_debug),
 #endif
@@ -94,6 +95,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
+#endif
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),

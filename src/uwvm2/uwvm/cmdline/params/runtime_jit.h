@@ -42,6 +42,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
+#if 0  // Release V2.0.1.1: --runtime-jit depends on the unimplemented LLVM JIT path.
 #if defined(UWVM_RUNTIME_LLVM_JIT)
 
     namespace details
@@ -73,6 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
 
 #endif
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params
 
 #ifndef UWVM_MODULE
@@ -81,4 +83,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

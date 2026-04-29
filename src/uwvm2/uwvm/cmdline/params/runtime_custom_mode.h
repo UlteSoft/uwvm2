@@ -62,7 +62,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_mode{
         .name{u8"--runtime-custom-mode"},
         .describe{u8"Custom selection of runtime mode."},
-        .usage{u8"[lazy|lazy+verification|full]"},
+        .usage{u8"["
+#if 0  // Release V2.0.1.1: lazy runtime modes are not implemented yet.
+                u8"lazy|lazy+verification|"
+#endif
+                u8"full]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_custom_mode_alias), 1uz}},
         .handle{::std::addressof(details::runtime_custom_mode_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_mode_existed)},
@@ -78,4 +82,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

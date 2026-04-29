@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if 0  // Release V2.0.1.1: --runtime-debug selects the debug interpreter path, which is not implemented for this release.
 #if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
 
 # if defined(UWVM_MODULE)
@@ -156,6 +157,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     }
 
 #endif
+#endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 
 #ifndef UWVM_MODULE
@@ -164,4 +166,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

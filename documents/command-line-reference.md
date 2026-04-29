@@ -29,7 +29,7 @@ Not every option exists in every build. Availability is controlled by compile-ti
 Typical conditions include:
 
 - debug-only options,
-- interpreter / LLVM-JIT / tiered / debug-interpreter backend availability,
+- runtime backend availability; in `V2.0.1.1` the public runtime CLI only exposes the implemented `full` mode with the `int` compiler,
 - WASI Preview 1 integration,
 - preload dynamic-library support,
 - weak-symbol support,
@@ -80,7 +80,7 @@ Practical consequence:
 Example:
 
 ```bash
-uwvm --runtime-jit --wasip1-set-argv0 myapp --run app.wasm --flag-for-guest
+uwvm --runtime-custom-mode full --wasip1-set-argv0 myapp --run app.wasm --flag-for-guest
 ```
 
 Here `--flag-for-guest` is passed to the guest program, not to `uwvm`.
@@ -107,7 +107,7 @@ These commands are intended for introspection. They print information and then r
 ## Syntax Conventions
 
 - Long options use `--option-name`.
-- Many options also have short project-specific aliases such as `-Rjit` or `-Wpre`.
+- Many options also have short project-specific aliases such as `-Rct` or `-Wpre`.
 - `<name:type>` indicates a typed placeholder. The supplied token must satisfy that type on the current platform.
 - `(<name:type>)` indicates an optional typed argument.
 - `|` separates alternative accepted forms within the same usage slot.
@@ -273,89 +273,55 @@ This is a pure flag-style parameter. It toggles the global memory-growth policy 
 
 | Option | Alias | Arguments | Description | Availability |
 | --- | --- | --- | --- | --- |
-| `--runtime-aot` | `-Raot` | None | Shortcut runtime: full compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
 | `--runtime-compile-threads` | `-Rct` | `[default\|aggressive\|count:ssize_t]` | Configure the runtime compile-thread count, or choose the adaptive `default` / `aggressive` policy upper bound. | Hosted runtime builds |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>\|code_size <bytes:size_t>]` | Configure how full-compile groups local functions into translation tasks. Effective only when extra runtime compile threads are enabled. | Hosted runtime builds |
 | `--runtime-compiler-log` | `-Rclog` | `<file:path>` | Write runtime compiler logs to a file. | Hosted runtime builds |
-| `--runtime-custom-compiler` | `-Rcc` | `[int\|tiered\|jit\|debug-int]` | Select the runtime compiler explicitly. | Depends on compiled backends |
-| `--runtime-custom-mode` | `-Rcm` | `[lazy\|lazy+verification\|full]` | Select the runtime mode explicitly. | Hosted runtime builds |
-| `--runtime-debug` | `-Rdebug` | None | Shortcut runtime: full compile plus debug interpreter. | Requires debug interpreter |
-| `--runtime-int` | `-Rint` | None | Shortcut runtime: lazy compile plus interpreter-only backend. | Requires interpreter backend |
-| `--runtime-jit` | `-Rjit` | None | Shortcut runtime: lazy compile plus LLVM-JIT-only backend. | Requires LLVM JIT |
-| `--runtime-tiered` | `-Rtiered` | None | Shortcut runtime: lazy compile plus tiered interpreter/JIT backend. | Requires tiered backend |
+| `--runtime-custom-compiler` | `-Rcc` | `[int]` | Select the implemented runtime compiler explicitly. | Hosted runtime builds |
+| `--runtime-custom-mode` | `-Rcm` | `[full]` | Select the implemented runtime mode explicitly. | Hosted runtime builds |
 
-## Runtime Model and Conflict Rules
+## Runtime Model
 
 Runtime selection is implemented as two pieces of state:
 
 - `runtime_mode_t`
 - `runtime_compiler_t`
 
-The source-defined runtime mode enum currently contains:
+The `V2.0.1.1` release CLI exposes only the implemented pair:
 
-- `lazy_compile`
-- `lazy_compile_with_full_code_verification`
-- `full_compile`
+- `runtime_mode_t::full_compile`
+- `runtime_compiler_t::uwvm_interpreter_only`
 
-The runtime compiler enum is compiled conditionally and may contain:
+The source still contains planned enum values for lazy, JIT, tiered, and debug-interpreter paths, but those command-line entries are hidden with `#if 0` until the corresponding execution paths are production-ready.
 
-- `uwvm_interpreter_only`
-- `debug_interpreter`
-- `uwvm_interpreter_llvm_jit_tiered`
-- `llvm_jit_only`
+### Hidden Runtime Selectors
 
-### Shortcut Mapping
+The following runtime selectors are intentionally not registered in this release:
 
-Shortcut runtime options are syntactic sugar over a concrete `(mode, compiler)` pair:
-
-| Shortcut | Mode | Compiler |
-| --- | --- | --- |
-| `--runtime-int` | `lazy_compile` | `uwvm_interpreter_only` |
-| `--runtime-jit` | `lazy_compile` | `llvm_jit_only` |
-| `--runtime-tiered` | `lazy_compile` | `uwvm_interpreter_llvm_jit_tiered` |
-| `--runtime-aot` | `full_compile` | `llvm_jit_only` |
-| `--runtime-debug` | `full_compile` | `debug_interpreter` |
-
-### Conflict Rules
-
-The source enforces the following:
-
-- Only one shortcut runtime option may be used at a time.
-- Any shortcut runtime option conflicts with `--runtime-custom-mode`.
-- Any shortcut runtime option conflicts with `--runtime-custom-compiler`.
-- `--runtime-custom-mode` and `--runtime-custom-compiler` are intended to be used together when you want explicit control over both axes.
+- `--runtime-int`
+- `--runtime-jit`
+- `--runtime-tiered`
+- `--runtime-aot`
+- `--runtime-debug`
 
 ### `--runtime-custom-mode`
 
 Accepted values:
 
-- `lazy`
-- `lazy+verification`
 - `full`
 
 Source mapping:
 
-- `lazy` -> `lazy_compile`
-- `lazy+verification` -> `lazy_compile_with_full_code_verification`
 - `full` -> `full_compile`
 
 ### `--runtime-custom-compiler`
 
-Accepted values depend on which backends were compiled in.
-
-Possible values in the source:
+Accepted values:
 
 - `int`
-- `tiered`
-- `jit`
-- `debug-int`
 
 Source mapping:
 
 - `int` -> `uwvm_interpreter_only`
-- `tiered` -> `uwvm_interpreter_llvm_jit_tiered`
-- `jit` -> `llvm_jit_only`
-- `debug-int` -> `debug_interpreter`
 
 ### `--runtime-compile-threads`
 
@@ -630,7 +596,7 @@ uwvm --help all
 
 ```bash
 uwvm \
-  --runtime-tiered \
+  --runtime-compile-threads default \
   --wasip1-set-argv0 myapp \
   --wasip1-add-environment MODE production \
   --run app.wasm --guest-flag
@@ -646,8 +612,8 @@ uwvm --mode validation --run app.wasm
 
 ```bash
 uwvm \
-  --runtime-custom-mode lazy+verification \
-  --runtime-custom-compiler jit \
+  --runtime-custom-mode full \
+  --runtime-custom-compiler int \
   --run app.wasm
 ```
 
@@ -666,7 +632,7 @@ uwvm --log-output file uwvm.log --run app.wasm
 ### Record runtime compiler output separately
 
 ```bash
-uwvm --runtime-compiler-log jit.log --runtime-jit --run app.wasm
+uwvm --runtime-compiler-log runtime.log --run app.wasm
 ```
 
 ### Mount a host directory into the WASI sandbox

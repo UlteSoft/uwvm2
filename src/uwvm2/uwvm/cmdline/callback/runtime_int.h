@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if 0  // Release V2.0.1.1: --runtime-int selects lazy mode, which is not implemented yet.
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 
 # if defined(UWVM_MODULE)
@@ -157,6 +158,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
 
+#endif
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 

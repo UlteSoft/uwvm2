@@ -66,6 +66,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                u8"int"
 #endif
+#if 0  // Release V2.0.1.1: tiered/JIT/debug interpreter backends are not implemented for production use.
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                u8"|"
 #endif
@@ -85,6 +86,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
                u8"debug-int"
 #endif
+#endif
                u8"]"},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_custom_compiler_alias), 1uz}},
         .handle{::std::addressof(details::runtime_custom_compiler_callback)},
@@ -101,4 +103,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # include <uwvm2/uwvm/utils/ansies/uwvm_color_pop_macro.h>
 # include <uwvm2/utils/macro/pop_macros.h>
 #endif
-

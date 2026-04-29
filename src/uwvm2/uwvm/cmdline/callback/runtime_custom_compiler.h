@@ -168,6 +168,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
         else
 #endif
+#if 0  // Release V2.0.1.1: tiered/JIT/debug interpreter backends are not implemented for production use.
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             if(currp1_str == u8"tiered")
         {
@@ -189,6 +190,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter;
         }
         else
+#endif
 #endif
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,

@@ -54,6 +54,7 @@ Each release entry should record:
 
 ### Beta Fixes
 
+- Hid unreleased runtime selector parameters from the `V2.0.1.1` CLI surface with `#if 0`, including `--runtime-int`, `--runtime-jit`, `--runtime-tiered`, `--runtime-aot`, and `--runtime-debug`, and restricted custom runtime selection to the implemented `--runtime-custom-mode full` plus `--runtime-custom-compiler int` path.
 - Corrected `uwvm_int` byref store lowering so delayed combine operands are flushed before plain `i32`/`i64`/`f32`/`f64` store and narrow-store opfuncs, preserving Wasm MVP address/value stack order when tail-call store fusions are not selected.
 - Hardened strict `uwvm_int` regression coverage for byref store pending-flush paths, `br_if` i64 local-eqz fusion expectations, extra-heavy i32 sum-loop execution, and strict test helper build hygiene.
 - Corrected `uwvm_int` `br_if` fallthrough typing in polymorphic Wasm MVP control-flow so single-result label values are re-materialized on the non-taken path, keeping the compiler-integrated translator aligned with the W3C stack-polymorphism algorithm and with the standalone validator/LLVM JIT validator behavior.

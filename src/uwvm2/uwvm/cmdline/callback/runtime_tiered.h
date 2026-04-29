@@ -47,6 +47,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
+#if 0  // Release V2.0.1.1: --runtime-tiered depends on lazy/tiered execution paths that are not implemented yet.
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
 
 # if defined(UWVM_MODULE)
@@ -158,6 +159,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }
 
+#endif
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params::details
 

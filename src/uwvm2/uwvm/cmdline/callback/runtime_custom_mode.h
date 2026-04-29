@@ -161,16 +161,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         // Setting the argument is already taken
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
 
-        if(auto const currp1_str{currp1->str}; currp1_str == u8"lazy")
+        auto const currp1_str{currp1->str};
+#if 0  // Release V2.0.1.1: lazy runtime modes are not implemented yet.
+        if(currp1_str == u8"lazy")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile;
         }
-        else if(auto const currp1_str{currp1->str}; currp1_str == u8"lazy+verification")
+        else if(currp1_str == u8"lazy+verification")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode =
                 ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification;
         }
-        else if(auto const currp1_str{currp1->str}; currp1_str == u8"full")
+        else
+#endif
+        if(currp1_str == u8"full")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
         }
