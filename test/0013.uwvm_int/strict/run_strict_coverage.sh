@@ -22,11 +22,6 @@ trap cleanup_lock EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-if [[ -z "${SYSROOT:-}" ]]; then
-  echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
-  exit 2
-fi
-
 # Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
 # Example: export UWVM_XMAKE_JOBS=4
 if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
@@ -46,14 +41,42 @@ xmake_build() {
   fi
 }
 
-TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
-LLVM_BIN="${TOOLCHAIN_ROOT}/llvm/bin"
-LLVM_PROFDATA="${LLVM_BIN}/llvm-profdata"
-LLVM_COV="${LLVM_BIN}/llvm-cov"
-CLANG_BIN="${LLVM_BIN}/clang"
+find_llvm_tool() {
+  local tool="$1"
+  local candidate=""
+  if [[ -n "${UWVM_LLVM_BIN:-}" ]]; then
+    candidate="${UWVM_LLVM_BIN}/${tool}"
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  fi
+  if [[ -n "${SYSROOT:-}" ]]; then
+    local toolchain_root
+    toolchain_root="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+    candidate="${toolchain_root}/llvm/bin/${tool}"
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  fi
+  command -v "${tool}" 2>/dev/null || true
+}
+
+find_clang_bin() {
+  if [[ -n "${UWVM_CLANG_BIN:-}" && -x "${UWVM_CLANG_BIN}" ]]; then
+    printf '%s\n' "${UWVM_CLANG_BIN}"
+    return 0
+  fi
+  find_llvm_tool clang
+}
+
+LLVM_PROFDATA="${UWVM_LLVM_PROFDATA:-$(find_llvm_tool llvm-profdata)}"
+LLVM_COV="${UWVM_LLVM_COV:-$(find_llvm_tool llvm-cov)}"
+CLANG_BIN="$(find_clang_bin)"
 
 if [[ ! -x "${LLVM_PROFDATA}" || ! -x "${LLVM_COV}" ]]; then
-  echo "ERR: llvm-profdata/llvm-cov not found under: ${LLVM_BIN}" >&2
+  echo "ERR: llvm-profdata/llvm-cov not found. Set UWVM_LLVM_BIN, UWVM_LLVM_PROFDATA/UWVM_LLVM_COV, or put them in PATH." >&2
   exit 3
 fi
 
@@ -71,7 +94,6 @@ COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
   --ccache=n
-  "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
@@ -81,12 +103,23 @@ COMMON_F_FLAGS=(
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}"
 )
 
+if [[ -n "${SYSROOT:-}" ]]; then
+  COMMON_F_FLAGS+=("--sysroot=${SYSROOT}")
+fi
+
 export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
 export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-coverage}"
 COVER_INCLUDE_REGEX="${UWVM_STRICT_COVERAGE_REGEX:-.*src/uwvm2/runtime/compiler/uwvm_int/(compile_all_from_uwvm|optable)/.*}"
 
 echo "INFO: strict coverage ABI modes = ${UWVM2TEST_ABI_MODES}"
 echo "INFO: strict coverage matrix level = ${UWVM2TEST_MATRIX_LEVEL}"
+if [[ -n "${SYSROOT:-}" ]]; then
+  echo "INFO: strict coverage sysroot = ${SYSROOT}"
+else
+  echo "INFO: strict coverage sysroot = <toolchain default>"
+fi
+echo "INFO: strict coverage llvm-profdata = ${LLVM_PROFDATA}"
+echo "INFO: strict coverage llvm-cov = ${LLVM_COV}"
 echo "INFO: strict coverage regex = ${COVER_INCLUDE_REGEX}"
 
 COVER_CXFLAGS="-fprofile-instr-generate -fcoverage-mapping"

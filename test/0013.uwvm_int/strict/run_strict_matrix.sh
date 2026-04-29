@@ -22,11 +22,6 @@ trap cleanup_lock EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-if [[ -z "${SYSROOT:-}" ]]; then
-  echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
-  exit 2
-fi
-
 # Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
 # Example: export UWVM_XMAKE_JOBS=4
 if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
@@ -49,8 +44,14 @@ xmake_build() {
 # macOS: when using a custom clang toolchain + sanitizer policies, dyld may not find
 # `libclang_rt.{asan,lsan,ubsan}_osx_dynamic.dylib` unless we point it at clang's runtime dir.
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
-  CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  CLANG_BIN=""
+  if [[ -n "${SYSROOT:-}" ]]; then
+    TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+    CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  fi
+  if [[ ! -x "${CLANG_BIN}" ]]; then
+    CLANG_BIN="$(command -v clang || true)"
+  fi
   if [[ -x "${CLANG_BIN}" ]]; then
     CLANG_RUNTIME_DIR="$("${CLANG_BIN}" --print-runtime-dir 2>/dev/null || true)"
     if [[ -n "${CLANG_RUNTIME_DIR}" ]]; then
@@ -62,13 +63,16 @@ fi
 COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
-  "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
   --static=none
   --execution-int=uwvm-int
 )
+
+if [[ -n "${SYSROOT:-}" ]]; then
+  COMMON_F_FLAGS+=("--sysroot=${SYSROOT}")
+fi
 
 SAN_POLICIES_FLAGS=(
   # Note: `-fsanitize=leak` (LSan) is not supported on macOS (Darwin).
@@ -132,6 +136,11 @@ export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-default}"
 
 echo "INFO: strict ABI modes = ${UWVM2TEST_ABI_MODES}"
 echo "INFO: strict matrix level = ${UWVM2TEST_MATRIX_LEVEL}"
+if [[ -n "${SYSROOT:-}" ]]; then
+  echo "INFO: strict sysroot = ${SYSROOT}"
+else
+  echo "INFO: strict sysroot = <toolchain default>"
+fi
 echo "INFO: strict combine modes = ${COMBINE_MODES[*]}"
 echo "INFO: strict delay modes = ${DELAY_MODES[*]}"
 

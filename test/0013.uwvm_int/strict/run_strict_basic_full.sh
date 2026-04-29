@@ -7,11 +7,6 @@ cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
 
-if [[ -z "${SYSROOT:-}" ]]; then
-  echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
-  exit 2
-fi
-
 mkdir -p -- "${ROOT_DIR}/build"
 LOCK_DIR="${UWVM_STRICT_LOCK_DIR:-${ROOT_DIR}/build/uwvm_int_strict.lock}"
 if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
@@ -45,8 +40,14 @@ xmake_build() {
 }
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
-  CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  CLANG_BIN=""
+  if [[ -n "${SYSROOT:-}" ]]; then
+    TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+    CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  fi
+  if [[ ! -x "${CLANG_BIN}" ]]; then
+    CLANG_BIN="$(command -v clang || true)"
+  fi
   if [[ -x "${CLANG_BIN}" ]]; then
     CLANG_RUNTIME_DIR="$("${CLANG_BIN}" --print-runtime-dir 2>/dev/null || true)"
     if [[ -n "${CLANG_RUNTIME_DIR}" ]]; then
@@ -58,7 +59,6 @@ fi
 COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
-  "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
   --use-cxx-module=n
@@ -67,6 +67,10 @@ COMMON_F_FLAGS=(
   "--enable-uwvm-int-combine-ops=${UWVM_STRICT_BASIC_COMBINE_MODE:-heavy}"
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_BASIC_DELAY_MODE:-heavy}"
 )
+
+if [[ -n "${SYSROOT:-}" ]]; then
+  COMMON_F_FLAGS+=("--sysroot=${SYSROOT}")
+fi
 
 export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
 export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-coverage}"
@@ -90,6 +94,11 @@ LOG_FILE="${UWVM_STRICT_BASIC_LOG:-${ROOT_DIR}/build/uwvm_int_basic_full.log}"
 
 echo "INFO: strict basic ABI modes = ${UWVM2TEST_ABI_MODES}" | tee -a "${LOG_FILE}"
 echo "INFO: strict basic matrix level = ${UWVM2TEST_MATRIX_LEVEL}" | tee -a "${LOG_FILE}"
+if [[ -n "${SYSROOT:-}" ]]; then
+  echo "INFO: strict basic sysroot = ${SYSROOT}" | tee -a "${LOG_FILE}"
+else
+  echo "INFO: strict basic sysroot = <toolchain default>" | tee -a "${LOG_FILE}"
+fi
 echo "INFO: strict basic target count = ${#STRICT_TARGETS[@]}" | tee -a "${LOG_FILE}"
 
 echo "=== uwvm_int strict basic full: configure ===" | tee -a "${LOG_FILE}"
