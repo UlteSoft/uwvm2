@@ -122,7 +122,8 @@ echo "INFO: strict coverage llvm-profdata = ${LLVM_PROFDATA}"
 echo "INFO: strict coverage llvm-cov = ${LLVM_COV}"
 echo "INFO: strict coverage regex = ${COVER_INCLUDE_REGEX}"
 
-COVER_CXFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+STRICT_NO_WERROR_CXFLAGS="-Wno-error"
+COVER_CXFLAGS="${STRICT_NO_WERROR_CXFLAGS} -fprofile-instr-generate -fcoverage-mapping"
 COVER_LDFLAGS="-fprofile-instr-generate -fcoverage-mapping"
 
 COVER_BATCH_SIZE="${UWVM_STRICT_COVERAGE_BATCH_SIZE:-8}"
