@@ -142,6 +142,26 @@ namespace
     {
         using Runner = interpreter_runner<Opt>;
 
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        auto run_one = [&](::std::size_t fidx, char const* expected_message) noexcept -> int
+        {
+            int const ec = run_in_child_expect_trap_message(expected_message,
+                                                            [&]
+                                                            {
+                                                                (void)Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                                                                  rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                                                                  pack_no_params(),
+                                                                                  nullptr,
+                                                                                  nullptr);
+                                                                exit_98();
+                                                            });
+            if(ec != 0)
+            {
+                ::std::fprintf(stderr, "uwvm2test: trunc trap case failed: fidx=%zu\n", fidx);
+            }
+            return ec;
+        };
+#else
         auto run_one = [&](::std::size_t fidx, ::std::initializer_list<int> expected_exits) noexcept -> int
         {
             int const ec = run_in_child_expect_exit_oneof(expected_exits,
@@ -164,18 +184,27 @@ namespace
             }
             return ec;
         };
+#endif
 
         // f0..f7 => invalid conversion
         for(::std::size_t i{}; i != 8uz; ++i)
         {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            int const ec = run_one(i, "invalid conversion to integer");
+#else
             int const ec = run_one(i, {12});
+#endif
             if(ec != 0) { return ec; }
         }
 
         // f8..f15 => overflow (must hit trap_integer_overflow_func).
         for(::std::size_t i{8uz}; i != 16uz; ++i)
         {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            int const ec = run_one(i, "integer overflow");
+#else
             int const ec = run_one(i, {11});
+#endif
             if(ec != 0) { return ec; }
         }
 
@@ -191,9 +220,11 @@ namespace
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
         UWVM2TEST_REQUIRE(cm.local_funcs.size() == 16uz);
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         // Hooks must remain intact after compilation.
         UWVM2TEST_REQUIRE(optable::trap_invalid_conversion_to_integer_func == exit_12);
         UWVM2TEST_REQUIRE(optable::trap_integer_overflow_func == exit_11);
+#endif
 
         // Keep bytecode shape checks to non-cached layouts. Cached ABIs can legitimately select different stacktop-specialized variants after `f32.const`.
         if constexpr(Opt.i32_stack_top_begin_pos == SIZE_MAX && Opt.i64_stack_top_begin_pos == SIZE_MAX && Opt.f32_stack_top_begin_pos == SIZE_MAX &&

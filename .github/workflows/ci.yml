@@ -30,7 +30,7 @@ jobs:
       - name: Work around LLVM libc++ header bug
         run: python3 tools/ci/patch_llvm_libcxx_hash_memory.py --llvm-prefix "$(brew --prefix llvm)"
       - name: Configure
-        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm-compiler=y --sdk="$(brew --prefix llvm)" --static=none
+        run: xmake f -m ${{ matrix.mode }} --march=none --use-llvm-compiler=y --sdk="$(brew --prefix llvm)" --enable-test-llvm-jit=y --static=none
       - name: Build
         run: |
           xmake b -rv
@@ -78,7 +78,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=none
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --enable-test-llvm-jit=y --static=none
       - name: Build
         run: |
           xmake b -rv
@@ -128,7 +128,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --static=none
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --cxflags="${{ matrix.cxx_flags }}" --test-libfuzzer=y --enable-test-llvm-jit=y --static=none
       - name: Build
         run: |
           # Build all targets (including tests), but do not run them.
@@ -194,7 +194,7 @@ jobs:
           ln -s $(which clang-23) clang
           ln -s $(which llvm-config-23) llvm-config
           export PATH=$PWD:$PATH
-          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --static=none
+          xmake f -m debug --use-llvm-compiler=y -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --march=none --enable-test-llvm-jit=y --static=none
       - name: Build
         run: xmake b -rv
       - name: Check UWVM version

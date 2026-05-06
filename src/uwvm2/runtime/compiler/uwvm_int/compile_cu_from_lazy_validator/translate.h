@@ -191,9 +191,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         struct lazy_split_control_frame
         {
             ::std::size_t eu_index{};
+            ::std::size_t active_eu_index{};
             ::std::size_t else_eu_index{SIZE_MAX};
             lazy_execution_unit_kind kind{lazy_execution_unit_kind::function};
+            bool then_eu_closed_at_else{};
         };
+
+        [[nodiscard]] inline constexpr ::std::size_t active_parent_eu_index(lazy_split_control_frame const& frame) noexcept
+        {
+            return frame.active_eu_index == SIZE_MAX ? frame.eu_index : frame.active_eu_index;
+        }
 
         [[nodiscard]] inline constexpr ::std::size_t byte_offset(::std::byte const* base, ::std::byte const* curr) noexcept
         { return static_cast<::std::size_t>(curr - base); }
@@ -309,7 +316,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             if(linear_begin == nullptr) { return; }
 
-            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : control_stack.back_unchecked().eu_index};
+            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : active_parent_eu_index(control_stack.back_unchecked())};
             auto const depth{control_stack.empty() ? 0uz : control_stack.size() - 1uz};
             append_linear_execution_unit_if_needed(storage,
                                                    function_index,
@@ -637,7 +644,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             ::uwvm2::utils::container::vector<lazy_split_control_frame> control_stack{};
             control_stack.reserve(32uz);
-            control_stack.push_back({.eu_index = function_eu_index, .else_eu_index = SIZE_MAX, .kind = lazy_execution_unit_kind::function});
+            control_stack.push_back(
+                {.eu_index = function_eu_index, .active_eu_index = function_eu_index, .else_eu_index = SIZE_MAX, .kind = lazy_execution_unit_kind::function});
 
             ::std::byte const* linear_begin{has_linear_eu_split(cfg) ? code_begin : nullptr};
             auto code_curr{code_begin};
@@ -691,14 +699,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [     safe    ] unsafe (could be the section_end)
                         //                 ^^ code_curr
 
-                        auto const parent_eu_index{control_stack.back_unchecked().eu_index};
+                        auto const parent_eu_index{active_parent_eu_index(control_stack.back_unchecked())};
                         auto const depth{control_stack.size()};
                         auto const kind{curr_opbase == wasm1_code::block  ? lazy_execution_unit_kind::block
                                         : curr_opbase == wasm1_code::loop ? lazy_execution_unit_kind::loop
                                                                           : lazy_execution_unit_kind::if_};
                         auto const eu_index{
                             append_execution_unit(storage, function_index, local_function_index, parent_eu_index, depth, code_begin, op_begin, nullptr, kind)};
-                        control_stack.push_back({.eu_index = eu_index, .else_eu_index = SIZE_MAX, .kind = kind});
+                        control_stack.push_back({.eu_index = eu_index, .active_eu_index = eu_index, .else_eu_index = SIZE_MAX, .kind = kind});
                         if(linear_begin != nullptr) { linear_begin = code_curr; }
                         break;
                     }
@@ -716,6 +724,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
 
                         auto& frame{control_stack.back_unchecked()};
+                        if(frame.else_eu_index != SIZE_MAX) [[unlikely]] { fail_lazy_split(op_begin, code_validation_error_code::illegal_else, err); }
+                        set_execution_unit_end(storage, frame.eu_index, op_begin);
+                        frame.then_eu_closed_at_else = true;
+
                         auto const else_eu_index{append_execution_unit(storage,
                                                                        function_index,
                                                                        local_function_index,
@@ -726,6 +738,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                        nullptr,
                                                                        lazy_execution_unit_kind::else_)};
                         frame.else_eu_index = else_eu_index;
+                        frame.active_eu_index = else_eu_index;
                         if(linear_begin != nullptr) { linear_begin = code_curr; }
                         break;
                     }
@@ -746,7 +759,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
 
                         auto const frame{control_stack.back_unchecked()};
-                        set_execution_unit_end(storage, frame.eu_index, code_curr);
+                        if(!frame.then_eu_closed_at_else) { set_execution_unit_end(storage, frame.eu_index, code_curr); }
                         if(frame.else_eu_index != SIZE_MAX) { set_execution_unit_end(storage, frame.else_eu_index, code_curr); }
                         control_stack.pop_back_unchecked();
 
@@ -775,7 +788,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
                         if(linear_begin != nullptr && static_cast<::std::size_t>(code_curr - linear_begin) >= cfg.linear_eu_code_size)
                         {
-                            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : control_stack.back_unchecked().eu_index};
+                            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : active_parent_eu_index(control_stack.back_unchecked())};
                             auto const depth{control_stack.empty() ? 0uz : control_stack.size() - 1uz};
                             append_linear_execution_unit_if_needed(storage,
                                                                    function_index,

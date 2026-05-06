@@ -479,7 +479,7 @@ template <typename Float>
     emit_llvm_conditional_trap(llvm_module,
                                ir_builder,
                                is_overflow,
-                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::invalid_conversion_to_integer);
+                               ::uwvm2::runtime::lib::llvm_jit_trap_kind::integer_overflow);
 
     return is_signed ? ir_builder.CreateFPToSI(operand, dest_type) : ir_builder.CreateFPToUI(operand, dest_type);
 }

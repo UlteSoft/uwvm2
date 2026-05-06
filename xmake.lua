@@ -453,12 +453,17 @@ end
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
 	local is_0013_uwvm_int = (string.find(file, "test/0013.uwvm_int/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\", 1, true) ~= nil)
+	local is_0013_uwvm_int_lazy = (string.find(file, "test/0013.uwvm_int/lazy/", 1, true) ~= nil) or (string.find(file, "test\\0013.uwvm_int\\lazy\\", 1, true) ~= nil)
+	local is_0014_llvm_jit = (string.find(file, "test/0014.llvm_jit/", 1, true) ~= nil) or (string.find(file, "test\\0014.llvm_jit\\", 1, true) ~= nil)
 	local is_libfuzzer = (string.find(file, "test/0009.libfuzzer/", 1, true) ~= nil) or
 		(string.find(file, "test\\0009.libfuzzer\\", 1, true) ~= nil)
-	local is_llvm_jit_test = string.find(file, "llvm_jit", 1, true) ~= nil
+	local is_llvm_jit_test = is_0014_llvm_jit or (string.find(file, "llvm_jit", 1, true) ~= nil)
 	local test_libfuzzer = get_config("test-libfuzzer")
+	local is_int_backend = get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default"
 
-	if not (is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) then
+	if not ((is_0013_uwvm_int and not get_config("enable-test-uwvm-int")) or
+		(is_0013_uwvm_int_lazy and not is_int_backend) or
+		(is_0014_llvm_jit and not get_config("enable-test-llvm-jit"))) then
 		local name = path.basename(file)
 		target(name)
 		local group = path.directory(file):gsub("\\\\", "/")
@@ -468,6 +473,11 @@ for _, file in ipairs(os.files("test/**.cc")) do
 
 		if ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) and
 			is_llvm_jit_test then
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+		end
+
+		if is_0013_uwvm_int_lazy then
 			add_deps("uwvm_runtime")
 			add_deps("uwvm")
 		end
@@ -665,6 +675,92 @@ for _, file in ipairs(os.files("test/**.cc")) do
 			add_files(file)
 		end
 
+		target_end()
+	end
+end
+
+-- LLVM JIT mirror of the 0013 strict uwvm-int suites. These targets compile the
+-- original 0013 source files with a runner macro that routes Runner::run through
+-- llvm_jit_call_raw_host_api, so the LLVM coverage stays aligned with 0013.
+if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")) then
+	for _, file in ipairs(os.files("test/0013.uwvm_int/strict/**.cc")) do
+		local rel = file:gsub("\\", "/")
+		rel = rel:gsub("^test/0013%.uwvm_int/strict/", "")
+		local suffix = rel:gsub("%.cc$", "")
+		suffix = suffix:gsub("/", "_"):gsub("%.", "_"):gsub("%-", "_")
+		local name = "llvm_jit_reuse_0013_" .. suffix
+
+		target(name)
+			set_group("test/0014.llvm_jit")
+			set_kind("binary")
+			def_build({ skip_static_libcxx = true })
+
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+
+			-- uwvm uses precise floating-point model to ensure determinism.
+			set_fpmodels("precise")
+
+			set_default(false)
+
+			local enable_cxx_module = get_config("use-cxx-module")
+
+			-- third-parties/fast_io
+			add_includedirs("third-parties/fast_io/include")
+
+			if enable_cxx_module then
+				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+			end
+			-- third-parties/bizwen
+			add_includedirs("third-parties/bizwen/include")
+
+			-- third-parties/boost
+			add_includedirs("third-parties/boost_unordered/include")
+
+			-- uwvm
+			add_defines("UWVM=2")
+			-- uwvm test
+			add_defines("UWVM_TEST=2")
+			add_defines("UWVM2TEST_RUNNER_USE_LLVM_JIT")
+
+			-- src
+			add_includedirs("src/")
+
+			if enable_cxx_module then
+				-- uwvm predefine
+				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+				-- utils
+				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+				-- object
+				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+				-- imported
+				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+				-- wasm parser
+				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+				-- validation
+				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
+				-- uwvm
+				add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+			end
+
+			set_warnings("all", "extra", "error")
+
+			if get_config("use-llvm-compiler") then
+				-- Test targets include CLI glue headers that currently trigger
+				-- `-Wundefined-inline` under LLVM. Keep src/* at full warning-as-error
+				-- strictness and only downgrade this diagnostic for tests.
+				add_cxxflags("-Wno-error=undefined-inline")
+			end
+
+			add_tests("unit", { group = "default" }) -- xmake test -g default
+			add_files(file)
 		target_end()
 	end
 end

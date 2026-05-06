@@ -442,6 +442,17 @@ option("enable-test-uwvm-int", function()
     set_default(false)
 end)
 
+option("enable-test-llvm-jit", function()
+    set_description
+    (
+        "Register slow LLVM JIT validation/coverage targets.",
+        "default = false",
+        [[    true: register 0014.llvm_jit targets and 0013 strict LLVM-JIT mirror targets.]],
+        [[    false: skip registering slow LLVM JIT validation/coverage targets.]]
+    )
+    set_default(false)
+end)
+
 -- uwvm Debug Option
 
 option("debug-timer", function()

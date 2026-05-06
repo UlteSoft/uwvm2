@@ -3106,7 +3106,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         inline void ensure_bridges_initialized() noexcept;
 #endif
-        inline void compile_all_modules_if_needed() noexcept;
+        inline void compile_all_modules_if_needed(bool initialize_interpreter_bridges = true) noexcept;
 
         [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view
             describe_runtime_mode(::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t mode) noexcept
@@ -3926,11 +3926,11 @@ namespace uwvm2::runtime::lib
         }
 #endif
 
-        inline void compile_all_modules_if_needed() noexcept
+        inline void compile_all_modules_if_needed(bool initialize_interpreter_bridges) noexcept
         {
             ensure_runtime_process_exit_handler_registered();
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-            ensure_bridges_initialized();
+            if(initialize_interpreter_bridges) { ensure_bridges_initialized(); }
 #endif
             if(g_runtime.compiled_all.load(::std::memory_order_acquire)) { return; }
 
@@ -5440,6 +5440,31 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    void llvm_jit_reset_runtime_state_host_api() noexcept
+    {
+        ensure_runtime_process_exit_handler_registered();
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        g_runtime.lazy_scheduler.stop();
+        g_runtime.lazy_initialized.store(false, ::std::memory_order_release);
+        g_runtime.lazy_compile_active = false;
+# endif
+
+        g_runtime.modules.clear();
+        g_runtime.module_name_to_id.clear();
+        g_runtime.defined_func_cache.clear();
+        g_runtime.defined_func_ptr_ranges.clear();
+        g_import_call_cache.clear();
+# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+        g_wasip1_runtime_module_context_cache.clear();
+# endif
+
+        g_runtime.compiled_all.store(false, ::std::memory_order_release);
+        g_runtime.bridges_initialized.store(false, ::std::memory_order_release);
+
+        erase_current_thread_state();
+    }
+
     void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                     ::std::uint_least32_t func_index,
                                     void* result_buffer,
@@ -5447,18 +5472,7 @@ namespace uwvm2::runtime::lib
                                     void const* param_buffer,
                                     ::std::size_t param_bytes) noexcept
     {
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-        llvm_jit_invoke_raw_host_bridge_common(
-            runtime_module_ptr,
-            result_buffer,
-            result_bytes,
-            param_buffer,
-            param_bytes,
-            0uz,
-            [](::std::byte*) noexcept {},
-            [&](::std::size_t wasm_module_id, ::std::byte** stack_top_ptr) { call_bridge(wasm_module_id, func_index, stack_top_ptr); });
-# else
-        compile_all_modules_if_needed();
+        compile_all_modules_if_needed(false);
 
         if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr)) [[unlikely]] { ::fast_io::fast_terminate(); }
 
@@ -5529,7 +5543,6 @@ namespace uwvm2::runtime::lib
         if(try_invoke_runtime_llvm_jit_raw_defined_entry(wasm_module_id, func_index, result_buffer, result_bytes, param_buffer, param_bytes)) { return; }
 
         ::fast_io::fast_terminate();
-# endif
     }
 #endif
 

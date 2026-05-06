@@ -65,6 +65,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    /// @brief Clear compiled runtime state before loading a fresh module set in the same process.
+    extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept;
+
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,

@@ -169,6 +169,25 @@ namespace
 
         auto run_trap = [&](::std::size_t fidx, byte_vec const& params, int expected_exit) noexcept -> int
         {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            char const* expected_message{};
+            switch(expected_exit)
+            {
+                case 11: expected_message = "integer overflow"; break;
+                case 12: expected_message = "invalid conversion to integer"; break;
+                default: expected_message = "Runtime crash"; break;
+            }
+            return run_in_child_expect_trap_message(expected_message,
+                                                    [&]
+                                                    {
+                                                        (void)Runner::run(cm.local_funcs.index_unchecked(fidx),
+                                                                          rt.local_defined_function_vec_storage.index_unchecked(fidx),
+                                                                          params,
+                                                                          nullptr,
+                                                                          nullptr);
+                                                        exit_98();
+                                                    });
+#else
             return run_in_child_expect_exit(expected_exit,
                                             [&]
                                             {
@@ -183,6 +202,7 @@ namespace
                                                                   nullptr);
                                                 exit_98();
                                             });
+#endif
         };
 
         // NaN cases
