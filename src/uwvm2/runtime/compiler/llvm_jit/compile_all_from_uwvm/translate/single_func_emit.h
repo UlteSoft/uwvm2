@@ -51,6 +51,12 @@ struct llvm_jit_memory_snapshot_values_t
 [[nodiscard]] inline ::llvm::StringRef get_llvm_string_ref(::uwvm2::utils::container::string const& str) noexcept
 { return get_llvm_string_ref(::uwvm2::utils::container::string_view{str.data(), str.size()}); }
 
+[[nodiscard]] inline bool llvm_jit_basic_block_has_terminator(::llvm::BasicBlock const* block) noexcept
+{
+    if(block == nullptr) [[unlikely]] { return false; }
+    return !block->empty() && block->back().isTerminator();
+}
+
 class raw_uwvm_string_ostream : public ::llvm::raw_ostream
 {
     ::uwvm2::utils::container::string& output;
@@ -2556,7 +2562,7 @@ inline void mark_runtime_local_func_llvm_jit_branch_target_has_incoming(runtime_
 
     auto& ir_builder{*state.ir_builder};
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     llvm_jit_stack_value_t branch_value{};
     if(!try_get_runtime_local_func_llvm_jit_branch_value(state, target.params, branch_value)) [[unlikely]] { return false; }
@@ -2612,7 +2618,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
 
     auto& ir_builder{*state.ir_builder};
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     emit_llvm_runtime_trap(ir_builder, ::uwvm2::runtime::lib::llvm_jit_trap_kind::unreachable);
     ir_builder.CreateUnreachable();
@@ -2678,7 +2684,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto& ir_builder{*state.ir_builder};
 
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     auto loop_body_block{::llvm::BasicBlock::Create(llvm_context, "loop.body", state.llvm_function)};
     auto end_block{::llvm::BasicBlock::Create(llvm_context, "loop.end", state.llvm_function)};
@@ -2727,7 +2733,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto& ir_builder{*state.ir_builder};
 
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     auto then_block{::llvm::BasicBlock::Create(llvm_context, "if.then", state.llvm_function)};
     auto else_block{::llvm::BasicBlock::Create(llvm_context, "if.else", state.llvm_function)};
@@ -2837,7 +2843,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     state.control_stack.back().is_reachable = continuation_reachable;
     if(!continuation_reachable)
     {
-        if(end_block != nullptr && end_block->getTerminator() == nullptr)
+        if(end_block != nullptr && !llvm_jit_basic_block_has_terminator(end_block))
         {
             if(end_phi != nullptr && end_phi->getNumIncomingValues() == 0u) { end_phi->eraseFromParent(); }
             ::llvm::IRBuilder<> unreachable_builder(end_block);
@@ -2901,7 +2907,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     if(!try_get_runtime_local_func_llvm_jit_branch_value(state, branch_target->params, branch_value)) [[unlikely]] { return false; }
 
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     if(get_runtime_block_result_count(branch_target->params) == 1uz)
     {
@@ -2986,7 +2992,7 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     if(!try_get_runtime_local_func_llvm_jit_branch_value(state, default_target->params, branch_value)) [[unlikely]] { return false; }
 
     auto current_block{ir_builder.GetInsertBlock()};
-    if(current_block == nullptr || current_block->getTerminator() != nullptr) [[unlikely]] { return false; }
+    if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
     ::uwvm2::utils::container::vector<::llvm::BasicBlock*> seen_blocks{};
     seen_blocks.reserve(branch_targets.size() + 1uz);
