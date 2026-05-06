@@ -69,6 +69,7 @@
 # include <uwvm2/parser/wasm/standard/wasm1/type/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1p1/type/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/compile_all_from_uwvm/impl.h>
+# include <uwvm2/runtime/compiler/uwvm_int/compile_cu_from_lazy_validator/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # include <uwvm2/utils/container/impl.h>
@@ -110,6 +111,10 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         using compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_full_function_symbol_t;
         using compiled_local_func_t = ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t;
+        using lazy_compiled_module_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_module_storage_t;
+        using lazy_compile_options_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_compile_options;
+        using lazy_validation_mode_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_validation_mode;
+        using lazy_parser_module_storage_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::parser_module_storage_t;
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         using llvm_jit_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
@@ -139,6 +144,8 @@ namespace uwvm2::runtime::lib
             runtime_module_storage_t const* runtime_module{};
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             compiled_module_t compiled{};
+            lazy_compiled_module_t lazy_compiled{};
+            lazy_compile_options_t lazy_compile_options{};
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             llvm_jit_compiled_module_t llvm_jit_compiled{};
@@ -185,9 +192,31 @@ namespace uwvm2::runtime::lib
 
             ::std::atomic_bool bridges_initialized{false};
             ::std::atomic_bool compiled_all{false};
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            ::uwvm2::utils::thread::lazy_compile_scheduler lazy_scheduler{};
+            ::std::atomic_bool lazy_initialized{false};
+            bool lazy_compile_active{};
+#endif
         };
 
         inline runtime_global_state g_runtime{};  // [global]
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        [[nodiscard]] inline lazy_parser_module_storage_t const*
+            find_lazy_validator_module_storage(::uwvm2::utils::container::u8string_view module_name) noexcept
+        {
+            auto const it{::uwvm2::uwvm::wasm::storage::all_module.find(module_name)};
+            if(it == ::uwvm2::uwvm::wasm::storage::all_module.end()) [[unlikely]] { return nullptr; }
+
+            using module_type_t = ::uwvm2::uwvm::wasm::type::module_type_t;
+            auto const& am{it->second};
+            if(am.type != module_type_t::exec_wasm && am.type != module_type_t::preloaded_wasm) [[unlikely]] { return nullptr; }
+
+            auto const wf{am.module_storage_ptr.wf};
+            if(wf == nullptr || wf->binfmt_ver != 1u) [[unlikely]] { return nullptr; }
+            return ::std::addressof(wf->wasm_module_storage.wasm_binfmt_ver1_storage);
+        }
+#endif
 
         inline bool& runtime_process_exiting_flag() noexcept
         {
@@ -2538,6 +2567,53 @@ namespace uwvm2::runtime::lib
             if(use_scratch) { g_call_scratch.release(scratch_mark); }
 # endif
         }
+
+        inline void ensure_lazy_defined_function_compiled(::std::size_t module_id, ::std::size_t function_index) noexcept
+        {
+            if(!g_runtime.lazy_compile_active) { return; }
+
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto& rec{g_runtime.modules.index_unchecked(module_id)};
+            auto const runtime_module{rec.runtime_module};
+            if(runtime_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const import_n{runtime_module->imported_function_vec_storage.size()};
+            if(function_index < import_n) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const local_index{function_index - import_n};
+            if(local_index >= rec.lazy_compiled.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const& fn{rec.lazy_compiled.functions.index_unchecked(local_index)};
+            auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled) { return; }
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(fn.primary_cu_index >= rec.lazy_compiled.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            ::uwvm2::validation::error::code_validation_error_impl err{};
+            ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_compile_request_context ctx{
+                .curr_module = runtime_module,
+                .lazy_storage = ::std::addressof(rec.lazy_compiled),
+                .options = rec.lazy_compile_options,
+                .compile_unit_index = fn.primary_cu_index,
+                .err = ::std::addressof(err)};
+
+            constexpr auto curr_target_tranopt{get_curr_target_tranopt()};
+            auto request{::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::make_lazy_compile_request<curr_target_tranopt>(ctx, 1u)};
+            if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]]
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                print_and_terminate_compile_validation_error(rec.module_name, err);
+# else
+                ::fast_io::fast_terminate();
+# endif
+            }
+        }
+
+        inline void ensure_lazy_defined_function_compiled(::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info) noexcept
+        { ensure_lazy_defined_function_compiled(info.module_id, info.function_index); }
+
+        inline void ensure_lazy_defined_function_compiled(compiled_defined_func_info const& info) noexcept
+        { ensure_lazy_defined_function_compiled(info.module_id, info.function_index); }
 #endif
 
         [[maybe_unused]] inline void invoke_local_imported(runtime_imported_func_storage_t::local_imported_target_t const& tgt,
@@ -2662,6 +2738,7 @@ namespace uwvm2::runtime::lib
 
             ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
             call_stack_guard g{call_stack, frame.module_id, frame.function_index};
+            ensure_lazy_defined_function_compiled(frame.module_id, frame.function_index);
             execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, ::std::addressof(stack_top_ptr));
 
             if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
@@ -2804,6 +2881,7 @@ namespace uwvm2::runtime::lib
                     auto const info{find_defined_func_info(rf.u.defined_ptr)};
                     if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto& call_stack{get_call_stack()};
+                    ensure_lazy_defined_function_compiled(*info);
                     execute_compiled_defined(call_stack, info->runtime_func, info->compiled_func, info->param_bytes, info->result_bytes, caller_stack_top_ptr);
                     return;
                 }
@@ -3474,6 +3552,7 @@ namespace uwvm2::runtime::lib
 
                 auto& call_stack{get_call_stack()};
                 call_stack_guard g{call_stack, info->module_id, info->function_index};
+                ensure_lazy_defined_function_compiled(*info);
                 execute_compiled_defined(call_stack, rf, cf, info->param_bytes, info->result_bytes, stack_top_ptr);
                 return;
             }
@@ -3501,6 +3580,7 @@ namespace uwvm2::runtime::lib
                 {
                     case cached_import_target::kind::defined:
                     {
+                        ensure_lazy_defined_function_compiled(tgt.frame.module_id, tgt.frame.function_index);
                         execute_compiled_defined(call_stack,
                                                  tgt.u.defined.runtime_func,
                                                  tgt.u.defined.compiled_func,
@@ -3539,6 +3619,7 @@ namespace uwvm2::runtime::lib
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& info{mod_cache.index_unchecked(local_index)};
             if(info.runtime_func != lf) [[unlikely]] { ::fast_io::fast_terminate(); }
+            ensure_lazy_defined_function_compiled(info);
             execute_compiled_defined(call_stack, info.runtime_func, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
         }
 
@@ -3593,6 +3674,7 @@ namespace uwvm2::runtime::lib
                             call_stack_guard g{call_stack, info.module_id, info.function_index};
                             auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                             if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                            ensure_lazy_defined_function_compiled(info);
                             execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                             return;
                         }
@@ -3608,6 +3690,7 @@ namespace uwvm2::runtime::lib
                             {
                                 case cached_import_target::kind::defined:
                                 {
+                                    ensure_lazy_defined_function_compiled(tgt.frame.module_id, tgt.frame.function_index);
                                     execute_compiled_defined(call_stack,
                                                              tgt.u.defined.runtime_func,
                                                              tgt.u.defined.compiled_func,
@@ -3692,8 +3775,10 @@ namespace uwvm2::runtime::lib
                     if(base == nullptr || def_ptr < base || def_ptr >= base + local_n) [[unlikely]] { ::fast_io::fast_terminate(); }
                     auto const local_idx{static_cast<::std::size_t>(def_ptr - base)};
 
-                    if(local_idx >= module_rec.compiled.local_defined_call_info.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    auto const& info{module_rec.compiled.local_defined_call_info.index_unchecked(local_idx)};
+                    if(wasm_module_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(wasm_module_id)};
+                    if(local_idx >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const& info{mod_cache.index_unchecked(local_idx)};
                     if(info.runtime_func != def_ptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                     // Update inline cache.
@@ -3705,7 +3790,7 @@ namespace uwvm2::runtime::lib
                         ic.expected_ft_ptr = expected_ft_ptr;
                         ic.elem_type = elem.type;
                         ic.target_ptr = static_cast<void const*>(def_ptr);
-                        ic.defined_info = ::std::addressof(info);
+                        ic.defined_info = info.compiled_call_info;
                         ic.imported_tgt = nullptr;
                     }
 
@@ -3714,6 +3799,7 @@ namespace uwvm2::runtime::lib
                     call_stack_guard g{call_stack, info.module_id, info.function_index};
                     auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ensure_lazy_defined_function_compiled(info);
                     execute_compiled_defined(call_stack, rf, info.compiled_func, info.param_bytes, info.result_bytes, stack_top_ptr);
                     return;
                 }
@@ -3779,6 +3865,7 @@ namespace uwvm2::runtime::lib
                     {
                         case cached_import_target::kind::defined:
                         {
+                            ensure_lazy_defined_function_compiled(tgt.frame.module_id, tgt.frame.function_index);
                             execute_compiled_defined(call_stack,
                                                      tgt.u.defined.runtime_func,
                                                      tgt.u.defined.compiled_func,
@@ -4089,6 +4176,11 @@ namespace uwvm2::runtime::lib
             }
 
             // Assign module ids.
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            g_runtime.lazy_scheduler.stop();
+            g_runtime.lazy_initialized.store(false, ::std::memory_order_release);
+            g_runtime.lazy_compile_active = false;
+#endif
             g_runtime.modules.clear();
             g_runtime.module_name_to_id.clear();
             g_runtime.defined_func_cache.clear();
@@ -4665,6 +4757,267 @@ namespace uwvm2::runtime::lib
             compile_lock.clear(::std::memory_order_release);
         }
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        inline void initialize_lazy_modules_if_needed(lazy_compile_run_config cfg) noexcept
+        {
+            ensure_runtime_process_exit_handler_registered();
+            ensure_bridges_initialized();
+
+            if(g_runtime.lazy_initialized.load(::std::memory_order_acquire)) { return; }
+
+            static ::std::atomic_flag lazy_init_lock = ATOMIC_FLAG_INIT;
+            while(lazy_init_lock.test_and_set(::std::memory_order_acquire))
+            {
+                if(g_runtime.lazy_initialized.load(::std::memory_order_acquire)) { return; }
+                ::uwvm2::utils::thread::lazy_compile_thread_yield();
+            }
+
+            if(g_runtime.lazy_initialized.load(::std::memory_order_relaxed))
+            {
+                lazy_init_lock.clear(::std::memory_order_release);
+                return;
+            }
+
+            g_runtime.lazy_scheduler.stop();
+            g_runtime.modules.clear();
+            g_runtime.module_name_to_id.clear();
+            g_runtime.defined_func_cache.clear();
+            g_runtime.defined_func_ptr_ranges.clear();
+            g_import_call_cache.clear();
+# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+            g_wasip1_runtime_module_context_cache.clear();
+# endif
+
+            auto const& rt_map{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage};
+            g_runtime.modules.reserve(rt_map.size());
+            g_runtime.module_name_to_id.reserve(rt_map.size());
+
+            ::std::size_t id{};
+            for(auto const& kv: rt_map)
+            {
+                g_runtime.module_name_to_id.emplace(kv.first, id);
+                compiled_module_record rec{};
+                rec.module_name = kv.first;
+                rec.runtime_module = ::std::addressof(kv.second);
+                g_runtime.modules.push_back(::std::move(rec));
+                ++id;
+            }
+
+            g_runtime.defined_func_cache.resize(g_runtime.modules.size());
+# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+            rebuild_wasip1_runtime_module_context_cache();
+# endif
+
+            using lazy_split_config = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_split_config;
+            using lazy_eu_policy_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_execution_unit_split_policy_t;
+            using lazy_cu_policy_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_compile_unit_split_policy_t;
+            using runtime_scheduling_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_t;
+
+            lazy_split_config split_config{};
+            split_config.linear_eu_code_size = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size;
+            split_config.cu_code_size = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size;
+            if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_policy == runtime_scheduling_policy_t::function_count)
+            {
+                split_config.eu_policy = lazy_eu_policy_t::function_only;
+                split_config.cu_policy = lazy_cu_policy_t::function;
+            }
+
+            auto const lazy_validation_mode{cfg.assume_full_code_verified ? lazy_validation_mode_t::assume_full_code_verified
+                                                                          : lazy_validation_mode_t::validate_on_lazy_compile};
+
+            for(auto& rec: g_runtime.modules)
+            {
+                auto const it{g_runtime.module_name_to_id.find(rec.module_name)};
+                if(it == g_runtime.module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                auto const module_id{it->second};
+
+                ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option opt{};
+                opt.curr_wasm_id = module_id;
+
+                rec.lazy_compile_options.compile_options = opt;
+                rec.lazy_compile_options.validation_mode = lazy_validation_mode;
+                rec.lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
+                if(lazy_validation_mode == lazy_validation_mode_t::validate_on_lazy_compile &&
+                   rec.lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
+
+                ::uwvm2::validation::error::code_validation_error_impl err{};
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    rec.lazy_compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::initialize_lazy_module_storage(
+                        *rec.runtime_module,
+                        opt,
+                        err,
+                        split_config);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    print_and_terminate_compile_validation_error(rec.module_name, err);
+                }
+# endif
+
+                rec.type_canon_index = build_type_canon_index(*rec.runtime_module);
+
+                auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
+                if(local_n != rec.lazy_compiled.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                auto& mod_cache{g_runtime.defined_func_cache.index_unchecked(module_id)};
+                mod_cache.clear();
+                mod_cache.resize(local_n);
+
+                if(local_n != 0uz)
+                {
+                    auto const base_ptr{rec.runtime_module->local_defined_function_vec_storage.data()};
+                    if(base_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    ::std::uintptr_t const begin{reinterpret_cast<::std::uintptr_t>(base_ptr)};
+                    constexpr ::std::size_t elem_size{sizeof(runtime_local_func_storage_t)};
+                    static_assert(elem_size != 0uz);
+                    if(local_n > (::std::numeric_limits<::std::uintptr_t>::max() / elem_size)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    ::std::uintptr_t const bytes{static_cast<::std::uintptr_t>(local_n * elem_size)};
+                    if(begin > ::std::numeric_limits<::std::uintptr_t>::max() - bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    g_runtime.defined_func_ptr_ranges.push_back(defined_func_ptr_range{begin, begin + bytes, module_id});
+                }
+
+                for(::std::size_t i{}; i != local_n; ++i)
+                {
+                    auto const runtime_func{::std::addressof(rec.runtime_module->local_defined_function_vec_storage.index_unchecked(i))};
+                    auto const compiled_call_info{::std::addressof(rec.lazy_compiled.compiled.local_defined_call_info.index_unchecked(i))};
+                    auto const compiled_func{::std::addressof(rec.lazy_compiled.compiled.local_funcs.index_unchecked(i))};
+
+                    auto const sig{func_sig_from_defined(runtime_func)};
+                    auto const param_bytes{total_abi_bytes(sig.params)};
+                    auto const result_bytes{total_abi_bytes(sig.results)};
+                    if((param_bytes == 0uz && sig.params.size != 0uz) || (result_bytes == 0uz && sig.results.size != 0uz)) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                    mod_cache.index_unchecked(i) = compiled_defined_func_info{module_id,
+                                                                              rec.runtime_module->imported_function_vec_storage.size() + i,
+                                                                              runtime_func,
+                                                                              compiled_call_info,
+                                                                              compiled_func,
+                                                                              param_bytes,
+                                                                              result_bytes};
+                }
+            }
+
+            if(!g_runtime.defined_func_ptr_ranges.empty())
+            {
+                ::std::sort(g_runtime.defined_func_ptr_ranges.begin(),
+                            g_runtime.defined_func_ptr_ranges.end(),
+                            [](defined_func_ptr_range const& a, defined_func_ptr_range const& b) constexpr noexcept { return a.begin < b.begin; });
+            }
+
+            g_import_call_cache.resize(g_runtime.modules.size());
+            for(::std::size_t mid{}; mid != g_runtime.modules.size(); ++mid)
+            {
+                auto const& rec{g_runtime.modules.index_unchecked(mid)};
+                auto const rt{rec.runtime_module};
+                if(rt == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                auto const import_n{rt->imported_function_vec_storage.size()};
+                auto& cache{g_import_call_cache.index_unchecked(mid)};
+                cache.clear();
+                cache.resize(import_n);
+
+                for(::std::size_t i{}; i != import_n; ++i)
+                {
+                    auto const imp{::std::addressof(rt->imported_function_vec_storage.index_unchecked(i))};
+                    if(imp->import_type_ptr != nullptr && imp->import_type_ptr->module_name == u8"wasi_snapshot_preview1" &&
+                       !is_wasip1_import_visible_for_runtime_module_id(mid)) [[unlikely]]
+                    {
+                        ::fast_io::fast_terminate();
+                    }
+                    auto const rf{resolve_func_from_import_assuming_initialized(imp)};
+
+                    cached_import_target tgt{};
+                    tgt.frame.module_id = mid;
+                    tgt.frame.function_index = i;
+
+                    switch(rf.k)
+                    {
+                        case resolved_func::kind::defined:
+                        {
+                            auto const info{find_defined_func_info(rf.u.defined_ptr)};
+                            if(info == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                            tgt.k = cached_import_target::kind::defined;
+                            tgt.frame.module_id = info->module_id;
+                            tgt.frame.function_index = info->function_index;
+                            tgt.sig = func_sig_from_defined(info->runtime_func);
+                            tgt.param_bytes = info->param_bytes;
+                            tgt.result_bytes = info->result_bytes;
+                            tgt.u.defined.runtime_func = info->runtime_func;
+                            tgt.u.defined.compiled_func = info->compiled_func;
+                            break;
+                        }
+                        case resolved_func::kind::local_imported:
+                        {
+                            tgt.k = cached_import_target::kind::local_imported;
+                            tgt.u.local_imported = rf.u.local_imported;
+                            tgt.sig = func_sig_from_local_imported(tgt.u.local_imported.module_ptr, tgt.u.local_imported.index);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
+                            break;
+                        }
+                        case resolved_func::kind::dl:
+                        {
+                            tgt.k = cached_import_target::kind::dl;
+                            tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
+                            tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
+                            break;
+                        }
+                        case resolved_func::kind::weak_symbol:
+                        {
+                            tgt.k = cached_import_target::kind::weak_symbol;
+                            tgt.u.capi_ptr = rf.u.capi_ptr;
+                            tgt.preload_module_memory_attribute = find_preload_module_memory_attribute(tgt.u.capi_ptr);
+                            tgt.sig = func_sig_from_capi(tgt.u.capi_ptr);
+                            tgt.param_bytes = total_abi_bytes(tgt.sig.params);
+                            tgt.result_bytes = total_abi_bytes(tgt.sig.results);
+                            if((tgt.param_bytes == 0uz && tgt.sig.params.size != 0uz) || (tgt.result_bytes == 0uz && tgt.sig.results.size != 0uz)) [[unlikely]]
+                            {
+                                ::fast_io::fast_terminate();
+                            }
+                            break;
+                        }
+                        [[unlikely]] default:
+                        {
+                            ::fast_io::fast_terminate();
+                        }
+                    }
+
+                    cache.index_unchecked(i) = tgt;
+                }
+            }
+
+            auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
+            g_runtime.lazy_scheduler.start({.worker_count = worker_count});
+            g_runtime.lazy_compile_active = true;
+            g_runtime.compiled_all.store(true, ::std::memory_order_release);
+            g_runtime.lazy_initialized.store(true, ::std::memory_order_release);
+            lazy_init_lock.clear(::std::memory_order_release);
+        }
+#endif
+
     }  // namespace
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
@@ -4719,6 +5072,131 @@ namespace uwvm2::runtime::lib
     { get_call_stack().push(call_stack_frame{module_id, function_index}); }
 
     void llvm_jit_pop_call_stack_frame() noexcept { get_call_stack().pop(); }
+#endif
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+    void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config cfg) noexcept
+    {
+        initialize_lazy_modules_if_needed(cfg);
+
+        auto const it{g_runtime.module_name_to_id.find(main_module_name)};
+        if(it == g_runtime.module_name_to_id.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto const main_id{it->second};
+
+        auto const main_module{g_runtime.modules.index_unchecked(main_id).runtime_module};
+        if(main_module == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+# if !defined(UWVM_DISABLE_LOCAL_IMPORTED_WASIP1) && defined(UWVM_IMPORT_WASI_WASIP1)
+        auto& entry_wasip1_env{resolve_wasip1_env_for_runtime_module_id(main_id)};
+        bind_wasip1_memory_for_selected_env(entry_wasip1_env, main_id);
+        ::uwvm2::uwvm::imported::wasi::wasip1::storage::scoped_current_wasip1_env_t entry_wasip1_env_guard{entry_wasip1_env};
+# endif
+
+        auto const import_n{main_module->imported_function_vec_storage.size()};
+        auto const total_n{import_n + main_module->local_defined_function_vec_storage.size()};
+        if(cfg.entry_function_index >= total_n) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        ::std::size_t param_bytes{};
+        ::std::size_t result_bytes{};
+        if(cfg.entry_function_index < import_n)
+        {
+            if(main_id >= g_import_call_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& cache{g_import_call_cache.index_unchecked(main_id)};
+            if(cfg.entry_function_index >= cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& tgt{cache.index_unchecked(cfg.entry_function_index)};
+
+            if(tgt.k != cached_import_target::kind::defined) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Entry function is imported but resolves to a non-wasm implementation (module=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    main_module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            if(tgt.sig.params.size != 0uz || tgt.sig.results.size != 0uz) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Entry function signature is not () -> () (module=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    main_module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            param_bytes = tgt.param_bytes;
+            result_bytes = tgt.result_bytes;
+        }
+        else
+        {
+            auto const local_index{cfg.entry_function_index - import_n};
+            if(main_id >= g_runtime.defined_func_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& mod_cache{g_runtime.defined_func_cache.index_unchecked(main_id)};
+            if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const& entry_info{mod_cache.index_unchecked(local_index)};
+            auto const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
+            if(entry_info.runtime_func != expected_rt) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            if(entry_info.param_bytes != 0uz || entry_info.result_bytes != 0uz) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Entry function signature is not () -> () (module=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    main_module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            param_bytes = entry_info.param_bytes;
+            result_bytes = entry_info.result_bytes;
+        }
+
+        if(param_bytes > (::std::numeric_limits<::std::size_t>::max() - result_bytes)) [[unlikely]] { ::fast_io::fast_terminate(); }
+        auto const stack_bytes{param_bytes + result_bytes};
+
+        heap_buf_guard host_stack_guard{};
+        ::std::byte* host_stack_base{};
+        UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(host_stack_base, stack_bytes, host_stack_guard);
+        ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
+
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(::fast_io::error)
+        {
+            trap_fatal(trap_kind::uncatched_int_tag);
+        }
+# endif
+
+        erase_current_thread_state();
+        g_runtime.lazy_scheduler.stop();
+    }
 #endif
 
     void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config cfg) noexcept

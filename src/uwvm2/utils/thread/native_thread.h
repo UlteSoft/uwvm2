@@ -39,6 +39,14 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#pragma push_macro("UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT")
+#undef UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT
+#ifndef UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT
+# if defined(__cpp_lib_atomic_wait) && __cpp_lib_atomic_wait >= 201907L && !(defined(__APPLE__) && defined(_LIBCPP_VERSION))
+#  define UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT 1
+# endif
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
@@ -388,7 +396,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
         inline void notify_unit(lazy_compile_unit_state& unit) noexcept
         {
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             unit.state.notify_all();
 #else
             (void)unit;
@@ -404,7 +412,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void wake_all_workers() noexcept
         {
             this->queue_epoch.fetch_add(1u, ::std::memory_order_release);
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             this->queue_epoch.notify_all();
 #endif
         }
@@ -465,14 +473,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void wake_one_worker() noexcept
         {
             this->queue_epoch.fetch_add(1u, ::std::memory_order_release);
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             this->queue_epoch.notify_one();
 #endif
         }
 
         inline void wait_for_queue_event(unsigned observed_epoch) noexcept
         {
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             while(this->queue_epoch.load(::std::memory_order_acquire) == observed_epoch && !this->stop_requested.load(::std::memory_order_acquire))
             {
                 this->queue_epoch.wait(observed_epoch, ::std::memory_order_acquire);
@@ -487,7 +495,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
         inline void wait_for_unit_event(lazy_compile_unit_state& unit, lazy_compile_state observed_state) noexcept
         {
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             while(unit.state.load(::std::memory_order_acquire) == observed_state)
             {
                 unit.state.wait(observed_state, ::std::memory_order_acquire);
@@ -560,7 +568,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         {
             while(this->queue_lock.test_and_set(::std::memory_order_acquire))
             {
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
                 this->queue_lock.wait(true, ::std::memory_order_acquire);
 #else
                 lazy_compile_thread_yield();
@@ -571,7 +579,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void unlock_queue() noexcept
         {
             this->queue_lock.clear(::std::memory_order_release);
-#if __cpp_lib_atomic_wait >= 201907L
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
             this->queue_lock.notify_one();
 #endif
         }
@@ -871,6 +879,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         }
     };
 }
+
+#pragma pop_macro("UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT")
 
 #ifndef UWVM_MODULE
 // macro
