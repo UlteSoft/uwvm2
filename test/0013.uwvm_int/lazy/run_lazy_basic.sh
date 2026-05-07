@@ -44,11 +44,12 @@ else
   )
 fi
 
-echo "INFO: lazy target count = ${#TARGETS[@]}"
+  echo "INFO: lazy target count = ${#TARGETS[@]}"
 
 for i in "${!TARGETS[@]}"; do
   t="${TARGETS[$i]}"
   printf '=== [%03d/%03d] build %s ===\n' "$((i + 1))" "${#TARGETS[@]}" "$t"
+  xmake f --ccache=n
   xmake_build "$t"
   exe="$(xmake show -t "$t" | perl -pe 's/\e\[[0-9;]*m//g' | sed -n 's/^[[:space:]]*targetfile:[[:space:]]*//p' | head -n1 || true)"
   if [[ -z "${exe}" || ! -f "${ROOT_DIR}/${exe}" ]]; then

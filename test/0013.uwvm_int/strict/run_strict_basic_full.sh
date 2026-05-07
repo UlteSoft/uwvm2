@@ -59,6 +59,7 @@ fi
 COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
+  --ccache=n
   --cxflags=-Wno-error
   --test-libfuzzer=y
   --enable-test-uwvm-int=y
