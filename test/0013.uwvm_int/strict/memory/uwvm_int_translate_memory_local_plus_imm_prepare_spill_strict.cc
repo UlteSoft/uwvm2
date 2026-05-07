@@ -196,12 +196,16 @@ namespace
         constexpr auto curr_f32 = make_curr_after_f32_pushes<Opt>(1uz);
         constexpr auto curr_f64 = make_curr_after_f64_pushes<Opt>(1uz);
 
+        UWVM2TEST_REQUIRE((contains_spill1<Opt, wasm_i32>(cm.local_funcs.index_unchecked(0).op.operands)));
+        auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr_from_tuple<Opt>(curr_i32, mem, tuple);
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_plain));
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_load_local_plus_imm =
             optable::translate::get_uwvmint_i32_load_local_plus_imm_fptr_from_tuple<Opt>(curr_i32, mem, tuple);
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_local_plus_imm));
-        UWVM2TEST_REQUIRE((contains_spill1<Opt, wasm_i32>(cm.local_funcs.index_unchecked(0).op.operands)));
-
-#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         auto const exp_f32_load_local_plus_imm =
             optable::translate::get_uwvmint_f32_load_local_plus_imm_fptr_from_tuple<Opt>(curr_f32, mem, tuple);
         auto const exp_f64_load_local_plus_imm =
@@ -223,12 +227,16 @@ namespace
         auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         if(verify_bytecode)
         {
             UWVM2TEST_REQUIRE(!rt.local_defined_memory_vec_storage.empty());
             auto const& mem = rt.local_defined_memory_vec_storage.index_unchecked(0).memory;
             UWVM2TEST_REQUIRE(check_bytecode<Opt>(cm, mem) == 0);
         }
+#else
+        (void)verify_bytecode;
+#endif
 
         using Runner = interpreter_runner<Opt>;
 

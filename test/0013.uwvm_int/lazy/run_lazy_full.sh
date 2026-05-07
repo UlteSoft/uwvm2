@@ -12,4 +12,5 @@ exec "${SCRIPT_DIR}/run_lazy_basic.sh" \
   uwvm_int_lazy_split \
   uwvm_int_lazy_scheduler \
   uwvm_int_lazy_runtime \
+  uwvm_int_lazy_strategy_matrix \
   uwvm_int_lazy_full_mvp

@@ -347,8 +347,11 @@ namespace
         auto const exp_f32_store = optable::translate::get_uwvmint_f32_store_fptr_from_tuple<Opt>(curr_f32_store, mem, tuple);
         auto const exp_f64_store = optable::translate::get_uwvmint_f64_store_fptr_from_tuple<Opt>(curr_f64_store, mem, tuple);
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_f32_load_localget = optable::translate::get_uwvmint_f32_load_localget_off_fptr_from_tuple<Opt>(curr_f32_survivor, mem, tuple);
         auto const exp_f64_load_localget = optable::translate::get_uwvmint_f64_load_localget_off_fptr_from_tuple<Opt>(curr_f64_survivor, mem, tuple);
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         auto const exp_f32_load_local_plus_imm =
             optable::translate::get_uwvmint_f32_load_local_plus_imm_fptr_from_tuple<Opt>(curr_f32_survivor, mem, tuple);
         auto const exp_f64_load_local_plus_imm =
@@ -357,6 +360,7 @@ namespace
             optable::translate::get_uwvmint_f32_store_local_plus_imm_fptr_from_tuple<Opt>(curr_f32_survivor, mem, tuple);
         auto const exp_f64_store_local_plus_imm =
             optable::translate::get_uwvmint_f64_store_local_plus_imm_fptr_from_tuple<Opt>(curr_f64_survivor, mem, tuple);
+#endif
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
@@ -368,12 +372,16 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f32_store));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_store));
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_f32_load_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_f32_load_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_f64_load_localget));
+#endif
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_f32_load_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_f64_load_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_f32_store_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_store_local_plus_imm));
+#endif
 
         if(expect_spill_fill)
         {
@@ -416,6 +424,7 @@ namespace
         auto cm = compiler::compile_all_from_uwvm_single_func<Opt>(rt, cop, err);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         if(verify_bytecode)
         {
             if constexpr(Opt.is_tail_call)
@@ -429,6 +438,9 @@ namespace
                 UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
             }
         }
+#else
+        (void)verify_bytecode;
+#endif
 
         UWVM2TEST_REQUIRE(run_suite<Opt>(cm, rt) == 0);
         return 0;

@@ -332,7 +332,9 @@ namespace
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
         UWVM2TEST_REQUIRE(!rt.local_defined_memory_vec_storage.empty());
         auto const& mem = rt.local_defined_memory_vec_storage.index_unchecked(0).memory;
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(check_bytecode<Opt>(cm, mem) == 0);
+#endif
         UWVM2TEST_REQUIRE(run_suite<Opt>(cm, rt) == 0);
         return 0;
     }

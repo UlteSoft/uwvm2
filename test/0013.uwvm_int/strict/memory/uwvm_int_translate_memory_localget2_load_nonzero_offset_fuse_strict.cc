@@ -252,15 +252,20 @@ namespace
         UWVM2TEST_REQUIRE(cm.local_funcs.size() == 4uz);
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-        if constexpr(Opt.is_tail_call)
+        if(verify_bytecode)
         {
-            UWVM2TEST_REQUIRE(check_tail_bytecode<Opt>(cm, mem) == 0);
+            if constexpr(Opt.is_tail_call)
+            {
+                UWVM2TEST_REQUIRE(check_tail_bytecode<Opt>(cm, mem) == 0);
+            }
+            else
+            {
+                UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
+            }
         }
-        else
+#else
+        (void)verify_bytecode;
 #endif
-        {
-            UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
-        }
 
         using Runner = interpreter_runner<Opt>;
 
