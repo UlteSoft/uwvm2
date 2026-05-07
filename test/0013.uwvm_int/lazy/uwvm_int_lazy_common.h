@@ -65,9 +65,8 @@ namespace uwvm2test::uwvm_int_lazy
 
     [[nodiscard]] inline lazy_split_config_t small_code_size_split_config() noexcept
     {
-        return lazy_split_config_t{.eu_policy = lazy::lazy_execution_unit_split_policy_t::structured_control_and_linear_chunks,
+        return lazy_split_config_t{.eu_policy = lazy::lazy_execution_unit_split_policy_t::structured_control,
                                    .cu_policy = lazy::lazy_compile_unit_split_policy_t::code_size,
-                                   .linear_eu_code_size = 5uz,
                                    .cu_code_size = 5uz};
     }
 
