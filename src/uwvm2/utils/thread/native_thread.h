@@ -205,10 +205,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         unsigned priority{};
     };
 
+    struct lazy_compile_scheduler;
+    using lazy_compile_refill_callback_type = bool (*)(void*, lazy_compile_scheduler&) noexcept;
+
     struct lazy_compile_scheduler_config
     {
         ::std::size_t worker_count{};
         ::std::size_t queue_capacity{};
+        lazy_compile_refill_callback_type refill_callback{};
+        void* refill_user_data{};
+    };
+
+    struct lazy_compile_scheduler_stats_snapshot
+    {
+        ::std::size_t enqueued_requests{};
+        ::std::size_t enqueue_failures{};
+        ::std::size_t duplicate_requests{};
+        ::std::size_t inline_compiles{};
+        ::std::size_t worker_compiles{};
+        ::std::size_t helper_compiles{};
+        ::std::size_t passive_waits{};
+        ::std::size_t worker_queue_waits{};
+        ::std::size_t refill_calls{};
+        ::std::size_t refill_successes{};
     };
 
     struct lazy_compile_scheduler
@@ -230,6 +249,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         ::std::atomic_size_t queued_count{};
         ::std::atomic_bool stop_requested{};
         ::std::atomic<unsigned> queue_epoch{};
+        lazy_compile_refill_callback_type refill_callback{};
+        void* refill_user_data{};
+
+        ::std::atomic_size_t enqueued_request_count{};
+        ::std::atomic_size_t enqueue_failure_count{};
+        ::std::atomic_size_t duplicate_request_count{};
+        ::std::atomic_size_t inline_compile_count{};
+        ::std::atomic_size_t worker_compile_count{};
+        ::std::atomic_size_t helper_compile_count{};
+        ::std::atomic_size_t passive_wait_count{};
+        ::std::atomic_size_t worker_queue_wait_count{};
+        ::std::atomic_size_t refill_call_count{};
+        ::std::atomic_size_t refill_success_count{};
 
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
         native_global_typed_allocator_buffer<native_thread_type> workers{};
@@ -262,6 +294,34 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         }
 
         inline void start(lazy_compile_scheduler_config config) noexcept;
+
+        inline void reset_stats() noexcept
+        {
+            this->enqueued_request_count.store(0uz, ::std::memory_order_relaxed);
+            this->enqueue_failure_count.store(0uz, ::std::memory_order_relaxed);
+            this->duplicate_request_count.store(0uz, ::std::memory_order_relaxed);
+            this->inline_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->worker_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->helper_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->passive_wait_count.store(0uz, ::std::memory_order_relaxed);
+            this->worker_queue_wait_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_call_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_success_count.store(0uz, ::std::memory_order_relaxed);
+        }
+
+        [[nodiscard]] inline lazy_compile_scheduler_stats_snapshot snapshot_stats() const noexcept
+        {
+            return {.enqueued_requests = this->enqueued_request_count.load(::std::memory_order_relaxed),
+                    .enqueue_failures = this->enqueue_failure_count.load(::std::memory_order_relaxed),
+                    .duplicate_requests = this->duplicate_request_count.load(::std::memory_order_relaxed),
+                    .inline_compiles = this->inline_compile_count.load(::std::memory_order_relaxed),
+                    .worker_compiles = this->worker_compile_count.load(::std::memory_order_relaxed),
+                    .helper_compiles = this->helper_compile_count.load(::std::memory_order_relaxed),
+                    .passive_waits = this->passive_wait_count.load(::std::memory_order_relaxed),
+                    .worker_queue_waits = this->worker_queue_wait_count.load(::std::memory_order_relaxed),
+                    .refill_calls = this->refill_call_count.load(::std::memory_order_relaxed),
+                    .refill_successes = this->refill_success_count.load(::std::memory_order_relaxed)};
+        }
 
         inline void stop() noexcept
         {
@@ -297,6 +357,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             this->queue = {};
             this->queue_capacity = 0uz;
             this->queued_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_callback = {};
+            this->refill_user_data = {};
         }
 
         [[nodiscard]] inline bool try_request(lazy_compile_request request) noexcept
@@ -306,11 +368,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             auto expected{lazy_compile_state::uncompiled};
             if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::queued, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
             {
+                this->duplicate_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 return expected == lazy_compile_state::queued || expected == lazy_compile_state::compiling || expected == lazy_compile_state::compiled;
             }
 
             if(!this->try_enqueue(request))
             {
+                this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 expected = lazy_compile_state::queued;
                 (void)request.unit->state.compare_exchange_strong(expected,
                                                                  lazy_compile_state::uncompiled,
@@ -320,6 +384,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 return false;
             }
 
+            this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
             return true;
         }
 
@@ -327,7 +392,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         {
             if(this->try_request(request))
             {
-                if(request.priority != 0u && request.unit != nullptr) { this->wait_until_ready(*request.unit); }
+                if(request.unit != nullptr) { this->wait_until_ready_passive(*request.unit); }
                 return;
             }
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return; }
@@ -335,12 +400,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             auto expected{lazy_compile_state::uncompiled};
             if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::compiling, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
             {
-                this->wait_until_ready(*request.unit);
+                this->wait_until_ready_passive(*request.unit);
                 return;
             }
 
+            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
             request.compile(request.user_data);
             this->complete_request(*request.unit);
+        }
+
+        inline bool wait_until_ready_passive(lazy_compile_unit_state& unit) noexcept
+        {
+            bool counted_wait{};
+            for(;;)
+            {
+                auto const st{unit.state.load(::std::memory_order_acquire)};
+                if(lazy_compile_state_is_terminal(st)) { return st == lazy_compile_state::compiled; }
+                if(st == lazy_compile_state::uncompiled) { return false; }
+                if(!counted_wait)
+                {
+                    this->passive_wait_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                    counted_wait = true;
+                }
+                this->wait_for_unit_event(unit, st);
+            }
         }
 
         [[nodiscard]] inline bool ensure_ready(lazy_compile_request request) noexcept
@@ -362,6 +445,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                                                                         ::std::memory_order_acq_rel,
                                                                         ::std::memory_order_acquire))
                         {
+                            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                             request.compile(request.user_data);
                             this->complete_request(*request.unit);
                             return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
@@ -369,13 +453,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                         continue;
                     }
 
-                    this->wait_until_ready(*request.unit);
+                    if(st == lazy_compile_state::queued)
+                    {
+                        auto expected{lazy_compile_state::queued};
+                        if(request.unit->state.compare_exchange_strong(expected,
+                                                                        lazy_compile_state::compiling,
+                                                                        ::std::memory_order_acq_rel,
+                                                                        ::std::memory_order_acquire))
+                        {
+                            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                            request.compile(request.user_data);
+                            this->complete_request(*request.unit);
+                            return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+                        }
+                        continue;
+                    }
+
+                    this->wait_for_unit_event(*request.unit, st);
                 }
             }
 
             if(this->try_request(request))
             {
-                this->wait_until_ready(*request.unit);
+                if(request.unit != nullptr && !this->wait_until_ready_passive(*request.unit)) [[unlikely]] { return false; }
                 return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
             }
 
@@ -392,6 +492,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                                                                     ::std::memory_order_acq_rel,
                                                                     ::std::memory_order_acquire))
                     {
+                        this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                         request.compile(request.user_data);
                         this->complete_request(*request.unit);
                         return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
@@ -399,7 +500,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                     continue;
                 }
 
-                this->wait_until_ready(*request.unit);
+                if(!this->wait_until_ready_passive(*request.unit)) [[unlikely]] { return false; }
             }
         }
 
@@ -539,7 +640,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             lazy_compile_request request{};
             if(this->try_dequeue(request))
             {
-                this->execute_request(request);
+                this->execute_request(request, false);
                 return;
             }
             lazy_compile_thread_yield();
@@ -561,7 +662,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             this->notify_unit(unit);
         }
 
-        inline void execute_request(lazy_compile_request request) noexcept
+        inline void execute_request(lazy_compile_request request, bool worker_thread) noexcept
         {
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return; }
 
@@ -571,8 +672,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 return;
             }
 
+            if(worker_thread) { this->worker_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
+            else { this->helper_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
             request.compile(request.user_data);
             this->complete_request(*request.unit);
+        }
+
+        [[nodiscard]] inline bool try_refill_background_work() noexcept
+        {
+            if(this->refill_callback == nullptr || this->stop_requested.load(::std::memory_order_acquire)) { return false; }
+            this->refill_call_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            if(this->refill_callback(this->refill_user_data, *this))
+            {
+                this->refill_success_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                return true;
+            }
+            return false;
         }
 
         inline void drain_abandoned_requests() noexcept
@@ -670,13 +785,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             lazy_compile_request request{};
             if(this->try_dequeue(request))
             {
-                this->execute_request(request);
+                this->execute_request(request, true);
                 continue;
             }
+
+            if(this->try_refill_background_work()) { continue; }
 
             auto const observed_epoch{this->queue_epoch.load(::std::memory_order_acquire)};
             if(this->queued_count.load(::std::memory_order_acquire) == 0uz && !this->stop_requested.load(::std::memory_order_acquire))
             {
+                this->worker_queue_wait_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 this->wait_for_queue_event(observed_epoch);
             }
         }
@@ -688,10 +806,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         this->stop();
 
 #ifndef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-        (void)config;
+        this->reset_stats();
+        this->refill_callback = config.refill_callback;
+        this->refill_user_data = config.refill_user_data;
         return;
 #else
-        if(config.worker_count == 0uz) { return; }
+        if(config.worker_count == 0uz)
+        {
+            this->reset_stats();
+            this->refill_callback = config.refill_callback;
+            this->refill_user_data = config.refill_user_data;
+            return;
+        }
         if(config.queue_capacity == 0uz) { config.queue_capacity = default_queue_capacity(config.worker_count); }
 
         this->queue = native_global_typed_allocator_buffer<ring_slot>{config.queue_capacity};
@@ -703,6 +829,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         this->queued_count.store(0uz, ::std::memory_order_relaxed);
         this->stop_requested.store(false, ::std::memory_order_relaxed);
         this->queue_epoch.store(0u, ::std::memory_order_relaxed);
+        this->refill_callback = config.refill_callback;
+        this->refill_user_data = config.refill_user_data;
+        this->reset_stats();
 
         this->workers = native_global_typed_allocator_buffer<native_thread_type>{config.worker_count};
         this->worker_handles = native_global_typed_allocator_buffer<::std::coroutine_handle<>>{config.worker_count};
