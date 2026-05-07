@@ -82,9 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         function,
         block,
         loop,
-        if_,
-        else_,
-        linear_chunk
+        if_
     };
 
     enum class lazy_compile_unit_kind : unsigned
@@ -103,8 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
     enum class lazy_execution_unit_split_policy_t : unsigned
     {
         function_only,
-        structured_control,
-        structured_control_and_linear_chunks
+        structured_control
     };
 
     enum class lazy_compile_unit_split_policy_t : unsigned
@@ -116,9 +113,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
     struct lazy_split_config
     {
-        lazy_execution_unit_split_policy_t eu_policy{lazy_execution_unit_split_policy_t::structured_control_and_linear_chunks};
+        lazy_execution_unit_split_policy_t eu_policy{lazy_execution_unit_split_policy_t::structured_control};
         lazy_compile_unit_split_policy_t cu_policy{lazy_compile_unit_split_policy_t::code_size};
-        ::std::size_t linear_eu_code_size{4096uz};
         ::std::size_t cu_code_size{4096uz};
     };
 
@@ -191,15 +187,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         struct lazy_split_control_frame
         {
             ::std::size_t eu_index{};
-            ::std::size_t active_eu_index{};
-            ::std::size_t else_eu_index{SIZE_MAX};
             lazy_execution_unit_kind kind{lazy_execution_unit_kind::function};
-            bool then_eu_closed_at_else{};
         };
 
         [[nodiscard]] inline constexpr ::std::size_t active_parent_eu_index(lazy_split_control_frame const& frame) noexcept
         {
-            return frame.active_eu_index == SIZE_MAX ? frame.eu_index : frame.active_eu_index;
+            return frame.eu_index;
         }
 
         [[nodiscard]] inline constexpr ::std::size_t byte_offset(::std::byte const* base, ::std::byte const* curr) noexcept
@@ -249,9 +242,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             code_curr += bytes;
         }
 
-        [[nodiscard]] inline constexpr bool has_linear_eu_split(lazy_split_config cfg) noexcept
-        { return cfg.eu_policy == lazy_execution_unit_split_policy_t::structured_control_and_linear_chunks && cfg.linear_eu_code_size != 0uz; }
-
         inline ::std::size_t append_execution_unit(lazy_module_storage_t& storage,
                                                    ::std::size_t function_index,
                                                    ::std::size_t local_function_index,
@@ -283,51 +273,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             eu.code_size = static_cast<::std::size_t>(code_end - eu.code_begin);
         }
 
-        inline void append_linear_execution_unit_if_needed(lazy_module_storage_t& storage,
-                                                           ::std::size_t function_index,
-                                                           ::std::size_t local_function_index,
-                                                           ::std::size_t parent_eu_index,
-                                                           ::std::size_t depth,
-                                                           ::std::byte const* function_code_begin,
-                                                           ::std::byte const*& linear_begin,
-                                                           ::std::byte const* linear_end)
-        {
-            if(linear_begin == nullptr || linear_begin >= linear_end) { return; }
-
-            (void)append_execution_unit(storage,
-                                        function_index,
-                                        local_function_index,
-                                        parent_eu_index,
-                                        depth,
-                                        function_code_begin,
-                                        linear_begin,
-                                        linear_end,
-                                        lazy_execution_unit_kind::linear_chunk);
-            linear_begin = linear_end;
-        }
-
-        inline void flush_linear_before_control(lazy_module_storage_t& storage,
-                                                ::std::size_t function_index,
-                                                ::std::size_t local_function_index,
-                                                ::std::byte const* function_code_begin,
-                                                ::uwvm2::utils::container::vector<lazy_split_control_frame> const& control_stack,
-                                                ::std::byte const*& linear_begin,
-                                                ::std::byte const* control_begin)
-        {
-            if(linear_begin == nullptr) { return; }
-
-            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : active_parent_eu_index(control_stack.back_unchecked())};
-            auto const depth{control_stack.empty() ? 0uz : control_stack.size() - 1uz};
-            append_linear_execution_unit_if_needed(storage,
-                                                   function_index,
-                                                   local_function_index,
-                                                   parent_eu_index,
-                                                   depth,
-                                                   function_code_begin,
-                                                   linear_begin,
-                                                   control_begin);
-        }
-
         inline ::std::size_t append_compile_unit_from_eu_range(lazy_module_storage_t& storage,
                                                                lazy_function_storage_t const& fn,
                                                                ::std::size_t begin_eu_index,
@@ -337,9 +282,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             auto const cu_index{storage.compile_units.size()};
             auto const& first_eu{storage.execution_units.index_unchecked(begin_eu_index)};
-            auto const& last_eu{storage.execution_units.index_unchecked(end_eu_index - 1uz)};
             auto const code_begin{first_eu.code_begin};
-            auto const code_end{last_eu.code_end};
+            auto code_end{first_eu.code_end};
+            for(::std::size_t i{begin_eu_index + 1uz}; i != end_eu_index; ++i)
+            {
+                auto const curr_end{storage.execution_units.index_unchecked(i).code_end};
+                code_end = curr_end > code_end ? curr_end : code_end;
+            }
             storage.compile_units.push_back({.function_index = fn.function_index,
                                              .local_function_index = fn.local_function_index,
                                              .begin_eu_index = begin_eu_index,
@@ -369,20 +318,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 return;
             }
 
-            bool has_linear_candidate{};
-            for(::std::size_t i{fn.first_eu_index}; i != fn.first_eu_index + fn.eu_count; ++i)
-            {
-                if(storage.execution_units.index_unchecked(i).kind == lazy_execution_unit_kind::linear_chunk)
-                {
-                    has_linear_candidate = true;
-                    break;
-                }
-            }
-
             auto const is_candidate{[&](lazy_execution_unit_storage_t const& eu) constexpr noexcept
                                     {
                                         if(eu.kind == lazy_execution_unit_kind::function) { return false; }
-                                        return has_linear_candidate ? eu.kind == lazy_execution_unit_kind::linear_chunk : true;
+                                        return true;
                                     }};
 
             if(cfg.cu_policy == lazy_compile_unit_split_policy_t::execution_unit)
@@ -644,10 +583,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             ::uwvm2::utils::container::vector<lazy_split_control_frame> control_stack{};
             control_stack.reserve(32uz);
-            control_stack.push_back(
-                {.eu_index = function_eu_index, .active_eu_index = function_eu_index, .else_eu_index = SIZE_MAX, .kind = lazy_execution_unit_kind::function});
+            control_stack.push_back({.eu_index = function_eu_index, .kind = lazy_execution_unit_kind::function});
 
-            ::std::byte const* linear_begin{has_linear_eu_split(cfg) ? code_begin : nullptr};
             auto code_curr{code_begin};
 
             for(;;)
@@ -682,8 +619,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
 
-                        flush_linear_before_control(storage, function_index, local_function_index, code_begin, control_stack, linear_begin, op_begin);
-
                         if(code_curr == code_end) [[unlikely]]
                         {
                             fail_lazy_split(op_begin, code_validation_error_code::missing_block_type, err, ::fast_io::parse_code::end_of_file);
@@ -706,8 +641,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                           : lazy_execution_unit_kind::if_};
                         auto const eu_index{
                             append_execution_unit(storage, function_index, local_function_index, parent_eu_index, depth, code_begin, op_begin, nullptr, kind)};
-                        control_stack.push_back({.eu_index = eu_index, .active_eu_index = eu_index, .else_eu_index = SIZE_MAX, .kind = kind});
-                        if(linear_begin != nullptr) { linear_begin = code_curr; }
+                        control_stack.push_back({.eu_index = eu_index, .kind = kind});
                         break;
                     }
                     case wasm1_code::else_:
@@ -716,30 +650,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
 
-                        flush_linear_before_control(storage, function_index, local_function_index, code_begin, control_stack, linear_begin, op_begin);
-
                         if(control_stack.empty() || control_stack.back_unchecked().kind != lazy_execution_unit_kind::if_) [[unlikely]]
                         {
                             fail_lazy_split(op_begin, code_validation_error_code::illegal_else, err);
                         }
-
-                        auto& frame{control_stack.back_unchecked()};
-                        if(frame.else_eu_index != SIZE_MAX) [[unlikely]] { fail_lazy_split(op_begin, code_validation_error_code::illegal_else, err); }
-                        set_execution_unit_end(storage, frame.eu_index, op_begin);
-                        frame.then_eu_closed_at_else = true;
-
-                        auto const else_eu_index{append_execution_unit(storage,
-                                                                       function_index,
-                                                                       local_function_index,
-                                                                       frame.eu_index,
-                                                                       control_stack.size(),
-                                                                       code_begin,
-                                                                       op_begin,
-                                                                       nullptr,
-                                                                       lazy_execution_unit_kind::else_)};
-                        frame.else_eu_index = else_eu_index;
-                        frame.active_eu_index = else_eu_index;
-                        if(linear_begin != nullptr) { linear_begin = code_curr; }
                         break;
                     }
                     case wasm1_code::end:
@@ -747,8 +661,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         // end    ...
                         // [safe] unsafe (could be the section_end)
                         // ^^ op_begin
-
-                        flush_linear_before_control(storage, function_index, local_function_index, code_begin, control_stack, linear_begin, op_begin);
 
                         if(control_stack.empty()) [[unlikely]]
                         {
@@ -759,8 +671,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                         }
 
                         auto const frame{control_stack.back_unchecked()};
-                        if(!frame.then_eu_closed_at_else) { set_execution_unit_end(storage, frame.eu_index, code_curr); }
-                        if(frame.else_eu_index != SIZE_MAX) { set_execution_unit_end(storage, frame.else_eu_index, code_curr); }
+                        set_execution_unit_end(storage, frame.eu_index, code_curr);
                         control_stack.pop_back_unchecked();
 
                         if(frame.kind == lazy_execution_unit_kind::function)
@@ -771,34 +682,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                             append_function_compile_units(storage, fn, cfg);
                             return;
                         }
-
-                        if(linear_begin != nullptr) { linear_begin = code_curr; }
                         break;
                     }
                     case wasm1_code::return_:
                     case wasm1_code::unreachable:
                     {
-                        flush_linear_before_control(storage, function_index, local_function_index, code_begin, control_stack, linear_begin, op_begin);
-                        if(linear_begin != nullptr) { linear_begin = code_curr; }
                         break;
                     }
                     default:
                     {
                         skip_wasm1_non_structural_immediates(code_curr, code_end, op_begin, curr_opbase, err);
-
-                        if(linear_begin != nullptr && static_cast<::std::size_t>(code_curr - linear_begin) >= cfg.linear_eu_code_size)
-                        {
-                            auto const parent_eu_index{control_stack.empty() ? SIZE_MAX : active_parent_eu_index(control_stack.back_unchecked())};
-                            auto const depth{control_stack.empty() ? 0uz : control_stack.size() - 1uz};
-                            append_linear_execution_unit_if_needed(storage,
-                                                                   function_index,
-                                                                   local_function_index,
-                                                                   parent_eu_index,
-                                                                   depth,
-                                                                   code_begin,
-                                                                   linear_begin,
-                                                                   code_curr);
-                        }
                         break;
                     }
                 }
@@ -905,8 +798,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                                                                                   storage.compiled,
                                                                                                                                   local_function_index,
                                                                                                                                   err);
-
-            aggregate_lazy_local_function_storage(storage.compiled);
         }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
@@ -962,8 +853,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             details::build_lazy_function_execution_units(curr_module, storage, local_function_index, split_config, err);
         }
-
-        details::aggregate_lazy_local_function_storage(storage.compiled);
         return storage;
     }
 

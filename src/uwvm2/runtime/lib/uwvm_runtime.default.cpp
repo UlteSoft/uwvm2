@@ -1048,9 +1048,25 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_USE_THREAD_LOCAL)
         struct thread_local_bump_allocator
         {
-            ::std::byte* base{};
-            ::std::size_t cap{};
-            ::std::size_t sp{};
+            struct block
+            {
+                ::std::byte* base{};
+                ::std::size_t cap{};
+                ::std::size_t sp{};
+                block* prev{};
+                block* next_free{};
+            };
+
+            struct mark_t
+            {
+                block* curr{};
+                ::std::size_t sp{};
+            };
+
+            using block_allocator = ::fast_io::native_typed_thread_local_allocator<block>;
+
+            block* curr{};
+            block* free_list{};
 
             thread_local_bump_allocator(thread_local_bump_allocator const&) = delete;
             thread_local_bump_allocator& operator= (thread_local_bump_allocator const&) = delete;
@@ -1059,46 +1075,120 @@ namespace uwvm2::runtime::lib
 
             inline ~thread_local_bump_allocator()
             {
-                if(base) { byte_allocator::deallocate(base); }
+                destroy_chain(curr);
+                destroy_chain(free_list);
             }
 
-            [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr ::std::size_t mark() const noexcept { return sp; }
+            [[nodiscard]] UWVM_ALWAYS_INLINE inline constexpr mark_t mark() const noexcept
+            { return {.curr = curr, .sp = curr == nullptr ? 0uz : curr->sp}; }
 
-            UWVM_ALWAYS_INLINE inline constexpr void release(::std::size_t m) noexcept { sp = m; }
+            UWVM_ALWAYS_INLINE inline void release(mark_t m) noexcept
+            {
+                while(curr != m.curr)
+                {
+                    if(curr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    auto const old{curr};
+                    curr = curr->prev;
+                    old->sp = 0uz;
+                    old->prev = nullptr;
+                    old->next_free = free_list;
+                    free_list = old;
+                }
+
+                if(curr != nullptr)
+                {
+                    if(m.sp > curr->sp) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    curr->sp = m.sp;
+                }
+                else if(m.sp != 0uz) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
+            }
 
             [[nodiscard]] UWVM_ALWAYS_INLINE static inline constexpr ::std::size_t align_up(::std::size_t v, ::std::size_t a) noexcept
             { return (v + (a - 1uz)) & ~(a - 1uz); }
 
-            UWVM_ALWAYS_INLINE inline void ensure_capacity(::std::size_t need) noexcept
+            UWVM_ALWAYS_INLINE inline void push_block(::std::size_t min_cap) noexcept
             {
-                if(need <= cap) [[likely]] { return; }
-
-                auto new_cap{cap ? cap : 4096uz};
-                while(new_cap < need) { new_cap <<= 1; }
-
-                void* const new_mem{byte_allocator::allocate(new_cap)};
-                if(new_mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-
-                if(base) [[likely]]
+                auto* b{take_free_block(min_cap)};
+                if(b == nullptr)
                 {
-                    ::std::memcpy(new_mem, base, sp);
-                    byte_allocator::deallocate(base);
+                    auto new_cap{4096uz};
+                    while(new_cap < min_cap) { new_cap <<= 1; }
+
+                    auto* const mem{static_cast<::std::byte*>(byte_allocator::allocate(new_cap))};
+                    if(mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                    b = block_allocator::allocate(1uz);
+                    if(b == nullptr) [[unlikely]]
+                    {
+                        byte_allocator::deallocate(mem);
+                        ::fast_io::fast_terminate();
+                    }
+
+                    ::std::construct_at(b, block{.base = mem, .cap = new_cap});
                 }
 
-                base = static_cast<::std::byte*>(new_mem);
-                cap = new_cap;
+                b->sp = 0uz;
+                b->prev = curr;
+                b->next_free = nullptr;
+                curr = b;
             }
 
             [[nodiscard]] UWVM_ALWAYS_INLINE inline ::std::byte* allocate_bytes(::std::size_t n, ::std::size_t align = 16uz) noexcept
             {
                 if(n == 0uz) [[unlikely]] { n = 1uz; }
-                sp = align_up(sp, align);
-                if(sp > (::std::numeric_limits<::std::size_t>::max() - n)) [[unlikely]] { ::fast_io::fast_terminate(); }
-                auto const need{sp + n};
-                ensure_capacity(need);
-                auto const p{base + sp};
-                sp = need;
+
+                if(align == 0uz || (align & (align - 1uz)) != 0uz) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(n > (::std::numeric_limits<::std::size_t>::max() - (align - 1uz))) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+                auto const min_cap{n + (align - 1uz)};
+                if(curr == nullptr) { push_block(min_cap); }
+
+                auto aligned_sp{align_up(curr->sp, align)};
+                if(aligned_sp > curr->cap || n > (curr->cap - aligned_sp))
+                {
+                    push_block(min_cap);
+                    aligned_sp = align_up(curr->sp, align);
+                    if(aligned_sp > curr->cap || n > (curr->cap - aligned_sp)) [[unlikely]] { ::fast_io::fast_terminate(); }
+                }
+
+                auto const p{curr->base + aligned_sp};
+                curr->sp = aligned_sp + n;
                 return p;
+            }
+
+            [[nodiscard]] inline block* take_free_block(::std::size_t min_cap) noexcept
+            {
+                block* prev{};
+                auto* it{free_list};
+                while(it != nullptr)
+                {
+                    if(it->cap >= min_cap)
+                    {
+                        if(prev == nullptr) { free_list = it->next_free; }
+                        else { prev->next_free = it->next_free; }
+                        it->next_free = nullptr;
+                        return it;
+                    }
+                    prev = it;
+                    it = it->next_free;
+                }
+
+                return nullptr;
+            }
+
+            static inline void destroy_chain(block* b) noexcept
+            {
+                while(b != nullptr)
+                {
+                    auto const next{b->prev != nullptr ? b->prev : b->next_free};
+                    if(b->base != nullptr) { byte_allocator::deallocate(b->base); }
+                    ::std::destroy_at(b);
+                    block_allocator::deallocate_n(b, 1uz);
+                    b = next;
+                }
             }
         };
 
@@ -2449,7 +2539,7 @@ namespace uwvm2::runtime::lib
             constexpr ::std::size_t kAllocaMaxCallDepth{128uz};
 # if defined(UWVM_USE_THREAD_LOCAL)
             bool const use_scratch{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
-            ::std::size_t scratch_mark{};
+            thread_local_bump_allocator::mark_t scratch_mark{};
             if(use_scratch) { scratch_mark = g_call_scratch.mark(); }
 # else
             bool const use_heap{frame_alloc_n > kAllocaMaxBytesPerFrame || call_stack.frames.size() > kAllocaMaxCallDepth};
@@ -4814,7 +4904,6 @@ namespace uwvm2::runtime::lib
             using runtime_scheduling_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_scheduling_policy_t;
 
             lazy_split_config split_config{};
-            split_config.linear_eu_code_size = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size;
             split_config.cu_code_size = ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_size;
             if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_scheduling_policy == runtime_scheduling_policy_t::function_count)
             {

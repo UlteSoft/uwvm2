@@ -347,6 +347,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         {
             if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
 
+            if(request.priority != 0u)
+            {
+                for(;;)
+                {
+                    auto const st{request.unit->state.load(::std::memory_order_acquire)};
+                    if(lazy_compile_state_is_terminal(st)) { return st == lazy_compile_state::compiled; }
+
+                    if(st == lazy_compile_state::uncompiled)
+                    {
+                        auto expected{lazy_compile_state::uncompiled};
+                        if(request.unit->state.compare_exchange_strong(expected,
+                                                                        lazy_compile_state::compiling,
+                                                                        ::std::memory_order_acq_rel,
+                                                                        ::std::memory_order_acquire))
+                        {
+                            request.compile(request.user_data);
+                            this->complete_request(*request.unit);
+                            return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+                        }
+                        continue;
+                    }
+
+                    this->wait_until_ready(*request.unit);
+                }
+            }
+
             if(this->try_request(request))
             {
                 this->wait_until_ready(*request.unit);
