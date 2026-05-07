@@ -232,12 +232,15 @@ case wasm1_code::i64_const:
 
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
     // Conbine: `local.get(i64) + i64.const` (delay emission for imm/localget fusions).
+#  ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
     if(conbine_pending.kind == conbine_pending_kind::rot_xor_add_i64_after_xor)
     {
         conbine_pending.kind = conbine_pending_kind::rot_xor_add_i64_after_xor_constc;
         conbine_pending.imm_i64_2 = imm;
     }
-    else if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i64)
+    else
+#  endif
+        if(conbine_pending.kind == conbine_pending_kind::local_get2 && conbine_pending.vt == curr_operand_stack_value_type::i64)
     {
         conbine_pending.kind = conbine_pending_kind::local_get2_const_i64;
         conbine_pending.imm_i64 = imm;
