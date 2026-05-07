@@ -132,6 +132,7 @@ namespace
         }
     }
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
     template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MemoryRef>
     [[nodiscard]] bool contains_any_f32_load_localget_off(ByteStorage const& bc, MemoryRef const& mem) noexcept
     {
@@ -189,6 +190,19 @@ namespace
 
         return false;
     }
+#else
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MemoryRef>
+    [[nodiscard]] bool contains_any_f32_load_localget_off(ByteStorage const&, MemoryRef const&) noexcept
+    {
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MemoryRef>
+    [[nodiscard]] bool contains_any_f64_load_localget_off(ByteStorage const&, MemoryRef const&) noexcept
+    {
+        return false;
+    }
+#endif
 
     [[nodiscard]] byte_vec build_memory_localget2_wide_load_prepare_spill_module()
     {

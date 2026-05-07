@@ -173,6 +173,7 @@ namespace
         auto const& bc2 = cm.local_funcs.index_unchecked(2).op.operands;
         auto const& bc3 = cm.local_funcs.index_unchecked(3).op.operands;
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_add_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_i32_load_plain));
@@ -190,6 +191,19 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
+#else
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_plain));
+#endif
         return 0;
     }
 #endif
@@ -204,6 +218,7 @@ namespace
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
 
         auto const exp_local_get_i32 = optable::translate::get_uwvmint_local_get_i32_fptr_from_tuple<Opt>(curr_initial, tuple);
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_load_add_imm =
             optable::translate::get_uwvmint_i32_load_add_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
         auto const exp_i32_load_and_imm =
@@ -212,6 +227,7 @@ namespace
             optable::translate::get_uwvmint_f32_load_localget_off_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
         auto const exp_f64_load_localget =
             optable::translate::get_uwvmint_f64_load_localget_off_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
+#endif
         auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
         auto const exp_f32_load_plain = optable::translate::get_uwvmint_f32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
         auto const exp_f64_load_plain = optable::translate::get_uwvmint_f64_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr_after_i32_1);
@@ -221,6 +237,7 @@ namespace
         auto const& bc2 = cm.local_funcs.index_unchecked(2).op.operands;
         auto const& bc3 = cm.local_funcs.index_unchecked(3).op.operands;
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_add_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_i32_load_plain));
@@ -238,6 +255,19 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_f64_load_plain));
+#else
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_f64_load_plain));
+#endif
         return 0;
     }
 
@@ -252,19 +282,16 @@ namespace
         UWVM2TEST_REQUIRE(cm.local_funcs.size() == 4uz);
 
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
-        if(verify_bytecode)
+        if constexpr(Opt.is_tail_call)
         {
-            if constexpr(Opt.is_tail_call)
-            {
-                UWVM2TEST_REQUIRE(check_tail_bytecode<Opt>(cm, mem) == 0);
-            }
-            else
-            {
-                UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
-            }
+            UWVM2TEST_REQUIRE(check_tail_bytecode<Opt>(cm, mem) == 0);
+        }
+        else
+        {
+            UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
         }
 #else
-        (void)verify_bytecode;
+        (void)mem;
 #endif
 
         using Runner = interpreter_runner<Opt>;
