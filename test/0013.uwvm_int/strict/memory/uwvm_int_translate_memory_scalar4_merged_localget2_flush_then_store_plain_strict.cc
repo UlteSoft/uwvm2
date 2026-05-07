@@ -258,8 +258,8 @@ namespace
         auto const& bc4 = cm.local_funcs.index_unchecked(4).op.operands;
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc0));
-        UWVM2TEST_REQUIRE(contains_i32_store_plain(bc0));
-        UWVM2TEST_REQUIRE(!contains_i32_store_localget(bc0));
+        UWVM2TEST_REQUIRE(contains_i32_store_localget(bc0));
+        UWVM2TEST_REQUIRE(!contains_i32_store_plain(bc0));
         UWVM2TEST_REQUIRE(!contains_i32_store_imm_localget(bc0));
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc1));
@@ -276,12 +276,12 @@ namespace
 # endif
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc3));
-        UWVM2TEST_REQUIRE(contains_i64_store_plain(bc3));
-        UWVM2TEST_REQUIRE(!contains_i64_store_localget(bc3));
+        UWVM2TEST_REQUIRE(contains_i64_store_localget(bc3));
+        UWVM2TEST_REQUIRE(!contains_i64_store_plain(bc3));
 
         UWVM2TEST_REQUIRE(contains_local_get_i32(bc4));
-        UWVM2TEST_REQUIRE(contains_i64_store32_plain(bc4));
-        UWVM2TEST_REQUIRE(!contains_i64_store32_localget(bc4));
+        UWVM2TEST_REQUIRE(contains_i64_store32_localget(bc4));
+        UWVM2TEST_REQUIRE(!contains_i64_store32_plain(bc4));
 
         return 0;
     }

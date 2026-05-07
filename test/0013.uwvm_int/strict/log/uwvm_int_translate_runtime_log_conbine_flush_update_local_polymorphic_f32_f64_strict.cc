@@ -63,7 +63,7 @@ namespace
 
         auto add_f32_flush_case = [&](wasm_op binop, float imm)
         {
-            func_type ty{{k_val_f32, k_val_i32}, {k_val_f32}};
+            func_type ty{{k_val_f32, k_val_f32}, {k_val_f32}};
             func_body fb{};
             auto& c = fb.code;
 
@@ -87,7 +87,7 @@ namespace
 
         auto add_f64_flush_case = [&](wasm_op binop, double imm)
         {
-            func_type ty{{k_val_f64, k_val_i64}, {k_val_f64}};
+            func_type ty{{k_val_f64, k_val_f64}, {k_val_f64}};
             func_body fb{};
             auto& c = fb.code;
 
@@ -221,5 +221,12 @@ namespace
 
 int main()
 {
-    return test_translate_runtime_log_conbine_flush_update_local_polymorphic_f32_f64();
+    try
+    {
+        return test_translate_runtime_log_conbine_flush_update_local_polymorphic_f32_f64();
+    }
+    catch(...)
+    {
+        return ::uwvm2test::uwvm_int_strict::fail(__LINE__, "uncaught exception");
+    }
 }

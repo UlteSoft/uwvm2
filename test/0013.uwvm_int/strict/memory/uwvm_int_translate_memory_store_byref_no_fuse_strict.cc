@@ -4,6 +4,73 @@ namespace
 {
     using namespace ::uwvm2test::uwvm_int_strict;
 
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename Fn>
+    [[nodiscard]] bool search_curr_i32(Fn&& fn) noexcept
+    {
+        for(::std::size_t i32_pos{Opt.i32_stack_top_begin_pos}; i32_pos != Opt.i32_stack_top_end_pos; ++i32_pos)
+        {
+            auto curr = make_initial_stacktop_currpos<Opt>();
+            curr.i32_stack_top_curr_pos = i32_pos;
+            if(fn(curr)) { return true; }
+        }
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename Fn>
+    [[nodiscard]] bool search_curr_i32_i64(Fn&& fn) noexcept
+    {
+        for(::std::size_t i32_pos{Opt.i32_stack_top_begin_pos}; i32_pos != Opt.i32_stack_top_end_pos; ++i32_pos)
+        {
+            for(::std::size_t i64_pos{Opt.i64_stack_top_begin_pos}; i64_pos != Opt.i64_stack_top_end_pos; ++i64_pos)
+            {
+                auto curr = make_initial_stacktop_currpos<Opt>();
+                curr.i32_stack_top_curr_pos = i32_pos;
+                curr.i64_stack_top_curr_pos = i64_pos;
+                if(fn(curr)) { return true; }
+            }
+        }
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_curr_after_i32_pushes(::std::size_t push_count) noexcept
+    {
+        auto curr = make_initial_stacktop_currpos<Opt>();
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != push_count; ++i)
+            {
+                curr.i32_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i32_stack_top_curr_pos, Opt.i32_stack_top_begin_pos, Opt.i32_stack_top_end_pos);
+            }
+        }
+        return curr;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_curr_after_i32_i64_pushes(::std::size_t i32_push_count,
+                                                                                                          ::std::size_t i64_push_count) noexcept
+    {
+        auto curr = make_initial_stacktop_currpos<Opt>();
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != i32_push_count; ++i)
+            {
+                curr.i32_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i32_stack_top_curr_pos, Opt.i32_stack_top_begin_pos, Opt.i32_stack_top_end_pos);
+            }
+        }
+        if constexpr(Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != i64_push_count; ++i)
+            {
+                curr.i64_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i64_stack_top_curr_pos, Opt.i64_stack_top_begin_pos, Opt.i64_stack_top_end_pos);
+            }
+        }
+        return curr;
+    }
+
     [[nodiscard]] byte_vec pack_i32x2(::std::int32_t a, ::std::int32_t b)
     {
         byte_vec out(8);
@@ -180,17 +247,10 @@ namespace
                                           ::uwvm2::object::memory::linear::native_memory_t const& mem) noexcept
     {
         constexpr auto curr = make_initial_stacktop_currpos<Opt>();
+        constexpr auto curr_after_i32_2 = make_curr_after_i32_pushes<Opt>(2uz);
+        constexpr auto curr_after_i32_i64 = make_curr_after_i32_i64_pushes<Opt>(1uz, 1uz);
         constexpr auto tuple =
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
-
-        auto const exp_i64_store_localget = optable::translate::get_uwvmint_i64_store_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_i64_store_plain = optable::translate::get_uwvmint_i64_store_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store8_localget = optable::translate::get_uwvmint_i32_store8_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store8_imm = optable::translate::get_uwvmint_i32_store8_imm_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store8_plain = optable::translate::get_uwvmint_i32_store8_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store16_localget = optable::translate::get_uwvmint_i32_store16_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store16_imm = optable::translate::get_uwvmint_i32_store16_imm_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store16_plain = optable::translate::get_uwvmint_i32_store16_fptr_from_tuple<Opt>(curr, mem, tuple);
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
@@ -198,17 +258,26 @@ namespace
         auto const& bc3 = cm.local_funcs.index_unchecked(3).op.operands;
         auto const& bc4 = cm.local_funcs.index_unchecked(4).op.operands;
 
+        auto const exp_i64_store_plain = optable::translate::get_uwvmint_i64_store_fptr_from_tuple<Opt>(curr_after_i32_i64, mem, tuple);
+        auto const exp_i64_store_localget = optable::translate::get_uwvmint_i64_store_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+        auto const exp_store8_plain = optable::translate::get_uwvmint_i32_store8_fptr_from_tuple<Opt>(curr_after_i32_2, mem, tuple);
+        auto const exp_store8_localget = optable::translate::get_uwvmint_i32_store8_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+        auto const exp_store8_imm = optable::translate::get_uwvmint_i32_store8_imm_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+        auto const exp_store16_plain = optable::translate::get_uwvmint_i32_store16_fptr_from_tuple<Opt>(curr_after_i32_2, mem, tuple);
+        auto const exp_store16_localget = optable::translate::get_uwvmint_i32_store16_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+        auto const exp_store16_imm = optable::translate::get_uwvmint_i32_store16_imm_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i64_store_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_i64_store_plain));
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_store8_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_store8_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_store8_plain));
+        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_store8_localget));
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_store8_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_store8_plain));
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_store16_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_store16_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_store16_plain));
+        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_store16_localget));
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc4, exp_store16_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc4, exp_store16_plain));

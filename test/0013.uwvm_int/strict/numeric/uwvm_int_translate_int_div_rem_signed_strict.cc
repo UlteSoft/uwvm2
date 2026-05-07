@@ -185,15 +185,17 @@ namespace
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
         using Runner = interpreter_runner<Opt>;
+        using i32_case = ::std::pair<::std::int32_t, ::std::int32_t>;
+        using i64_case = ::std::pair<::std::int64_t, ::std::int64_t>;
 
         // f0/f1: i32 div/rem signed.
-        for(auto const [a, b] : ::std::array{
-                ::std::pair{7, 3},
-                ::std::pair{-7, 3},
-                ::std::pair{7, -3},
-                ::std::pair{-7, -3},
-                ::std::pair{static_cast<::std::int32_t>(0x80000000u), 2},
-                ::std::pair{123456, -7},
+        for(auto const [a, b] : ::std::array<i32_case, 6uz>{
+                i32_case{7, 3},
+                i32_case{-7, 3},
+                i32_case{7, -3},
+                i32_case{-7, -3},
+                i32_case{static_cast<::std::int32_t>(0x80000000u), 2},
+                i32_case{123456, -7},
             })
         {
             // Avoid overflow trap: INT_MIN / -1 is invalid in Wasm.
@@ -216,13 +218,13 @@ namespace
         }
 
         // f2/f3: i64 div/rem signed.
-        for(auto const [a, b] : ::std::array{
-                ::std::pair{7ll, 3ll},
-                ::std::pair{-7ll, 3ll},
-                ::std::pair{7ll, -3ll},
-                ::std::pair{-7ll, -3ll},
-                ::std::pair{static_cast<::std::int64_t>(0x8000000000000000ull), 2ll},
-                ::std::pair{0x123456789abcdefll, -7ll},
+        for(auto const [a, b] : ::std::array<i64_case, 6uz>{
+                i64_case{7, 3},
+                i64_case{-7, 3},
+                i64_case{7, -3},
+                i64_case{-7, -3},
+                i64_case{static_cast<::std::int64_t>(0x8000000000000000ull), 2},
+                i64_case{0x123456789abcdefll, -7},
             })
         {
             UWVM2TEST_REQUIRE(!(a == static_cast<::std::int64_t>(0x8000000000000000ull) && b == -1ll));
@@ -244,11 +246,11 @@ namespace
         }
 
         // f4: i32.shr_s masking (shift count mod 32).
-        for(auto const [x, s] : ::std::array{
-                ::std::pair{static_cast<::std::int32_t>(-8), 1},
-                ::std::pair{static_cast<::std::int32_t>(-8), 33},  // 33 -> 1
-                ::std::pair{static_cast<::std::int32_t>(0x80000000u), 40},  // 40 -> 8
-                ::std::pair{static_cast<::std::int32_t>(0x7fffffffu), 35},  // 35 -> 3
+        for(auto const [x, s] : ::std::array<i32_case, 4uz>{
+                i32_case{static_cast<::std::int32_t>(-8), 1},
+                i32_case{static_cast<::std::int32_t>(-8), 33},  // 33 -> 1
+                i32_case{static_cast<::std::int32_t>(0x80000000u), 40},  // 40 -> 8
+                i32_case{static_cast<::std::int32_t>(0x7fffffffu), 35},  // 35 -> 3
             })
         {
             auto rr = Runner::run(cm.local_funcs.index_unchecked(4),
@@ -261,12 +263,12 @@ namespace
         }
 
         // f5-f8: i64 shifts/rotates masking (mod 64); f9: sub.
-        for(auto const [x, s] : ::std::array{
-                ::std::pair{0x0123456789abcdefll, 0ll},
-                ::std::pair{0x0123456789abcdefll, 4ll},
-                ::std::pair{static_cast<::std::int64_t>(0x8000000000000000ull), 1ll},
-                ::std::pair{static_cast<::std::int64_t>(-1ll), 63ll},
-                ::std::pair{static_cast<::std::int64_t>(-1ll), 65ll},  // 65 -> 1
+        for(auto const [x, s] : ::std::array<i64_case, 5uz>{
+                i64_case{0x0123456789abcdefll, 0},
+                i64_case{0x0123456789abcdefll, 4},
+                i64_case{static_cast<::std::int64_t>(0x8000000000000000ull), 1},
+                i64_case{static_cast<::std::int64_t>(-1ll), 63},
+                i64_case{static_cast<::std::int64_t>(-1ll), 65},  // 65 -> 1
             })
         {
             auto const sh = static_cast<unsigned long long>(s) & 63ull;

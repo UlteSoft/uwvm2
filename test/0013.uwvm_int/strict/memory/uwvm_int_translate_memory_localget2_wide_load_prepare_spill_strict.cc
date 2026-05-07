@@ -132,6 +132,64 @@ namespace
         }
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MemoryRef>
+    [[nodiscard]] bool contains_any_f32_load_localget_off(ByteStorage const& bc, MemoryRef const& mem) noexcept
+    {
+        using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+        using wasm_f32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
+
+        constexpr auto tuple =
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+        for(::std::size_t i32_pos = optable::details::stacktop_range_begin_pos<Opt, wasm_i32>();
+            i32_pos < optable::details::stacktop_range_end_pos<Opt, wasm_i32>();
+            ++i32_pos)
+        {
+            for(::std::size_t f32_pos = optable::details::stacktop_range_begin_pos<Opt, wasm_f32>();
+                f32_pos < optable::details::stacktop_range_end_pos<Opt, wasm_f32>();
+                ++f32_pos)
+            {
+                optable::uwvm_interpreter_stacktop_currpos_t curr{};
+                curr.i32_stack_top_curr_pos = i32_pos;
+                curr.f32_stack_top_curr_pos = f32_pos;
+
+                auto const fptr = optable::translate::get_uwvmint_f32_load_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+                if(bytecode_contains_fptr(bc, fptr)) { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt, typename ByteStorage, typename MemoryRef>
+    [[nodiscard]] bool contains_any_f64_load_localget_off(ByteStorage const& bc, MemoryRef const& mem) noexcept
+    {
+        using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+        using wasm_f64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
+
+        constexpr auto tuple =
+            compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
+
+        for(::std::size_t i32_pos = optable::details::stacktop_range_begin_pos<Opt, wasm_i32>();
+            i32_pos < optable::details::stacktop_range_end_pos<Opt, wasm_i32>();
+            ++i32_pos)
+        {
+            for(::std::size_t f64_pos = optable::details::stacktop_range_begin_pos<Opt, wasm_f64>();
+                f64_pos < optable::details::stacktop_range_end_pos<Opt, wasm_f64>();
+                ++f64_pos)
+            {
+                optable::uwvm_interpreter_stacktop_currpos_t curr{};
+                curr.i32_stack_top_curr_pos = i32_pos;
+                curr.f64_stack_top_curr_pos = f64_pos;
+
+                auto const fptr = optable::translate::get_uwvmint_f64_load_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
+                if(bytecode_contains_fptr(bc, fptr)) { return true; }
+            }
+        }
+
+        return false;
+    }
+
     [[nodiscard]] byte_vec build_memory_localget2_wide_load_prepare_spill_module()
     {
         module_builder mb{};
@@ -272,8 +330,23 @@ namespace
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
         auto const& bc2 = cm.local_funcs.index_unchecked(2).op.operands;
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_f32));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f64));
+        if constexpr(Opt.i32_stack_top_begin_pos == Opt.f32_stack_top_begin_pos && Opt.i32_stack_top_end_pos == Opt.f32_stack_top_end_pos)
+        {
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_f32) || contains_any_f32_load_localget_off<Opt>(bc1, mem));
+        }
+        else
+        {
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_f32));
+        }
+
+        if constexpr(Opt.i32_stack_top_begin_pos == Opt.f64_stack_top_begin_pos && Opt.i32_stack_top_end_pos == Opt.f64_stack_top_end_pos)
+        {
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f64) || contains_any_f64_load_localget_off<Opt>(bc2, mem));
+        }
+        else
+        {
+            UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_f64));
+        }
 
         if(expect_spill)
         {
