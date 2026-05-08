@@ -2994,31 +2994,26 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto current_block{ir_builder.GetInsertBlock()};
     if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
 
-    ::uwvm2::utils::container::vector<::llvm::BasicBlock*> seen_blocks{};
-    seen_blocks.reserve(branch_targets.size() + 1uz);
+    auto const add_target_incoming{[&](llvm_jit_branch_target_t const& branch_target)
+                                   {
+                                       if(expected_arity == 1uz)
+                                       {
+                                           if(branch_target.phi == nullptr) [[unlikely]] { return false; }
+                                           // LLVM PHI nodes need one incoming per CFG edge. `br_table`
+                                           // can legally route multiple switch edges from the same
+                                           // predecessor block to the same destination label, so we
+                                           // must preserve duplicates instead of coalescing them.
+                                           branch_target.phi->addIncoming(branch_value.value, current_block);
+                                       }
 
-    auto const add_unique_target_incoming{[&](llvm_jit_branch_target_t const& branch_target)
-                                          {
-                                              for(auto seen_block: seen_blocks)
-                                              {
-                                                  if(seen_block == branch_target.block) { return true; }
-                                              }
+                                       mark_runtime_local_func_llvm_jit_branch_target_has_incoming(state, branch_target);
+                                       return true;
+                                   }};
 
-                                              if(expected_arity == 1uz)
-                                              {
-                                                  if(branch_target.phi == nullptr) [[unlikely]] { return false; }
-                                                  branch_target.phi->addIncoming(branch_value.value, current_block);
-                                              }
-
-                                              seen_blocks.push_back(branch_target.block);
-                                              mark_runtime_local_func_llvm_jit_branch_target_has_incoming(state, branch_target);
-                                              return true;
-                                          }};
-
-    if(!add_unique_target_incoming(*default_target)) [[unlikely]] { return false; }
+    if(!add_target_incoming(*default_target)) [[unlikely]] { return false; }
     for(auto branch_target: branch_targets)
     {
-        if(branch_target == nullptr || !add_unique_target_incoming(*branch_target)) [[unlikely]] { return false; }
+        if(branch_target == nullptr || !add_target_incoming(*branch_target)) [[unlikely]] { return false; }
     }
 
     auto switch_inst{

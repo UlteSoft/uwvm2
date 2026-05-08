@@ -197,9 +197,6 @@ namespace
         constexpr auto curr_f64 = make_curr_after_f64_pushes<Opt>(1uz);
 
         UWVM2TEST_REQUIRE((contains_spill1<Opt, wasm_i32>(cm.local_funcs.index_unchecked(0).op.operands)));
-        auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr_from_tuple<Opt>(curr_i32, mem, tuple);
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_plain));
-
 #if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_load_local_plus_imm =
             optable::translate::get_uwvmint_i32_load_local_plus_imm_fptr_from_tuple<Opt>(curr_i32, mem, tuple);

@@ -407,12 +407,12 @@ namespace
         auto const exp_local_get_i32 = optable::translate::get_uwvmint_local_get_i32_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_get_i64 = optable::translate::get_uwvmint_local_get_i64_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_set_i64 = optable::translate::get_uwvmint_local_set_i64_fptr_from_tuple<Opt>(curr, tuple);
-        constexpr auto curr_after_i32_1 = make_curr_after_i32_pushes<Opt>(1uz);
-        constexpr auto curr_after_i32_2 = make_curr_after_i32_pushes<Opt>(2uz);
-        constexpr auto curr_after_i32_i64 = make_curr_after_i32_i64_pushes<Opt>(1uz, 1uz);
+        [[maybe_unused]] constexpr auto curr_after_i32_1 = make_curr_after_i32_pushes<Opt>(1uz);
+        [[maybe_unused]] constexpr auto curr_after_i32_2 = make_curr_after_i32_pushes<Opt>(2uz);
+        [[maybe_unused]] constexpr auto curr_after_i32_i64 = make_curr_after_i32_i64_pushes<Opt>(1uz, 1uz);
 
-        auto const exp_i32_const = optable::translate::get_uwvmint_i32_const_fptr_from_tuple<Opt>(curr, tuple);
-        auto const exp_i32_add = optable::translate::get_uwvmint_i32_add_fptr_from_tuple<Opt>(curr_after_i32_2, tuple);
+        [[maybe_unused]] auto const exp_i32_const = optable::translate::get_uwvmint_i32_const_fptr_from_tuple<Opt>(curr, tuple);
+        [[maybe_unused]] auto const exp_i32_add = optable::translate::get_uwvmint_i32_add_fptr_from_tuple<Opt>(curr_after_i32_2, tuple);
         auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_i64_load_plain = optable::translate::get_uwvmint_i64_load_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_i32_store_plain = optable::translate::get_uwvmint_i32_store_fptr_from_tuple<Opt>(curr, tuple);

@@ -50,8 +50,10 @@
 #  include <llvm/ExecutionEngine/ExecutionEngine.h>
 #  include <llvm/ExecutionEngine/MCJIT.h>
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#  include <llvm/InitializePasses.h>
 #  include <llvm/IR/LegacyPassManager.h>
 #  include <llvm/Linker/Linker.h>
+#  include <llvm/PassRegistry.h>
 #  include <llvm/Support/SourceMgr.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
@@ -3643,6 +3645,13 @@ namespace uwvm2::runtime::lib
             if(initialized) { return success; }
 
             initialized = true;
+            auto& pass_registry{*::llvm::PassRegistry::getPassRegistry()};
+            ::llvm::initializeCore(pass_registry);
+            ::llvm::initializeTransformUtils(pass_registry);
+            ::llvm::initializeScalarOpts(pass_registry);
+            ::llvm::initializeInstCombine(pass_registry);
+            ::llvm::initializeAnalysis(pass_registry);
+            ::llvm::initializeTarget(pass_registry);
             success = !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter() && !::llvm::InitializeNativeTargetAsmParser();
             return success;
         }
@@ -3656,9 +3665,8 @@ namespace uwvm2::runtime::lib
                 mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
-                    auto prefix{feature_enabled ? '+' : '-'};
                     mattrs.push_back(::uwvm2::utils::container::concat_uwvm(
-                        prefix,
+                        feature_enabled ? "+" : "-",
                         ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
                 }
             }

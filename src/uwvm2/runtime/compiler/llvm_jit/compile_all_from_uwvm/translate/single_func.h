@@ -14,6 +14,24 @@ struct llvm_jit_module_storage_t
     bool emitted{};
     ::std::unique_ptr<::llvm::LLVMContext> llvm_context_holder{};
     ::std::unique_ptr<::llvm::Module> llvm_module{};
+
+    llvm_jit_module_storage_t() = default;
+    llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) = delete;
+    llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t const&) = delete;
+    llvm_jit_module_storage_t(llvm_jit_module_storage_t&&) noexcept = default;
+    llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t&& other) noexcept
+    {
+        if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
+
+        llvm_module.reset();
+        llvm_context_holder.reset();
+
+        emitted = other.emitted;
+        llvm_context_holder = ::std::move(other.llvm_context_holder);
+        llvm_module = ::std::move(other.llvm_module);
+        other.emitted = false;
+        return *this;
+    }
 };
 
 struct full_function_symbol_t
