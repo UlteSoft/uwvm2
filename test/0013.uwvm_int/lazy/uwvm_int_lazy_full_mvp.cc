@@ -748,98 +748,69 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 1u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 1u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
         UWVM2TEST_REQUIRE(scheduler.ensure_ready(request));
         UWVM2TEST_REQUIRE(scheduler.ensure_ready(request));
         UWVM2TEST_REQUIRE(request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state_t::compiled);
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
-        UWVM2TEST_REQUIRE(!storage.compiled.local_funcs.index_unchecked(local_function_index).op.operands.empty());
+        UWVM2TEST_REQUIRE(compiled_local_func_ready(storage, local_function_index));
         return 0;
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
     [[nodiscard]] int run_executable_checks(prepared_runtime const& prep, lazy_module_t const& storage)
     {
-        using Runner = interpreter_runner<Opt>;
-
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_const7),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_const7),
-                                strict::pack_no_params(),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_const7, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_const7), strict::pack_no_params())};
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 7);
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_i32_add),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i32_add),
-                                pack_i32x2(17, 25),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_i32_add, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i32_add), pack_i32x2(17, 25))};
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 42);
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_i64_rem_s),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i64_rem_s),
-                                pack_i64x2(-17, 5),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_i64_rem_s, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i64_rem_s), pack_i64x2(-17, 5))};
             UWVM2TEST_REQUIRE(strict::load_i64(rr.results) == (-17 % 5));
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_f32_add),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_f32_add),
-                                pack_f32x2(1.5f, 2.25f),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_f32_add, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_f32_add), pack_f32x2(1.5f, 2.25f))};
             UWVM2TEST_REQUIRE(strict::load_f32(rr.results) == 3.75f);
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_f64_mul),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_f64_mul),
-                                pack_f64x2(1.25, 4.0),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_f64_mul, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_f64_mul), pack_f64x2(1.25, 4.0))};
             UWVM2TEST_REQUIRE(strict::load_f64(rr.results) == 5.0);
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_i32_trunc_f64_s),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i32_trunc_f64_s),
-                                strict::pack_f64(42.0),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_i32_trunc_f64_s, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_i32_trunc_f64_s), strict::pack_f64(42.0))};
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 42);
         }
 
         {
-            auto rr_true{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_if_else),
-                                     prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_if_else),
-                                     strict::pack_i32(1),
-                                     nullptr,
-                                     nullptr)};
+            auto rr_true{run_compiled_local_func<Opt>(
+                storage, k_fn_if_else, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_if_else), strict::pack_i32(1))};
             UWVM2TEST_REQUIRE(load_i32(rr_true.results) == 11);
 
-            auto rr_false{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_if_else),
-                                      prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_if_else),
-                                      strict::pack_i32(0),
-                                      nullptr,
-                                      nullptr)};
+            auto rr_false{run_compiled_local_func<Opt>(
+                storage, k_fn_if_else, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_if_else), strict::pack_i32(0))};
             UWVM2TEST_REQUIRE(load_i32(rr_false.results) == 22);
         }
 
         {
-            auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_memory_roundtrip),
-                                prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_memory_roundtrip),
-                                strict::pack_no_params(),
-                                nullptr,
-                                nullptr)};
+            auto rr{run_compiled_local_func<Opt>(
+                storage, k_fn_memory_roundtrip, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_memory_roundtrip), strict::pack_no_params())};
             UWVM2TEST_REQUIRE(static_cast<::std::uint32_t>(load_i32(rr.results)) == 0x11223344u);
         }
 
@@ -868,7 +839,7 @@ namespace
         for(::std::size_t i{}; i != k_fn_count; ++i)
         {
             UWVM2TEST_REQUIRE(storage.functions.index_unchecked(i).primary_cu_index != SIZE_MAX);
-            UWVM2TEST_REQUIRE(!storage.compiled.local_funcs.index_unchecked(i).op.operands.empty());
+            UWVM2TEST_REQUIRE(compiled_local_func_ready(storage, i));
         }
 
         UWVM2TEST_REQUIRE(run_executable_checks<Opt>(prep, storage) == 0);

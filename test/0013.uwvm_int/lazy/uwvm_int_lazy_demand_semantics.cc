@@ -127,7 +127,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, priority)};
+        auto request{make_lazy_compile_request<Opt>(ctx, priority)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -190,31 +190,32 @@ namespace
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 1uz);
 
         runner_lazy_call_bridge_scope<Opt> bridge_scope{prep, storage, options};
-        using Runner = interpreter_runner<Opt>;
-        auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_direct),
-                            prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_direct),
-                            pack_i32(41),
-                            nullptr,
-                            nullptr)};
+        auto rr{run_compiled_local_func<Opt>(
+            storage, k_fn_direct, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_direct), pack_i32(41))};
         UWVM2TEST_REQUIRE(load_i32(rr.results) == 42);
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+#endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
+#endif
 
-        auto rr_second{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_direct),
-                                   prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_direct),
-                                   pack_i32(9),
-                                   nullptr,
-                                   nullptr)};
+        auto rr_second{
+            run_compiled_local_func<Opt>(storage, k_fn_direct, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_direct), pack_i32(9))};
         UWVM2TEST_REQUIRE(load_i32(rr_second.results) == 10);
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+#endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
+#endif
         return 0;
     }
 
@@ -254,31 +255,32 @@ namespace
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 1uz);
 
         runner_lazy_call_bridge_scope<Opt> bridge_scope{prep, storage, options};
-        using Runner = interpreter_runner<Opt>;
-        auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_indirect),
-                            prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_indirect),
-                            pack_i32x2(41, 0),
-                            nullptr,
-                            nullptr)};
+        auto rr{run_compiled_local_func<Opt>(
+            storage, k_fn_indirect, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_indirect), pack_i32x2(41, 0))};
         UWVM2TEST_REQUIRE(load_i32(rr.results) == 42);
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+#endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
+#endif
 
-        auto rr_second{Runner::run(storage.compiled.local_funcs.index_unchecked(k_fn_indirect),
-                                   prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_indirect),
-                                   pack_i32x2(8, 0),
-                                   nullptr,
-                                   nullptr)};
+        auto rr_second{run_compiled_local_func<Opt>(
+            storage, k_fn_indirect, prep.mod->local_defined_function_vec_storage.index_unchecked(k_fn_indirect), pack_i32x2(8, 0))};
         UWVM2TEST_REQUIRE(load_i32(rr_second.results) == 9);
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+#endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
+#endif
         return 0;
     }
 

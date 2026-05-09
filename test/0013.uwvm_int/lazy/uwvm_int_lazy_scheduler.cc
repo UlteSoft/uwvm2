@@ -52,14 +52,10 @@ namespace
     {
         UWVM2TEST_REQUIRE(request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state_t::compiled);
         UWVM2TEST_REQUIRE(err.err_code == errc::ok);
-        UWVM2TEST_REQUIRE(!storage.compiled.local_funcs.index_unchecked(0).op.operands.empty());
+        UWVM2TEST_REQUIRE(compiled_local_func_ready(storage, 0uz));
 
-        using Runner = interpreter_runner<Opt>;
-        auto rr{Runner::run(storage.compiled.local_funcs.index_unchecked(0),
-                            prep.mod->local_defined_function_vec_storage.index_unchecked(0),
-                            pack_i32(37),
-                            nullptr,
-                            nullptr)};
+        auto rr{run_compiled_local_func<Opt>(
+            storage, 0uz, prep.mod->local_defined_function_vec_storage.index_unchecked(0), pack_i32(37))};
         UWVM2TEST_REQUIRE(load_i32(rr.results) == 42);
         return 0;
     }
@@ -89,7 +85,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 1u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 1u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
         UWVM2TEST_REQUIRE(request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state_t::uncompiled);
@@ -128,7 +124,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -166,7 +162,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -203,7 +199,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -236,7 +232,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = u8"uwvm2test_lazy_invalid_local"};
 
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 1u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 1u)};
         ::uwvm2::utils::thread::lazy_compile_scheduler scheduler{};
         scheduler.start({.worker_count = 0uz});
         UWVM2TEST_REQUIRE(!scheduler.ensure_ready(request));

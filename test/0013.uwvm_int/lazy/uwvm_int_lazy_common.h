@@ -7,13 +7,20 @@
 #include <cstdint>
 
 #include <uwvm2/runtime/compiler/uwvm_int/compile_cu_from_lazy_validator/impl.h>
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+# include <uwvm2/runtime/compiler/llvm_jit/compile_cu_from_lazy_validator/impl.h>
+#endif
 #include <uwvm2/runtime/lib/uwvm_runtime.h>
 #include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 
 namespace uwvm2test::uwvm_int_lazy
 {
     namespace strict = ::uwvm2test::uwvm_int_strict;
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    namespace lazy = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator;
+#else
     namespace lazy = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator;
+#endif
     namespace optable = ::uwvm2::runtime::compiler::uwvm_int::optable;
 
     using strict::byte_vec;
@@ -47,6 +54,7 @@ namespace uwvm2test::uwvm_int_lazy
 
     inline void configure_unexpected_traps() noexcept
     {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         static auto trap_unexpected = []() noexcept { ::fast_io::fast_terminate(); };
         optable::unreachable_func = +trap_unexpected;
         optable::trap_invalid_conversion_to_integer_func = +trap_unexpected;
@@ -54,6 +62,83 @@ namespace uwvm2test::uwvm_int_lazy
         optable::trap_integer_overflow_func = +trap_unexpected;
         optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
         optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+#endif
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    inline void compile_lazy_cu(runtime_module_t const& runtime_module,
+                                lazy_module_t& storage,
+                                lazy_compile_options_t& options,
+                                ::std::size_t compile_unit_index,
+                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
+    {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        (void)Opt;
+        lazy::compile_cu_from_lazy_validator(runtime_module, storage, options, compile_unit_index, err);
+#else
+        lazy::compile_cu_from_lazy_validator<Opt>(runtime_module, storage, options, compile_unit_index, err);
+#endif
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request
+        make_lazy_compile_request(lazy::lazy_compile_request_context& ctx, unsigned priority = 0u) noexcept
+    {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        (void)Opt;
+        return lazy::make_lazy_compile_request(ctx, priority);
+#else
+        return lazy::make_lazy_compile_request<Opt>(ctx, priority);
+#endif
+    }
+
+    [[nodiscard]] inline bool compiled_local_func_ready(lazy_module_t const& storage, ::std::size_t local_index) noexcept
+    {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        if(local_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
+        auto const& materialized{storage.materialized_functions.index_unchecked(local_index)};
+        return materialized.ready && materialized.entry_address != 0u && materialized.raw_entry_address != 0u;
+#else
+        if(local_index >= storage.compiled.local_funcs.size()) [[unlikely]] { return false; }
+        return !storage.compiled.local_funcs.index_unchecked(local_index).op.operands.empty();
+#endif
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    using lazy_run_result_t = typename interpreter_runner<Opt>::run_result;
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] inline lazy_run_result_t<Opt> run_compiled_local_func(lazy_module_t const& storage,
+                                                                        ::std::size_t local_index,
+                                                                        runtime_local_func_t const& rt_fn,
+                                                                        byte_vec const& packed_params)
+    {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        (void)storage;
+        (void)local_index;
+        auto const* const ft{rt_fn.function_type_ptr};
+        if(ft == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const param_bytes{strict::abi_total_bytes(ft->parameter.begin, ft->parameter.end)};
+        auto const result_bytes{strict::abi_total_bytes(ft->result.begin, ft->result.end)};
+        if(param_bytes != packed_params.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        lazy_run_result_t<Opt> rr{};
+        rr.results.resize(result_bytes);
+
+        ::std::uint_least32_t func_index{};
+        auto const* const module{strict::find_runtime_module_and_function_index(rt_fn, func_index)};
+        ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api(module,
+                                                          func_index,
+                                                          rr.results.empty() ? nullptr : rr.results.data(),
+                                                          result_bytes,
+                                                          packed_params.empty() ? nullptr : packed_params.data(),
+                                                          param_bytes);
+        return rr;
+#else
+        using Runner = interpreter_runner<Opt>;
+        return Runner::run(storage.compiled.local_funcs.index_unchecked(local_index), rt_fn, packed_params, nullptr, nullptr);
+#endif
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
@@ -70,14 +155,11 @@ namespace uwvm2test::uwvm_int_lazy
         if(fn.primary_cu_index >= g_lazy_call_lazy_module->compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
         ::uwvm2::validation::error::code_validation_error_impl err{};
-        lazy::compile_cu_from_lazy_validator<Opt>(*g_lazy_call_runtime_module,
-                                                  *g_lazy_call_lazy_module,
-                                                  *g_lazy_call_options,
-                                                  fn.primary_cu_index,
-                                                  err);
+        compile_lazy_cu<Opt>(*g_lazy_call_runtime_module, *g_lazy_call_lazy_module, *g_lazy_call_options, fn.primary_cu_index, err);
         if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
     }
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
     template <optable::uwvm_interpreter_translate_option_t Opt>
     inline void runner_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
     {
@@ -118,7 +200,9 @@ namespace uwvm2test::uwvm_int_lazy
         if(result_bytes != 0uz) { ::std::memcpy(param_base, rr.results.data(), result_bytes); }
         *stack_top_ptr = param_base + result_bytes;
     }
+#endif
 
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
     template <optable::uwvm_interpreter_translate_option_t Opt>
     inline void runner_call_indirect_bridge(::std::size_t wasm_module_id,
                                             ::std::size_t type_index,
@@ -186,6 +270,7 @@ namespace uwvm2test::uwvm_int_lazy
         if(result_bytes != 0uz) { ::std::memcpy(param_base, rr.results.data(), result_bytes); }
         *stack_top_ptr = param_base + result_bytes;
     }
+#endif
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
     struct runner_call_indirect_bridge_scope
@@ -194,10 +279,16 @@ namespace uwvm2test::uwvm_int_lazy
                                                    lazy_module_t const& storage,
                                                    ::std::size_t module_id = 0uz) noexcept
         {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             g_call_indirect_runtime_module = prep.mod;
             g_call_indirect_lazy_module = ::std::addressof(storage);
             g_call_indirect_module_id = module_id;
             optable::call_indirect_func = runner_call_indirect_bridge<Opt>;
+#else
+            (void)prep;
+            (void)storage;
+            (void)module_id;
+#endif
         }
 
         runner_call_indirect_bridge_scope(runner_call_indirect_bridge_scope const&) = delete;
@@ -205,10 +296,12 @@ namespace uwvm2test::uwvm_int_lazy
 
         ~runner_call_indirect_bridge_scope() noexcept
         {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             g_call_indirect_runtime_module = nullptr;
             g_call_indirect_lazy_module = nullptr;
             g_call_indirect_module_id = 0uz;
             optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+#endif
         }
     };
 
@@ -220,6 +313,7 @@ namespace uwvm2test::uwvm_int_lazy
                                               lazy_compile_options_t& options,
                                               ::std::size_t module_id = 0uz) noexcept
         {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             g_lazy_call_runtime_module = prep.mod;
             g_lazy_call_lazy_module = ::std::addressof(storage);
             g_lazy_call_options = ::std::addressof(options);
@@ -228,6 +322,12 @@ namespace uwvm2test::uwvm_int_lazy
             g_call_indirect_module_id = module_id;
             optable::call_func = runner_call_bridge<Opt>;
             optable::call_indirect_func = runner_call_indirect_bridge<Opt>;
+#else
+            (void)prep;
+            (void)storage;
+            (void)options;
+            (void)module_id;
+#endif
         }
 
         runner_lazy_call_bridge_scope(runner_lazy_call_bridge_scope const&) = delete;
@@ -235,6 +335,7 @@ namespace uwvm2test::uwvm_int_lazy
 
         ~runner_lazy_call_bridge_scope() noexcept
         {
+#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
             g_lazy_call_runtime_module = nullptr;
             g_lazy_call_lazy_module = nullptr;
             g_lazy_call_options = nullptr;
@@ -243,6 +344,7 @@ namespace uwvm2test::uwvm_int_lazy
             g_call_indirect_module_id = 0uz;
             optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
             optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+#endif
         }
     };
 
@@ -263,15 +365,19 @@ namespace uwvm2test::uwvm_int_lazy
 
     [[nodiscard]] inline lazy_split_config_t small_code_size_split_config() noexcept
     {
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        return lazy_split_config_t{.cu_code_size = 5uz};
+#else
         return lazy_split_config_t{.eu_policy = lazy::lazy_execution_unit_split_policy_t::structured_control,
                                    .cu_policy = lazy::lazy_compile_unit_split_policy_t::code_size,
                                    .cu_code_size = 5uz};
+#endif
     }
 
     [[nodiscard]] inline lazy_module_t initialize_lazy_storage(runtime_module_t const& rt, lazy_split_config_t cfg)
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
-        optable::compile_option cop{};
+        lazy::compile_option cop{};
         auto storage{lazy::initialize_lazy_module_storage(rt, cop, err, cfg)};
         if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
         return storage;
@@ -281,7 +387,7 @@ namespace uwvm2test::uwvm_int_lazy
                                                                   lazy_validation_mode_t mode,
                                                                   ::std::size_t module_id = 0uz) noexcept
     {
-        optable::compile_option cop{};
+        lazy::compile_option cop{};
         cop.curr_wasm_id = module_id;
 
         lazy_compile_options_t options{};
@@ -296,7 +402,11 @@ namespace uwvm2test::uwvm_int_lazy
         namespace mode = ::uwvm2::uwvm::runtime::runtime_mode;
 
         mode::global_runtime_mode = mode::runtime_mode_t::lazy_compile;
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        mode::global_runtime_compiler = mode::runtime_compiler_t::llvm_jit_only;
+#else
         mode::global_runtime_compiler = mode::runtime_compiler_t::uwvm_interpreter_only;
+#endif
         mode::global_runtime_compile_threads_resolved = worker_count;
         mode::global_runtime_scheduling_policy = mode::runtime_scheduling_policy_t::code_size;
         mode::global_runtime_scheduling_size = scheduling_size;

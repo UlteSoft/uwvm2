@@ -255,7 +255,7 @@ namespace
             ::std::fprintf(stderr, "  compile_remaining_functions fn=%zu\n", i);
             try
             {
-                lazy::compile_cu_from_lazy_validator<Opt>(*prep.mod, storage, options, fn.primary_cu_index, local_err);
+                compile_lazy_cu<Opt>(*prep.mod, storage, options, fn.primary_cu_index, local_err);
             }
             catch(::fast_io::error const&)
             {
@@ -326,7 +326,7 @@ namespace
             ::std::fprintf(stderr, "  direct_compile fn=%zu\n", compile_unit_index);
             try
             {
-                lazy::compile_cu_from_lazy_validator<Opt>(*prep.mod, storage, options, compile_unit_index, err);
+                compile_lazy_cu<Opt>(*prep.mod, storage, options, compile_unit_index, err);
             }
             catch(::fast_io::error const&)
             {
@@ -346,7 +346,7 @@ namespace
                                                    .err = ::std::addressof(err),
                                                    .module_name = module_name_view(cc.module_name_ascii)};
 
-            auto request{lazy::make_lazy_compile_request<Opt>(ctx, cc.priority)};
+            auto request{make_lazy_compile_request<Opt>(ctx, cc.priority)};
             UWVM2TEST_REQUIRE(request.unit != nullptr);
             UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -378,7 +378,7 @@ namespace
         }
 
         UWVM2TEST_REQUIRE(compile_remaining_functions<Opt>(prep, storage, options, cc.compile_function_index) == 0);
-        UWVM2TEST_REQUIRE(!storage.compiled.local_funcs.index_unchecked(cc.compile_function_index).op.operands.empty());
+        UWVM2TEST_REQUIRE(compiled_local_func_ready(storage, cc.compile_function_index));
         UWVM2TEST_REQUIRE(verify_results<Opt>(prep, storage) == 0);
         return 0;
     }
@@ -401,7 +401,7 @@ namespace
                                                .compile_unit_index = storage.compile_units.size(),
                                                .err = ::std::addressof(err),
                                                .module_name = u8"uwvm2test_lazy_strategy_invalid_request"};
-        auto request{lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
+        auto request{make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit == nullptr);
         UWVM2TEST_REQUIRE(request.compile == nullptr);
 

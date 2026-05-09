@@ -763,4 +763,87 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			add_files(file)
 		target_end()
 	end
+
+	for _, file in ipairs(os.files("test/0013.uwvm_int/lazy/**.cc")) do
+		local normalized = file:gsub("\\", "/")
+		if normalized:find("/uwvm_int_lazy_split.cc", 1, true) or normalized:find("/uwvm_int_lazy_strategy_matrix.cc", 1, true) then
+			goto continue_llvm_jit_lazy
+		end
+		local rel = normalized
+		rel = rel:gsub("^test/0013%.uwvm_int/lazy/", "")
+		local suffix = rel:gsub("%.cc$", "")
+		suffix = suffix:gsub("/", "_"):gsub("%.", "_"):gsub("%-", "_")
+		local name = "llvm_jit_lazy_reuse_0013_" .. suffix
+
+		target(name)
+			set_group("test/0014.llvm_jit/lazy")
+			set_kind("binary")
+			def_build({ skip_static_libcxx = true })
+
+			add_deps("uwvm_runtime")
+			add_deps("uwvm")
+
+			-- uwvm uses precise floating-point model to ensure determinism.
+			set_fpmodels("precise")
+
+			set_default(false)
+
+			local enable_cxx_module = get_config("use-cxx-module")
+
+			-- third-parties/fast_io
+			add_includedirs("third-parties/fast_io/include")
+
+			if enable_cxx_module then
+				add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+				add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+			end
+			-- third-parties/bizwen
+			add_includedirs("third-parties/bizwen/include")
+
+			-- third-parties/boost
+			add_includedirs("third-parties/boost_unordered/include")
+
+			-- uwvm
+			add_defines("UWVM=2")
+			-- uwvm test
+			add_defines("UWVM_TEST=2")
+			add_defines("UWVM2TEST_RUNNER_USE_LLVM_JIT")
+
+			-- src
+			add_includedirs("src/")
+
+			if enable_cxx_module then
+				-- uwvm predefine
+				add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+				-- utils
+				add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+				-- object
+				add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+				-- imported
+				add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+				-- wasm parser
+				add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+				-- validation
+				add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
+				-- uwvm
+				add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+			end
+
+			set_warnings("all", "extra", "error")
+
+			if get_config("use-llvm-compiler") then
+				add_cxxflags("-Wno-error=undefined-inline")
+			end
+
+			add_tests("unit", { group = "default" }) -- xmake test -g default
+			add_files(file)
+		target_end()
+		::continue_llvm_jit_lazy::
+	end
 end
