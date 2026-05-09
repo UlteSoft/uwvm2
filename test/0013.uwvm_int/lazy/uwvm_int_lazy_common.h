@@ -38,6 +38,9 @@ namespace uwvm2test::uwvm_int_lazy
     using lazy_validation_mode_t = lazy::lazy_validation_mode;
     using lazy_compile_state_t = ::uwvm2::utils::thread::lazy_compile_state;
 
+    inline runtime_module_t const* g_lazy_call_runtime_module{};
+    inline lazy_module_t* g_lazy_call_lazy_module{};
+    inline lazy_compile_options_t* g_lazy_call_options{};
     inline runtime_module_t const* g_call_indirect_runtime_module{};
     inline lazy_module_t const* g_call_indirect_lazy_module{};
     inline ::std::size_t g_call_indirect_module_id{};
@@ -51,6 +54,69 @@ namespace uwvm2test::uwvm_int_lazy
         optable::trap_integer_overflow_func = +trap_unexpected;
         optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
         optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    inline void runner_compile_local_function_if_needed(::std::size_t local_index) UWVM_THROWS
+    {
+        if(g_lazy_call_runtime_module == nullptr || g_lazy_call_lazy_module == nullptr || g_lazy_call_options == nullptr) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+        if(local_index >= g_lazy_call_lazy_module->functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const& fn{g_lazy_call_lazy_module->functions.index_unchecked(local_index)};
+        if(fn.materialization_state.state.load(::std::memory_order_acquire) == lazy_compile_state_t::compiled) { return; }
+        if(fn.primary_cu_index >= g_lazy_call_lazy_module->compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        ::uwvm2::validation::error::code_validation_error_impl err{};
+        lazy::compile_cu_from_lazy_validator<Opt>(*g_lazy_call_runtime_module,
+                                                  *g_lazy_call_lazy_module,
+                                                  *g_lazy_call_options,
+                                                  fn.primary_cu_index,
+                                                  err);
+        if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    inline void runner_call_bridge(::std::size_t wasm_module_id, ::std::size_t call_function, ::std::byte** stack_top_ptr) UWVM_THROWS
+    {
+        if(wasm_module_id != SIZE_MAX) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(g_lazy_call_lazy_module == nullptr || stack_top_ptr == nullptr || *stack_top_ptr == nullptr) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+
+        auto const* const info{reinterpret_cast<optable::compiled_defined_call_info const*>(call_function)};
+        if(info == nullptr || info->runtime_func == nullptr || info->compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const compiled_base{g_lazy_call_lazy_module->compiled.local_funcs.data()};
+        auto const local_count{g_lazy_call_lazy_module->compiled.local_funcs.size()};
+        if(compiled_base == nullptr || info->compiled_func < compiled_base || info->compiled_func >= compiled_base + local_count) [[unlikely]]
+        {
+            ::fast_io::fast_terminate();
+        }
+        auto const local_index{static_cast<::std::size_t>(info->compiled_func - compiled_base)};
+        runner_compile_local_function_if_needed<Opt>(local_index);
+
+        auto const param_bytes{info->param_bytes};
+        auto const result_bytes{info->result_bytes};
+        auto const top_addr{reinterpret_cast<::std::uintptr_t>(*stack_top_ptr)};
+        if(top_addr < param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto* const param_base{*stack_top_ptr - param_bytes};
+        byte_vec packed_params(param_bytes);
+        if(param_bytes != 0uz) { ::std::memcpy(packed_params.data(), param_base, param_bytes); }
+
+        using Runner = interpreter_runner<Opt>;
+        auto rr{Runner::run(g_lazy_call_lazy_module->compiled.local_funcs.index_unchecked(local_index),
+                            *static_cast<runtime_local_func_t const*>(info->runtime_func),
+                            packed_params,
+                            nullptr,
+                            nullptr)};
+        if(rr.results.size() != result_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+        if(result_bytes != 0uz) { ::std::memcpy(param_base, rr.results.data(), result_bytes); }
+        *stack_top_ptr = param_base + result_bytes;
     }
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
@@ -105,6 +171,10 @@ namespace uwvm2test::uwvm_int_lazy
         auto* const param_base{*stack_top_ptr - param_bytes};
         byte_vec packed_params(param_bytes);
         if(param_bytes != 0uz) { ::std::memcpy(packed_params.data(), param_base, param_bytes); }
+        if(g_lazy_call_runtime_module != nullptr && g_lazy_call_lazy_module != nullptr && g_lazy_call_options != nullptr)
+        {
+            runner_compile_local_function_if_needed<Opt>(local_index);
+        }
 
         using Runner = interpreter_runner<Opt>;
         auto rr{Runner::run(g_call_indirect_lazy_module->compiled.local_funcs.index_unchecked(local_index),
@@ -138,6 +208,40 @@ namespace uwvm2test::uwvm_int_lazy
             g_call_indirect_runtime_module = nullptr;
             g_call_indirect_lazy_module = nullptr;
             g_call_indirect_module_id = 0uz;
+            optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
+        }
+    };
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    struct runner_lazy_call_bridge_scope
+    {
+        explicit runner_lazy_call_bridge_scope(prepared_runtime const& prep,
+                                              lazy_module_t& storage,
+                                              lazy_compile_options_t& options,
+                                              ::std::size_t module_id = 0uz) noexcept
+        {
+            g_lazy_call_runtime_module = prep.mod;
+            g_lazy_call_lazy_module = ::std::addressof(storage);
+            g_lazy_call_options = ::std::addressof(options);
+            g_call_indirect_runtime_module = prep.mod;
+            g_call_indirect_lazy_module = ::std::addressof(storage);
+            g_call_indirect_module_id = module_id;
+            optable::call_func = runner_call_bridge<Opt>;
+            optable::call_indirect_func = runner_call_indirect_bridge<Opt>;
+        }
+
+        runner_lazy_call_bridge_scope(runner_lazy_call_bridge_scope const&) = delete;
+        runner_lazy_call_bridge_scope& operator=(runner_lazy_call_bridge_scope const&) = delete;
+
+        ~runner_lazy_call_bridge_scope() noexcept
+        {
+            g_lazy_call_runtime_module = nullptr;
+            g_lazy_call_lazy_module = nullptr;
+            g_lazy_call_options = nullptr;
+            g_call_indirect_runtime_module = nullptr;
+            g_call_indirect_lazy_module = nullptr;
+            g_call_indirect_module_id = 0uz;
+            optable::call_func = +[](::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
             optable::call_indirect_func = +[](::std::size_t, ::std::size_t, ::std::size_t, ::std::byte**) { ::fast_io::fast_terminate(); };
         }
     };
