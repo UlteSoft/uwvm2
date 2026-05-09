@@ -343,7 +343,8 @@ namespace
                                                    .lazy_storage = ::std::addressof(storage),
                                                    .options = options,
                                                    .compile_unit_index = compile_unit_index,
-                                                   .err = ::std::addressof(err)};
+                                                   .err = ::std::addressof(err),
+                                                   .module_name = module_name_view(cc.module_name_ascii)};
 
             auto request{lazy::make_lazy_compile_request<Opt>(ctx, cc.priority)};
             UWVM2TEST_REQUIRE(request.unit != nullptr);
@@ -398,7 +399,8 @@ namespace
                                                .lazy_storage = ::std::addressof(storage),
                                                .options = options,
                                                .compile_unit_index = storage.compile_units.size(),
-                                               .err = ::std::addressof(err)};
+                                               .err = ::std::addressof(err),
+                                               .module_name = u8"uwvm2test_lazy_strategy_invalid_request"};
         auto request{lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit == nullptr);
         UWVM2TEST_REQUIRE(request.compile == nullptr);

@@ -58,7 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     // avr does not have posix
     inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8c_io_observer> u8runtime_log_output{
         ::fast_io::u8c_stderr()};  // [global] No global variable dependencies from other translation units
-# elif ((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) || (defined(__MSDOS__) || defined(__DJGPP__)) ||                                  \
+# elif ((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) || (defined(__MSDOS__) || defined(__DJGPP__)) ||                                   \
      (defined(__NEWLIB__) && !defined(__CYGWIN__)) || defined(_PICOLIBC__) || defined(__wasm__)
     // win9x cannot dup stderr
     inline ::fast_io::basic_io_lockable_nonmovable<::fast_io::u8native_io_observer> u8runtime_log_output{

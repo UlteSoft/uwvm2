@@ -75,6 +75,7 @@
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # include <uwvm2/utils/container/impl.h>
+# include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
 # include <uwvm2/uwvm/imported/wasi/wasip1/storage/impl.h>
 # include <uwvm2/uwvm/wasm/feature/impl.h>
@@ -966,6 +967,7 @@ namespace uwvm2::runtime::lib
                 ctx.options = rec.lazy_compile_options;
                 ctx.compile_unit_index = fn.primary_cu_index;
                 ctx.err = ::std::addressof(rec.lazy_background_errors.index_unchecked(i));
+                ctx.module_name = rec.module_name;
                 rec.lazy_prefetch_order.index_unchecked(i) = i;
             }
 
@@ -2988,10 +2990,35 @@ namespace uwvm2::runtime::lib
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled)
             {
                 g_runtime.lazy_runtime_compiled_hit_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"demand-hit module=\"",
+                                                              rec.module_name,
+                                                              u8"\" module_id=",
+                                                              module_id,
+                                                              u8" fn=",
+                                                              function_index,
+                                                              u8" local_fn=",
+                                                              local_index,
+                                                              u8" cu=",
+                                                              fn.primary_cu_index,
+                                                              u8" state=compiled");
                 return;
             }
             g_runtime.lazy_runtime_miss_count.fetch_add(1uz, ::std::memory_order_relaxed);
-            if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]]
+            {
+                ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"demand-failed module=\"",
+                                                              rec.module_name,
+                                                              u8"\" module_id=",
+                                                              module_id,
+                                                              u8" fn=",
+                                                              function_index,
+                                                              u8" local_fn=",
+                                                              local_index,
+                                                              u8" cu=",
+                                                              fn.primary_cu_index,
+                                                              u8" state=failed");
+                ::fast_io::fast_terminate();
+            }
             if(fn.primary_cu_index >= rec.lazy_compiled.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             ::uwvm2::validation::error::code_validation_error_impl err{};
@@ -3000,11 +3027,26 @@ namespace uwvm2::runtime::lib
                 .lazy_storage = ::std::addressof(rec.lazy_compiled),
                 .options = rec.lazy_compile_options,
                 .compile_unit_index = fn.primary_cu_index,
-                .err = ::std::addressof(err)};
+                .err = ::std::addressof(err),
+                .module_name = rec.module_name};
 
             constexpr auto curr_target_tranopt{get_curr_target_tranopt()};
             auto const request_priority{1u};
             auto request{::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::make_lazy_compile_request<curr_target_tranopt>(ctx, request_priority)};
+            ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"demand-request module=\"",
+                                                          rec.module_name,
+                                                          u8"\" module_id=",
+                                                          module_id,
+                                                          u8" fn=",
+                                                          function_index,
+                                                          u8" local_fn=",
+                                                          local_index,
+                                                          u8" cu=",
+                                                          fn.primary_cu_index,
+                                                          u8" state=",
+                                                          ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::compile_state_name(st),
+                                                          u8" priority=",
+                                                          request_priority);
             if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]]
             {
 # ifdef UWVM_CPP_EXCEPTIONS

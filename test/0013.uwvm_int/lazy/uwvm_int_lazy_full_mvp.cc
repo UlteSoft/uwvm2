@@ -745,7 +745,8 @@ namespace
                                                .lazy_storage = ::std::addressof(storage),
                                                .options = options,
                                                .compile_unit_index = fn.primary_cu_index,
-                                               .err = ::std::addressof(err)};
+                                               .err = ::std::addressof(err),
+                                               .module_name = module_name};
 
         auto request{lazy::make_lazy_compile_request<Opt>(ctx, 1u)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
