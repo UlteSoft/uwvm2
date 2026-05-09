@@ -349,28 +349,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
         {
+            static_cast<void>(target_machine);
             if(::llvm::verifyModule(module)) [[unlikely]] { return false; }
 
-            ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
-            function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
-            function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
-            function_pass_manager.add(::llvm::createInstructionCombiningPass());
-            function_pass_manager.add(::llvm::createReassociatePass());
-            function_pass_manager.add(::llvm::createGVNPass());
-            function_pass_manager.add(::llvm::createCFGSimplificationPass());
-            function_pass_manager.add(::llvm::createLICMPass());
-            function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
-            function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
-
-            function_pass_manager.doInitialization();
-            for(auto& function: module)
-            {
-                if(function.isDeclaration()) { continue; }
-                function_pass_manager.run(function);
-            }
-            function_pass_manager.doFinalization();
-
-            return !::llvm::verifyModule(module);
+            return true;
         }
 
         [[nodiscard]] inline ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
@@ -415,7 +397,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT)
-                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                .setOptLevel(::llvm::CodeGenOptLevel::None)
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
@@ -428,7 +410,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             auto raw_engine{::llvm::EngineBuilder(::std::move(llvm_module))
                                 .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                                .setOptLevel(::llvm::CodeGenOptLevel::None)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
                                 .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())

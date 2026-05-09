@@ -197,6 +197,8 @@ namespace uwvm2::runtime::lib
             ::std::unique_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_entry_addresses{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_raw_entry_addresses{};
+            ::uwvm2::utils::container::vector<runtime_llvm_jit_raw_call_target_t> llvm_jit_lazy_direct_call_targets{};
+            ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_lazy_direct_typed_entry_targets{};
             bool llvm_jit_ready{};
 #endif
 
@@ -1268,12 +1270,16 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool enqueue_llvm_jit_lazy_background_requests_for_module(compiled_module_record& rec,
                                                                                        ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
         {
+            constexpr ::std::size_t refill_request_budget{32uz};
             auto const local_n{rec.lazy_prefetch_order.size()};
             if(local_n == 0uz || rec.runtime_module == nullptr) [[unlikely]] { return false; }
 
             bool queued{};
+            ::std::size_t queued_this_refill{};
             for(; rec.lazy_prefetch_cursor < local_n; ++rec.lazy_prefetch_cursor)
             {
+                if(queued_this_refill == refill_request_budget) { break; }
+
                 auto const local_index{rec.lazy_prefetch_order.index_unchecked(rec.lazy_prefetch_cursor)};
                 if(local_index >= rec.llvm_jit_lazy_compiled.functions.size()) [[unlikely]] { continue; }
                 auto& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
@@ -1286,6 +1292,7 @@ namespace uwvm2::runtime::lib
 
                 if(!scheduler.try_request(request)) [[unlikely]] { break; }
                 queued = true;
+                ++queued_this_refill;
             }
 
             return queued;
@@ -3416,6 +3423,40 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
+        [[nodiscard]] inline bool try_get_runtime_llvm_jit_defined_entry_address(::std::size_t module_id,
+                                                                                 ::std::size_t function_index,
+                                                                                 ::std::uintptr_t& function_address) noexcept
+        {
+            function_address = 0u;
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
+
+            auto const& rec{g_runtime.modules.index_unchecked(module_id)};
+            auto const runtime_module{rec.runtime_module};
+            if(runtime_module == nullptr) [[unlikely]] { return false; }
+
+            auto const import_n{runtime_module->imported_function_vec_storage.size()};
+            if(function_index < import_n) { return false; }
+
+            auto const local_index{function_index - import_n};
+            if(rec.llvm_jit_ready && local_index < rec.llvm_jit_local_entry_addresses.size())
+            {
+                function_address = rec.llvm_jit_local_entry_addresses.index_unchecked(local_index);
+                if(function_address != 0u) { return true; }
+            }
+
+            if(g_runtime.lazy_compile_active &&
+               ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                   ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+            {
+                return ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_entry_address(
+                    rec.llvm_jit_lazy_compiled,
+                    local_index,
+                    function_address);
+            }
+
+            return false;
+        }
+
         [[nodiscard]] inline bool try_invoke_runtime_llvm_jit_raw_defined_entry(::std::size_t module_id,
                                                                                 ::std::size_t function_index,
                                                                                 void* result_buffer,
@@ -3509,22 +3550,55 @@ namespace uwvm2::runtime::lib
                                                                           ::std::size_t param_bytes) noexcept
         {
             auto const info{reinterpret_cast<compiled_defined_func_info const*>(context_address)};
-            auto const result_buffer{reinterpret_cast<void*>(result_buffer_address)};
-            auto const param_buffer{reinterpret_cast<void const*>(param_buffer_address)};
             if(info == nullptr || param_bytes != info->param_bytes || result_bytes != info->result_bytes) [[unlikely]]
             {
                 ::fast_io::fast_terminate();
             }
 
-            if(!try_invoke_runtime_llvm_jit_raw_defined_entry(info->module_id,
-                                                              info->function_index,
-                                                              result_buffer,
-                                                              result_bytes,
-                                                              param_buffer,
-                                                              param_bytes)) [[unlikely]]
+            if(!ensure_lazy_llvm_jit_defined_function_compiled(info->module_id, info->function_index)) [[unlikely]]
             {
                 ::fast_io::fast_terminate();
             }
+
+            ::std::uintptr_t function_address{};
+            if(!try_get_runtime_llvm_jit_raw_defined_entry_address(info->module_id, info->function_index, function_address)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            ::std::uintptr_t typed_function_address{};
+            if(!try_get_runtime_llvm_jit_defined_entry_address(info->module_id, info->function_index, typed_function_address)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            if(info->module_id < g_runtime.modules.size()) [[likely]]
+            {
+                auto& rec{g_runtime.modules.index_unchecked(info->module_id)};
+                auto const runtime_module{rec.runtime_module};
+                if(runtime_module != nullptr)
+                {
+                    auto const import_n{runtime_module->imported_function_vec_storage.size()};
+                    if(info->function_index >= import_n)
+                    {
+                        auto const local_index{info->function_index - import_n};
+                        if(local_index < rec.llvm_jit_lazy_direct_call_targets.size())
+                        {
+                            auto& target{rec.llvm_jit_lazy_direct_call_targets.index_unchecked(local_index)};
+                            target.entry_address = function_address;
+                            target.context_address = 0u;
+                        }
+                        if(local_index < rec.llvm_jit_lazy_direct_typed_entry_targets.size())
+                        {
+                            rec.llvm_jit_lazy_direct_typed_entry_targets.index_unchecked(local_index) = typed_function_address;
+                        }
+                    }
+                }
+            }
+
+            using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
+            auto const entry_fn{reinterpret_cast<entry_fn_t>(function_address)};
+            entry_fn(0u, result_buffer_address, result_bytes, param_buffer_address, param_bytes);
         }
 #endif
 
@@ -5997,6 +6071,26 @@ namespace uwvm2::runtime::lib
                     info.result_bytes = result_bytes;
                     mod_cache.index_unchecked(i) = info;
                 }
+
+                rec.llvm_jit_lazy_direct_call_targets.clear();
+                rec.llvm_jit_lazy_direct_call_targets.resize(local_n);
+                for(::std::size_t i{}; i != local_n; ++i)
+                {
+                    auto& target{rec.llvm_jit_lazy_direct_call_targets.index_unchecked(i)};
+                    target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_lazy_raw_call_defined_entry);
+                    target.context_address = reinterpret_cast<::std::uintptr_t>(::std::addressof(mod_cache.index_unchecked(i)));
+                    target.encoded_type_id = find_canonical_type_id_for_sig(rec, func_sig_from_defined(mod_cache.index_unchecked(i).runtime_func));
+                }
+
+                rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_raw_call_target_base_address =
+                    reinterpret_cast<::std::uintptr_t>(rec.llvm_jit_lazy_direct_call_targets.data());
+                rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_raw_call_target_count = rec.llvm_jit_lazy_direct_call_targets.size();
+                rec.llvm_jit_lazy_direct_typed_entry_targets.clear();
+                rec.llvm_jit_lazy_direct_typed_entry_targets.resize(local_n);
+                rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_typed_entry_target_base_address =
+                    reinterpret_cast<::std::uintptr_t>(rec.llvm_jit_lazy_direct_typed_entry_targets.data());
+                rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_typed_entry_target_count =
+                    rec.llvm_jit_lazy_direct_typed_entry_targets.size();
 
                 prepare_llvm_jit_lazy_background_request_contexts(rec);
             }

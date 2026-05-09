@@ -49,6 +49,10 @@ struct compile_option
 {
     ::std::size_t curr_wasm_id{};
     bool route_wasm_calls_through_runtime_bridge{};
+    ::std::uintptr_t lazy_defined_raw_call_target_base_address{};
+    ::std::size_t lazy_defined_raw_call_target_count{};
+    ::std::uintptr_t lazy_defined_typed_entry_target_base_address{};
+    ::std::size_t lazy_defined_typed_entry_target_count{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -553,7 +557,11 @@ namespace details
                                                       local_func_storage_t const& local_func_storage,
                                                       ::uwvm2::validation::error::code_validation_error_impl& err,
                                                       llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
-                                                      bool route_wasm_calls_through_runtime_bridge = false) UWVM_THROWS
+                                                      bool route_wasm_calls_through_runtime_bridge = false,
+                                                      ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
+                                                      ::std::size_t lazy_defined_raw_call_target_count = 0uz,
+                                                      ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
+                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -803,7 +811,14 @@ namespace details
         bool emit_llvm_jit_active{
             emitted_llvm_jit_ir_storage != nullptr &&
             try_prepare_runtime_local_func_llvm_jit_emit_state(
-                local_func_storage, *emitted_llvm_jit_ir_storage, llvm_jit_emit_state, route_wasm_calls_through_runtime_bridge)};
+                local_func_storage,
+                *emitted_llvm_jit_ir_storage,
+                llvm_jit_emit_state,
+                route_wasm_calls_through_runtime_bridge,
+                lazy_defined_raw_call_target_base_address,
+                lazy_defined_raw_call_target_count,
+                lazy_defined_typed_entry_target_base_address,
+                lazy_defined_typed_entry_target_count)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -1100,7 +1115,15 @@ namespace details
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
         local_func_storage.module_id = options.curr_wasm_id;
         validate_runtime_local_func(
-            validation_module, local_func_storage, err, emitted_llvm_jit_ir_storage, options.route_wasm_calls_through_runtime_bridge);
+            validation_module,
+            local_func_storage,
+            err,
+            emitted_llvm_jit_ir_storage,
+            options.route_wasm_calls_through_runtime_bridge,
+            options.lazy_defined_raw_call_target_base_address,
+            options.lazy_defined_raw_call_target_count,
+            options.lazy_defined_typed_entry_target_base_address,
+            options.lazy_defined_typed_entry_target_count);
         return local_func_storage;
     }
 
