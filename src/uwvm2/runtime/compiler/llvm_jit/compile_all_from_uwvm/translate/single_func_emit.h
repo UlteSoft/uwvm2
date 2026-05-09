@@ -2178,6 +2178,7 @@ struct llvm_jit_branch_target_t
 struct runtime_local_func_llvm_jit_emit_state_t
 {
     bool valid{};
+    bool route_wasm_calls_through_runtime_bridge{};
     local_func_storage_t const* local_func_storage_ptr{};
     ::uwvm2::utils::container::vector<runtime_operand_stack_value_type> local_types{};
     ::llvm::LLVMContext* llvm_context_holder{};
@@ -2212,9 +2213,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
 [[nodiscard]] inline bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
                                                                              llvm_jit_module_storage_t& module_storage,
-                                                                             runtime_local_func_llvm_jit_emit_state_t& state)
+                                                                             runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                             bool route_wasm_calls_through_runtime_bridge = false)
 {
     state = {};
+    state.route_wasm_calls_through_runtime_bridge = route_wasm_calls_through_runtime_bridge;
 
     auto function_type_ptr{local_func_storage.function_type_ptr};
     auto wasm_code_ptr{local_func_storage.wasm_code_ptr};
@@ -3158,6 +3161,44 @@ template <typename EmitBridgeCallFromBuffers>
     return llvm_jit_runtime_raw_bridge_emit_result_t{.valid = true, .bridge_call = bridge_call, .result_value = result_value};
 }
 
+[[nodiscard]] inline llvm_jit_runtime_raw_bridge_emit_result_t emit_runtime_local_func_llvm_jit_raw_host_wasm_call(
+    runtime_local_func_llvm_jit_emit_state_t& state,
+    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+    validation_module_traits_t::wasm_u32 func_index,
+    ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& wasm_function_type,
+    llvm_jit_prepared_wasm_call_operands_t const& prepared_call,
+    char const* param_buffer_name,
+    char const* result_buffer_name)
+{
+    if(!state.valid || state.llvm_context_holder == nullptr) [[unlikely]] { return {}; }
+
+    auto& llvm_context{*state.llvm_context_holder};
+    auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+    auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
+    auto const abi_layout{prepared_call.abi_layout};
+
+    return emit_runtime_local_func_llvm_jit_runtime_raw_host_bridge_call(
+        state,
+        wasm_function_type,
+        {prepared_call.arguments.data(), prepared_call.arguments.size()},
+        param_buffer_name,
+        result_buffer_name,
+        [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) -> ::llvm::CallInst*
+        {
+            auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
+            return emit_runtime_local_func_llvm_jit_runtime_bridge_call(
+                state,
+                ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api,
+                bridge_function_type,
+                {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(::std::addressof(runtime_module))),
+                 ::llvm::ConstantInt::get(llvm_i32_type, func_index),
+                 raw_call_buffers.result_buffer_address,
+                 ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
+                 raw_call_buffers.param_buffer_address,
+                 ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)});
+        });
+}
+
 template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32BridgeFunction, typename F64BridgeFunction>
 [[nodiscard]] inline ::llvm::CallInst* emit_runtime_local_func_llvm_jit_runtime_scalar_bridge_call(runtime_local_func_llvm_jit_emit_state_t& state,
                                                                                                     runtime_operand_stack_value_type value_type,
@@ -3460,7 +3501,15 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
     auto const prepared_call{prepare_runtime_local_func_llvm_jit_wasm_call_operands(state, *callee_type_ptr)};
     if(!prepared_call.valid) [[unlikely]] { return false; }
 
-    auto const abi_layout{prepared_call.abi_layout};
+    if(state.route_wasm_calls_through_runtime_bridge)
+    {
+        auto const raw_bridge_result{emit_runtime_local_func_llvm_jit_raw_host_wasm_call(
+            state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call, "call.params", "call.result.buf")};
+        if(!raw_bridge_result.valid) [[unlikely]] { return false; }
+
+        return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, raw_bridge_result.result_value);
+    }
+
     auto const import_func_count{runtime_module_ptr->imported_function_vec_storage.size()};
     if(static_cast<::std::size_t>(func_index) < import_func_count)
     {
@@ -3475,30 +3524,8 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, call_value);
         }
 
-        auto& llvm_context{*state.llvm_context_holder};
-        auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-        auto llvm_i32_type{::llvm::Type::getInt32Ty(llvm_context)};
-
-        auto const raw_bridge_result{emit_runtime_local_func_llvm_jit_runtime_raw_host_bridge_call(
-            state,
-            *callee_type_ptr,
-            {prepared_call.arguments.data(), prepared_call.arguments.size()},
-            "call.params",
-            "call.result.buf",
-            [&](llvm_jit_runtime_raw_call_buffers_t const& raw_call_buffers) -> ::llvm::CallInst*
-            {
-                auto bridge_function_type{get_llvm_runtime_raw_call_bridge_function_type(llvm_context)};
-                return emit_runtime_local_func_llvm_jit_runtime_bridge_call(
-                    state,
-                    ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api,
-                    bridge_function_type,
-                    {::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(runtime_module_ptr)),
-                     ::llvm::ConstantInt::get(llvm_i32_type, func_index),
-                     raw_call_buffers.result_buffer_address,
-                     ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes),
-                     raw_call_buffers.param_buffer_address,
-                     ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes)});
-            })};
+        auto const raw_bridge_result{emit_runtime_local_func_llvm_jit_raw_host_wasm_call(
+            state, *runtime_module_ptr, func_index, *callee_type_ptr, prepared_call, "call.params", "call.result.buf")};
         if(!raw_bridge_result.valid) [[unlikely]] { return false; }
 
         return push_runtime_local_func_llvm_jit_wasm_call_result(state, prepared_call, raw_bridge_result.result_value);

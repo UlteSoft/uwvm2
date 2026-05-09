@@ -48,6 +48,7 @@ struct full_function_symbol_t
 struct compile_option
 {
     ::std::size_t curr_wasm_id{};
+    bool route_wasm_calls_through_runtime_bridge{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -551,7 +552,8 @@ namespace details
     inline constexpr void validate_runtime_local_func(validation_module_storage_t const& module_storage,
                                                       local_func_storage_t const& local_func_storage,
                                                       ::uwvm2::validation::error::code_validation_error_impl& err,
-                                                      llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr) UWVM_THROWS
+                                                      llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
+                                                      bool route_wasm_calls_through_runtime_bridge = false) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -799,7 +801,9 @@ namespace details
 
         runtime_local_func_llvm_jit_emit_state_t llvm_jit_emit_state{};
         bool emit_llvm_jit_active{
-            emitted_llvm_jit_ir_storage != nullptr && try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage, *emitted_llvm_jit_ir_storage, llvm_jit_emit_state)};
+            emitted_llvm_jit_ir_storage != nullptr &&
+            try_prepare_runtime_local_func_llvm_jit_emit_state(
+                local_func_storage, *emitted_llvm_jit_ir_storage, llvm_jit_emit_state, route_wasm_calls_through_runtime_bridge)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -1095,7 +1099,8 @@ namespace details
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
         local_func_storage.module_id = options.curr_wasm_id;
-        validate_runtime_local_func(validation_module, local_func_storage, err, emitted_llvm_jit_ir_storage);
+        validate_runtime_local_func(
+            validation_module, local_func_storage, err, emitted_llvm_jit_ir_storage, options.route_wasm_calls_through_runtime_bridge);
         return local_func_storage;
     }
 

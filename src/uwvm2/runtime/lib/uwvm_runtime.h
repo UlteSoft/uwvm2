@@ -60,7 +60,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config) noexcept;
 
-    /// @brief Lazily compile and run the main module using the uwvm-int interpreter backend.
+    /// @brief Lazily compile and run the main module using the configured lazy-capable backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 

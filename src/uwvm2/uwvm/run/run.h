@@ -700,9 +700,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only) [[unlikely]]
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        bool lazy_backend_supported{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+                        if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -710,7 +724,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                                 u8"[fatal] ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"Lazy compilation currently supports only the uwvm-int interpreter backend (-Rcc int). ",
+                                                u8"Lazy compilation currently supports the uwvm-int and llvm-jit backends (-Rcc int|jit). ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                                 u8"(runtime)\n\n",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
@@ -739,9 +753,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler !=
-                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only) [[unlikely]]
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        bool lazy_backend_supported{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+                        if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
@@ -749,7 +777,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                                 u8"[fatal] ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                u8"Lazy compilation currently supports only the uwvm-int interpreter backend (-Rcc int). ",
+                                                u8"Lazy compilation currently supports the uwvm-int and llvm-jit backends (-Rcc int|jit). ",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                                 u8"(runtime)\n\n",
                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
