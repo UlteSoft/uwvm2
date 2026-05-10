@@ -3309,6 +3309,22 @@ struct llvm_jit_lazy_typed_target_emit_result_t
     auto target_base_ptr{get_llvm_host_pointer_constant(state.lazy_defined_typed_entry_target_base_address, typed_entry_ptr_type)};
     if(target_base_ptr == nullptr) [[unlikely]] { return {}; }
 
+    auto const known_typed_entry_targets{
+        reinterpret_cast<::std::uintptr_t const*>(state.lazy_defined_typed_entry_target_base_address)};
+    auto const known_typed_entry_address{known_typed_entry_targets[local_function_index]};
+    if(known_typed_entry_address != 0u)
+    {
+        auto typed_entry_function_ptr{
+            get_llvm_host_pointer_constant(known_typed_entry_address, get_llvm_pointer_type(callee_function_type))};
+        if(typed_entry_function_ptr == nullptr) [[unlikely]] { return {}; }
+        auto typed_call{apply_llvm_jit_wasm_calling_conv(ir_builder.CreateCall(
+            callee_function_type,
+            typed_entry_function_ptr,
+            {prepared_call.arguments.data(), prepared_call.arguments.size()}))};
+        if(prepared_call.has_result && typed_call == nullptr) [[unlikely]] { return {}; }
+        return {.valid = true, .result_value = typed_call};
+    }
+
     auto target_ptr{ir_builder.CreateInBoundsGEP(llvm_intptr_type,
                                                  target_base_ptr,
                                                  {::llvm::ConstantInt::get(llvm_intptr_type, local_function_index)},

@@ -1209,6 +1209,39 @@ namespace uwvm2::runtime::lib
 #endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        inline void publish_llvm_jit_lazy_materialized_function(void* user_data, ::std::size_t local_function_index) noexcept
+        {
+            auto const rec{static_cast<compiled_module_record*>(user_data)};
+            if(rec == nullptr || rec->runtime_module == nullptr) [[unlikely]] { return; }
+            if(local_function_index >= rec->llvm_jit_lazy_compiled.materialized_functions.size()) [[unlikely]] { return; }
+
+            ::std::uintptr_t raw_entry_address{};
+            ::std::uintptr_t typed_entry_address{};
+            if(!::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_raw_entry_address(
+                   rec->llvm_jit_lazy_compiled,
+                   local_function_index,
+                   raw_entry_address) ||
+               !::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_entry_address(
+                   rec->llvm_jit_lazy_compiled,
+                   local_function_index,
+                   typed_entry_address))
+            {
+                return;
+            }
+
+            if(local_function_index < rec->llvm_jit_lazy_direct_call_targets.size())
+            {
+                auto& target{rec->llvm_jit_lazy_direct_call_targets.index_unchecked(local_function_index)};
+                target.entry_address = raw_entry_address;
+                target.context_address = 0u;
+            }
+
+            if(local_function_index < rec->llvm_jit_lazy_direct_typed_entry_targets.size())
+            {
+                rec->llvm_jit_lazy_direct_typed_entry_targets.index_unchecked(local_function_index) = typed_entry_address;
+            }
+        }
+
         [[nodiscard]] inline ::std::size_t llvm_jit_lazy_compile_unit_code_size(compiled_module_record const& rec,
                                                                                  ::std::size_t local_function_index) noexcept
         {
@@ -1241,6 +1274,8 @@ namespace uwvm2::runtime::lib
                 ctx.compile_unit_index = fn.primary_cu_index;
                 ctx.err = ::std::addressof(rec.llvm_jit_lazy_background_errors.index_unchecked(i));
                 ctx.module_name = rec.module_name;
+                ctx.publish_materialized_function = publish_llvm_jit_lazy_materialized_function;
+                ctx.publish_user_data = ::std::addressof(rec);
                 rec.lazy_prefetch_order.index_unchecked(i) = i;
             }
 
@@ -1265,6 +1300,84 @@ namespace uwvm2::runtime::lib
             ::std::rotate(rec.lazy_prefetch_order.begin(), it, it + 1uz);
             rec.lazy_prefetch_order.index_unchecked(0) = preferred_local_index;
             rec.lazy_prefetch_cursor = 0uz;
+        }
+
+        [[nodiscard]] inline bool collect_llvm_jit_lazy_entry_direct_graph_order(
+            runtime_module_storage_t const& runtime_module,
+            ::std::size_t entry_local_function_index,
+            ::std::size_t graph_budget,
+            ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
+        {
+            out.clear();
+            auto const local_n{runtime_module.local_defined_function_vec_storage.size()};
+            if(graph_budget == 0uz || entry_local_function_index >= local_n) [[unlikely]] { return false; }
+
+            ::uwvm2::utils::container::vector<::std::uint_least8_t> seen{};
+            seen.resize(local_n);
+
+            out.reserve(graph_budget);
+            ::uwvm2::utils::container::vector<::std::size_t> stack{};
+            stack.reserve(graph_budget);
+            seen.index_unchecked(entry_local_function_index) = 1u;
+            stack.push_back(entry_local_function_index);
+            ::std::size_t seen_count{1uz};
+
+            ::uwvm2::utils::container::vector<::std::size_t> callees{};
+            while(!stack.empty() && out.size() < graph_budget)
+            {
+                auto const local_index{stack.back()};
+                stack.pop_back();
+                out.push_back(local_index);
+
+                callees.clear();
+                if(!::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::collect_direct_defined_callees(
+                       runtime_module,
+                       local_index,
+                       callees))
+                {
+                    continue;
+                }
+
+                for(auto remaining{callees.size()}; remaining != 0uz;)
+                {
+                    --remaining;
+                    auto const callee_local_index{callees.index_unchecked(remaining)};
+                    if(callee_local_index >= local_n) [[unlikely]] { continue; }
+                    if(seen.index_unchecked(callee_local_index) != 0u) { continue; }
+                    if(seen_count == graph_budget) { break; }
+
+                    seen.index_unchecked(callee_local_index) = 1u;
+                    stack.push_back(callee_local_index);
+                    ++seen_count;
+                }
+            }
+
+            // Compile callees before their callers. This lets later callers fold
+            // already-materialized typed callees into direct function pointers.
+            ::std::reverse(out.begin(), out.end());
+            return true;
+        }
+
+        [[nodiscard]] inline bool seed_llvm_jit_lazy_background_entry_direct_graph(compiled_module_record& rec,
+                                                                                   ::std::size_t entry_local_function_index) noexcept
+        {
+            constexpr ::std::size_t background_graph_budget{96uz};
+
+            if(rec.runtime_module == nullptr) [[unlikely]] { return false; }
+
+            ::uwvm2::utils::container::vector<::std::size_t> graph_order{};
+            if(!collect_llvm_jit_lazy_entry_direct_graph_order(*rec.runtime_module, entry_local_function_index, background_graph_budget, graph_order))
+            {
+                return false;
+            }
+
+            if(graph_order.empty()) [[unlikely]] { return false; }
+
+            rec.lazy_prefetch_order.clear();
+            rec.lazy_prefetch_order.reserve(graph_order.size());
+            for(auto const local_index: graph_order) { rec.lazy_prefetch_order.push_back(local_index); }
+            rec.lazy_prefetch_cursor = 0uz;
+            return true;
         }
 
         [[nodiscard]] inline bool enqueue_llvm_jit_lazy_background_requests_for_module(compiled_module_record& rec,
@@ -1321,6 +1434,54 @@ namespace uwvm2::runtime::lib
 
             g_runtime.lazy_prefetch_lock.clear(::std::memory_order_release);
             return queued;
+        }
+
+        inline void prewarm_llvm_jit_lazy_entry_direct_graph(::std::size_t module_id, ::std::size_t entry_local_function_index) noexcept
+        {
+            constexpr ::std::size_t prewarm_budget{96uz};
+
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return; }
+            auto& rec{g_runtime.modules.index_unchecked(module_id)};
+            auto const runtime_module{rec.runtime_module};
+            if(runtime_module == nullptr) [[unlikely]] { return; }
+
+            ::uwvm2::utils::container::vector<::std::size_t> worklist{};
+            if(!collect_llvm_jit_lazy_entry_direct_graph_order(*runtime_module, entry_local_function_index, prewarm_budget, worklist)) { return; }
+
+            for(auto const local_index: worklist)
+            {
+                if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() ||
+                   local_index >= rec.llvm_jit_lazy_background_request_contexts.size())
+                    [[unlikely]]
+                {
+                    continue;
+                }
+
+                auto ctx{rec.llvm_jit_lazy_background_request_contexts.index_unchecked(local_index)};
+                auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 1u)};
+                if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { continue; }
+                if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            }
+        }
+
+        [[nodiscard]] inline bool has_llvm_jit_lazy_background_work() noexcept
+        {
+            for(auto const& rec: g_runtime.modules)
+            {
+                if(rec.runtime_module == nullptr) [[unlikely]] { continue; }
+                auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
+                for(auto const local_index: rec.lazy_prefetch_order)
+                {
+                    if(local_index >= local_n) [[unlikely]] { continue; }
+                    auto const& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
+                    if(fn.materialization_state.state.load(::std::memory_order_acquire) ==
+                       ::uwvm2::utils::thread::lazy_compile_state::uncompiled)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 #endif
 
@@ -3358,7 +3519,9 @@ namespace uwvm2::runtime::lib
                 .options = rec.llvm_jit_lazy_compile_options,
                 .compile_unit_index = fn.primary_cu_index,
                 .err = ::std::addressof(err),
-                .module_name = rec.module_name};
+                .module_name = rec.module_name,
+                .publish_materialized_function = publish_llvm_jit_lazy_materialized_function,
+                .publish_user_data = ::std::addressof(rec)};
 
             auto const request_priority{1u};
             auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, request_priority)};
@@ -6253,15 +6416,24 @@ namespace uwvm2::runtime::lib
             if(g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
             {
                 auto& preferred_rec{g_runtime.modules.index_unchecked(g_runtime.lazy_prefetch_module_id)};
-                prioritize_llvm_jit_lazy_background_entry(preferred_rec, g_runtime.lazy_prefetch_local_function_index);
+                if(!seed_llvm_jit_lazy_background_entry_direct_graph(preferred_rec, g_runtime.lazy_prefetch_local_function_index))
+                {
+                    prioritize_llvm_jit_lazy_background_entry(preferred_rec, g_runtime.lazy_prefetch_local_function_index);
+                }
             }
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
-            g_runtime.lazy_scheduler.start({.worker_count = worker_count,
+            if(g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
+            {
+                prewarm_llvm_jit_lazy_entry_direct_graph(g_runtime.lazy_prefetch_module_id, g_runtime.lazy_prefetch_local_function_index);
+            }
+
+            auto const has_lazy_background_work{worker_count != 0uz && has_llvm_jit_lazy_background_work()};
+            g_runtime.lazy_scheduler.start({.worker_count = has_lazy_background_work ? worker_count : 0uz,
                                             .queue_capacity = 0uz,
-                                            .refill_callback = worker_count == 0uz ? nullptr : &llvm_jit_lazy_background_refill_callback,
+                                            .refill_callback = has_lazy_background_work ? &llvm_jit_lazy_background_refill_callback : nullptr,
                                             .refill_user_data = nullptr});
-            if(worker_count != 0uz)
+            if(has_lazy_background_work)
             {
                 (void)llvm_jit_lazy_background_refill_callback(nullptr, g_runtime.lazy_scheduler);
             }

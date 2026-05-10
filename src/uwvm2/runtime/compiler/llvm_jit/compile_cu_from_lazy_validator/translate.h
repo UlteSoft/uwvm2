@@ -23,9 +23,11 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <algorithm>
 # include <atomic>
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
 # include <exception>
 # include <limits>
 # include <memory>
@@ -201,6 +203,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         compile_option compile_options{};
         parser_module_storage_t const* validator_module_storage{};
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
+        ::llvm::CodeGenOptLevel codegen_opt_level{::llvm::CodeGenOptLevel::None};
     };
 
     struct lazy_compile_request_context
@@ -211,6 +214,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         ::std::size_t compile_unit_index{};
         ::uwvm2::validation::error::code_validation_error_impl* err{};
         ::uwvm2::utils::container::u8string_view module_name{};
+        void (*publish_materialized_function)(void*, ::std::size_t) noexcept {};
+        void* publish_user_data{};
     };
 
     namespace details
@@ -347,6 +352,77 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             for(auto const& attr: attr_storage) { attr_refs.push_back(all_details::get_llvm_string_ref(attr)); }
         }
 
+        [[nodiscard]] inline bool skip_wasm_instruction_for_direct_call_scan(::std::byte const*& code_curr, ::std::byte const* code_end) noexcept
+        {
+            if(code_curr == code_end) [[unlikely]] { return false; }
+
+            all_details::wasm1_code op{};
+            ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
+            switch(op)
+            {
+                case all_details::wasm1_code::block:
+                case all_details::wasm1_code::loop:
+                case all_details::wasm1_code::if_:
+                {
+                    ++code_curr;
+                    all_details::runtime_block_result_type block_result{};
+                    return all_details::parse_wasm_block_result_type(code_curr, code_end, block_result);
+                }
+                default:
+                {
+                    return all_details::skip_wasm_unreachable_noncontrol_instruction(code_curr, code_end);
+                }
+            }
+        }
+
+        inline void append_unique_local_function_index(::uwvm2::utils::container::vector<::std::size_t>& out,
+                                                       ::std::size_t local_function_index)
+        {
+            if(::std::find(out.begin(), out.end(), local_function_index) == out.end()) { out.push_back(local_function_index); }
+        }
+
+        [[nodiscard]] inline bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
+                                                                 ::std::size_t local_function_index,
+                                                                 ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+        {
+            callees.clear();
+            if(local_function_index >= curr_module.local_defined_function_vec_storage.size()) [[unlikely]] { return false; }
+
+            auto const& local_func{curr_module.local_defined_function_vec_storage.index_unchecked(local_function_index)};
+            if(local_func.wasm_code_ptr == nullptr) [[unlikely]] { return false; }
+
+            auto code_curr{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.expr_begin)};
+            auto const code_end{reinterpret_cast<::std::byte const*>(local_func.wasm_code_ptr->body.code_end)};
+            if(code_curr == nullptr || code_end == nullptr || code_curr > code_end) [[unlikely]] { return false; }
+
+            auto const import_count{curr_module.imported_function_vec_storage.size()};
+            auto const local_count{curr_module.local_defined_function_vec_storage.size()};
+            auto const all_function_count{import_count + local_count};
+
+            while(code_curr < code_end)
+            {
+                all_details::wasm1_code op{};
+                ::std::memcpy(::std::addressof(op), code_curr, sizeof(op));
+                if(op == all_details::wasm1_code::call)
+                {
+                    ++code_curr;
+                    all_details::validation_module_traits_t::wasm_u32 function_index{};
+                    if(!all_details::parse_wasm_leb128_immediate(code_curr, code_end, function_index)) [[unlikely]] { return false; }
+
+                    auto const function_index_uz{static_cast<::std::size_t>(function_index)};
+                    if(function_index_uz >= import_count && function_index_uz < all_function_count)
+                    {
+                        append_unique_local_function_index(callees, function_index_uz - import_count);
+                    }
+                    continue;
+                }
+
+                if(!skip_wasm_instruction_for_direct_call_scan(code_curr, code_end)) [[unlikely]] { return false; }
+            }
+
+            return true;
+        }
+
         [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
         {
             static_cast<void>(target_machine);
@@ -367,6 +443,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline bool materialize_lazy_local_function(runtime_module_storage_t const& curr_module,
                                                                   lazy_module_storage_t& storage,
+                                                                  lazy_compile_options const& options,
                                                                   ::std::size_t local_function_index,
                                                                   llvm_jit_module_storage_t& llvm_ir_storage) noexcept
         {
@@ -397,7 +474,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT)
-                .setOptLevel(::llvm::CodeGenOptLevel::None)
+                .setOptLevel(options.codegen_opt_level)
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
@@ -410,7 +487,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             auto raw_engine{::llvm::EngineBuilder(::std::move(llvm_module))
                                 .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(::llvm::CodeGenOptLevel::None)
+                                .setOptLevel(options.codegen_opt_level)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
                                 .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
@@ -469,7 +546,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::std::addressof(llvm_ir_storage));
             llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
 
-            if(!materialize_lazy_local_function(curr_module, storage, local_function_index, llvm_ir_storage)) [[unlikely]]
+            if(!materialize_lazy_local_function(curr_module, storage, options, local_function_index, llvm_ir_storage)) [[unlikely]]
             {
                 ::fast_io::fast_terminate();
             }
@@ -512,6 +589,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 # endif
             {
                 compile_lazy_local_function(*ctx->curr_module, storage, ctx->options, cu.local_function_index, err);
+                if(ctx->publish_materialized_function != nullptr)
+                {
+                    ctx->publish_materialized_function(ctx->publish_user_data, cu.local_function_index);
+                }
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
                 lazy_runtime_log::line(u8"compile-end module=\"",
                                        ctx->module_name,
@@ -569,6 +650,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         return storage;
+    }
+
+    [[nodiscard]] inline bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
+                                                             ::std::size_t local_function_index,
+                                                             ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
+    {
+        return details::collect_direct_defined_callees(curr_module, local_function_index, callees);
     }
 
     inline void compile_cu_from_lazy_validator(runtime_module_storage_t const& curr_module,
