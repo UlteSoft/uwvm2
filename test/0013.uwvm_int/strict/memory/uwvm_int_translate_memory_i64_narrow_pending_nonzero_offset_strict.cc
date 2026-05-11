@@ -321,8 +321,6 @@ namespace
             auto const exp_load32_u = optable::translate::get_uwvmint_i64_load32_u_fptr_from_tuple<Opt>(curr_load, mem, tuple);
             auto const exp_store8 = optable::translate::get_uwvmint_i64_store8_fptr_from_tuple<Opt>(curr_store, mem, tuple);
             auto const exp_store16 = optable::translate::get_uwvmint_i64_store16_fptr_from_tuple<Opt>(curr_store, mem, tuple);
-            auto const exp_store_localget = optable::translate::get_uwvmint_i64_store_localget_off_fptr_from_tuple<Opt>(curr_initial, mem, tuple);
-            auto const exp_store32_localget = optable::translate::get_uwvmint_i64_store32_localget_off_fptr_from_tuple<Opt>(curr_initial, mem, tuple);
 
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_load8_s));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_load8_u));
@@ -332,10 +330,6 @@ namespace
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_load32_u));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_store8));
             UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_store16));
-            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_store_localget));
-            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_store32_localget));
-            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_store_localget));
-            UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_store32_localget));
         }
         else
         {

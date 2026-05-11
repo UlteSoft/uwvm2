@@ -33,7 +33,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`compiler` uses global `-static` where supported)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 
@@ -51,7 +51,7 @@ $ xmake i -o <install_path>
 ```
 
 ### Additional Options
-1. `--static` Static links
+1. `--static=none|non-system|compiler` Static linking policy (`compiler` uses global `-static` where supported)
 2. `--march` The default is native, which uses the cpu designator to control it
 3. `--use-cxx-module=y` Use cpp module to compile, compiler may not be supported
 

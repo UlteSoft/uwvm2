@@ -44,6 +44,45 @@ namespace
         return count;
     }
 
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_curr_after_i32_pushes(::std::size_t push_count) noexcept
+    {
+        auto curr = make_initial_stacktop_currpos<Opt>();
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != push_count; ++i)
+            {
+                curr.i32_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i32_stack_top_curr_pos, Opt.i32_stack_top_begin_pos, Opt.i32_stack_top_end_pos);
+            }
+        }
+        return curr;
+    }
+
+    template <optable::uwvm_interpreter_translate_option_t Opt>
+    [[nodiscard]] consteval optable::uwvm_interpreter_stacktop_currpos_t make_curr_after_i32_i64_pushes(::std::size_t i32_push_count,
+                                                                                                          ::std::size_t i64_push_count) noexcept
+    {
+        auto curr = make_initial_stacktop_currpos<Opt>();
+        if constexpr(Opt.i32_stack_top_begin_pos != SIZE_MAX && Opt.i32_stack_top_begin_pos != Opt.i32_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != i32_push_count; ++i)
+            {
+                curr.i32_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i32_stack_top_curr_pos, Opt.i32_stack_top_begin_pos, Opt.i32_stack_top_end_pos);
+            }
+        }
+        if constexpr(Opt.i64_stack_top_begin_pos != SIZE_MAX && Opt.i64_stack_top_begin_pos != Opt.i64_stack_top_end_pos)
+        {
+            for(::std::size_t i{}; i != i64_push_count; ++i)
+            {
+                curr.i64_stack_top_curr_pos =
+                    optable::details::ring_prev_pos(curr.i64_stack_top_curr_pos, Opt.i64_stack_top_begin_pos, Opt.i64_stack_top_end_pos);
+            }
+        }
+        return curr;
+    }
+
     [[nodiscard]] byte_vec build_memory_offset_fuse_module()
     {
         module_builder mb{};
@@ -358,9 +397,9 @@ namespace
 #endif
 
     template <optable::uwvm_interpreter_translate_option_t Opt>
-    [[nodiscard]] int check_byref_bytecode(compiled_module_t const& cm) noexcept
+    [[nodiscard]] int check_byref_bytecode(compiled_module_t const& cm,
+                                           ::uwvm2::object::memory::linear::native_memory_t const&) noexcept
     {
-        static_assert(!Opt.is_tail_call);
         constexpr auto curr = make_initial_stacktop_currpos<Opt>();
         constexpr auto tuple =
             compiler::details::make_interpreter_tuple<Opt>(::std::make_index_sequence<compiler::details::interpreter_tuple_size<Opt>()>{});
@@ -368,17 +407,16 @@ namespace
         auto const exp_local_get_i32 = optable::translate::get_uwvmint_local_get_i32_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_get_i64 = optable::translate::get_uwvmint_local_get_i64_fptr_from_tuple<Opt>(curr, tuple);
         auto const exp_local_set_i64 = optable::translate::get_uwvmint_local_set_i64_fptr_from_tuple<Opt>(curr, tuple);
+        [[maybe_unused]] constexpr auto curr_after_i32_1 = make_curr_after_i32_pushes<Opt>(1uz);
+        [[maybe_unused]] constexpr auto curr_after_i32_2 = make_curr_after_i32_pushes<Opt>(2uz);
+        [[maybe_unused]] constexpr auto curr_after_i32_i64 = make_curr_after_i32_i64_pushes<Opt>(1uz, 1uz);
 
-        auto const exp_i32_load_localget = optable::translate::get_uwvmint_i32_load_localget_off_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-        auto const exp_i32_load_local_plus_imm =
-            optable::translate::get_uwvmint_i32_load_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-        auto const exp_i32_store_local_plus_imm =
-            optable::translate::get_uwvmint_i32_store_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-
-        auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-        auto const exp_i64_load_plain = optable::translate::get_uwvmint_i64_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-        auto const exp_i32_store_plain = optable::translate::get_uwvmint_i32_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
-        auto const exp_i64_store_plain = optable::translate::get_uwvmint_i64_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        [[maybe_unused]] auto const exp_i32_const = optable::translate::get_uwvmint_i32_const_fptr_from_tuple<Opt>(curr, tuple);
+        [[maybe_unused]] auto const exp_i32_add = optable::translate::get_uwvmint_i32_add_fptr_from_tuple<Opt>(curr_after_i32_2, tuple);
+        auto const exp_i32_load_plain = optable::translate::get_uwvmint_i32_load_fptr_from_tuple<Opt>(curr, tuple);
+        auto const exp_i64_load_plain = optable::translate::get_uwvmint_i64_load_fptr_from_tuple<Opt>(curr, tuple);
+        auto const exp_i32_store_plain = optable::translate::get_uwvmint_i32_store_fptr_from_tuple<Opt>(curr, tuple);
+        auto const exp_i64_store_plain = optable::translate::get_uwvmint_i64_store_fptr_from_tuple<Opt>(curr, tuple);
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
@@ -387,6 +425,15 @@ namespace
         auto const& bc4 = cm.local_funcs.index_unchecked(4).op.operands;
         auto const& bc5 = cm.local_funcs.index_unchecked(5).op.operands;
         auto const& bc6 = cm.local_funcs.index_unchecked(6).op.operands;
+
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
+        static_assert(!Opt.is_tail_call);
+        auto const exp_i32_load_localget =
+            optable::translate::get_uwvmint_i32_load_localget_off_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_i32_load_local_plus_imm =
+            optable::translate::get_uwvmint_i32_load_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_i32_store_local_plus_imm =
+            optable::translate::get_uwvmint_i32_store_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_i32_load_plain));
@@ -429,6 +476,35 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_f64_store_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_f64_store_plain));
 # endif
+#else
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_i64_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_i64_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_set_i64));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_local_get_i64));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_local_get_i32));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_i32_const));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_i32_add));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_i32_load_plain));
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc4, exp_i32_store_plain));
+        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc4, exp_local_get_i32) == 2uz);
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc5, exp_i64_store_plain));
+        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc5, exp_local_get_i32) == 1uz);
+        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc5, exp_local_get_i64) == 1uz);
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc6, exp_i32_const));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc6, exp_i32_add));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc6, exp_i32_store_plain));
+        UWVM2TEST_REQUIRE(bytecode_count_fptr(bc6, exp_local_get_i32) == 2uz);
+#endif
         return 0;
     }
 
@@ -448,10 +524,10 @@ namespace
         }
         else
 #endif
+        if constexpr(!Opt.is_tail_call)
         {
-            UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
+            UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm, mem) == 0);
         }
-
         UWVM2TEST_REQUIRE(run_suite<Opt>(cm, rt) == 0);
         return 0;
     }

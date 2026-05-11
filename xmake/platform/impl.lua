@@ -1,3 +1,7 @@
+function uwvm_static_mode_is_compiler()
+    return get_config("static") == "compiler"
+end
+
 includes("windows.lua")
 includes("mingw.lua")
 includes("linux.lua")

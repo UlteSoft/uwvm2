@@ -127,10 +127,19 @@ end)
 option("static", function()
     set_description
     (
-        "The static flag is used to enable static linking of libraries instead of dynamic linking and use lld when linking",
-        "static linking is disable by default"
+        "Select the static linking policy.",
+        [[    none: Use dynamic/default linking for libraries that have a dynamic default.]],
+        [[    non-system: Statically link non-system/non-platform libraries by explicit archive selection; keep platform/system libraries under the platform default.]],
+        [[    compiler: Use the compiler/toolchain global static strategy, including -static where supported.]]
     )
-    set_default(false)
+    set_default("none")
+    set_values("none", "non-system", "compiler")
+    after_check(function()
+        local static_mode = get_config("static")
+        if static_mode ~= "none" and static_mode ~= "non-system" and static_mode ~= "compiler" then
+            raise([[Invalid --static value "%s"; expected one of: none, non-system, compiler.]], tostring(static_mode))
+        end
+    end)
 end)
 
 option("use-llvm-compiler", function()
@@ -429,6 +438,17 @@ option("enable-test-uwvm-int", function()
         "default = false",
         [[    true: register 0013.uwvm_int test targets.]],
         [[    false: skip registering 0013.uwvm_int test targets.]]
+    )
+    set_default(false)
+end)
+
+option("enable-test-llvm-jit", function()
+    set_description
+    (
+        "Register slow LLVM JIT validation/coverage targets.",
+        "default = false",
+        [[    true: register 0014.llvm_jit targets and 0013 strict LLVM-JIT mirror targets.]],
+        [[    false: skip registering slow LLVM JIT validation/coverage targets.]]
     )
     set_default(false)
 end)

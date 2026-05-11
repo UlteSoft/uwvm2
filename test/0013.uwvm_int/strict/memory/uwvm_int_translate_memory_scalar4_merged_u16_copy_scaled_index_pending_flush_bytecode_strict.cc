@@ -243,12 +243,12 @@ namespace
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
         auto const& bc2 = cm.local_funcs.index_unchecked(2).op.operands;
 
-        UWVM2TEST_REQUIRE((contains_any_i32_shl<Opt>(bc0)));
-        UWVM2TEST_REQUIRE((contains_any_i32_shl<Opt>(bc1)));
-        UWVM2TEST_REQUIRE((contains_any_i32_shl<Opt>(bc2)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc0, mem)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc1, mem)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc2, mem)));
+        UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc0)));
+        UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc1)));
+        UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc2)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc0, mem)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc1, mem)));
         UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc2, mem)));

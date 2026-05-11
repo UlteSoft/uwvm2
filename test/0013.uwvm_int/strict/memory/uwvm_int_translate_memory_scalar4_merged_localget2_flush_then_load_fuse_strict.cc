@@ -236,13 +236,13 @@ namespace
 
         UWVM2TEST_REQUIRE(bytecode_count_fptr(bc1, exp_local_get_i32) >= 1uz);
         UWVM2TEST_REQUIRE(search_curr_i32_i64<Opt>([&](auto curr) noexcept {
+            return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_load_localget_set_local_fptr_from_tuple<Opt>(curr, mem, tuple));
+        }));
+        UWVM2TEST_REQUIRE(!search_curr_i32_i64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_load_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
         UWVM2TEST_REQUIRE(!search_curr_i32_i64<Opt>([&](auto curr) noexcept {
             return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_load_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple));
-        }));
-        UWVM2TEST_REQUIRE(!search_curr_i32_i64<Opt>([&](auto curr) noexcept {
-            return bytecode_contains_fptr(bc1, optable::translate::get_uwvmint_i64_load_localget_set_local_fptr_from_tuple<Opt>(curr, mem, tuple));
         }));
 
         UWVM2TEST_REQUIRE(bytecode_count_fptr(bc2, exp_local_get_i32) >= 1uz);

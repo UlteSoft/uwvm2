@@ -26,16 +26,9 @@ namespace
             constexpr ::std::int32_t k_end = 10;
             constexpr ::std::int32_t k_step = 1;
 
-            func_type ty{{}, {k_val_i32}};
+            func_type ty{{k_val_i32}, {k_val_i32}};
             func_body fb{};
-            fb.locals.push_back({1u, k_val_i32});  // local0: sp (i32)
             auto& c = fb.code;
-
-            // sp = 0
-            op(c, wasm_op::i32_const);
-            i32(c, 0);
-            op(c, wasm_op::local_set);
-            u32(c, k_sp_local);
 
             // init i = 0
             op(c, wasm_op::local_get);
@@ -149,7 +142,7 @@ namespace
         using Runner = interpreter_runner<Opt>;
         UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
                                               rt.local_defined_function_vec_storage.index_unchecked(0),
-                                              pack_no_params(),
+                                              pack_i32(0),
                                               nullptr,
                                               nullptr)
                                        .results) == 45);
@@ -191,7 +184,7 @@ namespace
             using Runner = interpreter_runner<opt>;
             UWVM2TEST_REQUIRE(load_i32(Runner::run(cm.local_funcs.index_unchecked(0),
                                                   rt.local_defined_function_vec_storage.index_unchecked(0),
-                                                  pack_no_params(),
+                                                  pack_i32(0),
                                                   nullptr,
                                                   nullptr)
                                            .results) == 45);
@@ -230,4 +223,3 @@ int main()
 {
     return test_translate_i32_sum_loop_run();
 }
-

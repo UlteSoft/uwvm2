@@ -27,7 +27,7 @@ xmake i -o ./out/djgpp
 ```
 
 ### Additional Options
-- `--static` Static links (typical for DOS/DJGPP builds)
+- `--static=none|non-system|compiler` Static linking policy (`compiler` is typical for DOS/DJGPP builds)
 - `--march` Defaults to native; adjust as needed
 - `--use-cxx-module=y` Use C++ modules if your compiler supports them
 

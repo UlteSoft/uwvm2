@@ -125,14 +125,20 @@ Enables/disables link-time optimization (LTO) policy in release-like modes (`rel
 - **Example:**
   - `xmake f --enable-lto=n`
 
-### `--static=[y|n]`
+### `--static=MODE`
 
-Enables static linking by adding `-static` at link time (where supported).
+Selects the static linking policy.
 
-- **Default:** `n`
-- **Impact:** Produces more self-contained binaries but can significantly increase size and may be incompatible with some platforms/toolchains (e.g. macOS generally does not support fully static system linking in the same way as Linux).
+- **Default:** `none`
+- **Values:**
+  - `none`: Use dynamic/default linking for libraries that have a dynamic default.
+  - `non-system`: Link non-system/non-platform libraries through explicit static archives when available, while leaving platform/system libraries to the platform default. This is the intended release-oriented policy and avoids global `-static` on platforms such as Darwin.
+  - `compiler`: Use the compiler/toolchain global static strategy, including `-static` where supported.
+- **Impact:** `compiler` may produce highly self-contained binaries on platforms that support full static linking, but can be incompatible with toolchains such as Darwin. `non-system` is more portable: LLVM JIT libraries and other non-platform libraries are resolved as static archives, while system libraries such as libc and platform frameworks remain dynamic/default.
 - **Example:**
-  - `xmake f --static=y`
+  - `xmake f --static=none`
+  - `xmake f --static=non-system`
+  - `xmake f --static=compiler`
 
 ### `--use-llvm-compiler=[y|n]`
 

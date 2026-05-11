@@ -254,7 +254,12 @@ namespace
         auto expect_ge_u = [](::std::int64_t x) constexpr -> ::std::int32_t
         { return static_cast<::std::int32_t>(static_cast<::std::uint64_t>(x) >= 7u); };
 
-        for(::std::int64_t x : {0ll, 6ll, 7ll, 8ll, -1ll, static_cast<::std::int64_t>(0x8000000000000000ull)})
+        for(::std::int64_t x : {static_cast<::std::int64_t>(0),
+                                static_cast<::std::int64_t>(6),
+                                static_cast<::std::int64_t>(7),
+                                static_cast<::std::int64_t>(8),
+                                static_cast<::std::int64_t>(-1),
+                                static_cast<::std::int64_t>(0x8000000000000000ull)})
         {
             auto rr0 = Runner::run(cm.local_funcs.index_unchecked(0),
                                    rt.local_defined_function_vec_storage.index_unchecked(0),

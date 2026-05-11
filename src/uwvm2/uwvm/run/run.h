@@ -700,9 +700,42 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
-                        /// @todo run interpreter
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        bool lazy_backend_supported{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+                        if(!lazy_backend_supported) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Lazy compilation currently supports the uwvm-int and llvm-jit backends (-Rcc int|jit). ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8"(runtime)\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
 
-                        // not supported yet
+                        ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
+                        cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                        cfg.assume_full_code_verified = false;
+                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+#else
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                             u8"uwvm: ",
@@ -714,14 +747,53 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                             u8"(runtime)\n\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
+#endif
 
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
-                        /// @todo run interpreter
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+                        bool lazy_backend_supported{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
+                        if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                           ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
+                        {
+                            lazy_backend_supported = true;
+                        }
+# endif
+                        if(!lazy_backend_supported) [[unlikely]]
+                        {
+                            ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                u8"uwvm: ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                                u8"[fatal] ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"Lazy compilation currently supports the uwvm-int and llvm-jit backends (-Rcc int|jit). ",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                                u8"(runtime)\n\n",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                            ::fast_io::fast_terminate();
+                        }
 
-                        // not supported yet
+                        if(!::uwvm2::uwvm::runtime::validator::validate_all_wasm_code()) [[unlikely]]
+                        {
+                            return static_cast<int>(::uwvm2::uwvm::run::retval::check_module_error);
+                        }
+
+                        ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
+                        cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                        cfg.assume_full_code_verified = true;
+                        ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
+#else
                         ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                             u8"uwvm: ",
@@ -733,6 +805,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                             u8"(runtime)\n\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
+#endif
 
                         break;
                     }
@@ -773,14 +846,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
                             {
-                                // not supported yet
                                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
                                                     u8"uwvm: ",
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
                                                     u8"[fatal] ",
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                    u8"UWVM INTERPRETER LLVM JIT Tiered is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
+                                                    u8"Tiered compilation conflicts with full compilation. ",
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
                                                     u8"(runtime)\n\n",
                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));

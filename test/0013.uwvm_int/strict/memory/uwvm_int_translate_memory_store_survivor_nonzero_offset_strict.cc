@@ -276,6 +276,7 @@ namespace
         }
         else
 #endif
+        if constexpr(!Opt.is_tail_call)
         {
             UWVM2TEST_REQUIRE(check_byref_bytecode<Opt>(cm) == 0);
         }

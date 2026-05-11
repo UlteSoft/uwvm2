@@ -7,17 +7,25 @@ cd -- "${ROOT_DIR}"
 
 STRICT_DIR="test/0013.uwvm_int/strict"
 
-if [[ -z "${SYSROOT:-}" ]]; then
-  echo "ERR: SYSROOT is empty. Example: export SYSROOT=/path/to/sdk-or-sysroot" >&2
-  exit 2
+mkdir -p -- "${ROOT_DIR}/build"
+LOCK_DIR="${UWVM_STRICT_LOCK_DIR:-${ROOT_DIR}/build/uwvm_int_strict.lock}"
+if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
+  echo "ERR: another uwvm_int strict run appears to be active: ${LOCK_DIR}" >&2
+  echo "ERR: remove the lock only after confirming no xmake/uwvm_int test process is still running." >&2
+  exit 9
 fi
+printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+cleanup_lock() {
+  rm -rf -- "${LOCK_DIR}"
+}
+trap cleanup_lock EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Optional: limit xmake parallel jobs (useful on memory-limited machines, e.g. macOS).
 # Example: export UWVM_XMAKE_JOBS=4
-XMAKE_JOBS_ARGS=()
 if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
   if [[ "${UWVM_XMAKE_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
-    XMAKE_JOBS_ARGS=(-j "${UWVM_XMAKE_JOBS}")
     echo "INFO: xmake jobs limited via UWVM_XMAKE_JOBS=${UWVM_XMAKE_JOBS}"
   else
     echo "ERR: UWVM_XMAKE_JOBS must be a positive integer, got: ${UWVM_XMAKE_JOBS}" >&2
@@ -25,14 +33,50 @@ if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
   fi
 fi
 
-TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
-LLVM_BIN="${TOOLCHAIN_ROOT}/llvm/bin"
-LLVM_PROFDATA="${LLVM_BIN}/llvm-profdata"
-LLVM_COV="${LLVM_BIN}/llvm-cov"
-CLANG_BIN="${LLVM_BIN}/clang"
+xmake_build() {
+  if [[ -n "${UWVM_XMAKE_JOBS:-}" ]]; then
+    xmake b -v -j "${UWVM_XMAKE_JOBS}" "$@"
+  else
+    xmake b -v "$@"
+  fi
+}
+
+find_llvm_tool() {
+  local tool="$1"
+  local candidate=""
+  if [[ -n "${UWVM_LLVM_BIN:-}" ]]; then
+    candidate="${UWVM_LLVM_BIN}/${tool}"
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  fi
+  if [[ -n "${SYSROOT:-}" ]]; then
+    local toolchain_root
+    toolchain_root="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+    candidate="${toolchain_root}/llvm/bin/${tool}"
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  fi
+  command -v "${tool}" 2>/dev/null || true
+}
+
+find_clang_bin() {
+  if [[ -n "${UWVM_CLANG_BIN:-}" && -x "${UWVM_CLANG_BIN}" ]]; then
+    printf '%s\n' "${UWVM_CLANG_BIN}"
+    return 0
+  fi
+  find_llvm_tool clang
+}
+
+LLVM_PROFDATA="${UWVM_LLVM_PROFDATA:-$(find_llvm_tool llvm-profdata)}"
+LLVM_COV="${UWVM_LLVM_COV:-$(find_llvm_tool llvm-cov)}"
+CLANG_BIN="$(find_clang_bin)"
 
 if [[ ! -x "${LLVM_PROFDATA}" || ! -x "${LLVM_COV}" ]]; then
-  echo "ERR: llvm-profdata/llvm-cov not found under: ${LLVM_BIN}" >&2
+  echo "ERR: llvm-profdata/llvm-cov not found. Set UWVM_LLVM_BIN, UWVM_LLVM_PROFDATA/UWVM_LLVM_COV, or put them in PATH." >&2
   exit 3
 fi
 
@@ -50,15 +94,18 @@ COMMON_F_FLAGS=(
   -m debug
   --use-llvm-compiler=y
   --ccache=n
-  "--sysroot=${SYSROOT}"
   --test-libfuzzer=y
-  --enable-test-0013-uwvm-int=y
+  --enable-test-uwvm-int=y
   --use-cxx-module=n
-  --static=n
-  --enable-int=uwvm-int
+  --static=none
+  --execution-int=uwvm-int
   "--enable-uwvm-int-combine-ops=${UWVM_STRICT_COVERAGE_COMBINE_MODE:-heavy}"
   "--enable-uwvm-int-delay-local=${UWVM_STRICT_COVERAGE_DELAY_MODE:-heavy}"
 )
+
+if [[ -n "${SYSROOT:-}" ]]; then
+  COMMON_F_FLAGS+=("--sysroot=${SYSROOT}")
+fi
 
 export UWVM2TEST_ABI_MODES="${UWVM_STRICT_ABI_MODES:-all}"
 export UWVM2TEST_MATRIX_LEVEL="${UWVM_STRICT_MATRIX_LEVEL:-coverage}"
@@ -66,9 +113,17 @@ COVER_INCLUDE_REGEX="${UWVM_STRICT_COVERAGE_REGEX:-.*src/uwvm2/runtime/compiler/
 
 echo "INFO: strict coverage ABI modes = ${UWVM2TEST_ABI_MODES}"
 echo "INFO: strict coverage matrix level = ${UWVM2TEST_MATRIX_LEVEL}"
+if [[ -n "${SYSROOT:-}" ]]; then
+  echo "INFO: strict coverage sysroot = ${SYSROOT}"
+else
+  echo "INFO: strict coverage sysroot = <toolchain default>"
+fi
+echo "INFO: strict coverage llvm-profdata = ${LLVM_PROFDATA}"
+echo "INFO: strict coverage llvm-cov = ${LLVM_COV}"
 echo "INFO: strict coverage regex = ${COVER_INCLUDE_REGEX}"
 
-COVER_CXFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+STRICT_NO_WERROR_CXFLAGS="-Wno-error"
+COVER_CXFLAGS="${STRICT_NO_WERROR_CXFLAGS} -fprofile-instr-generate -fcoverage-mapping"
 COVER_LDFLAGS="-fprofile-instr-generate -fcoverage-mapping"
 
 COVER_BATCH_SIZE="${UWVM_STRICT_COVERAGE_BATCH_SIZE:-8}"
@@ -78,9 +133,11 @@ if [[ ! "${COVER_BATCH_SIZE}" =~ ^[0-9]+$ ]]; then
 fi
 
 STRICT_TARGETS=()
+FULL_TARGET_SET=false
 if [[ "$#" -gt 0 ]]; then
   STRICT_TARGETS=("$@")
 else
+  FULL_TARGET_SET=true
   while IFS= read -r f; do
     STRICT_TARGETS+=("$(basename -- "${f}" .cc)")
   done < <(find "${STRICT_DIR}" -type f -name '*.cc' | sort)
@@ -108,9 +165,12 @@ xmake f "${COMMON_F_FLAGS[@]}" --cxflags="${COVER_CXFLAGS}" --ldflags="${COVER_L
 export LLVM_PROFILE_FILE="${PROFRAW_DIR}/%p.profraw"
 
 echo "=== uwvm_int strict coverage: build+run strict targets (profile) ==="
-if [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
+if [[ "${FULL_TARGET_SET}" == "true" ]]; then
+  echo "--- strict coverage build all strict targets ---"
+  xmake_build -g "${STRICT_DIR}/*"
+elif [[ "${COVER_BATCH_SIZE}" == "0" || "${#STRICT_TARGETS[@]}" -le "${COVER_BATCH_SIZE}" ]]; then
   for t in "${STRICT_TARGETS[@]}"; do
-    xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+    xmake_build "${t}"
   done
 else
   batch_idx=0
@@ -119,7 +179,7 @@ else
     batch=("${STRICT_TARGETS[@]:i:COVER_BATCH_SIZE}")
     echo "--- strict coverage build batch ${batch_idx}: ${#batch[@]} targets ---"
     for t in "${batch[@]}"; do
-      xmake b -v "${XMAKE_JOBS_ARGS[@]}" "${t}"
+      xmake_build "${t}"
     done
   done
 fi

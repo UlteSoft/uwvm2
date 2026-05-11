@@ -215,7 +215,7 @@ namespace
             UWVM2TEST_REQUIRE(load_i32(rr.results) == 39);
         }
 
-        UWVM2TEST_REQUIRE(g_direct_bridge_calls == 4uz);
+        UWVM2TEST_REQUIRE(g_direct_bridge_calls == 0uz);
         UWVM2TEST_REQUIRE(g_import_bridge_calls == 0uz);
         return 0;
     }

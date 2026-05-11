@@ -60,7 +60,7 @@ xmake i -o ./out/none-riscv
 ```
 
 ### Additional Options
-- `--static` Static links (typical for bare-metal)
+- `--static=none|non-system|compiler` Static linking policy (`compiler` is typical for bare-metal)
 - `--march` Tune for your MCU/SoC architecture if needed
 - `--use-cxx-module=y` Only if your toolchain supports C++ modules
 

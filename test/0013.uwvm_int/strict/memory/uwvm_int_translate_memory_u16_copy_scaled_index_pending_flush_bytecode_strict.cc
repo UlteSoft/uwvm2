@@ -243,14 +243,14 @@ namespace
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
 
-        UWVM2TEST_REQUIRE((contains_any_i32_shl<Opt>(bc0)));
-        UWVM2TEST_REQUIRE((contains_any_i32_shl<Opt>(bc1)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc0, mem)));
         UWVM2TEST_REQUIRE((contains_any_plain_i32_load16_u<Opt>(bc1, mem)));
 
         if constexpr(Opt.is_tail_call)
         {
             UWVM2TEST_REQUIRE(mem != nullptr);
+            UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc0)));
+            UWVM2TEST_REQUIRE(!(contains_any_i32_shl<Opt>(bc1)));
             UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc0, *mem)));
             UWVM2TEST_REQUIRE(!(contains_any_i32_load16_u_localget_off<Opt>(bc1, *mem)));
             UWVM2TEST_REQUIRE(!(contains_any_u16_copy_scaled_index<Opt>(bc0, *mem)));

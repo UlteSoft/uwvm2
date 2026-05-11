@@ -282,6 +282,7 @@ namespace
         auto rr10 = Runner::run(cm.local_funcs.index_unchecked(10), rt.local_defined_function_vec_storage.index_unchecked(10), pack_i32_f64(0, 9.5), nullptr, nullptr);
         UWVM2TEST_REQUIRE(load_f64(rr10.results) == 9.5);
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_load_localget_off =
             optable::translate::get_uwvmint_i32_load_localget_off_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
         auto const exp_i32_load_add_imm =
@@ -334,7 +335,32 @@ namespace
                           bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_f32_store_plain));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(10).op.operands, exp_f64_store_local_plus_imm) ||
                           bytecode_contains_fptr(cm.local_funcs.index_unchecked(10).op.operands, exp_f64_store_plain));
+#else
+        auto const exp_i32_load_plain =
+            optable::translate::get_uwvmint_i32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_f32_load_plain =
+            optable::translate::get_uwvmint_f32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_f64_load_plain =
+            optable::translate::get_uwvmint_f64_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_i32_store_plain =
+            optable::translate::get_uwvmint_i32_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_f32_store_plain =
+            optable::translate::get_uwvmint_f32_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_f64_store_plain =
+            optable::translate::get_uwvmint_f64_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
 
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(1).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(2).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(4).op.operands, exp_f32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(5).op.operands, exp_f32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(6).op.operands, exp_f64_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(7).op.operands, exp_f64_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(8).op.operands, exp_i32_store_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(9).op.operands, exp_f32_store_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(10).op.operands, exp_f64_store_plain));
+#endif
         return 0;
     }
 

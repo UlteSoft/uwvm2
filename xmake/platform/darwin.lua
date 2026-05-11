@@ -1,5 +1,6 @@
 
-function darwin_target()
+function darwin_target(opt)
+    opt = opt or {}
 
 	local use_llvm_compiler = get_config("use-llvm-compiler")
 	if use_llvm_compiler then	
@@ -16,6 +17,21 @@ function darwin_target()
         local sysroot_cvt = "--sysroot=" .. sysroot_para
         add_cxflags(sysroot_cvt, {force = true})
         add_ldflags(sysroot_cvt, {force = true})
+
+        if use_llvm_compiler and not opt.skip_static_libcxx then
+            local libcxx_archive = path.join(sysroot_para, "usr", "lib", "libc++.a")
+            local libcxxabi_archive = path.join(sysroot_para, "usr", "lib", "libc++abi.a")
+            if os.isfile(libcxx_archive) then
+                -- The Darwin .tbd stub in standalone LLVM sysroots may lag behind
+                -- libc++ headers and miss C++20 atomic wait/notify exports.
+                add_ldflags(libcxx_archive, {force = true})
+                add_shflags(libcxx_archive, {force = true})
+            end
+            if os.isfile(libcxxabi_archive) then
+                add_ldflags(libcxxabi_archive, {force = true})
+                add_shflags(libcxxabi_archive, {force = true})
+            end
+        end
     end
 
     local target_para = get_config("target")
@@ -31,9 +47,7 @@ function darwin_target()
         add_cxflags("-fno-ident") -- also strip ident data
     end
 
-    local static_link = get_config("static")
-    static_link = static_link == true or static_link == "y" or static_link == "yes" or static_link == "true" or static_link == "on" or static_link == "1"
-    if static_link then	
+    if uwvm_static_mode_is_compiler() then
         add_ldflags("-static", {force = true})
     end
 

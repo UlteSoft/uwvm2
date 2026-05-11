@@ -184,6 +184,121 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
         using queue = ::uwvm2::utils::container::queue<Container>;
     }
 
+    /// @brief owned pointer
+    template <typename T>
+    struct fast_io_owned_ptr_deleter
+    {
+        inline constexpr void operator() (T* ptr) const noexcept
+        {
+            if(ptr == nullptr) [[unlikely]] { return; }
+            ::std::destroy_at(ptr);
+            ::fast_io::native_typed_global_allocator<T>::deallocate(ptr);
+        }
+    };
+
+    template <typename T>
+    struct delete_owned_ptr_deleter
+    {
+        inline constexpr void operator() (T* ptr) const noexcept
+        { delete ptr; }
+    };
+
+    template <typename T, typename Deleter = ::uwvm2::utils::container::fast_io_owned_ptr_deleter<T>>
+    struct basic_owned_ptr
+    {
+        using element_type = T;
+        using deleter_type = Deleter;
+
+        T* ptr{};
+
+        inline constexpr basic_owned_ptr() noexcept = default;
+        inline constexpr basic_owned_ptr(::std::nullptr_t) noexcept
+        {
+        }
+
+        inline constexpr explicit basic_owned_ptr(T* p) noexcept
+            : ptr{p}
+        {
+        }
+
+        basic_owned_ptr(basic_owned_ptr const&) = delete;
+        basic_owned_ptr& operator= (basic_owned_ptr const&) = delete;
+
+        inline constexpr basic_owned_ptr(basic_owned_ptr&& other) noexcept
+            : ptr{other.release()}
+        {
+        }
+
+        inline constexpr basic_owned_ptr& operator= (basic_owned_ptr&& other) noexcept
+        {
+            if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
+            reset(other.release());
+            return *this;
+        }
+
+        inline constexpr ~basic_owned_ptr() noexcept
+        { reset(); }
+
+        [[nodiscard]] inline constexpr T* get() const noexcept
+        { return ptr; }
+
+        [[nodiscard]] inline constexpr explicit operator bool() const noexcept
+        { return ptr != nullptr; }
+
+        [[nodiscard]] inline constexpr bool operator== (::std::nullptr_t) const noexcept
+        { return ptr == nullptr; }
+
+        [[nodiscard]] inline constexpr bool operator!= (::std::nullptr_t) const noexcept
+        { return ptr != nullptr; }
+
+        [[nodiscard]] inline constexpr T& operator*() const noexcept
+        { return *ptr; }
+
+        [[nodiscard]] inline constexpr T* operator->() const noexcept
+        { return ptr; }
+
+        [[nodiscard]] inline constexpr T* release() noexcept
+        {
+            auto const old_ptr{ptr};
+            ptr = nullptr;
+            return old_ptr;
+        }
+
+        inline constexpr void reset(T* p = nullptr) noexcept
+        {
+            if(ptr == p) [[unlikely]] { return; }
+
+            auto const old_ptr{ptr};
+            ptr = p;
+            if(old_ptr != nullptr) [[unlikely]] { Deleter{}(old_ptr); }
+        }
+
+        inline constexpr void swap(basic_owned_ptr& other) noexcept
+        { ::std::swap(ptr, other.ptr); }
+    };
+
+    template <typename T>
+    using owned_ptr = ::uwvm2::utils::container::basic_owned_ptr<T>;
+
+    template <typename T>
+    using delete_owned_ptr = ::uwvm2::utils::container::basic_owned_ptr<T, ::uwvm2::utils::container::delete_owned_ptr_deleter<T>>;
+
+    template <typename T, typename... Args>
+    [[nodiscard]] inline auto make_owned(Args&&... args) -> ::uwvm2::utils::container::owned_ptr<T>
+    {
+        auto ptr{::fast_io::native_typed_global_allocator<T>::allocate(1)};
+        try
+        {
+            ::std::construct_at(ptr, ::std::forward<Args>(args)...);
+        }
+        catch(...)
+        {
+            ::fast_io::native_typed_global_allocator<T>::deallocate(ptr);
+            throw;
+        }
+        return ::uwvm2::utils::container::owned_ptr<T>{ptr};
+    }
+
     /// @brief ordered
     template <typename Key, typename Compare = ::std::less<Key>, typename Alloc = ::uwvm2::utils::container::fast_io_global_std_allocator<Key>>
     using set = ::std::set<Key, Compare, Alloc>;  /// @todo replace with btree set

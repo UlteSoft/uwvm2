@@ -223,6 +223,7 @@ namespace
         static_assert(!Opt.is_tail_call);
         constexpr auto curr = make_initial_stacktop_currpos<Opt>();
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_i32_load_local_plus_imm =
             optable::translate::get_uwvmint_i32_load_local_plus_imm_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
         auto const exp_i32_load_plain =
@@ -235,10 +236,54 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_local_plus_imm));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_plain));
 
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i32_store_local_plus_imm));
-        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i32_load_local_plus_imm));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i32_store_plain));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(3).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                                                          3
+#else
+                                                          1
+#endif
+                                                      ).op.operands,
+                                             exp_i32_store_local_plus_imm));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                                                          3
+#else
+                                                          1
+#endif
+                                                      ).op.operands,
+                                             exp_i32_load_local_plus_imm));
+        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                                                           3
+#else
+                                                           1
+#endif
+                                                       ).op.operands,
+                                              exp_i32_store_plain));
+        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(cm.local_funcs.index_unchecked(
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                                                           3
+#else
+                                                           1
+#endif
+                                                       ).op.operands,
+                                              exp_i32_load_plain));
+#else
+        auto const exp_i32_load_plain =
+            optable::translate::get_uwvmint_i32_load_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+        auto const exp_i32_store_plain =
+            optable::translate::get_uwvmint_i32_store_fptr<Opt, ::std::byte const*, ::std::byte*, ::std::byte*>(curr);
+
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(0).op.operands, exp_i32_load_plain));
+        UWVM2TEST_REQUIRE(bytecode_contains_fptr(cm.local_funcs.index_unchecked(
+#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
+                                                          3
+#else
+                                                          1
+#endif
+                                                      ).op.operands,
+                                             exp_i32_store_plain));
+#endif
 
 #if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS)
         auto const exp_f32_load_local_plus_imm =

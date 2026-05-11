@@ -62,7 +62,7 @@ namespace
 
         auto add_i32_flush_case = [&](wasm_op binop, ::std::int32_t imm)
         {
-            func_type ty{{k_val_i32, k_val_i64}, {k_val_i32}};
+            func_type ty{{k_val_i32, k_val_i32}, {k_val_i32}};
             func_body fb{};
             auto& c = fb.code;
 
@@ -86,7 +86,7 @@ namespace
 
         auto add_i64_flush_case = [&](wasm_op binop, ::std::int64_t imm)
         {
-            func_type ty{{k_val_i64, k_val_i32}, {k_val_i32}};
+            func_type ty{{k_val_i64, k_val_i64}, {k_val_i32}};
             func_body fb{};
             auto& c = fb.code;
 

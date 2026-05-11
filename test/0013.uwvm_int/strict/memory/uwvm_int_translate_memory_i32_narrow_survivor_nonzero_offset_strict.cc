@@ -226,10 +226,12 @@ namespace
         auto const exp_load16_s = optable::translate::get_uwvmint_i32_load16_s_fptr_from_tuple<Opt>(plain_curr, mem, tuple);
         auto const exp_load16_u = optable::translate::get_uwvmint_i32_load16_u_fptr_from_tuple<Opt>(plain_curr, mem, tuple);
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         auto const exp_load8_s_localget = optable::translate::get_uwvmint_i32_load8_s_localget_off_fptr_from_tuple<Opt>(fused_curr, mem, tuple);
         auto const exp_load8_u_localget = optable::translate::get_uwvmint_i32_load8_u_localget_off_fptr_from_tuple<Opt>(fused_curr, mem, tuple);
         auto const exp_load16_s_localget = optable::translate::get_uwvmint_i32_load16_s_localget_off_fptr_from_tuple<Opt>(fused_curr, mem, tuple);
         auto const exp_load16_u_localget = optable::translate::get_uwvmint_i32_load16_u_localget_off_fptr_from_tuple<Opt>(fused_curr, mem, tuple);
+#endif
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
@@ -241,10 +243,12 @@ namespace
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc2, exp_load16_s));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc3, exp_load16_u));
 
+#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS)
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_load8_s_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_load8_u_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc2, exp_load16_s_localget));
         UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc3, exp_load16_u_localget));
+#endif
 
         if(expect_spill)
         {

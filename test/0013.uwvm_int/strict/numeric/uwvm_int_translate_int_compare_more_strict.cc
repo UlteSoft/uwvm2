@@ -122,15 +122,17 @@ namespace
         UWVM2TEST_REQUIRE(err.err_code == ::uwvm2::validation::error::code_validation_error_code::ok);
 
         using Runner = interpreter_runner<Opt>;
+        using i32_case = ::std::pair<::std::int32_t, ::std::int32_t>;
+        using i64_case = ::std::pair<::std::int64_t, ::std::int64_t>;
 
         // f0: i32 pack
-        for(auto const [a, b] : ::std::array{
-                ::std::pair{0, 0},
-                ::std::pair{1, 2},
-                ::std::pair{2, 1},
-                ::std::pair{-1, 0},
-                ::std::pair{static_cast<::std::int32_t>(0x80000000u), 0},
-                ::std::pair{static_cast<::std::int32_t>(0xffffffffu), 1},
+        for(auto const [a, b] : ::std::array<i32_case, 6uz>{
+                i32_case{0, 0},
+                i32_case{1, 2},
+                i32_case{2, 1},
+                i32_case{-1, 0},
+                i32_case{static_cast<::std::int32_t>(0x80000000u), 0},
+                i32_case{static_cast<::std::int32_t>(0xffffffffu), 1},
             })
         {
             auto rr = Runner::run(cm.local_funcs.index_unchecked(0),
@@ -142,13 +144,13 @@ namespace
         }
 
         // f1: i64 pack
-        for(auto const [a, b] : ::std::array{
-                ::std::pair{0ll, 0ll},
-                ::std::pair{1ll, 2ll},
-                ::std::pair{2ll, 1ll},
-                ::std::pair{-1ll, 0ll},
-                ::std::pair{static_cast<::std::int64_t>(0x8000000000000000ull), 0ll},
-                ::std::pair{static_cast<::std::int64_t>(0xffffffffffffffffull), 1ll},
+        for(auto const [a, b] : ::std::array<i64_case, 6uz>{
+                i64_case{0, 0},
+                i64_case{1, 2},
+                i64_case{2, 1},
+                i64_case{-1, 0},
+                i64_case{static_cast<::std::int64_t>(0x8000000000000000ull), 0},
+                i64_case{static_cast<::std::int64_t>(0xffffffffffffffffull), 1},
             })
         {
             auto rr = Runner::run(cm.local_funcs.index_unchecked(1),

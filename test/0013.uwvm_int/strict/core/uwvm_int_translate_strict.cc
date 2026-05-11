@@ -7,6 +7,7 @@
 #include <bit>
 #include <cstdio>
 #include <limits>
+#include <memory>
 #include <utility>
 #
 #ifndef UWVM_MODULE
@@ -21,7 +22,11 @@
 # include <uwvm2/uwvm/wasm/feature/impl.h>
 # include <uwvm2/uwvm/wasm/loader/load_and_check_modules.h>
 # include <uwvm2/uwvm/wasm/storage/impl.h>
+# include <uwvm2/uwvm/runtime/runtime_mode/impl.h>
 # include <uwvm2/uwvm/runtime/storage/impl.h>
+# if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+#  include <uwvm2/runtime/lib/uwvm_runtime.h>
+# endif
 #else
 # error "Module testing is not currently supported"
 #endif
@@ -356,10 +361,25 @@ namespace
         runtime_module_t const* mod{};
     };
 
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    inline void configure_llvm_jit_runner_runtime() noexcept
+    {
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode =
+            ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
+        ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler =
+            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only;
+    }
+#endif
+
     [[nodiscard]] inline prepared_runtime prepare_runtime_from_wasm(byte_vec const& wasm_bytes, ::uwvm2::utils::container::u8string_view module_name)
     {
         ::uwvm2::uwvm::io::show_verbose = false;
         ::uwvm2::uwvm::io::show_depend_warning = false;
+
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        configure_llvm_jit_runner_runtime();
+        ::uwvm2::runtime::lib::llvm_jit_reset_runtime_state_host_api();
+#endif
 
         // Reset global storages (match fuzz harness).
         ::uwvm2::uwvm::wasm::storage::all_module.clear();
@@ -423,6 +443,69 @@ namespace
         return prepared_runtime{ .mod = ::std::addressof(it->second) };
     }
 
+    template <typename ByteStorage, typename Fptr>
+    [[nodiscard]] bool bytecode_contains_fptr_impl(ByteStorage const& bytes, Fptr fptr) noexcept
+    {
+        if(fptr == nullptr) { return false; }
+        ::std::array<::std::byte, sizeof(Fptr)> needle{};
+        ::std::memcpy(needle.data(), ::std::addressof(fptr), sizeof(Fptr));
+        if(bytes.size() < needle.size()) { return false; }
+        for(::std::size_t i{}; i + needle.size() <= bytes.size(); ++i)
+        {
+            if(::std::memcmp(bytes.data() + i, needle.data(), needle.size()) == 0) { return true; }
+        }
+        return false;
+    }
+
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+    [[nodiscard]] runtime_module_t const*
+        find_runtime_module_and_function_index(runtime_local_func_t const& rt_fn, ::std::uint_least32_t& func_index) noexcept
+    {
+        auto const needle{reinterpret_cast<::std::uintptr_t>(::std::addressof(rt_fn))};
+
+        for(auto const& kv: ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage)
+        {
+            auto const& module = kv.second;
+            auto const local_n = module.local_defined_function_vec_storage.size();
+            if(local_n == 0uz) { continue; }
+
+            auto const* base_ptr = module.local_defined_function_vec_storage.data();
+            if(base_ptr == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const begin = reinterpret_cast<::std::uintptr_t>(base_ptr);
+            constexpr ::std::size_t elem_size{sizeof(runtime_local_func_t)};
+            static_assert(elem_size != 0uz);
+            if(local_n > (::std::numeric_limits<::std::uintptr_t>::max() / elem_size)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const bytes = static_cast<::std::uintptr_t>(local_n * elem_size);
+            if(begin > ::std::numeric_limits<::std::uintptr_t>::max() - bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const end = begin + bytes;
+
+            if(needle < begin || needle >= end) { continue; }
+            auto const off = needle - begin;
+            if((off % elem_size) != 0u) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+            auto const local_index = static_cast<::std::size_t>(off / elem_size);
+            if(::std::addressof(module.local_defined_function_vec_storage.index_unchecked(local_index)) != ::std::addressof(rt_fn)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            auto const import_n = module.imported_function_vec_storage.size();
+            if(local_index > (::std::numeric_limits<::std::size_t>::max() - import_n)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            auto const full_index = import_n + local_index;
+            if(full_index > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least32_t>::max)())) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+
+            func_index = static_cast<::std::uint_least32_t>(full_index);
+            return ::std::addressof(module);
+        }
+
+        ::fast_io::fast_terminate();
+    }
+#endif
+
     template <optable::uwvm_interpreter_translate_option_t CompileOption>
     struct interpreter_runner
     {
@@ -481,6 +564,22 @@ namespace
                 ::fast_io::fast_terminate();
             }
 
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+            run_result rr{};
+            rr.hit_expected0 = bytecode_contains_fptr_impl(fn.op.operands, expected0);
+            rr.hit_expected1 = bytecode_contains_fptr_impl(fn.op.operands, expected1);
+            rr.results.resize(result_bytes);
+
+            ::std::uint_least32_t func_index{};
+            auto const* module = find_runtime_module_and_function_index(rt_fn, func_index);
+            ::uwvm2::runtime::lib::llvm_jit_call_raw_host_api(module,
+                                                              func_index,
+                                                              rr.results.empty() ? nullptr : rr.results.data(),
+                                                              result_bytes,
+                                                              packed_params.empty() ? nullptr : packed_params.data(),
+                                                              param_bytes);
+            return rr;
+#else
             // Align locals/stack to 16 bytes (match runtime's typical alignment).
             constexpr ::std::size_t k_align = 16uz;
             auto align_up = [](byte_vec& buf) noexcept -> ::std::byte*
@@ -531,6 +630,7 @@ namespace
             rr.results.resize(result_bytes);
             if(result_bytes != 0uz) { ::std::memcpy(rr.results.data(), operand_base, result_bytes); }
             return rr;
+#endif
         }
     };
 
@@ -568,15 +668,7 @@ namespace
     template <typename ByteStorage, typename Fptr>
     [[nodiscard]] bool bytecode_contains_fptr(ByteStorage const& bytes, Fptr fptr) noexcept
     {
-        if(fptr == nullptr) { return false; }
-        ::std::array<::std::byte, sizeof(Fptr)> needle{};
-        ::std::memcpy(needle.data(), ::std::addressof(fptr), sizeof(Fptr));
-        if(bytes.size() < needle.size()) { return false; }
-        for(::std::size_t i{}; i + needle.size() <= bytes.size(); ++i)
-        {
-            if(::std::memcmp(bytes.data() + i, needle.data(), needle.size()) == 0) { return true; }
-        }
-        return false;
+        return bytecode_contains_fptr_impl(bytes, fptr);
     }
 
     [[nodiscard]] byte_vec build_strict_suite_module()

@@ -247,7 +247,11 @@ namespace
         using Runner = interpreter_runner<Opt>;
 
         // f0/f1: i64 -> i64
-        for(::std::int64_t x : {0ll, 1ll, -1ll, 0x7fff'ffff'ffff'ffffll, static_cast<::std::int64_t>(0x8000'0000'0000'0000ull)})
+        for(::std::int64_t x : {static_cast<::std::int64_t>(0),
+                                static_cast<::std::int64_t>(1),
+                                static_cast<::std::int64_t>(-1),
+                                static_cast<::std::int64_t>(0x7fff'ffff'ffff'ffffull),
+                                static_cast<::std::int64_t>(0x8000'0000'0000'0000ull)})
         {
             UWVM2TEST_REQUIRE(load_i64(Runner::run(cm.local_funcs.index_unchecked(0),
                                                   rt.local_defined_function_vec_storage.index_unchecked(0),

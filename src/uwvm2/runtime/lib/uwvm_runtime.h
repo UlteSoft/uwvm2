@@ -47,11 +47,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         ::std::size_t entry_function_index{};
     };
 
+    struct lazy_compile_run_config
+    {
+        /// @brief The first function index to enter in the main module.
+        /// @note  This is the WASM function index space (imports first, then local-defined).
+        /// @note  Imported entries are only supported when they resolve to a wasm-defined `() -> ()` function.
+        ::std::size_t entry_function_index{};
+        bool assume_full_code_verified{};
+    };
+
     /// @brief Full-compile and run the main module using the configured runtime backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void full_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, full_compile_run_config) noexcept;
 
+    /// @brief Lazily compile and run the main module using the configured lazy-capable backend.
+    /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
+    extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+    /// @brief Clear compiled runtime state before loading a fresh module set in the same process.
+    extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept;
+
     extern "C++" void llvm_jit_call_raw_host_api(void const* runtime_module_ptr,
                                                  ::std::uint_least32_t func_index,
                                                  void* result_buffer,

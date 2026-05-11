@@ -186,53 +186,64 @@ int main()
 #if !defined(__unix__) && !defined(__APPLE__)
     return 0;  // skip on non-POSIX platforms
 #else
+    auto run_case = [&](auto&& child_fn, int expected_exit, char const* expected_message) -> int
+    {
+        (void)expected_exit;
+        (void)expected_message;
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        return run_in_child_expect_trap_message(expected_message, ::std::forward<decltype(child_fn)>(child_fn));
+#else
+        return run_in_child_expect_exit(expected_exit, ::std::forward<decltype(child_fn)>(child_fn));
+#endif
+    };
+
     int ec{};
 
     if(abi_mode_enabled("byref"))
     {
-        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_byref_opt>(); });
+        ec = run_case([] { child_div0<k_test_byref_opt>(); }, 10, "integer divide by zero");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_byref_opt>(); });
+        ec = run_case([] { child_overflow<k_test_byref_opt>(); }, 11, "integer overflow");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_byref_opt>(); });
+        ec = run_case([] { child_invalid_conv<k_test_byref_opt>(); }, 12, "invalid conversion to integer");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_byref_opt>(); });
+        ec = run_case([] { child_unreachable<k_test_byref_opt>(); }, 13, "catch unreachable");
         if(ec != 0) { return ec; }
     }
 
     if(abi_mode_enabled("tail-min"))
     {
-        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_min_opt>(); });
+        ec = run_case([] { child_div0<k_test_tail_min_opt>(); }, 10, "integer divide by zero");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_min_opt>(); });
+        ec = run_case([] { child_overflow<k_test_tail_min_opt>(); }, 11, "integer overflow");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_min_opt>(); });
+        ec = run_case([] { child_invalid_conv<k_test_tail_min_opt>(); }, 12, "invalid conversion to integer");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_min_opt>(); });
+        ec = run_case([] { child_unreachable<k_test_tail_min_opt>(); }, 13, "catch unreachable");
         if(ec != 0) { return ec; }
     }
 
     if(abi_mode_enabled("tail-sysv"))
     {
-        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_sysv_opt>(); });
+        ec = run_case([] { child_div0<k_test_tail_sysv_opt>(); }, 10, "integer divide by zero");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_sysv_opt>(); });
+        ec = run_case([] { child_overflow<k_test_tail_sysv_opt>(); }, 11, "integer overflow");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_sysv_opt>(); });
+        ec = run_case([] { child_invalid_conv<k_test_tail_sysv_opt>(); }, 12, "invalid conversion to integer");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_sysv_opt>(); });
+        ec = run_case([] { child_unreachable<k_test_tail_sysv_opt>(); }, 13, "catch unreachable");
         if(ec != 0) { return ec; }
     }
 
     if(abi_mode_enabled("tail-aapcs64"))
     {
-        ec = run_in_child_expect_exit(10, [] { child_div0<k_test_tail_aapcs64_opt>(); });
+        ec = run_case([] { child_div0<k_test_tail_aapcs64_opt>(); }, 10, "integer divide by zero");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(11, [] { child_overflow<k_test_tail_aapcs64_opt>(); });
+        ec = run_case([] { child_overflow<k_test_tail_aapcs64_opt>(); }, 11, "integer overflow");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(12, [] { child_invalid_conv<k_test_tail_aapcs64_opt>(); });
+        ec = run_case([] { child_invalid_conv<k_test_tail_aapcs64_opt>(); }, 12, "invalid conversion to integer");
         if(ec != 0) { return ec; }
-        ec = run_in_child_expect_exit(13, [] { child_unreachable<k_test_tail_aapcs64_opt>(); });
+        ec = run_case([] { child_unreachable<k_test_tail_aapcs64_opt>(); }, 13, "catch unreachable");
         if(ec != 0) { return ec; }
     }
 

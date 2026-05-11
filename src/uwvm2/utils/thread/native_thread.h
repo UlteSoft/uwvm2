@@ -39,6 +39,14 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
+#pragma push_macro("UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT")
+#undef UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT
+#ifndef UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT
+# if defined(__cpp_lib_atomic_wait) && __cpp_lib_atomic_wait >= 201907L && !(defined(__APPLE__) && defined(_LIBCPP_VERSION))
+#  define UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT 1
+# endif
+#endif
+
 UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 {
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
@@ -154,6 +162,716 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             return h;
         }
     };
+
+    enum class lazy_compile_state : unsigned
+    {
+        uncompiled,
+        queued,
+        compiling,
+        compiled,
+        failed
+    };
+
+    [[nodiscard]] inline constexpr bool lazy_compile_state_is_terminal(lazy_compile_state st) noexcept
+    { return st == lazy_compile_state::compiled || st == lazy_compile_state::failed; }
+
+    inline void lazy_compile_thread_yield() noexcept
+    {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        ::fast_io::this_thread::yield();
+#endif
+    }
+
+    struct lazy_compile_unit_state
+    {
+        ::std::atomic<lazy_compile_state> state{lazy_compile_state::uncompiled};
+
+        inline constexpr lazy_compile_unit_state() noexcept = default;
+        inline lazy_compile_unit_state(lazy_compile_unit_state const&) noexcept : state{lazy_compile_state::uncompiled} {}
+        inline lazy_compile_unit_state& operator= (lazy_compile_unit_state const&) noexcept
+        {
+            this->state.store(lazy_compile_state::uncompiled, ::std::memory_order_relaxed);
+            return *this;
+        }
+    };
+
+    struct lazy_compile_request
+    {
+        using compile_callback_type = void (*)(void*) noexcept;
+
+        lazy_compile_unit_state* unit{};
+        compile_callback_type compile{};
+        void* user_data{};
+        unsigned priority{};
+    };
+
+    struct lazy_compile_scheduler;
+    using lazy_compile_refill_callback_type = bool (*)(void*, lazy_compile_scheduler&) noexcept;
+
+    struct lazy_compile_scheduler_config
+    {
+        ::std::size_t worker_count{};
+        ::std::size_t queue_capacity{};
+        lazy_compile_refill_callback_type refill_callback{};
+        void* refill_user_data{};
+    };
+
+    struct lazy_compile_scheduler_stats_snapshot
+    {
+        ::std::size_t enqueued_requests{};
+        ::std::size_t enqueue_failures{};
+        ::std::size_t duplicate_requests{};
+        ::std::size_t inline_compiles{};
+        ::std::size_t worker_compiles{};
+        ::std::size_t helper_compiles{};
+        ::std::size_t passive_waits{};
+        ::std::size_t worker_queue_waits{};
+        ::std::size_t refill_calls{};
+        ::std::size_t refill_successes{};
+    };
+
+    struct lazy_compile_scheduler
+    {
+        struct worker_task;
+        struct ring_slot
+        {
+            lazy_compile_request request{};
+        };
+
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        using native_thread_type = ::fast_io::native_thread;
+#endif
+
+        native_global_typed_allocator_buffer<ring_slot> queue{};
+        ::std::size_t queue_capacity{};
+        ::std::size_t queue_head{};
+        ::std::atomic_flag queue_lock = ATOMIC_FLAG_INIT;
+        ::std::atomic_size_t queued_count{};
+        ::std::atomic_bool stop_requested{};
+        ::std::atomic<unsigned> queue_epoch{};
+        lazy_compile_refill_callback_type refill_callback{};
+        void* refill_user_data{};
+
+        ::std::atomic_size_t enqueued_request_count{};
+        ::std::atomic_size_t enqueue_failure_count{};
+        ::std::atomic_size_t duplicate_request_count{};
+        ::std::atomic_size_t inline_compile_count{};
+        ::std::atomic_size_t worker_compile_count{};
+        ::std::atomic_size_t helper_compile_count{};
+        ::std::atomic_size_t passive_wait_count{};
+        ::std::atomic_size_t worker_queue_wait_count{};
+        ::std::atomic_size_t refill_call_count{};
+        ::std::atomic_size_t refill_success_count{};
+
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        native_global_typed_allocator_buffer<native_thread_type> workers{};
+        native_global_typed_allocator_buffer<::std::coroutine_handle<>> worker_handles{};
+        ::std::size_t worker_count{};
+#endif
+
+        inline constexpr lazy_compile_scheduler() noexcept = default;
+        inline constexpr lazy_compile_scheduler(lazy_compile_scheduler const&) noexcept = delete;
+        inline constexpr lazy_compile_scheduler& operator= (lazy_compile_scheduler const&) noexcept = delete;
+
+        inline constexpr lazy_compile_scheduler(lazy_compile_scheduler&&) noexcept = delete;
+        inline constexpr lazy_compile_scheduler& operator= (lazy_compile_scheduler&&) noexcept = delete;
+
+        inline ~lazy_compile_scheduler() noexcept { this->stop(); }
+
+        [[nodiscard]] inline constexpr bool running() const noexcept
+        {
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+            return this->worker_count != 0uz;
+#else
+            return false;
+#endif
+        }
+
+        [[nodiscard]] inline static constexpr ::std::size_t default_queue_capacity(::std::size_t worker_count) noexcept
+        {
+            auto const scaled{worker_count * 64uz};
+            return scaled < 256uz ? 256uz : scaled;
+        }
+
+        inline void start(lazy_compile_scheduler_config config) noexcept;
+
+        inline void reset_stats() noexcept
+        {
+            this->enqueued_request_count.store(0uz, ::std::memory_order_relaxed);
+            this->enqueue_failure_count.store(0uz, ::std::memory_order_relaxed);
+            this->duplicate_request_count.store(0uz, ::std::memory_order_relaxed);
+            this->inline_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->worker_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->helper_compile_count.store(0uz, ::std::memory_order_relaxed);
+            this->passive_wait_count.store(0uz, ::std::memory_order_relaxed);
+            this->worker_queue_wait_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_call_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_success_count.store(0uz, ::std::memory_order_relaxed);
+        }
+
+        [[nodiscard]] inline lazy_compile_scheduler_stats_snapshot snapshot_stats() const noexcept
+        {
+            return {.enqueued_requests = this->enqueued_request_count.load(::std::memory_order_relaxed),
+                    .enqueue_failures = this->enqueue_failure_count.load(::std::memory_order_relaxed),
+                    .duplicate_requests = this->duplicate_request_count.load(::std::memory_order_relaxed),
+                    .inline_compiles = this->inline_compile_count.load(::std::memory_order_relaxed),
+                    .worker_compiles = this->worker_compile_count.load(::std::memory_order_relaxed),
+                    .helper_compiles = this->helper_compile_count.load(::std::memory_order_relaxed),
+                    .passive_waits = this->passive_wait_count.load(::std::memory_order_relaxed),
+                    .worker_queue_waits = this->worker_queue_wait_count.load(::std::memory_order_relaxed),
+                    .refill_calls = this->refill_call_count.load(::std::memory_order_relaxed),
+                    .refill_successes = this->refill_success_count.load(::std::memory_order_relaxed)};
+        }
+
+        inline void stop() noexcept
+        {
+            this->stop_requested.store(true, ::std::memory_order_release);
+            this->wake_all_workers();
+
+#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+            for(::std::size_t i{}; i != this->worker_count; ++i)
+            {
+                auto& worker{this->workers.buffer[i]};
+                if(worker.joinable()) { worker.join(); }
+                ::std::destroy_at(this->workers.buffer + i);
+
+                auto& handle{this->worker_handles.buffer[i]};
+                if(handle)
+                {
+                    if(!handle.done()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                    handle.destroy();
+                    handle = {};
+                }
+            }
+            this->worker_count = 0uz;
+            this->workers = {};
+            this->worker_handles = {};
+#endif
+
+            this->drain_abandoned_requests();
+
+            if(this->queue.buffer)
+            {
+                for(::std::size_t i{}; i != this->queue_capacity; ++i) { ::std::destroy_at(this->queue.buffer + i); }
+            }
+            this->queue = {};
+            this->queue_capacity = 0uz;
+            this->queued_count.store(0uz, ::std::memory_order_relaxed);
+            this->refill_callback = {};
+            this->refill_user_data = {};
+        }
+
+        [[nodiscard]] inline bool try_request(lazy_compile_request request) noexcept
+        {
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
+
+            auto expected{lazy_compile_state::uncompiled};
+            if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::queued, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
+            {
+                this->duplicate_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                return expected == lazy_compile_state::queued || expected == lazy_compile_state::compiling || expected == lazy_compile_state::compiled;
+            }
+
+            if(!this->try_enqueue(request))
+            {
+                this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                expected = lazy_compile_state::queued;
+                (void)request.unit->state.compare_exchange_strong(expected,
+                                                                 lazy_compile_state::uncompiled,
+                                                                 ::std::memory_order_acq_rel,
+                                                                 ::std::memory_order_acquire);
+                this->notify_unit(*request.unit);
+                return false;
+            }
+
+            this->enqueued_request_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            return true;
+        }
+
+        inline void request_or_compile_inline(lazy_compile_request request) noexcept
+        {
+            if(this->try_request(request))
+            {
+                if(request.unit != nullptr) { this->wait_until_ready_passive(*request.unit); }
+                return;
+            }
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return; }
+
+            auto expected{lazy_compile_state::uncompiled};
+            if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::compiling, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
+            {
+                this->wait_until_ready_passive(*request.unit);
+                return;
+            }
+
+            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            request.compile(request.user_data);
+            this->complete_request(*request.unit);
+        }
+
+        inline bool wait_until_ready_passive(lazy_compile_unit_state& unit) noexcept
+        {
+            bool counted_wait{};
+            for(;;)
+            {
+                auto const st{unit.state.load(::std::memory_order_acquire)};
+                if(lazy_compile_state_is_terminal(st)) { return st == lazy_compile_state::compiled; }
+                if(st == lazy_compile_state::uncompiled) { return false; }
+                if(!counted_wait)
+                {
+                    this->passive_wait_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                    counted_wait = true;
+                }
+                this->wait_for_unit_event(unit, st);
+            }
+        }
+
+        [[nodiscard]] inline bool ensure_ready(lazy_compile_request request) noexcept
+        {
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
+
+            if(request.priority != 0u)
+            {
+                for(;;)
+                {
+                    auto const st{request.unit->state.load(::std::memory_order_acquire)};
+                    if(lazy_compile_state_is_terminal(st)) { return st == lazy_compile_state::compiled; }
+
+                    if(st == lazy_compile_state::uncompiled)
+                    {
+                        auto expected{lazy_compile_state::uncompiled};
+                        if(request.unit->state.compare_exchange_strong(expected,
+                                                                        lazy_compile_state::compiling,
+                                                                        ::std::memory_order_acq_rel,
+                                                                        ::std::memory_order_acquire))
+                        {
+                            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                            request.compile(request.user_data);
+                            this->complete_request(*request.unit);
+                            return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+                        }
+                        continue;
+                    }
+
+                    if(st == lazy_compile_state::queued)
+                    {
+                        auto expected{lazy_compile_state::queued};
+                        if(request.unit->state.compare_exchange_strong(expected,
+                                                                        lazy_compile_state::compiling,
+                                                                        ::std::memory_order_acq_rel,
+                                                                        ::std::memory_order_acquire))
+                        {
+                            this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                            request.compile(request.user_data);
+                            this->complete_request(*request.unit);
+                            return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+                        }
+                        continue;
+                    }
+
+                    this->wait_for_unit_event(*request.unit, st);
+                }
+            }
+
+            if(this->try_request(request))
+            {
+                if(request.unit != nullptr && !this->wait_until_ready_passive(*request.unit)) [[unlikely]] { return false; }
+                return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+            }
+
+            for(;;)
+            {
+                auto const st{request.unit->state.load(::std::memory_order_acquire)};
+                if(lazy_compile_state_is_terminal(st)) { return st == lazy_compile_state::compiled; }
+
+                if(st == lazy_compile_state::uncompiled)
+                {
+                    auto expected{lazy_compile_state::uncompiled};
+                    if(request.unit->state.compare_exchange_strong(expected,
+                                                                    lazy_compile_state::compiling,
+                                                                    ::std::memory_order_acq_rel,
+                                                                    ::std::memory_order_acquire))
+                    {
+                        this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                        request.compile(request.user_data);
+                        this->complete_request(*request.unit);
+                        return request.unit->state.load(::std::memory_order_acquire) == lazy_compile_state::compiled;
+                    }
+                    continue;
+                }
+
+                if(!this->wait_until_ready_passive(*request.unit)) [[unlikely]] { return false; }
+            }
+        }
+
+        inline void wait_until_ready(lazy_compile_unit_state& unit) noexcept
+        {
+            for(;;)
+            {
+                auto const st{unit.state.load(::std::memory_order_acquire)};
+                if(lazy_compile_state_is_terminal(st) || st == lazy_compile_state::uncompiled) { return; }
+
+                if(st == lazy_compile_state::queued)
+                {
+                    this->help_or_yield_once();
+                    continue;
+                }
+
+                this->wait_for_unit_event(unit, st);
+            }
+        }
+
+        inline void notify_unit(lazy_compile_unit_state& unit) noexcept
+        {
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            unit.state.notify_all();
+#else
+            (void)unit;
+#endif
+        }
+
+        inline void mark_failed(lazy_compile_unit_state& unit) noexcept
+        {
+            unit.state.store(lazy_compile_state::failed, ::std::memory_order_release);
+            this->notify_unit(unit);
+        }
+
+        inline void wake_all_workers() noexcept
+        {
+            this->queue_epoch.fetch_add(1u, ::std::memory_order_release);
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            this->queue_epoch.notify_all();
+#endif
+        }
+
+        [[nodiscard]] inline bool try_enqueue(lazy_compile_request request) noexcept
+        {
+            if(this->queue_capacity == 0uz || this->stop_requested.load(::std::memory_order_acquire)) { return false; }
+
+            this->lock_queue();
+
+            auto const current_count{this->queued_count.load(::std::memory_order_relaxed)};
+            if(current_count >= this->queue_capacity)
+            {
+                this->unlock_queue();
+                return false;
+            }
+
+            ::std::size_t write_index{};
+            if(request.priority == 0u)
+            {
+                write_index = (this->queue_head + current_count) % this->queue_capacity;
+            }
+            else
+            {
+                this->queue_head = this->queue_head == 0uz ? this->queue_capacity - 1uz : this->queue_head - 1uz;
+                write_index = this->queue_head;
+            }
+
+            this->queue.buffer[write_index].request = request;
+            this->queued_count.store(current_count + 1uz, ::std::memory_order_release);
+            this->unlock_queue();
+            this->wake_one_worker();
+            return true;
+        }
+
+        [[nodiscard]] inline bool try_dequeue(lazy_compile_request& out) noexcept
+        {
+            if(this->queue_capacity == 0uz) { return false; }
+
+            this->lock_queue();
+
+            auto const current_count{this->queued_count.load(::std::memory_order_relaxed)};
+            if(current_count == 0uz)
+            {
+                this->unlock_queue();
+                return false;
+            }
+
+            auto& slot{this->queue.buffer[this->queue_head]};
+            out = slot.request;
+            slot.request = {};
+            this->queue_head = (this->queue_head + 1uz) % this->queue_capacity;
+            this->queued_count.store(current_count - 1uz, ::std::memory_order_release);
+            this->unlock_queue();
+            return true;
+        }
+
+        inline void wake_one_worker() noexcept
+        {
+            this->queue_epoch.fetch_add(1u, ::std::memory_order_release);
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            this->queue_epoch.notify_one();
+#endif
+        }
+
+        inline void wait_for_queue_event(unsigned observed_epoch) noexcept
+        {
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            while(this->queue_epoch.load(::std::memory_order_acquire) == observed_epoch && !this->stop_requested.load(::std::memory_order_acquire))
+            {
+                this->queue_epoch.wait(observed_epoch, ::std::memory_order_acquire);
+            }
+#else
+            while(this->queue_epoch.load(::std::memory_order_acquire) == observed_epoch && !this->stop_requested.load(::std::memory_order_acquire))
+            {
+                lazy_compile_thread_yield();
+            }
+#endif
+        }
+
+        inline void wait_for_unit_event(lazy_compile_unit_state& unit, lazy_compile_state observed_state) noexcept
+        {
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            while(unit.state.load(::std::memory_order_acquire) == observed_state)
+            {
+                unit.state.wait(observed_state, ::std::memory_order_acquire);
+            }
+#else
+            while(unit.state.load(::std::memory_order_acquire) == observed_state)
+            {
+                lazy_compile_thread_yield();
+            }
+#endif
+        }
+
+        inline void help_or_yield_once() noexcept
+        {
+            lazy_compile_request request{};
+            if(this->try_dequeue(request))
+            {
+                this->execute_request(request, false);
+                return;
+            }
+            lazy_compile_thread_yield();
+        }
+
+        inline void complete_request(lazy_compile_unit_state& unit) noexcept
+        {
+            auto expected{lazy_compile_state::compiling};
+            if(!unit.state.compare_exchange_strong(expected,
+                                                   lazy_compile_state::compiled,
+                                                   ::std::memory_order_release,
+                                                   ::std::memory_order_acquire))
+            {
+                if(expected != lazy_compile_state::failed)
+                {
+                    unit.state.store(lazy_compile_state::compiled, ::std::memory_order_release);
+                }
+            }
+            this->notify_unit(unit);
+        }
+
+        inline void execute_request(lazy_compile_request request, bool worker_thread) noexcept
+        {
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return; }
+
+            auto expected{lazy_compile_state::queued};
+            if(!request.unit->state.compare_exchange_strong(expected, lazy_compile_state::compiling, ::std::memory_order_acq_rel, ::std::memory_order_acquire))
+            {
+                return;
+            }
+
+            if(worker_thread) { this->worker_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
+            else { this->helper_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
+            request.compile(request.user_data);
+            this->complete_request(*request.unit);
+        }
+
+        [[nodiscard]] inline bool try_refill_background_work() noexcept
+        {
+            if(this->refill_callback == nullptr || this->stop_requested.load(::std::memory_order_acquire)) { return false; }
+            this->refill_call_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            if(this->refill_callback(this->refill_user_data, *this))
+            {
+                this->refill_success_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                return true;
+            }
+            return false;
+        }
+
+        inline void drain_abandoned_requests() noexcept
+        {
+            lazy_compile_request request{};
+            while(this->try_dequeue(request))
+            {
+                if(request.unit == nullptr) { continue; }
+                auto expected{lazy_compile_state::queued};
+                (void)request.unit->state.compare_exchange_strong(expected,
+                                                                  lazy_compile_state::uncompiled,
+                                                                  ::std::memory_order_acq_rel,
+                                                                  ::std::memory_order_acquire);
+                this->notify_unit(*request.unit);
+            }
+        }
+
+        inline void lock_queue() noexcept
+        {
+            while(this->queue_lock.test_and_set(::std::memory_order_acquire))
+            {
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+                this->queue_lock.wait(true, ::std::memory_order_acquire);
+#else
+                lazy_compile_thread_yield();
+#endif
+            }
+        }
+
+        inline void unlock_queue() noexcept
+        {
+            this->queue_lock.clear(::std::memory_order_release);
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+            this->queue_lock.notify_one();
+#endif
+        }
+
+        inline worker_task make_worker_task() noexcept;
+    };
+
+    struct lazy_compile_scheduler::worker_task
+    {
+        struct promise_type;
+        using handle_type = ::std::coroutine_handle<promise_type>;
+
+        struct promise_type
+        {
+            [[nodiscard]] inline constexpr worker_task get_return_object() noexcept { return worker_task{handle_type::from_promise(*this)}; }
+            [[nodiscard]] inline static constexpr worker_task get_return_object_on_allocation_failure() noexcept { return {}; }
+            [[nodiscard]] inline constexpr ::std::suspend_always initial_suspend() const noexcept { return {}; }
+            [[nodiscard]] inline constexpr ::std::suspend_always final_suspend() const noexcept { return {}; }
+            inline constexpr void return_void() const noexcept {}
+            [[noreturn]] inline void unhandled_exception() const noexcept { ::fast_io::fast_terminate(); }
+            [[nodiscard]] inline static void* operator new (::std::size_t n) noexcept { return ::fast_io::native_global_allocator::allocate(n); }
+            inline static void operator delete (void* p) noexcept { ::fast_io::native_global_allocator::deallocate(p); }
+            inline static void operator delete (void* p, ::std::size_t n) noexcept { ::fast_io::native_global_allocator::deallocate_n(p, n); }
+        };
+
+        handle_type handle{};
+
+        inline constexpr worker_task() noexcept = default;
+        inline constexpr explicit worker_task(handle_type h) noexcept : handle{h} {}
+        inline constexpr worker_task(worker_task const&) noexcept = delete;
+        inline constexpr worker_task& operator= (worker_task const&) noexcept = delete;
+        inline constexpr worker_task(worker_task&& other) noexcept : handle{other.handle} { other.handle = {}; }
+
+        inline constexpr worker_task& operator= (worker_task&& other) noexcept
+        {
+            if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
+            if(this->handle) { this->handle.destroy(); }
+            this->handle = other.handle;
+            other.handle = {};
+            return *this;
+        }
+
+        inline constexpr ~worker_task() noexcept
+        {
+            if(this->handle) { this->handle.destroy(); }
+        }
+
+        [[nodiscard]] inline constexpr handle_type release() noexcept
+        {
+            auto const h{this->handle};
+            this->handle = {};
+            return h;
+        }
+    };
+
+    inline lazy_compile_scheduler::worker_task lazy_compile_scheduler::make_worker_task() noexcept
+    {
+        for(;;)
+        {
+            if(this->stop_requested.load(::std::memory_order_acquire)) { break; }
+
+            lazy_compile_request request{};
+            if(this->try_dequeue(request))
+            {
+                this->execute_request(request, true);
+                continue;
+            }
+
+            if(this->try_refill_background_work()) { continue; }
+
+            auto const observed_epoch{this->queue_epoch.load(::std::memory_order_acquire)};
+            if(this->queued_count.load(::std::memory_order_acquire) == 0uz && !this->stop_requested.load(::std::memory_order_acquire))
+            {
+                this->worker_queue_wait_count.fetch_add(1uz, ::std::memory_order_relaxed);
+                this->wait_for_queue_event(observed_epoch);
+            }
+        }
+        co_return;
+    }
+
+    inline void lazy_compile_scheduler::start(lazy_compile_scheduler_config config) noexcept
+    {
+        this->stop();
+
+#ifndef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+        this->reset_stats();
+        this->refill_callback = config.refill_callback;
+        this->refill_user_data = config.refill_user_data;
+        return;
+#else
+        if(config.worker_count == 0uz)
+        {
+            this->reset_stats();
+            this->refill_callback = config.refill_callback;
+            this->refill_user_data = config.refill_user_data;
+            return;
+        }
+        if(config.queue_capacity == 0uz) { config.queue_capacity = default_queue_capacity(config.worker_count); }
+
+        this->queue = native_global_typed_allocator_buffer<ring_slot>{config.queue_capacity};
+        for(::std::size_t i{}; i != config.queue_capacity; ++i) { ::std::construct_at(this->queue.buffer + i); }
+
+        this->queue_capacity = config.queue_capacity;
+        this->queue_head = 0uz;
+        this->queue_lock.clear(::std::memory_order_release);
+        this->queued_count.store(0uz, ::std::memory_order_relaxed);
+        this->stop_requested.store(false, ::std::memory_order_relaxed);
+        this->queue_epoch.store(0u, ::std::memory_order_relaxed);
+        this->refill_callback = config.refill_callback;
+        this->refill_user_data = config.refill_user_data;
+        this->reset_stats();
+
+        this->workers = native_global_typed_allocator_buffer<native_thread_type>{config.worker_count};
+        this->worker_handles = native_global_typed_allocator_buffer<::std::coroutine_handle<>>{config.worker_count};
+
+# ifdef UWVM_CPP_EXCEPTIONS
+        try
+# endif
+        {
+            while(this->worker_count != config.worker_count)
+            {
+                auto task{this->make_worker_task()};
+                auto handle{task.release()};
+                if(!handle) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+#  ifdef UWVM_CPP_EXCEPTIONS
+                try
+#  endif
+                {
+                    ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{[handle]() noexcept { handle.resume(); }});
+                }
+#  ifdef UWVM_CPP_EXCEPTIONS
+                catch(...)
+                {
+                    handle.destroy();
+                    throw;
+                }
+#  endif
+
+                ::std::construct_at(this->worker_handles.buffer + this->worker_count, handle);
+                ++this->worker_count;
+            }
+        }
+# ifdef UWVM_CPP_EXCEPTIONS
+        catch(...)
+        {
+            this->stop();
+        }
+# endif
+#endif
+    }
 
     struct scheduled_task_batch
     {
@@ -316,6 +1034,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         }
     };
 }
+
+#pragma pop_macro("UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT")
 
 #ifndef UWVM_MODULE
 // macro

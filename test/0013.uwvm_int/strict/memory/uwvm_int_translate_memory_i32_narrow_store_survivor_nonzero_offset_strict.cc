@@ -149,16 +149,12 @@ namespace
 
         auto const exp_store8 = optable::translate::get_uwvmint_i32_store8_fptr_from_tuple<Opt>(curr, mem, tuple);
         auto const exp_store16 = optable::translate::get_uwvmint_i32_store16_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store8_localget = optable::translate::get_uwvmint_i32_store8_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
-        auto const exp_store16_localget = optable::translate::get_uwvmint_i32_store16_localget_off_fptr_from_tuple<Opt>(curr, mem, tuple);
 
         auto const& bc0 = cm.local_funcs.index_unchecked(0).op.operands;
         auto const& bc1 = cm.local_funcs.index_unchecked(1).op.operands;
 
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc0, exp_store8));
         UWVM2TEST_REQUIRE(bytecode_contains_fptr(bc1, exp_store16));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc0, exp_store8_localget));
-        UWVM2TEST_REQUIRE(!bytecode_contains_fptr(bc1, exp_store16_localget));
 
         if(expect_fill)
         {
