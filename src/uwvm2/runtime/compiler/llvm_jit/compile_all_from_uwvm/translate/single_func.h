@@ -12,8 +12,8 @@ struct local_func_storage_t
 struct llvm_jit_module_storage_t
 {
     bool emitted{};
-    ::std::unique_ptr<::llvm::LLVMContext> llvm_context_holder{};
-    ::std::unique_ptr<::llvm::Module> llvm_module{};
+    ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
+    ::uwvm2::utils::container::owned_ptr<::llvm::Module> llvm_module{};
 
     llvm_jit_module_storage_t() = default;
     llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) = delete;

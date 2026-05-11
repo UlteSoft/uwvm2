@@ -2188,7 +2188,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::llvm::LLVMContext* llvm_context_holder{};
     ::llvm::Module* llvm_module{};
     ::llvm::Function* llvm_function{};
-    ::std::unique_ptr<::llvm::IRBuilder<>> ir_builder{};
+    ::uwvm2::utils::container::owned_ptr<::llvm::IRBuilder<>> ir_builder{};
     ::uwvm2::utils::container::vector<::llvm::AllocaInst*> local_pointers{};
     runtime_memory_access_info_t memory0_access_info{};
     bool memory0_access_info_resolved{};
@@ -2207,11 +2207,12 @@ struct runtime_local_func_llvm_jit_emit_state_t
     llvm_jit_module_storage_t& module_storage)
 {
     module_storage = {};
-    module_storage.llvm_context_holder = ::std::make_unique<::llvm::LLVMContext>();
+    module_storage.llvm_context_holder = ::uwvm2::utils::container::make_owned<::llvm::LLVMContext>();
     if(module_storage.llvm_context_holder == nullptr) [[unlikely]] { return false; }
 
     auto const llvm_module_name{get_llvm_wasm_ir_module_name(runtime_module)};
-    module_storage.llvm_module = ::std::make_unique<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
+    module_storage.llvm_module =
+        ::uwvm2::utils::container::make_owned<::llvm::Module>(get_llvm_string_ref(llvm_module_name), *module_storage.llvm_context_holder);
     return module_storage.llvm_module != nullptr;
 }
 
@@ -2309,7 +2310,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     apply_llvm_jit_wasm_calling_conv(*state.llvm_function);
 
     auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
-    state.ir_builder = ::std::make_unique<::llvm::IRBuilder<>>(entry_block);
+    state.ir_builder = ::uwvm2::utils::container::make_owned<::llvm::IRBuilder<>>(entry_block);
     if(!emit_runtime_local_func_llvm_jit_call_stack_push(*state.ir_builder, local_func_storage.module_id, local_func_storage.function_index))
         [[unlikely]]
     {

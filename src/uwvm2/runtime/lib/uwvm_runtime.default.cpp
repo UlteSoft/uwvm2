@@ -116,6 +116,17 @@ namespace uwvm2::runtime::lib
         using lazy_compile_scheduler_stats_snapshot_t = ::uwvm2::utils::thread::lazy_compile_scheduler_stats_snapshot;
         using lazy_parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
 
+        template <typename>
+        struct member_function_first_argument;
+
+        template <typename R, typename C, typename A0>
+        struct member_function_first_argument<R (C::*)(A0)>
+        {
+            using type = A0;
+        };
+
+        using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
+
         struct compiled_module_record;
         [[nodiscard]] inline lazy_parser_module_storage_t const*
             find_lazy_validator_module_storage(::uwvm2::utils::container::u8string_view module_name) noexcept;
@@ -193,8 +204,8 @@ namespace uwvm2::runtime::lib
             llvm_jit_lazy_compile_options_t llvm_jit_lazy_compile_options{};
             ::uwvm2::utils::container::vector<llvm_jit_lazy_compile_request_context_t> llvm_jit_lazy_background_request_contexts{};
             ::uwvm2::utils::container::vector<::uwvm2::validation::error::code_validation_error_impl> llvm_jit_lazy_background_errors{};
-            ::std::unique_ptr<::llvm::LLVMContext> llvm_jit_context_holder{};
-            ::std::unique_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
+            ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_jit_context_holder{};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_entry_addresses{};
             ::uwvm2::utils::container::vector<::std::uintptr_t> llvm_jit_local_raw_entry_addresses{};
             ::uwvm2::utils::container::vector<runtime_llvm_jit_raw_call_target_t> llvm_jit_lazy_direct_call_targets{};
@@ -288,15 +299,15 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             if(runtime_process_exiting_flag())
             {
-                llvm_jit_compiled.llvm_jit_module.llvm_module.release();
-                llvm_jit_compiled.llvm_jit_module.llvm_context_holder.release();
+                static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_module.release());
+                static_cast<void>(llvm_jit_compiled.llvm_jit_module.llvm_context_holder.release());
                 for(auto& materialized_func: llvm_jit_lazy_compiled.materialized_functions)
                 {
-                    materialized_func.llvm_jit_engine.release();
-                    materialized_func.llvm_context_holder.release();
+                    static_cast<void>(materialized_func.llvm_jit_engine.release());
+                    static_cast<void>(materialized_func.llvm_context_holder.release());
                 }
-                llvm_jit_engine.release();
-                llvm_jit_context_holder.release();
+                static_cast<void>(llvm_jit_engine.release());
+                static_cast<void>(llvm_jit_context_holder.release());
             }
 #endif
         }
@@ -4390,7 +4401,7 @@ namespace uwvm2::runtime::lib
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
-            ::std::unique_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
             if(target_machine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -4419,13 +4430,12 @@ namespace uwvm2::runtime::lib
                 return false;
             }
 
-            auto raw_engine{::llvm::EngineBuilder(::std::move(merged_module))
+            auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
                                 .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
-                                .create(target_machine.release())};
+                                .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
@@ -4434,8 +4444,9 @@ namespace uwvm2::runtime::lib
                 }
                 return false;
             }
+            static_cast<void>(target_machine.release());
 
-            ::std::unique_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{raw_engine};
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
                 llvm_jit_materialize_verbose_info(u8"LLVM JIT materialization finalizing object for module \"",

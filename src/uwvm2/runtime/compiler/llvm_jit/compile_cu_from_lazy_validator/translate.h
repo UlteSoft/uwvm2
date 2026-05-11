@@ -176,8 +176,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     struct lazy_materialized_function_storage_t
     {
         local_func_storage_t local_func{};
-        ::std::unique_ptr<::llvm::LLVMContext> llvm_context_holder{};
-        ::std::unique_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
+        ::uwvm2::utils::container::owned_ptr<::llvm::LLVMContext> llvm_context_holder{};
+        ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t raw_entry_address{};
         bool ready{};
@@ -220,6 +220,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     namespace details
     {
+        template <typename>
+        struct member_function_first_argument;
+
+        template <typename R, typename C, typename A0>
+        struct member_function_first_argument<R (C::*)(A0)>
+        {
+            using type = A0;
+        };
+
+        using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
+
         namespace all_compile = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm;
         namespace all_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
@@ -478,23 +489,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
-            ::std::unique_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::TargetMachine> target_machine{target_builder.selectTarget()};
             if(target_machine == nullptr) [[unlikely]] { return false; }
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
             if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine)) [[unlikely]] { return false; }
 
-            auto raw_engine{::llvm::EngineBuilder(::std::move(llvm_module))
+            auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
                                 .setOptLevel(options.codegen_opt_level)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<::llvm::SectionMemoryManager>())
-                                .create(target_machine.release())};
+                                .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
+            static_cast<void>(target_machine.release());
 
-            ::std::unique_ptr<::llvm::ExecutionEngine> engine{raw_engine};
+            ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> engine{raw_engine};
             engine->finalizeObject();
 
             auto const import_func_count{curr_module.imported_function_vec_storage.size()};
