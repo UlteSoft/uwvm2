@@ -1043,7 +1043,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         if(cu.local_function_index >= ctx.lazy_storage->functions.size()) [[unlikely]] { return {}; }
         auto& fn{ctx.lazy_storage->functions.index_unchecked(cu.local_function_index)};
 
-        auto* unit{cu.materialization_scope == lazy_materialization_scope::whole_function ? ::std::addressof(fn.materialization_state)
+        auto unit{cu.materialization_scope == lazy_materialization_scope::whole_function ? ::std::addressof(fn.materialization_state)
                                                                                           : ::std::addressof(cu.state)};
         return {.unit = unit,
                 .compile = details::lazy_compile_request_entry<CompileOption>,

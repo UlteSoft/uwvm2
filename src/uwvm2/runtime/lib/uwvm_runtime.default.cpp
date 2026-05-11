@@ -1776,13 +1776,13 @@ namespace uwvm2::runtime::lib
 
             UWVM_ALWAYS_INLINE inline void push_block(::std::size_t min_cap) noexcept
             {
-                auto* b{take_free_block(min_cap)};
+                auto b{take_free_block(min_cap)};
                 if(b == nullptr)
                 {
                     auto new_cap{4096uz};
                     while(new_cap < min_cap) { new_cap <<= 1; }
 
-                    auto* const mem{static_cast<::std::byte*>(byte_allocator::allocate(new_cap))};
+                    auto const mem{static_cast<::std::byte*>(byte_allocator::allocate(new_cap))};
                     if(mem == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
 
                     b = block_allocator::allocate(1uz);
@@ -1827,7 +1827,7 @@ namespace uwvm2::runtime::lib
             [[nodiscard]] inline block* take_free_block(::std::size_t min_cap) noexcept
             {
                 block* prev{};
-                auto* it{free_list};
+                auto it{free_list};
                 while(it != nullptr)
                 {
                     if(it->cap >= min_cap)

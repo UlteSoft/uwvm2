@@ -192,7 +192,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
         {
             if(ptr == nullptr) [[unlikely]] { return; }
             ::std::destroy_at(ptr);
-            ::uwvm2::utils::container::fast_io_global_std_allocator<T>{}.deallocate(ptr, 1);
+            ::fast_io::native_typed_global_allocator<T>::deallocate(ptr);
         }
     };
 
@@ -259,7 +259,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
 
         [[nodiscard]] inline constexpr T* release() noexcept
         {
-            auto* const old_ptr{ptr};
+            auto const old_ptr{ptr};
             ptr = nullptr;
             return old_ptr;
         }
@@ -268,7 +268,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
         {
             if(ptr == p) [[unlikely]] { return; }
 
-            auto* const old_ptr{ptr};
+            auto const old_ptr{ptr};
             ptr = p;
             if(old_ptr != nullptr) [[unlikely]] { Deleter{}(old_ptr); }
         }
@@ -286,15 +286,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::container
     template <typename T, typename... Args>
     [[nodiscard]] inline auto make_owned(Args&&... args) -> ::uwvm2::utils::container::owned_ptr<T>
     {
-        auto allocator{::uwvm2::utils::container::fast_io_global_std_allocator<T>{}};
-        auto* ptr{allocator.allocate(1)};
+        auto ptr{::fast_io::native_typed_global_allocator<T>::allocate(1)};
         try
         {
             ::std::construct_at(ptr, ::std::forward<Args>(args)...);
         }
         catch(...)
         {
-            allocator.deallocate(ptr, 1);
+            ::fast_io::native_typed_global_allocator<T>::deallocate(ptr);
             throw;
         }
         return ::uwvm2::utils::container::owned_ptr<T>{ptr};
