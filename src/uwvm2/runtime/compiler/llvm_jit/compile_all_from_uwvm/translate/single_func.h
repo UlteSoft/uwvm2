@@ -48,6 +48,7 @@ struct full_function_symbol_t
 struct compile_option
 {
     ::std::size_t curr_wasm_id{};
+    bool verify_llvm_jit_ir{true};
     bool route_wasm_calls_through_runtime_bridge{};
     ::std::uintptr_t lazy_defined_raw_call_target_base_address{};
     ::std::size_t lazy_defined_raw_call_target_count{};
@@ -557,6 +558,7 @@ namespace details
                                                       local_func_storage_t const& local_func_storage,
                                                       ::uwvm2::validation::error::code_validation_error_impl& err,
                                                       llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
+                                                      bool verify_llvm_jit_ir = true,
                                                       bool route_wasm_calls_through_runtime_bridge = false,
                                                       ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
@@ -814,6 +816,7 @@ namespace details
                 local_func_storage,
                 *emitted_llvm_jit_ir_storage,
                 llvm_jit_emit_state,
+                verify_llvm_jit_ir,
                 route_wasm_calls_through_runtime_bridge,
                 lazy_defined_raw_call_target_base_address,
                 lazy_defined_raw_call_target_count,
@@ -1119,6 +1122,7 @@ namespace details
             local_func_storage,
             err,
             emitted_llvm_jit_ir_storage,
+            options.verify_llvm_jit_ir,
             options.route_wasm_calls_through_runtime_bridge,
             options.lazy_defined_raw_call_target_base_address,
             options.lazy_defined_raw_call_target_count,

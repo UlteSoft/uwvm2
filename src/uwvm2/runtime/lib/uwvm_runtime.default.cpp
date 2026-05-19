@@ -1363,9 +1363,6 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            // Compile callees before their callers. This lets later callers fold
-            // already-materialized typed callees into direct function pointers.
-            ::std::reverse(out.begin(), out.end());
             return true;
         }
 

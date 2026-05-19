@@ -57,6 +57,16 @@ struct llvm_jit_memory_snapshot_values_t
     return !block->empty() && block->back().isTerminator();
 }
 
+[[nodiscard]] inline bool verify_llvm_jit_function(::llvm::Function& function, bool verify_llvm_jit_ir) noexcept
+{
+    return !verify_llvm_jit_ir || !::llvm::verifyFunction(function);
+}
+
+[[nodiscard]] inline bool verify_llvm_jit_module(::llvm::Module& module, bool verify_llvm_jit_ir) noexcept
+{
+    return !verify_llvm_jit_ir || !::llvm::verifyModule(module);
+}
+
 class raw_uwvm_string_ostream : public ::llvm::raw_ostream
 {
     ::uwvm2::utils::container::string& output;
@@ -2178,6 +2188,7 @@ struct llvm_jit_branch_target_t
 struct runtime_local_func_llvm_jit_emit_state_t
 {
     bool valid{};
+    bool verify_llvm_jit_ir{true};
     bool route_wasm_calls_through_runtime_bridge{};
     ::std::uintptr_t lazy_defined_raw_call_target_base_address{};
     ::std::size_t lazy_defined_raw_call_target_count{};
@@ -2219,6 +2230,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
 [[nodiscard]] inline bool try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage_t const& local_func_storage,
                                                                              llvm_jit_module_storage_t& module_storage,
                                                                              runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                             bool verify_llvm_jit_ir = true,
                                                                              bool route_wasm_calls_through_runtime_bridge = false,
                                                                              ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
                                                                              ::std::size_t lazy_defined_raw_call_target_count = 0uz,
@@ -2226,6 +2238,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                                              ::std::size_t lazy_defined_typed_entry_target_count = 0uz)
 {
     state = {};
+    state.verify_llvm_jit_ir = verify_llvm_jit_ir;
     state.route_wasm_calls_through_runtime_bridge = route_wasm_calls_through_runtime_bridge;
     state.lazy_defined_raw_call_target_base_address = lazy_defined_raw_call_target_base_address;
     state.lazy_defined_raw_call_target_count = lazy_defined_raw_call_target_count;
@@ -2525,14 +2538,14 @@ struct runtime_local_func_llvm_jit_emit_state_t
 
             raw_ir_builder.CreateRetVoid();
 
-            if(::llvm::verifyFunction(*raw_entry_function)) [[unlikely]] { return false; }
+            if(!verify_llvm_jit_function(*raw_entry_function, state.verify_llvm_jit_ir)) [[unlikely]] { return false; }
             return true;
         }};
 
     if(!emit_runtime_local_func_llvm_jit_raw_entry_wrapper()) [[unlikely]] { return false; }
 
-    if(::llvm::verifyFunction(*state.llvm_function)) [[unlikely]] { return false; }
-    if(::llvm::verifyModule(*state.llvm_module)) [[unlikely]] { return false; }
+    if(!verify_llvm_jit_function(*state.llvm_function, state.verify_llvm_jit_ir)) [[unlikely]] { return false; }
+    if(!verify_llvm_jit_module(*state.llvm_module, state.verify_llvm_jit_ir)) [[unlikely]] { return false; }
     return true;
 }
 
