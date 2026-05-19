@@ -195,6 +195,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         }
     };
 
+    inline void lazy_compile_notify_unit(lazy_compile_unit_state& unit) noexcept
+    {
+#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
+        unit.state.notify_all();
+#else
+        (void)unit;
+#endif
+    }
+
     struct lazy_compile_request
     {
         using compile_callback_type = void (*)(void*) noexcept;
@@ -523,11 +532,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
         inline void notify_unit(lazy_compile_unit_state& unit) noexcept
         {
-#if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
-            unit.state.notify_all();
-#else
-            (void)unit;
-#endif
+            lazy_compile_notify_unit(unit);
         }
 
         inline void mark_failed(lazy_compile_unit_state& unit) noexcept

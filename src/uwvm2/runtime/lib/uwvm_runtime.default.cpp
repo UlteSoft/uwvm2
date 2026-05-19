@@ -1363,9 +1363,6 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            // Compile callees before their callers. This lets later callers fold
-            // already-materialized typed callees into direct function pointers.
-            ::std::reverse(out.begin(), out.end());
             return true;
         }
 
@@ -1445,34 +1442,6 @@ namespace uwvm2::runtime::lib
 
             g_runtime.lazy_prefetch_lock.clear(::std::memory_order_release);
             return queued;
-        }
-
-        inline void prewarm_llvm_jit_lazy_entry_direct_graph(::std::size_t module_id, ::std::size_t entry_local_function_index) noexcept
-        {
-            constexpr ::std::size_t prewarm_budget{96uz};
-
-            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return; }
-            auto& rec{g_runtime.modules.index_unchecked(module_id)};
-            auto const runtime_module{rec.runtime_module};
-            if(runtime_module == nullptr) [[unlikely]] { return; }
-
-            ::uwvm2::utils::container::vector<::std::size_t> worklist{};
-            if(!collect_llvm_jit_lazy_entry_direct_graph_order(*runtime_module, entry_local_function_index, prewarm_budget, worklist)) { return; }
-
-            for(auto const local_index: worklist)
-            {
-                if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() ||
-                   local_index >= rec.llvm_jit_lazy_background_request_contexts.size())
-                    [[unlikely]]
-                {
-                    continue;
-                }
-
-                auto ctx{rec.llvm_jit_lazy_background_request_contexts.index_unchecked(local_index)};
-                auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 1u)};
-                if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { continue; }
-                if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]] { ::fast_io::fast_terminate(); }
-            }
         }
 
         [[nodiscard]] inline bool has_llvm_jit_lazy_background_work() noexcept
@@ -4067,7 +4036,7 @@ namespace uwvm2::runtime::lib
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                                 {
                                     target.entry_address = reinterpret_cast<::std::uintptr_t>(llvm_jit_raw_call_defined_entry);
-                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info);
+                                    target.context_address = reinterpret_cast<::std::uintptr_t>(defined_info->compiled_call_info);
                                 }
 # else
                                 {
@@ -4201,6 +4170,25 @@ namespace uwvm2::runtime::lib
                 }
             }
         }
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        [[nodiscard]] inline bool runtime_compiler_requests_uwvm_int_translation() noexcept
+        {
+            switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
+            {
+                case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
+                    return true;
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
+                    return true;
+# endif
+                [[unlikely]] default:
+                    return false;
+            }
+        }
+#else
+        [[nodiscard]] inline constexpr bool runtime_compiler_requests_uwvm_int_translation() noexcept { return false; }
+#endif
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline bool runtime_compiler_requests_llvm_jit_translation() noexcept
@@ -4942,8 +4930,12 @@ namespace uwvm2::runtime::lib
         inline void compile_all_modules_if_needed(bool initialize_interpreter_bridges) noexcept
         {
             ensure_runtime_process_exit_handler_registered();
+
+            auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
+            auto const compile_uwvm_int_translation{runtime_compiler_requests_uwvm_int_translation()};
+            auto const compile_llvm_jit_translation{runtime_compiler_requests_llvm_jit_translation()};
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-            if(initialize_interpreter_bridges) { ensure_bridges_initialized(); }
+            if(initialize_interpreter_bridges && compile_uwvm_int_translation) { ensure_bridges_initialized(); }
 #endif
             if(g_runtime.compiled_all.load(::std::memory_order_acquire)) { return; }
 
@@ -5037,8 +5029,6 @@ namespace uwvm2::runtime::lib
                                                                         runtime_compile_threads_policy == runtime_compile_threads_policy_t::aggressive};
             auto const adaptive_runtime_compile_threads_policy_active{default_runtime_compile_threads_policy_active ||
                                                                       aggressive_runtime_compile_threads_policy_active};
-            auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
-            auto const compile_llvm_jit_translation{runtime_compiler_requests_llvm_jit_translation()};
             ::uwvm2::utils::container::u8string_view const adaptive_runtime_compile_threads_policy_name{
                 aggressive_runtime_compile_threads_policy_active ? ::uwvm2::utils::container::u8string_view{u8"aggressive"}
                                                                  : ::uwvm2::utils::container::u8string_view{u8"default"}};
@@ -5230,6 +5220,9 @@ namespace uwvm2::runtime::lib
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
             {
+                ::uwvm2::utils::container::u8string_view const uwvm_int_translation_state{compile_uwvm_int_translation
+                                                                                              ? ::uwvm2::utils::container::u8string_view{u8"enabled"}
+                                                                                              : ::uwvm2::utils::container::u8string_view{u8"disabled"}};
                 ::uwvm2::utils::container::u8string_view const llvm_jit_translation_state{compile_llvm_jit_translation
                                                                                               ? ::uwvm2::utils::container::u8string_view{u8"enabled"}
                                                                                               : ::uwvm2::utils::container::u8string_view{u8"disabled"}};
@@ -5242,6 +5235,10 @@ namespace uwvm2::runtime::lib
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                     describe_runtime_compiler(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler),
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                    u8", uwvm-int-translation=",
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, compile_uwvm_int_translation ? UWVM_COLOR_U8_LT_GREEN : UWVM_COLOR_U8_YELLOW),
+                    uwvm_int_translation_state,
+                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                     u8", llvm-jit-translation=",
                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, compile_llvm_jit_translation ? UWVM_COLOR_U8_LT_GREEN : UWVM_COLOR_U8_YELLOW),
                     llvm_jit_translation_state,
@@ -5250,7 +5247,10 @@ namespace uwvm2::runtime::lib
 
                 if(compile_llvm_jit_translation)
                 {
-                    runtime_compile_threads_verbose_info(u8"LLVM JIT translation artifacts will also be generated during full translation. ");
+                    runtime_compile_threads_verbose_info(
+                        compile_uwvm_int_translation
+                            ? ::uwvm2::utils::container::u8string_view{u8"LLVM JIT translation artifacts will also be generated during full translation. "}
+                            : ::uwvm2::utils::container::u8string_view{u8"LLVM JIT full translation will be generated without uwvm-int full artifacts. "});
                     runtime_compile_threads_verbose_info(
                         u8"Current LLVM JIT translation parallelizes Wasm-to-LLVM IR emission across task modules and links them back into one module before optimization/materialization, so runtime compile-thread scheduling can also reduce LLVM translation time while keeping the final aggressive whole-module optimization path unchanged. ");
                 }
@@ -5420,28 +5420,31 @@ namespace uwvm2::runtime::lib
 #endif
                 {
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    if(compile_uwvm_int_translation)
                     {
-                        runtime_compile_threads_verbose_info(u8"Begin runtime full translation for module \"",
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                             rec.module_name,
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                             u8"\". ");
-                    }
-                    rec.compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm<kTranslateOpt>(
-                        *rec.runtime_module,
-                        opt,
-                        err,
-                        effective_module_extra_compile_threads,
-                        effective_compile_task_split_conf);
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            runtime_compile_threads_verbose_info(u8"Begin runtime full translation for module \"",
+                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                                 rec.module_name,
+                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                                 u8"\". ");
+                        }
+                        rec.compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm<kTranslateOpt>(
+                            *rec.runtime_module,
+                            opt,
+                            err,
+                            effective_module_extra_compile_threads,
+                            effective_compile_task_split_conf);
 
-                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                    {
-                        runtime_compile_threads_verbose_info(u8"Runtime full translation finished for module \"",
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                             rec.module_name,
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                             u8"\". ");
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            runtime_compile_threads_verbose_info(u8"Runtime full translation finished for module \"",
+                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                                 rec.module_name,
+                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                                 u8"\". ");
+                        }
                     }
 #endif
 
@@ -5494,7 +5497,11 @@ namespace uwvm2::runtime::lib
 
                 auto const local_n{rec.runtime_module->local_defined_function_vec_storage.size()};
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                if(local_n != rec.compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+                if(compile_uwvm_int_translation &&
+                   (local_n != rec.compiled.local_funcs.size() || local_n != rec.compiled.local_defined_call_info.size())) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
                 if(compile_llvm_jit_translation && local_n != rec.llvm_jit_compiled.local_funcs.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -5575,8 +5582,13 @@ namespace uwvm2::runtime::lib
                 {
                     auto const runtime_func{::std::addressof(rec.runtime_module->local_defined_function_vec_storage.index_unchecked(i))};
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-                    auto const compiled_call_info{::std::addressof(rec.compiled.local_defined_call_info.index_unchecked(i))};
-                    auto const compiled_func{::std::addressof(rec.compiled.local_funcs.index_unchecked(i))};
+                    ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const* compiled_call_info{};
+                    compiled_local_func_t const* compiled_func{};
+                    if(compile_uwvm_int_translation)
+                    {
+                        compiled_call_info = ::std::addressof(rec.compiled.local_defined_call_info.index_unchecked(i));
+                        compiled_func = ::std::addressof(rec.compiled.local_funcs.index_unchecked(i));
+                    }
 #endif
 
                     auto const sig{func_sig_from_defined(runtime_func)};
@@ -6434,11 +6446,6 @@ namespace uwvm2::runtime::lib
             }
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
-            if(g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
-            {
-                prewarm_llvm_jit_lazy_entry_direct_graph(g_runtime.lazy_prefetch_module_id, g_runtime.lazy_prefetch_local_function_index);
-            }
-
             auto const has_lazy_background_work{worker_count != 0uz && has_llvm_jit_lazy_background_work()};
             g_runtime.lazy_scheduler.start({.worker_count = has_lazy_background_work ? worker_count : 0uz,
                                             .queue_capacity = 0uz,
