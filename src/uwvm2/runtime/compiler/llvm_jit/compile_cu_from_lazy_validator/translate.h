@@ -203,7 +203,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         compile_option compile_options{};
         parser_module_storage_t const* validator_module_storage{};
         lazy_validation_mode validation_mode{lazy_validation_mode::validate_on_lazy_compile};
-        ::llvm::CodeGenOptLevel codegen_opt_level{::llvm::CodeGenOptLevel::None};
+        ::llvm::CodeGenOptLevel codegen_opt_level{::llvm::CodeGenOptLevel::Less};
     };
 
     struct lazy_compile_request_context
@@ -465,12 +465,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             return true;
         }
 
-        [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
+        [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module,
+                                                                ::llvm::TargetMachine& target_machine,
+                                                                ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
         {
-            static_cast<void>(target_machine);
             if(!all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir())) [[unlikely]] { return false; }
 
-            return true;
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
+
+            ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
+            function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
+            function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
+            function_pass_manager.add(::llvm::createEarlyCSEPass());
+            function_pass_manager.add(::llvm::createCFGSimplificationPass());
+            function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
+
+            function_pass_manager.doInitialization();
+            for(auto& function: module)
+            {
+                if(function.isDeclaration()) { continue; }
+                function_pass_manager.run(function);
+            }
+            function_pass_manager.doFinalization();
+
+            return all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir());
         }
 
         [[nodiscard]] inline ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
@@ -525,7 +543,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -606,7 +624,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -736,8 +754,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                    ::std::size_t entry_local_function_index,
                                                    ::uwvm2::utils::container::vector<::std::size_t>& out) noexcept
         {
-            constexpr ::std::size_t group_function_budget{128uz};
-            constexpr ::std::size_t group_code_size_budget{64uz * 1024uz};
+            constexpr ::std::size_t group_function_budget{16uz};
+            constexpr ::std::size_t group_code_size_budget{8uz * 1024uz};
             out.clear();
             if(entry_local_function_index >= storage.functions.size()) [[unlikely]] { return; }
 

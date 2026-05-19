@@ -1444,34 +1444,6 @@ namespace uwvm2::runtime::lib
             return queued;
         }
 
-        inline void prewarm_llvm_jit_lazy_entry_direct_graph(::std::size_t module_id, ::std::size_t entry_local_function_index) noexcept
-        {
-            constexpr ::std::size_t prewarm_budget{96uz};
-
-            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return; }
-            auto& rec{g_runtime.modules.index_unchecked(module_id)};
-            auto const runtime_module{rec.runtime_module};
-            if(runtime_module == nullptr) [[unlikely]] { return; }
-
-            ::uwvm2::utils::container::vector<::std::size_t> worklist{};
-            if(!collect_llvm_jit_lazy_entry_direct_graph_order(*runtime_module, entry_local_function_index, prewarm_budget, worklist)) { return; }
-
-            for(auto const local_index: worklist)
-            {
-                if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() ||
-                   local_index >= rec.llvm_jit_lazy_background_request_contexts.size())
-                    [[unlikely]]
-                {
-                    continue;
-                }
-
-                auto ctx{rec.llvm_jit_lazy_background_request_contexts.index_unchecked(local_index)};
-                auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 1u)};
-                if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { continue; }
-                if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]] { ::fast_io::fast_terminate(); }
-            }
-        }
-
         [[nodiscard]] inline bool has_llvm_jit_lazy_background_work() noexcept
         {
             for(auto const& rec: g_runtime.modules)
@@ -6474,11 +6446,6 @@ namespace uwvm2::runtime::lib
             }
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
-            if(g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
-            {
-                prewarm_llvm_jit_lazy_entry_direct_graph(g_runtime.lazy_prefetch_module_id, g_runtime.lazy_prefetch_local_function_index);
-            }
-
             auto const has_lazy_background_work{worker_count != 0uz && has_llvm_jit_lazy_background_work()};
             g_runtime.lazy_scheduler.start({.worker_count = has_lazy_background_work ? worker_count : 0uz,
                                             .queue_capacity = 0uz,
