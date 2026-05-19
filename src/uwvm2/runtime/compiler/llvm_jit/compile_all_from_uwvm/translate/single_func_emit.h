@@ -117,6 +117,24 @@ public:
     return ::llvm::ConstantExpr::getIntToPtr(host_address_value, pointer_type);
 }
 
+[[nodiscard]] inline ::llvm::AllocaInst* create_llvm_jit_entry_block_alloca(::llvm::IRBuilder<>& ir_builder,
+                                                                            ::llvm::Type* allocated_type,
+                                                                            ::llvm::Value* array_size,
+                                                                            char const* name)
+{
+    if(allocated_type == nullptr) [[unlikely]] { return nullptr; }
+
+    auto current_block{ir_builder.GetInsertBlock()};
+    if(current_block == nullptr) [[unlikely]] { return nullptr; }
+
+    auto current_function{current_block->getParent()};
+    if(current_function == nullptr || current_function->empty()) [[unlikely]] { return nullptr; }
+
+    auto& entry_block{current_function->getEntryBlock()};
+    ::llvm::IRBuilder<> entry_builder{&entry_block, entry_block.getFirstInsertionPt()};
+    return entry_builder.CreateAlloca(allocated_type, array_size, name);
+}
+
 [[nodiscard]] inline constexpr ::llvm::CallingConv::ID get_llvm_jit_host_calling_conv() noexcept
 {
 #if defined(_WIN64) && (defined(__x86_64__) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC)) && !defined(__CYGWIN__)
@@ -808,7 +826,11 @@ struct runtime_direct_callee_resolution_t
     ::llvm::Value* param_buffer_address{::llvm::ConstantInt::get(llvm_intptr_type, 0u)};
     if(abi_layout.parameter_bytes != 0uz)
     {
-        auto param_buffer{ir_builder.CreateAlloca(llvm_i8_type, ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes), param_buffer_name)};
+        auto param_buffer{create_llvm_jit_entry_block_alloca(ir_builder,
+                                                             llvm_i8_type,
+                                                             ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.parameter_bytes),
+                                                             param_buffer_name)};
+        if(param_buffer == nullptr) [[unlikely]] { return {}; }
 
         ::std::size_t parameter_offset{};
         for(::std::size_t parameter_index{}; parameter_index != abi_layout.parameter_count; ++parameter_index)
@@ -832,7 +854,8 @@ struct runtime_direct_callee_resolution_t
     {
         auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
         if(llvm_result_type == nullptr) [[unlikely]] { return {}; }
-        result_buffer = ir_builder.CreateAlloca(llvm_result_type, nullptr, result_buffer_name);
+        result_buffer = create_llvm_jit_entry_block_alloca(ir_builder, llvm_result_type, nullptr, result_buffer_name);
+        if(result_buffer == nullptr) [[unlikely]] { return {}; }
         result_buffer_address = ir_builder.CreatePtrToInt(result_buffer, llvm_intptr_type);
     }
 
@@ -4225,8 +4248,9 @@ template <typename CreateValue>
             if(!ensure_memory0_access_info() || memory0_access_info.local_imported_module_ptr == nullptr) [[unlikely]] { return result; }
 
             auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
-            auto memory_begin_slot{ir_builder.CreateAlloca(llvm_intptr_type, nullptr, "local_imported.memory.begin.addr.slot")};
-            auto byte_length_slot{ir_builder.CreateAlloca(llvm_intptr_type, nullptr, "local_imported.memory.byte_length.slot")};
+            auto memory_begin_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, "local_imported.memory.begin.addr.slot")};
+            auto byte_length_slot{create_llvm_jit_entry_block_alloca(ir_builder, llvm_intptr_type, nullptr, "local_imported.memory.byte_length.slot")};
+            if(memory_begin_slot == nullptr || byte_length_slot == nullptr) [[unlikely]] { return result; }
             auto bridge_function_type{::llvm::FunctionType::get(
                 ::llvm::Type::getInt1Ty(llvm_context),
                 {llvm_intptr_type, llvm_intptr_type, get_llvm_pointer_type(llvm_intptr_type), get_llvm_pointer_type(llvm_intptr_type)},
