@@ -189,7 +189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                             u8"    - LLVM Version: Unknown\n"
 #endif
-                            u8"\n");
+        );
     }
 #endif
 

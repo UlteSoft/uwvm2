@@ -14,7 +14,7 @@ Each entry here is intentionally short. Follow the file link for the full behavi
 | Parser lifecycle, `--run`, duplicate handling, negative values, host path classes, symlink-follow behavior, Windows NT `::NT::`, Win32 paths, UNC paths, WSL provider paths, and DOS path forms. | [parsing-and-paths.md](command-line/parsing-and-paths.md) |
 | Global and debug commands: `--help`, `--mode`, `--run`, `--version`, and debug-only `--debug-test`. | [global-debug.md](command-line/global-debug.md) |
 | WebAssembly commands: module loading, preloaded Wasm modules, native preload DLs, import binding rewrites, weak symbols, parser/initializer limits, memory limits, preload memory attributes, and strict memory growth. | [wasm.md](command-line/wasm.md) |
-| Runtime commands: runtime mode/compiler selection, shortcut conflicts, compile-thread policies, scheduling, and compiler logs. | [runtime.md](command-line/runtime.md) |
+| Runtime commands: runtime mode/compiler selection, shortcut conflicts, LLVM IR verifier control, compile-thread policies, scheduling, and compiler logs. | [runtime.md](command-line/runtime.md) |
 | Logging commands: output routing, warning category enable/disable/fatal conversion, verbose mode, and Windows ANSI mode. | [logging.md](command-line/logging.md) |
 | WASI commands: UTF-8 relaxation, WASI Preview 1 global/single/group targets, environment rules, mounts, trace output, sockets, target overrides, and initialization order. | [wasi.md](command-line/wasi.md) |
 

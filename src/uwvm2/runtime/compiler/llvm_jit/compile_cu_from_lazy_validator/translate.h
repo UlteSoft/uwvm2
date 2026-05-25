@@ -234,15 +234,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         namespace all_compile = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm;
         namespace all_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
-        [[nodiscard]] inline constexpr bool should_verify_lazy_llvm_jit_ir() noexcept
-        {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            return true;
-#else
-            return false;
-#endif
-        }
-
         struct llvm_jit_native_target_config
         {
             ::uwvm2::utils::container::string cpu_name{};
@@ -467,9 +458,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module,
                                                                 ::llvm::TargetMachine& target_machine,
-                                                                ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+                                                                ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                                bool verify_llvm_jit_ir) noexcept
         {
-            if(!all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir())) [[unlikely]] { return false; }
+            if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
 
@@ -488,7 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
             function_pass_manager.doFinalization();
 
-            return all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir());
+            return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
         }
 
         [[nodiscard]] inline ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
@@ -543,7 +535,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module,
+                                              *target_machine,
+                                              options.codegen_opt_level,
+                                              options.compile_options.verify_llvm_jit_ir))
+                [[unlikely]]
+            {
+                return false;
+            }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -624,7 +623,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module,
+                                              *target_machine,
+                                              options.codegen_opt_level,
+                                              options.compile_options.verify_llvm_jit_ir))
+                [[unlikely]]
+            {
+                return false;
+            }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -896,7 +902,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
 
             compile_option emit_options{options.compile_options};
-            emit_options.verify_llvm_jit_ir = should_verify_lazy_llvm_jit_ir();
             emit_options.route_wasm_calls_through_runtime_bridge = true;
             for(auto const local_function_index: claimed_group)
             {
@@ -956,7 +961,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
 
             compile_option emit_options{options.compile_options};
-            emit_options.verify_llvm_jit_ir = should_verify_lazy_llvm_jit_ir();
             emit_options.route_wasm_calls_through_runtime_bridge = true;
             materialized.local_func = all_details::compile_all_from_uwvm_local_func(
                 curr_module,
@@ -987,6 +991,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             ::uwvm2::validation::error::code_validation_error_impl local_err{};
             auto& err{ctx->err == nullptr ? local_err : *ctx->err};
+            ::fast_io::unix_timestamp compile_start_time{};
+            if(lazy_runtime_log::enabled()) [[unlikely]]
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    // do nothing
+                }
+# endif
+            }
 
             lazy_runtime_log::line(u8"compile-start module=\"",
                                    ctx->module_name,
@@ -1016,6 +1036,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                   err,
                                                   ctx->publish_materialized_function,
                                                   ctx->publish_user_data);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(lazy_runtime_log::enabled()) [[unlikely]]
+                {
+# ifdef UWVM_CPP_EXCEPTIONS
+                    try
+# endif
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+# ifdef UWVM_CPP_EXCEPTIONS
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+# endif
+                }
                 lazy_runtime_log::line(u8"compile-end module=\"",
                                        ctx->module_name,
                                        u8"\" module_id=",
@@ -1027,12 +1063,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                        u8" cu=",
                                        ctx->compile_unit_index,
                                        u8" state=",
-                                       compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)));
+                                       compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)),
+                                       u8" time=",
+                                       compile_end_time - compile_start_time);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
             {
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::failed);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(lazy_runtime_log::enabled()) [[unlikely]]
+                {
+                    try
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+                }
                 lazy_runtime_log::line(u8"compile-end module=\"",
                                        ctx->module_name,
                                        u8"\" module_id=",
@@ -1043,7 +1093,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                        fn.function_index,
                                        u8" cu=",
                                        ctx->compile_unit_index,
-                                       u8" state=failed");
+                                       u8" state=failed time=",
+                                       compile_end_time - compile_start_time);
             }
 # endif
         }
@@ -1089,6 +1140,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        ::fast_io::unix_timestamp compile_start_time{};
+        if(lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
 
         auto& cu{storage.compile_units.index_unchecked(compile_unit_index)};
         if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1152,6 +1219,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         details::compile_lazy_local_function_group(curr_module, storage, options, cu.local_function_index, err);
+        ::fast_io::unix_timestamp compile_end_time{};
+        if(lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
         lazy_runtime_log::line(u8"compile-cu-end module_id=",
                                options.compile_options.curr_wasm_id,
                                u8" local_fn=",
@@ -1159,7 +1242,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                u8" cu=",
                                compile_unit_index,
                                u8" state=",
-                               compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)));
+                               compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)),
+                               u8" time=",
+                               compile_end_time - compile_start_time);
     }
 
     [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context& ctx,

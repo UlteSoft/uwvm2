@@ -20,6 +20,7 @@ Source focus:
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
 | `--runtime-aot` | `-Raot` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: full compilation with LLVM JIT. |
 | `--runtime-compiler-log` | `-Rclog` | `[out|err|file <file:path>]` | Once | Runtime backend support | Route runtime compiler logs. |
+| `--runtime-disable-llvm-ir-verifaction` | None | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
 
@@ -134,6 +135,29 @@ Behavior:
 - Open failure is a command-line error.
 
 This log is for runtime compiler internals. It is separate from main diagnostics configured by `--log-output`.
+
+## `--runtime-disable-llvm-ir-verifaction`
+
+Behavior:
+
+- LLVM IR verification is enabled by default for LLVM-JIT runtime compilation.
+- This command disables the LLVM IR verifier for LLVM-JIT full, lazy, and tiered runtime paths.
+- It has no alias.
+- It has an `is_exist` guard.
+- It is compiled only when `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` is enabled.
+- It does not disable Wasm validation or lazy full-code verification selected by `--runtime-custom-mode lazy+verification`.
+
+Failure model when verification is enabled:
+
+- LLVM verifier failure means UWVM2 generated invalid LLVM IR.
+- UWVM2 treats that as an internal UWVM2 bug, not as a guest Wasm validation error.
+- Debug builds with detailed debug checks call the debug bug trap before termination; release builds terminate.
+
+Example:
+
+```bash
+uwvm --runtime-aot --runtime-disable-llvm-ir-verifaction --run app.wasm
+```
 
 ## `--runtime-compile-threads`
 
@@ -252,5 +276,15 @@ uwvm \
   --log-output file uwvm.log \
   --runtime-compiler-log file compiler.log \
   --runtime-aot \
+  --run app.wasm
+```
+
+LLVM JIT without LLVM IR verification:
+
+```bash
+uwvm \
+  --runtime-custom-mode full \
+  --runtime-custom-compiler jit \
+  --runtime-disable-llvm-ir-verifaction \
   --run app.wasm
 ```

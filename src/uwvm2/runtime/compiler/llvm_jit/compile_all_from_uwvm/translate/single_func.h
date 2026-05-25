@@ -45,10 +45,14 @@ struct full_function_symbol_t
     ::std::size_t operand_stack_byte_max{};
 };
 
+inline constexpr bool default_verify_llvm_jit_ir{
+    true
+};
+
 struct compile_option
 {
     ::std::size_t curr_wasm_id{};
-    bool verify_llvm_jit_ir{true};
+    bool verify_llvm_jit_ir{default_verify_llvm_jit_ir};
     bool route_wasm_calls_through_runtime_bridge{};
     ::std::uintptr_t lazy_defined_raw_call_target_base_address{};
     ::std::size_t lazy_defined_raw_call_target_count{};
@@ -558,7 +562,7 @@ namespace details
                                                       local_func_storage_t const& local_func_storage,
                                                       ::uwvm2::validation::error::code_validation_error_impl& err,
                                                       llvm_jit_module_storage_t* emitted_llvm_jit_ir_storage = nullptr,
-                                                      bool verify_llvm_jit_ir = true,
+                                                      bool verify_llvm_jit_ir = default_verify_llvm_jit_ir,
                                                       bool route_wasm_calls_through_runtime_bridge = false,
                                                       ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
@@ -1253,6 +1257,20 @@ namespace details
         return true;
     }
 
+    inline bool finalize_runtime_llvm_jit_module_storage(llvm_jit_module_storage_t& module_storage, bool verify_llvm_jit_ir) noexcept
+    {
+        module_storage.emitted = module_storage.llvm_context_holder != nullptr && module_storage.llvm_module != nullptr;
+        if(!module_storage.emitted) { return true; }
+
+        if(!verify_llvm_jit_module(*module_storage.llvm_module, verify_llvm_jit_ir)) [[unlikely]]
+        {
+            module_storage = {};
+            return false;
+        }
+
+        return true;
+    }
+
     inline constexpr void validate_runtime_module_all_local_funcs(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
                                                                   ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
@@ -1557,7 +1575,7 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
                                                                                                                                storage.llvm_jit_module)
                                                                                                                          : nullptr);
             }
-            storage.llvm_jit_module.emitted = storage.llvm_jit_module.llvm_context_holder != nullptr && storage.llvm_jit_module.llvm_module != nullptr;
+            static_cast<void>(details::finalize_runtime_llvm_jit_module_storage(storage.llvm_jit_module, options.verify_llvm_jit_ir));
         }};
 
     if(details::should_run_local_functions_serially(curr_module, split_config, extra_compile_threads))
@@ -1634,7 +1652,11 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
         return storage;
     }
 
-    storage.llvm_jit_module.emitted = storage.llvm_jit_module.llvm_context_holder != nullptr && storage.llvm_jit_module.llvm_module != nullptr;
+    if(!details::finalize_runtime_llvm_jit_module_storage(storage.llvm_jit_module, options.verify_llvm_jit_ir))
+    {
+        compile_local_functions_serially();
+        return storage;
+    }
 
     return storage;
 }
@@ -1655,6 +1677,6 @@ inline full_function_symbol_t compile_all_from_uwvm_single_func(::uwvm2::uwvm::r
                                                                             0uz,
                                                                             err,
                                                                             emit_llvm_jit_active ? ::std::addressof(storage.llvm_jit_module) : nullptr));
-    storage.llvm_jit_module.emitted = storage.llvm_jit_module.llvm_context_holder != nullptr && storage.llvm_jit_module.llvm_module != nullptr;
+    static_cast<void>(details::finalize_runtime_llvm_jit_module_storage(storage.llvm_jit_module, options.verify_llvm_jit_ir));
     return storage;
 }
