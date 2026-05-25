@@ -549,6 +549,72 @@ for _, file in ipairs(os.files("test/**.cc")) do
 					before_build(function(target)
 						local utility = import("utility.utility", { anonymous = true })
 						local require_static_wabt = utility.is_static_non_system_mode()
+						local llvm_jit_options = utility.get_llvm_jit_options()
+
+						local function append_unique(values, seen, value)
+							if not value or value == "" or seen[value] then
+								return
+							end
+
+							seen[value] = true
+							table.insert(values, value)
+						end
+
+						local function append_cmake_cache_value(cache_values, line)
+							local key, value = line:match("^([%w_]+):[^=]*=(.*)$")
+							if key and value then
+								cache_values[key] = value
+							end
+						end
+
+						local function read_cmake_cache(cache_file)
+							if not os.isfile(cache_file) then
+								return {}
+							end
+
+							local cache_values = {}
+							local cache_text = io.readfile(cache_file) or ""
+							cache_text = cache_text:gsub("\r\n", "\n")
+							for line in (cache_text .. "\n"):gmatch("(.-)\n") do
+								append_cmake_cache_value(cache_values, line)
+							end
+							return cache_values
+						end
+
+						local function wabt_uses_compatible_llvm_abi(wabt_root)
+							local wabt_build = path.join(wabt_root, "build")
+							local cache_values = read_cmake_cache(path.join(wabt_build, "CMakeCache.txt"))
+							if cache_values["CMAKE_CXX_COMPILER"] == nil and cache_values["CMAKE_CXX_FLAGS"] == nil then
+								return false
+							end
+
+							local expected_cxx = target:tool("cxx")
+							local actual_cxx = cache_values["CMAKE_CXX_COMPILER"]
+							if not expected_cxx or not actual_cxx then
+								return false
+							end
+
+							if path.normalize(expected_cxx) ~= path.normalize(actual_cxx) then
+								return false
+							end
+
+							local expected_stdlib = nil
+							for _, flag in ipairs(llvm_jit_options.cxxflags or {}) do
+								if flag:startswith("-stdlib=") then
+									expected_stdlib = flag
+									break
+								end
+							end
+
+							if expected_stdlib then
+								local actual_cxx_flags = cache_values["CMAKE_CXX_FLAGS"] or ""
+								if actual_cxx_flags:find(expected_stdlib, 1, true) == nil then
+									return false
+								end
+							end
+
+							return true
+						end
 
 						local function wabt_uses_external_crypto(wabt_config)
 							if not os.isfile(wabt_config) then
@@ -567,7 +633,111 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							local has_lib = has_static_lib or
 								(not require_static_wabt and (os.isfile(path.join(wabt_build, "libwabt.so")) or os.isfile(path.join(wabt_build, "libwabt.dylib"))))
 
-							return os.isdir(wabt_include) and os.isfile(wabt_config) and has_lib and not wabt_uses_external_crypto(wabt_config)
+							return os.isdir(wabt_include)
+								and os.isfile(wabt_config)
+								and has_lib
+								and not wabt_uses_external_crypto(wabt_config)
+								and wabt_uses_compatible_llvm_abi(wabt_root)
+						end
+
+						local function make_wabt_cmake_args(wabt_root)
+							local build_dir = path.join(wabt_root, "build")
+							local cmake_args = {
+								"-S", wabt_root,
+								"-B", build_dir,
+								"-DCMAKE_BUILD_TYPE=Release",
+								"-DBUILD_TESTS=OFF",
+								"-DBUILD_TOOLS=OFF",
+								"-DBUILD_LIBWASM=OFF",
+								"-DUSE_INTERNAL_SHA256=ON",
+								"-DHAVE_OPENSSL_SHA_H=OFF"
+							}
+
+							local cc = target:tool("cc")
+							local cxx = target:tool("cxx")
+							if cc then
+								table.insert(cmake_args, "-DCMAKE_C_COMPILER=" .. cc)
+							end
+							if cxx then
+								table.insert(cmake_args, "-DCMAKE_CXX_COMPILER=" .. cxx)
+							end
+
+							local cflags = {}
+							local cflags_seen = {}
+							local cxxflags = {}
+							local cxxflags_seen = {}
+							local linkerflags = {}
+							local linkerflags_seen = {}
+
+							local function append_common_compile_flag(flag)
+								append_unique(cflags, cflags_seen, flag)
+								append_unique(cxxflags, cxxflags_seen, flag)
+							end
+
+							local function append_cxx_system_include(dir)
+								if not dir or dir == "" then
+									return
+								end
+
+								table.insert(cxxflags, "-isystem")
+								table.insert(cxxflags, dir)
+							end
+
+							local sysroot_para = get_config("sysroot")
+							if sysroot_para ~= "detect" and sysroot_para then
+								local sysroot_flag = "--sysroot=" .. sysroot_para
+								append_common_compile_flag(sysroot_flag)
+								append_unique(linkerflags, linkerflags_seen, sysroot_flag)
+							end
+
+							local target_para = get_config("target")
+							if target_para ~= "detect" and target_para then
+								local target_flag = "--target=" .. target_para
+								append_common_compile_flag(target_flag)
+								append_unique(linkerflags, linkerflags_seen, target_flag)
+							end
+
+							local llvm_target = get_config("llvm-target")
+							if llvm_target ~= "detect" and llvm_target then
+								local llvm_target_flag = "--target=" .. llvm_target
+								append_common_compile_flag(llvm_target_flag)
+								append_unique(linkerflags, linkerflags_seen, llvm_target_flag)
+							end
+
+							for _, include_dir in ipairs(llvm_jit_options.sysincludedirs or {}) do
+								append_cxx_system_include(include_dir)
+							end
+
+							for _, flag in ipairs(llvm_jit_options.cxxflags or {}) do
+								append_unique(cxxflags, cxxflags_seen, flag)
+							end
+
+							if target:is_plat("linux") then
+								append_unique(linkerflags, linkerflags_seen, "-fuse-ld=lld")
+							end
+							for _, linkdir in ipairs(llvm_jit_options.linkdirs or {}) do
+								append_unique(linkerflags, linkerflags_seen, "-L" .. linkdir)
+							end
+							for _, flag in ipairs(llvm_jit_options.ldflags or {}) do
+								append_unique(linkerflags, linkerflags_seen, flag)
+							end
+							for _, syslink in ipairs(llvm_jit_options.syslinks or {}) do
+								append_unique(linkerflags, linkerflags_seen, "-l" .. syslink)
+							end
+
+							if #cflags ~= 0 then
+								table.insert(cmake_args, "-DCMAKE_C_FLAGS=" .. os.args(cflags))
+							end
+							if #cxxflags ~= 0 then
+								table.insert(cmake_args, "-DCMAKE_CXX_FLAGS=" .. os.args(cxxflags))
+							end
+							if #linkerflags ~= 0 then
+								local linkerflags_str = os.args(linkerflags)
+								table.insert(cmake_args, "-DCMAKE_EXE_LINKER_FLAGS=" .. linkerflags_str)
+								table.insert(cmake_args, "-DCMAKE_SHARED_LINKER_FLAGS=" .. linkerflags_str)
+							end
+
+							return cmake_args
 						end
 
 						if not (has_wabt("build/test/third-parties/wabt") or has_wabt("wabt")) then
@@ -594,10 +764,11 @@ for _, file in ipairs(os.files("test/**.cc")) do
 							if os.isdir(wabt_root) then
 								print("wabt is required for " .. target:name() .. " but no built artifacts were found. Building wabt...")
 								local build_dir = path.join(wabt_root, "build")
+								os.tryrm(build_dir)
 								-- Build WABT in Release so libwabt is compiled with NDEBUG and won't abort on debug assertions
 								-- when fed malformed inputs (important for fuzzing/differential validation).
 								-- Use WABT's internal SHA-256 implementation so Darwin cross sysroots do not need OpenSSL libcrypto.
-								os.vrunv("cmake", {"-S", wabt_root, "-B", build_dir, "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTS=OFF", "-DBUILD_TOOLS=OFF", "-DBUILD_LIBWASM=OFF", "-DUSE_INTERNAL_SHA256=ON", "-DHAVE_OPENSSL_SHA_H=OFF"})
+								os.vrunv("cmake", make_wabt_cmake_args(wabt_root))
 								os.vrunv("cmake", {"--build", build_dir, "--target", "wabt", "--config", "Release"})
 							else
 								raise("wabt is required for " .. target:name() .. " but neither source nor built artifacts were found.")
