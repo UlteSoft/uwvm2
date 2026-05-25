@@ -4272,9 +4272,21 @@ namespace uwvm2::runtime::lib
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
         }
 
+        [[nodiscard]] inline constexpr bool should_verify_runtime_llvm_jit_ir() noexcept
+        {
+#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+            return true;
+#else
+            return false;
+#endif
+        }
+
         [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
         {
-            if(::llvm::verifyModule(module)) [[unlikely]] { return false; }
+            if constexpr(should_verify_runtime_llvm_jit_ir())
+            {
+                if(::llvm::verifyModule(module)) [[unlikely]] { return false; }
+            }
 
             ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
             function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
@@ -4295,7 +4307,8 @@ namespace uwvm2::runtime::lib
             }
             function_pass_manager.doFinalization();
 
-            return !::llvm::verifyModule(module);
+            if constexpr(should_verify_runtime_llvm_jit_ir()) { return !::llvm::verifyModule(module); }
+            return true;
         }
 
         [[nodiscard]] inline bool try_materialize_runtime_module_llvm_jit(compiled_module_record& rec) noexcept
