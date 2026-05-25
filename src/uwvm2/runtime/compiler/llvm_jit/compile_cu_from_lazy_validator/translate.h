@@ -987,6 +987,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             ::uwvm2::validation::error::code_validation_error_impl local_err{};
             auto& err{ctx->err == nullptr ? local_err : *ctx->err};
+            ::fast_io::unix_timestamp compile_start_time{};
+            if(lazy_runtime_log::enabled()) [[unlikely]]
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    // do nothing
+                }
+# endif
+            }
 
             lazy_runtime_log::line(u8"compile-start module=\"",
                                    ctx->module_name,
@@ -1016,6 +1032,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                   err,
                                                   ctx->publish_materialized_function,
                                                   ctx->publish_user_data);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(lazy_runtime_log::enabled()) [[unlikely]]
+                {
+# ifdef UWVM_CPP_EXCEPTIONS
+                    try
+# endif
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+# ifdef UWVM_CPP_EXCEPTIONS
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+# endif
+                }
                 lazy_runtime_log::line(u8"compile-end module=\"",
                                        ctx->module_name,
                                        u8"\" module_id=",
@@ -1027,12 +1059,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                        u8" cu=",
                                        ctx->compile_unit_index,
                                        u8" state=",
-                                       compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)));
+                                       compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)),
+                                       u8" time=",
+                                       compile_end_time - compile_start_time);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
             {
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::failed);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(lazy_runtime_log::enabled()) [[unlikely]]
+                {
+                    try
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+                }
                 lazy_runtime_log::line(u8"compile-end module=\"",
                                        ctx->module_name,
                                        u8"\" module_id=",
@@ -1043,7 +1089,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                        fn.function_index,
                                        u8" cu=",
                                        ctx->compile_unit_index,
-                                       u8" state=failed");
+                                       u8" state=failed time=",
+                                       compile_end_time - compile_start_time);
             }
 # endif
         }
@@ -1089,6 +1136,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        ::fast_io::unix_timestamp compile_start_time{};
+        if(lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
 
         auto& cu{storage.compile_units.index_unchecked(compile_unit_index)};
         if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1152,6 +1215,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         details::compile_lazy_local_function_group(curr_module, storage, options, cu.local_function_index, err);
+        ::fast_io::unix_timestamp compile_end_time{};
+        if(lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
         lazy_runtime_log::line(u8"compile-cu-end module_id=",
                                options.compile_options.curr_wasm_id,
                                u8" local_fn=",
@@ -1159,7 +1238,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                u8" cu=",
                                compile_unit_index,
                                u8" state=",
-                               compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)));
+                               compile_state_name(fn.materialization_state.state.load(::std::memory_order_acquire)),
+                               u8" time=",
+                               compile_end_time - compile_start_time);
     }
 
     [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context& ctx,

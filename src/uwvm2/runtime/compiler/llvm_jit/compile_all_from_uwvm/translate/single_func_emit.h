@@ -59,12 +59,16 @@ struct llvm_jit_memory_snapshot_values_t
 
 [[nodiscard]] inline bool verify_llvm_jit_function(::llvm::Function& function, bool verify_llvm_jit_ir) noexcept
 {
-    return !verify_llvm_jit_ir || !::llvm::verifyFunction(function);
+    if(!verify_llvm_jit_ir) { return true; }
+    if(!::llvm::verifyFunction(function)) [[likely]] { return true; }
+    runtime_storage_bug();
 }
 
 [[nodiscard]] inline bool verify_llvm_jit_module(::llvm::Module& module, bool verify_llvm_jit_ir) noexcept
 {
-    return !verify_llvm_jit_ir || !::llvm::verifyModule(module);
+    if(!verify_llvm_jit_ir) { return true; }
+    if(!::llvm::verifyModule(module)) [[likely]] { return true; }
+    runtime_storage_bug();
 }
 
 class raw_uwvm_string_ostream : public ::llvm::raw_ostream

@@ -850,6 +850,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
             ::uwvm2::validation::error::code_validation_error_impl local_err{};
             auto& err{ctx->err == nullptr ? local_err : *ctx->err};
+            ::fast_io::unix_timestamp compile_start_time{};
+            if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
+            {
+# ifdef UWVM_CPP_EXCEPTIONS
+                try
+# endif
+                {
+                    compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                }
+# ifdef UWVM_CPP_EXCEPTIONS
+                catch(::fast_io::error)
+                {
+                    // do nothing
+                }
+# endif
+            }
 
             ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-start module=\"",
                                                           ctx->module_name,
@@ -880,6 +896,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             {
                 compile_lazy_local_function<CompileOption>(*ctx->curr_module, storage, ctx->options, cu.local_function_index, err);
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
+                {
+# ifdef UWVM_CPP_EXCEPTIONS
+                    try
+# endif
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+# ifdef UWVM_CPP_EXCEPTIONS
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+# endif
+                }
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-end module=\"",
                                                               ctx->module_name,
                                                               u8"\" module_id=",
@@ -893,12 +925,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                               u8" state=compiled cu_count=",
                                                               fn.cu_count,
                                                               u8" eu_count=",
-                                                              fn.eu_count);
+                                                              fn.eu_count,
+                                                              u8" time=",
+                                                              compile_end_time - compile_start_time);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
             {
                 mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::failed);
+                ::fast_io::unix_timestamp compile_end_time{};
+                if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
+                {
+                    try
+                    {
+                        compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+                }
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-end module=\"",
                                                               ctx->module_name,
                                                               u8"\" module_id=",
@@ -909,7 +955,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                               fn.function_index,
                                                               u8" cu=",
                                                               ctx->compile_unit_index,
-                                                              u8" state=failed");
+                                                              u8" state=failed time=",
+                                                              compile_end_time - compile_start_time);
             }
 # endif
         }
@@ -947,6 +994,22 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                ::uwvm2::validation::error::code_validation_error_impl& err) UWVM_THROWS
     {
         if(compile_unit_index >= storage.compile_units.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        ::fast_io::unix_timestamp compile_start_time{};
+        if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_start_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
 
         auto& cu{storage.compile_units.index_unchecked(compile_unit_index)};
         if(cu.local_function_index >= storage.functions.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1024,13 +1087,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 
         details::compile_lazy_local_function<CompileOption>(curr_module, storage, options, cu.local_function_index, err);
         details::mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
+        ::fast_io::unix_timestamp compile_end_time{};
+        if(::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::enabled()) [[unlikely]]
+        {
+# ifdef UWVM_CPP_EXCEPTIONS
+            try
+# endif
+            {
+                compile_end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+            }
+# ifdef UWVM_CPP_EXCEPTIONS
+            catch(::fast_io::error)
+            {
+                // do nothing
+            }
+# endif
+        }
         ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-end module_id=",
                                                       options.compile_options.curr_wasm_id,
                                                       u8" local_fn=",
                                                       cu.local_function_index,
                                                       u8" cu=",
                                                       compile_unit_index,
-                                                      u8" state=compiled");
+                                                      u8" state=compiled time=",
+                                                      compile_end_time - compile_start_time);
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
