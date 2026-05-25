@@ -4272,18 +4272,11 @@ namespace uwvm2::runtime::lib
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
         }
 
-        [[nodiscard]] inline constexpr bool should_verify_runtime_llvm_jit_ir() noexcept
+        [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module,
+                                                                   ::llvm::TargetMachine& target_machine,
+                                                                   bool verify_llvm_jit_ir) noexcept
         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            return true;
-#else
-            return false;
-#endif
-        }
-
-        [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module, ::llvm::TargetMachine& target_machine) noexcept
-        {
-            if constexpr(should_verify_runtime_llvm_jit_ir())
+            if(verify_llvm_jit_ir)
             {
                 if(::llvm::verifyModule(module)) [[unlikely]]
                 {
@@ -4313,7 +4306,7 @@ namespace uwvm2::runtime::lib
             }
             function_pass_manager.doFinalization();
 
-            if constexpr(should_verify_runtime_llvm_jit_ir())
+            if(verify_llvm_jit_ir)
             {
                 if(::llvm::verifyModule(module)) [[unlikely]]
                 {
@@ -4446,7 +4439,10 @@ namespace uwvm2::runtime::lib
             merged_module->setDataLayout(target_machine->createDataLayout());
             auto const optimize_start_time{llvm_jit_materialize_runtime_log_now()};
             llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"", rec.module_name, u8"\"");
-            if(!optimize_runtime_llvm_jit_module(*merged_module, *target_machine)) [[unlikely]]
+            if(!optimize_runtime_llvm_jit_module(*merged_module,
+                                                 *target_machine,
+                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction))
+                [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
@@ -5561,6 +5557,7 @@ namespace uwvm2::runtime::lib
                         }
                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option llvm_jit_opt{};
                         llvm_jit_opt.curr_wasm_id = module_id;
+                        llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction;
                         auto const llvm_jit_translation_start_time{runtime_compile_threads_verbose_now()};
                         rec.llvm_jit_compiled = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_all_from_uwvm(
                             *rec.runtime_module,
@@ -6282,6 +6279,7 @@ namespace uwvm2::runtime::lib
 
                 ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option opt{};
                 opt.curr_wasm_id = module_id;
+                opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction;
 
                 rec.llvm_jit_lazy_compile_options.compile_options = opt;
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;

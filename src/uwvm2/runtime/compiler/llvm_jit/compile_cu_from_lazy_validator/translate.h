@@ -234,15 +234,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         namespace all_compile = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm;
         namespace all_details = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details;
 
-        [[nodiscard]] inline constexpr bool should_verify_lazy_llvm_jit_ir() noexcept
-        {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-            return true;
-#else
-            return false;
-#endif
-        }
-
         struct llvm_jit_native_target_config
         {
             ::uwvm2::utils::container::string cpu_name{};
@@ -467,9 +458,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline bool optimize_lazy_llvm_jit_module(::llvm::Module& module,
                                                                 ::llvm::TargetMachine& target_machine,
-                                                                ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+                                                                ::llvm::CodeGenOptLevel codegen_opt_level,
+                                                                bool verify_llvm_jit_ir) noexcept
         {
-            if(!all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir())) [[unlikely]] { return false; }
+            if(!all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir)) [[unlikely]] { return false; }
 
             if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
 
@@ -488,7 +480,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
             function_pass_manager.doFinalization();
 
-            return all_details::verify_llvm_jit_module(module, should_verify_lazy_llvm_jit_ir());
+            return all_details::verify_llvm_jit_module(module, verify_llvm_jit_ir);
         }
 
         [[nodiscard]] inline ::std::uintptr_t resolve_llvm_function_address(::llvm::ExecutionEngine& engine,
@@ -543,7 +535,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module,
+                                              *target_machine,
+                                              options.codegen_opt_level,
+                                              options.compile_options.verify_llvm_jit_ir))
+                [[unlikely]]
+            {
+                return false;
+            }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -624,7 +623,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level)) [[unlikely]] { return false; }
+            if(!optimize_lazy_llvm_jit_module(*llvm_module,
+                                              *target_machine,
+                                              options.codegen_opt_level,
+                                              options.compile_options.verify_llvm_jit_ir))
+                [[unlikely]]
+            {
+                return false;
+            }
 
             auto raw_engine{::llvm::EngineBuilder(details::llvm_module_owner_t{llvm_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
@@ -896,7 +902,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
 
             compile_option emit_options{options.compile_options};
-            emit_options.verify_llvm_jit_ir = should_verify_lazy_llvm_jit_ir();
             emit_options.route_wasm_calls_through_runtime_bridge = true;
             for(auto const local_function_index: claimed_group)
             {
@@ -956,7 +961,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
 
             compile_option emit_options{options.compile_options};
-            emit_options.verify_llvm_jit_ir = should_verify_lazy_llvm_jit_ir();
             emit_options.route_wasm_calls_through_runtime_bridge = true;
             materialized.local_func = all_details::compile_all_from_uwvm_local_func(
                 curr_module,

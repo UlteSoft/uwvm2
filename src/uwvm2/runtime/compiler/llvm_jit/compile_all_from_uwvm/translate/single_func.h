@@ -46,11 +46,7 @@ struct full_function_symbol_t
 };
 
 inline constexpr bool default_verify_llvm_jit_ir{
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
     true
-#else
-    false
-#endif
 };
 
 struct compile_option

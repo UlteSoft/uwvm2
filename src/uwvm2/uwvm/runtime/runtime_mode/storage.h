@@ -128,6 +128,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details Interpreted either as `functions per task` or `cumulative wasm code-body bytes per task` depending on the selected policy.
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    /// @brief Whether runtime LLVM IR verification is disabled by command line.
+    inline bool runtime_disable_llvm_ir_verifaction{};  // [global]
+#endif
+
     /// @brief   The global runtime mode.
     /// @details default = full_compile
     /// @todo    set default to lazy_compile

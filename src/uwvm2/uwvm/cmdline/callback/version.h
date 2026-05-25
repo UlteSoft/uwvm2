@@ -189,13 +189,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #else
                             u8"    - LLVM Version: Unknown\n"
 #endif
-                            u8"    - LLVM IR Verification: "
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                            u8"On\n"
-#else
-                            u8"Off\n"
-#endif
-                            u8"\n");
+        );
     }
 #endif
 
