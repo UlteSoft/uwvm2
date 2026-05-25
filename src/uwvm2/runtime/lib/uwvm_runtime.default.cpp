@@ -5032,6 +5032,68 @@ namespace uwvm2::runtime::lib
                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                 }};
 
+            auto const runtime_compile_threads_verbose_now{
+                []() noexcept
+                {
+                    ::fast_io::unix_timestamp ts{};
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+#ifdef UWVM_CPP_EXCEPTIONS
+                        try
+#endif
+                        {
+                            ts = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                        }
+#ifdef UWVM_CPP_EXCEPTIONS
+                        catch(::fast_io::error)
+                        {
+                            // do nothing
+                        }
+#endif
+                    }
+                    return ts;
+                }};
+
+            auto const runtime_compile_threads_verbose_done{
+                []<typename... Args>(::fast_io::unix_timestamp start_time, Args&&... args) noexcept
+                {
+                    if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
+
+                    ::fast_io::unix_timestamp end_time{};
+#ifdef UWVM_CPP_EXCEPTIONS
+                    try
+#endif
+                    {
+                        end_time = ::fast_io::posix_clock_gettime(::fast_io::posix_clock_id::monotonic_raw);
+                    }
+#ifdef UWVM_CPP_EXCEPTIONS
+                    catch(::fast_io::error)
+                    {
+                        // do nothing
+                    }
+#endif
+
+                    ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                        u8"uwvm: ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                                        u8"[info]  ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        ::std::forward<Args>(args)...,
+                                        u8" done. (time=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                        end_time - start_time,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"s). ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                        u8"[",
+                                        ::uwvm2::uwvm::io::get_local_realtime(),
+                                        u8"] ",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                        u8"(verbose)\n",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                }};
+
             using runtime_compile_threads_policy_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_policy_t;
 
             auto effective_extra_compile_threads{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
@@ -5443,6 +5505,7 @@ namespace uwvm2::runtime::lib
                                                                  ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                                  u8"\". ");
                         }
+                        auto const uwvm_int_translation_start_time{runtime_compile_threads_verbose_now()};
                         rec.compiled = ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::compile_all_from_uwvm<kTranslateOpt>(
                             *rec.runtime_module,
                             opt,
@@ -5450,14 +5513,12 @@ namespace uwvm2::runtime::lib
                             effective_module_extra_compile_threads,
                             effective_compile_task_split_conf);
 
-                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                        {
-                            runtime_compile_threads_verbose_info(u8"Runtime full translation finished for module \"",
-                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                                 rec.module_name,
-                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                                 u8"\". ");
-                        }
+                        runtime_compile_threads_verbose_done(uwvm_int_translation_start_time,
+                                                            u8"Runtime full translation for module \"",
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                            rec.module_name,
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                            u8"\"");
                     }
 #endif
 
@@ -5474,6 +5535,7 @@ namespace uwvm2::runtime::lib
                         }
                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option llvm_jit_opt{};
                         llvm_jit_opt.curr_wasm_id = module_id;
+                        auto const llvm_jit_translation_start_time{runtime_compile_threads_verbose_now()};
                         rec.llvm_jit_compiled = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_all_from_uwvm(
                             *rec.runtime_module,
                             llvm_jit_opt,
@@ -5488,14 +5550,12 @@ namespace uwvm2::runtime::lib
                             effective_compile_task_split_conf
 # endif
                         );
-                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
-                        {
-                            runtime_compile_threads_verbose_info(u8"LLVM JIT translation finished for module \"",
-                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                                 rec.module_name,
-                                                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                                 u8"\". ");
-                        }
+                        runtime_compile_threads_verbose_done(llvm_jit_translation_start_time,
+                                                            u8"LLVM JIT translation for module \"",
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                            rec.module_name,
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                            u8"\"");
                     }
 #endif
                 }
@@ -5529,6 +5589,7 @@ namespace uwvm2::runtime::lib
                                                              ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                              u8"\". ");
                     }
+                    auto const llvm_jit_materialize_start_time{runtime_compile_threads_verbose_now()};
                     if(!try_materialize_runtime_module_llvm_jit(rec)) [[unlikely]]
                     {
                         if(runtime_compiler_requires_llvm_jit_execution())
@@ -5561,13 +5622,14 @@ namespace uwvm2::runtime::lib
                                             u8"\"; falling back to interpreter execution for this module.\n",
                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                     }
-                    else if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    else
                     {
-                        runtime_compile_threads_verbose_info(u8"LLVM JIT materialization finished for module \"",
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                             rec.module_name,
-                                                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                             u8"\". ");
+                        runtime_compile_threads_verbose_done(llvm_jit_materialize_start_time,
+                                                            u8"LLVM JIT materialization for module \"",
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                                            rec.module_name,
+                                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                            u8"\"");
                     }
                 }
 #endif
