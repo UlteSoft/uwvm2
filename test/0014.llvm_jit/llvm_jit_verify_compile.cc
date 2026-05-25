@@ -105,20 +105,43 @@ namespace
         return true;
     }
 
-    [[nodiscard]] bool run_mode(::std::filesystem::path const& uwvm_path,
-                                ::std::filesystem::path const& wasm_path,
-                                ::std::string_view compiler_mode)
+    [[nodiscard]] bool run_command(::std::string const& command, char const* label)
     {
-        auto const command{
-            quote_argument(uwvm_path) + " -Rcm full -Rcc " + ::std::string{compiler_mode} + " --run " + quote_argument(wasm_path)};
-
         ::std::cout << "[llvm_jit] " << command << '\n';
 
         auto const status{::std::system(command.c_str())};
         if(status == 0) [[likely]] { return true; }
 
-        ::std::cerr << "uwvm returned non-zero status for mode " << compiler_mode << ": " << status << '\n';
+        ::std::cerr << "uwvm returned non-zero status for " << label << ": " << status << '\n';
         return false;
+    }
+
+    [[nodiscard]] bool run_full_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
+    {
+        auto const command{
+            quote_argument(uwvm_path) + " -Rcm full -Rcc jit --run " + quote_argument(wasm_path)};
+        return run_command(command, "full llvm-jit");
+    }
+
+    [[nodiscard]] bool run_lazy_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
+    {
+        auto const command{
+            quote_argument(uwvm_path) + " -Rjit --run " + quote_argument(wasm_path)};
+        return run_command(command, "lazy llvm-jit");
+    }
+
+    [[nodiscard]] bool run_lazy_verification_mode(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
+    {
+        auto const command{
+            quote_argument(uwvm_path) + " -Rcm lazy+verification -Rcc jit --run " + quote_argument(wasm_path)};
+        return run_command(command, "lazy+verification llvm-jit");
+    }
+
+    [[nodiscard]] bool run_aot_shortcut(::std::filesystem::path const& uwvm_path, ::std::filesystem::path const& wasm_path)
+    {
+        auto const command{
+            quote_argument(uwvm_path) + " -Raot --run " + quote_argument(wasm_path)};
+        return run_command(command, "runtime-aot shortcut");
     }
 
     template <::std::size_t N>
@@ -130,7 +153,10 @@ namespace
         auto const wasm_path{executable_dir / "test-artifacts" / "0014.llvm_jit" / ::std::string{file_name}};
         if(!write_fixture(wasm_path, wasm_bytes)) [[unlikely]] { return false; }
 
-        if(!run_mode(uwvm_path, wasm_path, "jit")) [[unlikely]] { return false; }
+        if(!run_full_mode(uwvm_path, wasm_path)) [[unlikely]] { return false; }
+        if(!run_aot_shortcut(uwvm_path, wasm_path)) [[unlikely]] { return false; }
+        if(!run_lazy_mode(uwvm_path, wasm_path)) [[unlikely]] { return false; }
+        if(!run_lazy_verification_mode(uwvm_path, wasm_path)) [[unlikely]] { return false; }
         return true;
     }
 

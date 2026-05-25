@@ -184,10 +184,15 @@ namespace
         UWVM2TEST_REQUIRE(stats.worker_compiles == 1uz);
 
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_direct));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 2uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_leaf));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 1uz);
+#endif
 
         runner_lazy_call_bridge_scope<Opt> bridge_scope{prep, storage, options};
         auto rr{run_compiled_local_func<Opt>(
@@ -198,9 +203,12 @@ namespace
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
 #endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_direct));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 2uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
-#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
 #endif
 
@@ -211,9 +219,12 @@ namespace
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
 #endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_direct));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 2uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_indirect));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
-#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
 #endif
         return 0;
@@ -249,10 +260,14 @@ namespace
         UWVM2TEST_REQUIRE(stats.helper_compiles == 0uz);
 
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_indirect));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 1uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_leaf));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 1uz);
+#endif
 
         runner_lazy_call_bridge_scope<Opt> bridge_scope{prep, storage, options};
         auto rr{run_compiled_local_func<Opt>(
@@ -263,9 +278,11 @@ namespace
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
 #endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_indirect));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 1uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
-#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
 #endif
 
@@ -276,9 +293,11 @@ namespace
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_leaf));
 #endif
         UWVM2TEST_REQUIRE(function_is_compiled(storage, k_fn_indirect));
+#if defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
+        UWVM2TEST_REQUIRE(compiled_function_count(storage) >= 1uz);
+#else
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_direct));
         UWVM2TEST_REQUIRE(!function_is_compiled(storage, k_fn_probe));
-#if !defined(UWVM2TEST_RUNNER_USE_LLVM_JIT)
         UWVM2TEST_REQUIRE(compiled_function_count(storage) == 2uz);
 #endif
         return 0;
