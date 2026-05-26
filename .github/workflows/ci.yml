@@ -93,7 +93,7 @@ jobs:
     name: Linux (x86_64) uwvm-int + llvm-jit
     runs-on: ubuntu-latest
     env:
-      XMAKE_JOBS: "2"
+      XMAKE_JOBS: "4"
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       LSAN_OPTIONS: print_suppressions=0
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
