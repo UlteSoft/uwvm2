@@ -89,6 +89,50 @@ jobs:
         run: xmake test -v
 
   # ---------------------------------------------------------------------------
+  x86_64-linux-gnu-backend-tests:
+    name: Linux (x86_64) uwvm-int + llvm-jit
+    runs-on: ubuntu-latest
+    env:
+      XMAKE_JOBS: "2"
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      LSAN_OPTIONS: print_suppressions=0
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          CODENAME=$(lsb_release -cs)
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository ppa:xmake-io/xmake
+          sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+      - name: Configure
+        run: |
+          ln -s $(which clang++-23) clang++
+          ln -s $(which clang-23) clang
+          ln -s $(which llvm-config-23) llvm-config
+          export PATH=$PWD:$PATH
+          xmake f -m debug \
+            --use-llvm-compiler=y \
+            --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined \
+            --march=none \
+            --static=none \
+            --execution-int=uwvm-int \
+            --execution-jit=llvm \
+            --enable-test-uwvm-int=y \
+            --enable-test-llvm-jit=y
+      - name: Check UWVM version
+        run: |
+          xmake b -rv -j "${XMAKE_JOBS}" uwvm
+          xmake run uwvm --version
+      - name: Run uwvm-int lazy tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/lazy/run_lazy_full.sh
+      - name: Run uwvm-int strict tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/strict/run_strict_basic_full.sh
+      - name: Run llvm-jit tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0014.llvm_jit/run_llvm_jit_full.sh
+
+  # ---------------------------------------------------------------------------
   x86_64-linux-gnu-sde-dmr:
     if: ${{ !always() }}
     name: Linux (x86_64, SDE DMR)
