@@ -49,7 +49,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::lazy_runtime_lo
         }
     }
 
-    [[nodiscard]] inline bool enabled() noexcept
+    [[nodiscard]] inline constexpr bool enabled() noexcept
     {
 #ifdef UWVM
         return ::uwvm2::uwvm::io::enable_runtime_log;
@@ -59,17 +59,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::lazy_runtime_lo
     }
 
     template <typename... Args>
-    inline void line(Args&&... args) noexcept
+    inline constexpr void line(Args&&... args) noexcept
     {
 #ifdef UWVM
         if(!enabled()) { return; }
 
-        auto u8runtime_log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8runtime_log_output)};
-        ::fast_io::operations::decay::stream_ref_decay_lock_guard u8runtime_log_output_lg{
-            ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8runtime_log_output_osr)};
-        auto u8runtime_log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8runtime_log_output_osr)};
-
-        ::fast_io::io::perrln(u8runtime_log_output_ul, u8"[uwvm-int-lazy] ", ::std::forward<Args>(args)...);
+        ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[uwvm-int-lazy] ", ::std::forward<Args>(args)...);
 #else
         ((void)args, ...);
 #endif
