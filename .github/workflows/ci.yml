@@ -108,10 +108,12 @@ jobs:
           sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
       - name: Configure
         run: |
-          ln -s $(which clang++-23) clang++
-          ln -s $(which clang-23) clang
-          ln -s $(which llvm-config-23) llvm-config
-          export PATH=$PWD:$PATH
+          mkdir -p .github/tools
+          ln -sf "$(which clang++-23)" .github/tools/clang++
+          ln -sf "$(which clang-23)" .github/tools/clang
+          ln -sf "$(which llvm-config-23)" .github/tools/llvm-config
+          echo "$PWD/.github/tools" >> "$GITHUB_PATH"
+          export PATH="$PWD/.github/tools:$PATH"
           xmake f -m debug \
             --use-llvm-compiler=y \
             --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined \
