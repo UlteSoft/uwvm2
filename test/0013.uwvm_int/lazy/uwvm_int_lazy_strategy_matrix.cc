@@ -346,7 +346,7 @@ namespace
                                                    .err = ::std::addressof(err),
                                                    .module_name = module_name_view(cc.module_name_ascii)};
 
-            auto request{make_lazy_compile_request<Opt>(ctx, cc.priority)};
+            auto request{::uwvm2test::uwvm_int_lazy::make_lazy_compile_request<Opt>(ctx, cc.priority)};
             UWVM2TEST_REQUIRE(request.unit != nullptr);
             UWVM2TEST_REQUIRE(request.compile != nullptr);
 
@@ -401,7 +401,7 @@ namespace
                                                .compile_unit_index = storage.compile_units.size(),
                                                .err = ::std::addressof(err),
                                                .module_name = u8"uwvm2test_lazy_strategy_invalid_request"};
-        auto request{make_lazy_compile_request<Opt>(ctx, 0u)};
+        auto request{::uwvm2test::uwvm_int_lazy::make_lazy_compile_request<Opt>(ctx, 0u)};
         UWVM2TEST_REQUIRE(request.unit == nullptr);
         UWVM2TEST_REQUIRE(request.compile == nullptr);
 
