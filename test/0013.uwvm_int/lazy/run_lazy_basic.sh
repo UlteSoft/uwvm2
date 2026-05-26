@@ -33,6 +33,39 @@ xmake_build() {
   fi
 }
 
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  CLANG_BIN=""
+  if [[ -n "${SYSROOT:-}" ]]; then
+    TOOLCHAIN_ROOT="$(cd -- "$(dirname -- "${SYSROOT}")" && pwd)"
+    CLANG_BIN="${TOOLCHAIN_ROOT}/llvm/bin/clang"
+  fi
+  if [[ ! -x "${CLANG_BIN}" ]]; then
+    CLANG_BIN="$(command -v clang || true)"
+  fi
+  if [[ -x "${CLANG_BIN}" ]]; then
+    CLANG_RUNTIME_DIR="$("${CLANG_BIN}" --print-runtime-dir 2>/dev/null || true)"
+    if [[ -n "${CLANG_RUNTIME_DIR}" ]]; then
+      export DYLD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    fi
+  fi
+fi
+
+COMMON_F_FLAGS=(
+  -m debug
+  --use-llvm-compiler=y
+  --ccache=n
+  --cxflags=-Wno-error
+  --test-libfuzzer=y
+  --enable-test-uwvm-int=y
+  --use-cxx-module=n
+  --static=none
+  --execution-int=uwvm-int
+)
+
+if [[ -n "${SYSROOT:-}" ]]; then
+  COMMON_F_FLAGS+=("--sysroot=${SYSROOT}")
+fi
+
 TARGETS=()
 if [[ "$#" -gt 0 ]]; then
   TARGETS=("$@")
@@ -44,12 +77,14 @@ else
   )
 fi
 
-  echo "INFO: lazy target count = ${#TARGETS[@]}"
+echo "INFO: lazy target count = ${#TARGETS[@]}"
+echo "=== uwvm_int lazy: configure ==="
+xmake f -c
+xmake f "${COMMON_F_FLAGS[@]}"
 
 for i in "${!TARGETS[@]}"; do
   t="${TARGETS[$i]}"
   printf '=== [%03d/%03d] build %s ===\n' "$((i + 1))" "${#TARGETS[@]}" "$t"
-  xmake f --ccache=n
   xmake_build "$t"
   exe="$(xmake show -t "$t" | perl -pe 's/\e\[[0-9;]*m//g' | sed -n 's/^[[:space:]]*targetfile:[[:space:]]*//p' | head -n1 || true)"
   if [[ -z "${exe}" || ! -f "${ROOT_DIR}/${exe}" ]]; then
