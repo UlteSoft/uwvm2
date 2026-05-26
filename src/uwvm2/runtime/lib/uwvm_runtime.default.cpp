@@ -4272,8 +4272,26 @@ namespace uwvm2::runtime::lib
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
         }
 
+        [[nodiscard]] inline ::llvm::CodeGenOptLevel resolve_runtime_llvm_jit_codegen_opt_level(
+            ::llvm::CodeGenOptLevel default_level) noexcept
+        {
+            if(!::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_existed) { return default_level; }
+
+            using runtime_llvm_jit_optimization_level_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_t;
+            switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level)
+            {
+                case runtime_llvm_jit_optimization_level_t::default_level: return default_level;
+                case runtime_llvm_jit_optimization_level_t::none: return ::llvm::CodeGenOptLevel::None;
+                case runtime_llvm_jit_optimization_level_t::less: return ::llvm::CodeGenOptLevel::Less;
+                case runtime_llvm_jit_optimization_level_t::mid: return ::llvm::CodeGenOptLevel::Default;
+                case runtime_llvm_jit_optimization_level_t::aggressive: return ::llvm::CodeGenOptLevel::Aggressive;
+            }
+            ::fast_io::fast_terminate();
+        }
+
         [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module,
                                                                    ::llvm::TargetMachine& target_machine,
+                                                                   ::llvm::CodeGenOptLevel codegen_opt_level,
                                                                    bool verify_llvm_jit_ir) noexcept
         {
             if(verify_llvm_jit_ir)
@@ -4286,6 +4304,8 @@ namespace uwvm2::runtime::lib
                     ::fast_io::fast_terminate();
                 }
             }
+
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
 
             ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
             function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
@@ -4419,9 +4439,12 @@ namespace uwvm2::runtime::lib
             ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
             append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
 
+            auto const codegen_opt_level{
+                resolve_runtime_llvm_jit_codegen_opt_level(::llvm::CodeGenOptLevel::Aggressive)};
+
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT)
-                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                .setOptLevel(codegen_opt_level)
                 .setMCPU(host_cpu_name)
                 .setMAttrs(host_target_attributes);
 
@@ -4434,6 +4457,7 @@ namespace uwvm2::runtime::lib
                 }
                 return false;
             }
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { target_machine->setFastISel(true); }
 
             merged_module->setTargetTriple(target_machine->getTargetTriple());
             merged_module->setDataLayout(target_machine->createDataLayout());
@@ -4441,6 +4465,7 @@ namespace uwvm2::runtime::lib
             llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"", rec.module_name, u8"\"");
             if(!optimize_runtime_llvm_jit_module(*merged_module,
                                                  *target_machine,
+                                                 codegen_opt_level,
                                                  !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction))
                 [[unlikely]]
             {
@@ -4457,7 +4482,7 @@ namespace uwvm2::runtime::lib
 
             auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{merged_module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
-                                .setOptLevel(::llvm::CodeGenOptLevel::Aggressive)
+                                .setOptLevel(codegen_opt_level)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
                                 .create(target_machine.get())};
@@ -6283,6 +6308,8 @@ namespace uwvm2::runtime::lib
 
                 rec.llvm_jit_lazy_compile_options.compile_options = opt;
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;
+                rec.llvm_jit_lazy_compile_options.codegen_opt_level =
+                    resolve_runtime_llvm_jit_codegen_opt_level(::llvm::CodeGenOptLevel::Less);
                 rec.llvm_jit_lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
                 if(lazy_validation_mode == llvm_jit_lazy_validation_mode_t::validate_on_lazy_compile &&
                    rec.llvm_jit_lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]

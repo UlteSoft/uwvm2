@@ -51,6 +51,7 @@
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
 # include "runtime_scheduling_policy.h"
+# include "runtime_llvm_jit_optimization_level.h"
 # include "runtime_disable_llvm_ir_verifaction.h"
 # include "runtime_debug_int.h"
 # include "runtime_int.h"

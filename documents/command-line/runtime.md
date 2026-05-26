@@ -20,6 +20,7 @@ Source focus:
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
 | `--runtime-aot` | `-Raot` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: full compilation with LLVM JIT. |
 | `--runtime-compiler-log` | `-Rclog` | `[out|err|file <file:path>]` | Once | Runtime backend support | Route runtime compiler logs. |
+| `--runtime-llvm-jit-optimization-level` | None | `[0|1|2|3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Force LLVM JIT optimization level. |
 | `--runtime-disable-llvm-ir-verifaction` | None | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
@@ -135,6 +136,32 @@ Behavior:
 - Open failure is a command-line error.
 
 This log is for runtime compiler internals. It is separate from main diagnostics configured by `--log-output`.
+
+## `--runtime-llvm-jit-optimization-level`
+
+Syntax:
+
+```bash
+uwvm --runtime-llvm-jit-optimization-level 0
+uwvm --runtime-llvm-jit-optimization-level 1
+uwvm --runtime-llvm-jit-optimization-level 2
+uwvm --runtime-llvm-jit-optimization-level 3
+```
+
+Behavior:
+
+- The option accepts only unsigned integer values `0`, `1`, `2`, and `3`.
+- Values greater than `3`, negative values, and non-numeric strings are command-line errors.
+- If omitted, each LLVM JIT policy keeps its existing default optimization level.
+- If set, the provided value is a force setting for all LLVM-JIT runtime paths.
+- The mapping is `0 = none`, `1 = less`, `2 = mid/default`, `3 = aggressive`.
+- The override applies to LLVM-JIT full, lazy, and tiered runtime paths.
+
+Example:
+
+```bash
+uwvm --runtime-jit --runtime-llvm-jit-optimization-level 1 --run app.wasm
+```
 
 ## `--runtime-disable-llvm-ir-verifaction`
 
