@@ -4996,6 +4996,7 @@ template <typename CreateValue>
                                                      ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_load_type)),
                                                      "memory.load")};
                 load_inst->setAlignment(memory_alignment);
+                load_inst->setVolatile(true);
 
                 if(load_bytes == 4uz) { return load_inst; }
                 return signed_load ? ir_builder.CreateSExt(load_inst, llvm_i32_type) : ir_builder.CreateZExt(load_inst, llvm_i32_type);
@@ -5020,6 +5021,7 @@ template <typename CreateValue>
                                                      ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(llvm_load_type)),
                                                      "memory.load")};
                 load_inst->setAlignment(memory_alignment);
+                load_inst->setVolatile(true);
 
                 if(load_bytes == 8uz) { return load_inst; }
                 return signed_load ? ir_builder.CreateSExt(load_inst, llvm_i64_type) : ir_builder.CreateZExt(load_inst, llvm_i64_type);
@@ -5034,6 +5036,7 @@ template <typename CreateValue>
                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getFloatTy(llvm_context))),
                                           "memory.load")};
                 load_inst->setAlignment(memory_alignment);
+                load_inst->setVolatile(true);
                 return load_inst;
             }
 
@@ -5046,6 +5049,7 @@ template <typename CreateValue>
                                           ir_builder.CreatePointerCast(direct_memory_pointer, get_llvm_pointer_type(::llvm::Type::getDoubleTy(llvm_context))),
                                           "memory.load")};
                 load_inst->setAlignment(memory_alignment);
+                load_inst->setVolatile(true);
                 return load_inst;
             }
 
