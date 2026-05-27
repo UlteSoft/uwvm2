@@ -87,6 +87,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 
     extern "C++" [[noreturn]] void llvm_jit_runtime_trap(llvm_jit_trap_kind) noexcept;
 
+    extern "C++" void llvm_jit_call_indirect_oob_debug(::std::size_t module_id,
+                                                       ::std::size_t function_index,
+                                                       ::std::size_t table_index,
+                                                       ::std::uintptr_t table_view_base,
+                                                       ::std::uintptr_t table_data_address,
+                                                       ::std::size_t table_size,
+                                                       ::std::size_t selector) noexcept;
+
     extern "C++" void llvm_jit_push_call_stack_frame(::std::size_t module_id, ::std::size_t function_index) noexcept;
 
     extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;

@@ -4091,6 +4091,35 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             auto table_data_address{ir_builder.CreateLoad(llvm_intptr_type, table_data_address_ptr, "call_indirect.table.data.addr")};
             auto table_size{ir_builder.CreateLoad(llvm_intptr_type, table_size_ptr, "call_indirect.table.size")};
 
+            if(state.lazy_defined_targets_are_atomic)
+            {
+                auto debug_function_type{::llvm::FunctionType::get(::llvm::Type::getVoidTy(llvm_context),
+                                                                    {llvm_intptr_type,
+                                                                     llvm_intptr_type,
+                                                                     llvm_intptr_type,
+                                                                     llvm_intptr_type,
+                                                                     llvm_intptr_type,
+                                                                     llvm_intptr_type,
+                                                                     llvm_intptr_type},
+                                                                    false)};
+                auto debug_pointer{get_llvm_runtime_bridge_function_pointer(llvm_context,
+                                                                            debug_function_type,
+                                                                            ::uwvm2::runtime::lib::llvm_jit_call_indirect_oob_debug)};
+                if(debug_pointer != nullptr)
+                {
+                    apply_llvm_jit_host_calling_conv(
+                        ir_builder.CreateCall(debug_function_type,
+                                              debug_pointer,
+                                              {::llvm::ConstantInt::get(llvm_intptr_type, local_func_storage.module_id),
+                                               ::llvm::ConstantInt::get(llvm_intptr_type, local_func_storage.function_index),
+                                               ::llvm::ConstantInt::get(llvm_intptr_type, table_index),
+                                               ::llvm::ConstantInt::get(llvm_intptr_type, reinterpret_cast<::std::uintptr_t>(table_view_begin)),
+                                               table_data_address,
+                                               table_size,
+                                               selector_index}));
+                }
+            }
+
             emit_llvm_conditional_trap(*llvm_module,
                                        ir_builder,
                                        ir_builder.CreateICmpUGE(selector_index, table_size),
@@ -4108,6 +4137,11 @@ template <typename I32BridgeFunction, typename I64BridgeFunction, typename F32Br
             auto entry_address{ir_builder.CreateLoad(llvm_intptr_type, entry_address_ptr, "call_indirect.entry.addr")};
             auto context_address{ir_builder.CreateLoad(llvm_intptr_type, context_address_ptr, "call_indirect.context.addr")};
             auto encoded_type_id{ir_builder.CreateLoad(llvm_i32_type, encoded_type_id_ptr, "call_indirect.type.id")};
+            if(state.lazy_defined_targets_are_atomic)
+            {
+                entry_address->setAtomic(::llvm::AtomicOrdering::Acquire);
+                context_address->setAtomic(::llvm::AtomicOrdering::Acquire);
+            }
 
             emit_llvm_conditional_trap(*llvm_module,
                                        ir_builder,

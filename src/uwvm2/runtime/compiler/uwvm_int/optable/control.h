@@ -87,6 +87,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void unreachable_tail(Type... /*type*/) UWVM_THROWS
         { unreachable(); }
+
+        [[nodiscard]] inline constexpr bool tiered_backedge_try_switch_or_probe(tiered_backedge_probe_slot_t* slot,
+                                                                                ::std::byte** stack_top_ptr,
+                                                                                ::std::byte* local_base) noexcept
+        {
+            if(slot == nullptr) [[unlikely]] { return false; }
+
+            auto const osr_entry_address{
+                ::std::atomic_ref<::std::uintptr_t>{slot->osr_entry_address}.load(::std::memory_order_acquire)};
+            if(osr_entry_address == tiered_backedge_osr_disabled_entry) { return false; }
+
+            auto const switch_func{slot->switch_func};
+            if(osr_entry_address != 0u && switch_func != nullptr &&
+               switch_func(slot->module_id,
+                           slot->local_function_index,
+                           slot->wasm_code_offset,
+                           slot->loop_depth,
+                           slot->slot,
+                           osr_entry_address,
+                           stack_top_ptr,
+                           local_base))
+            {
+                return true;
+            }
+
+            auto const threshold{slot->threshold};
+            auto const probe_func{slot->probe_func};
+            if(threshold == 0uz || probe_func == nullptr) { return false; }
+
+            auto counter_ref{::std::atomic_ref<::std::size_t>{slot->counter}};
+            if(counter_ref.load(::std::memory_order_relaxed) >= threshold) { return false; }
+
+            auto const count{counter_ref.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
+            if(count == threshold)
+            {
+                probe_func(slot->module_id, slot->local_function_index, slot->wasm_code_offset, slot->loop_depth);
+                auto const published_osr_entry_address{
+                    ::std::atomic_ref<::std::uintptr_t>{slot->osr_entry_address}.load(::std::memory_order_acquire)};
+                if(published_osr_entry_address != 0u && published_osr_entry_address != tiered_backedge_osr_disabled_entry && switch_func != nullptr &&
+                   switch_func(slot->module_id,
+                               slot->local_function_index,
+                               slot->wasm_code_offset,
+                               slot->loop_depth,
+                               slot->slot,
+                               published_osr_entry_address,
+                               stack_top_ptr,
+                               local_base))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }  // namespace details
 
     /// @brief `unreachable` opcode (tail-call): traps/terminates the VM.
@@ -326,9 +380,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// @brief Tiered-only loop/backedge switch/probe.
     /// @details
     /// - Emitted only when `compile_option::tiered_backedge_switch_func` is non-null.
-    /// - `type[0]` layout:
-    ///   `[opfunc_ptr][probe_callback][switch_callback][osr_entry_base][osr_entry_count][counter_base][counter_count][threshold][slot][module_id][local_fn][wasm_offset][depth][next_opfunc_ptr]`.
-    /// - The tiered-only hot path is an acquire load of the published OSR entry slot; if it is still empty, we fall back to a relaxed counter bump.
+    /// - `type[0]` layout: `[opfunc_ptr][tiered_backedge_probe_slot_t*][next_opfunc_ptr]`.
+    /// - The tiered-only hot path reads one slot pointer and one acquire OSR-entry word. If the slot is not ready, the counter slow path is saturated at the
+    ///   hot threshold so tight loops stop doing atomic writes after the first hot notification.
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -341,74 +395,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
 
-        tiered_backedge_probe_func_t probe_func;  // no init
-        ::std::memcpy(::std::addressof(probe_func), type...[0], sizeof(probe_func));
-        type...[0] += sizeof(probe_func);
+        ::std::uintptr_t slot_address;  // no init
+        ::std::memcpy(::std::addressof(slot_address), type...[0], sizeof(slot_address));
+        type...[0] += sizeof(slot_address);
 
-        tiered_backedge_switch_func_t switch_func;  // no init
-        ::std::memcpy(::std::addressof(switch_func), type...[0], sizeof(switch_func));
-        type...[0] += sizeof(switch_func);
-
-        ::std::uintptr_t osr_entry_base_address;  // no init
-        ::std::memcpy(::std::addressof(osr_entry_base_address), type...[0], sizeof(osr_entry_base_address));
-        type...[0] += sizeof(osr_entry_base_address);
-
-        ::std::size_t osr_entry_count;  // no init
-        ::std::memcpy(::std::addressof(osr_entry_count), type...[0], sizeof(osr_entry_count));
-        type...[0] += sizeof(osr_entry_count);
-
-        ::std::uintptr_t counter_base_address;  // no init
-        ::std::memcpy(::std::addressof(counter_base_address), type...[0], sizeof(counter_base_address));
-        type...[0] += sizeof(counter_base_address);
-
-        ::std::size_t counter_count;  // no init
-        ::std::memcpy(::std::addressof(counter_count), type...[0], sizeof(counter_count));
-        type...[0] += sizeof(counter_count);
-
-        ::std::size_t threshold;  // no init
-        ::std::memcpy(::std::addressof(threshold), type...[0], sizeof(threshold));
-        type...[0] += sizeof(threshold);
-
-        ::std::size_t slot;  // no init
-        ::std::memcpy(::std::addressof(slot), type...[0], sizeof(slot));
-        type...[0] += sizeof(slot);
-
-        ::std::size_t module_id;  // no init
-        ::std::memcpy(::std::addressof(module_id), type...[0], sizeof(module_id));
-        type...[0] += sizeof(module_id);
-
-        ::std::size_t local_function_index;  // no init
-        ::std::memcpy(::std::addressof(local_function_index), type...[0], sizeof(local_function_index));
-        type...[0] += sizeof(local_function_index);
-
-        ::std::size_t wasm_code_offset;  // no init
-        ::std::memcpy(::std::addressof(wasm_code_offset), type...[0], sizeof(wasm_code_offset));
-        type...[0] += sizeof(wasm_code_offset);
-
-        ::std::size_t loop_depth;  // no init
-        ::std::memcpy(::std::addressof(loop_depth), type...[0], sizeof(loop_depth));
-        type...[0] += sizeof(loop_depth);
-
-        ::std::uintptr_t osr_entry_address{};
-        auto const osr_entry_base{reinterpret_cast<::std::uintptr_t*>(osr_entry_base_address)};
-        if(osr_entry_base != nullptr && slot < osr_entry_count)
-        {
-            osr_entry_address = ::std::atomic_ref<::std::uintptr_t>{osr_entry_base[slot]}.load(::std::memory_order_acquire);
-        }
-
-        if(osr_entry_address != 0u && switch_func != nullptr &&
-           switch_func(module_id, local_function_index, wasm_code_offset, loop_depth, slot, osr_entry_address, ::std::addressof(type...[1]), type...[2]))
-        {
-            return;
-        }
-
-        auto const counter_base{reinterpret_cast<::std::size_t*>(counter_base_address)};
-        if(counter_base != nullptr && probe_func != nullptr && slot < counter_count && threshold != 0uz)
-        {
-            auto& counter{counter_base[slot]};
-            auto const count{::std::atomic_ref<::std::size_t>{counter}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-            if(count == threshold) { probe_func(module_id, local_function_index, wasm_code_offset, loop_depth); }
-        }
+        auto const slot{reinterpret_cast<tiered_backedge_probe_slot_t*>(slot_address)};
+        if(details::tiered_backedge_try_switch_or_probe(slot, ::std::addressof(type...[1]), type...[2])) { return; }
 
         ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
         ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
@@ -433,74 +425,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
 
-        tiered_backedge_probe_func_t probe_func;  // no init
-        ::std::memcpy(::std::addressof(probe_func), typeref...[0], sizeof(probe_func));
-        typeref...[0] += sizeof(probe_func);
+        ::std::uintptr_t slot_address;  // no init
+        ::std::memcpy(::std::addressof(slot_address), typeref...[0], sizeof(slot_address));
+        typeref...[0] += sizeof(slot_address);
 
-        tiered_backedge_switch_func_t switch_func;  // no init
-        ::std::memcpy(::std::addressof(switch_func), typeref...[0], sizeof(switch_func));
-        typeref...[0] += sizeof(switch_func);
-
-        ::std::uintptr_t osr_entry_base_address;  // no init
-        ::std::memcpy(::std::addressof(osr_entry_base_address), typeref...[0], sizeof(osr_entry_base_address));
-        typeref...[0] += sizeof(osr_entry_base_address);
-
-        ::std::size_t osr_entry_count;  // no init
-        ::std::memcpy(::std::addressof(osr_entry_count), typeref...[0], sizeof(osr_entry_count));
-        typeref...[0] += sizeof(osr_entry_count);
-
-        ::std::uintptr_t counter_base_address;  // no init
-        ::std::memcpy(::std::addressof(counter_base_address), typeref...[0], sizeof(counter_base_address));
-        typeref...[0] += sizeof(counter_base_address);
-
-        ::std::size_t counter_count;  // no init
-        ::std::memcpy(::std::addressof(counter_count), typeref...[0], sizeof(counter_count));
-        typeref...[0] += sizeof(counter_count);
-
-        ::std::size_t threshold;  // no init
-        ::std::memcpy(::std::addressof(threshold), typeref...[0], sizeof(threshold));
-        typeref...[0] += sizeof(threshold);
-
-        ::std::size_t slot;  // no init
-        ::std::memcpy(::std::addressof(slot), typeref...[0], sizeof(slot));
-        typeref...[0] += sizeof(slot);
-
-        ::std::size_t module_id;  // no init
-        ::std::memcpy(::std::addressof(module_id), typeref...[0], sizeof(module_id));
-        typeref...[0] += sizeof(module_id);
-
-        ::std::size_t local_function_index;  // no init
-        ::std::memcpy(::std::addressof(local_function_index), typeref...[0], sizeof(local_function_index));
-        typeref...[0] += sizeof(local_function_index);
-
-        ::std::size_t wasm_code_offset;  // no init
-        ::std::memcpy(::std::addressof(wasm_code_offset), typeref...[0], sizeof(wasm_code_offset));
-        typeref...[0] += sizeof(wasm_code_offset);
-
-        ::std::size_t loop_depth;  // no init
-        ::std::memcpy(::std::addressof(loop_depth), typeref...[0], sizeof(loop_depth));
-        typeref...[0] += sizeof(loop_depth);
-
-        ::std::uintptr_t osr_entry_address{};
-        auto const osr_entry_base{reinterpret_cast<::std::uintptr_t*>(osr_entry_base_address)};
-        if(osr_entry_base != nullptr && slot < osr_entry_count)
-        {
-            osr_entry_address = ::std::atomic_ref<::std::uintptr_t>{osr_entry_base[slot]}.load(::std::memory_order_acquire);
-        }
-
-        if(osr_entry_address != 0u && switch_func != nullptr &&
-           switch_func(module_id, local_function_index, wasm_code_offset, loop_depth, slot, osr_entry_address, ::std::addressof(typeref...[1]), typeref...[2]))
+        auto const slot{reinterpret_cast<tiered_backedge_probe_slot_t*>(slot_address)};
+        if(details::tiered_backedge_try_switch_or_probe(slot, ::std::addressof(typeref...[1]), typeref...[2]))
         {
             typeref...[0] = nullptr;
             return;
-        }
-
-        auto const counter_base{reinterpret_cast<::std::size_t*>(counter_base_address)};
-        if(counter_base != nullptr && probe_func != nullptr && slot < counter_count && threshold != 0uz)
-        {
-            auto& counter{counter_base[slot]};
-            auto const count{::std::atomic_ref<::std::size_t>{counter}.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-            if(count == threshold) { probe_func(module_id, local_function_index, wasm_code_offset, loop_depth); }
         }
     }
 

@@ -1,8 +1,10 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
-// Verbose emit logging for offline analysis (enabled only when `-Rclog` is used).
-constexpr bool runtime_log_emit_opfuncs{true};
-constexpr bool runtime_log_emit_cf{true};
-constexpr bool runtime_log_emit_wasm_ops{true};
+// Keep `-Rclog` useful for runtime decisions without dumping every emitted op.
+constexpr bool runtime_log_emit_opfuncs{false};
+constexpr bool runtime_log_emit_cf{false};
+constexpr bool runtime_log_emit_wasm_ops{false};
+constexpr bool runtime_log_emit_stacktop{false};
+constexpr bool runtime_log_emit_conbine{false};
 constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t
@@ -880,9 +882,9 @@ auto const emit_stacktop_spill1_typed_to{
     {
         if constexpr(stacktop_enabled)
         {
-            if(runtime_log_on) [[unlikely]]
+            if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.stacktop_spill1_count; }
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
             {
-                ++runtime_log_stats.stacktop_spill1_count;
                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                      u8"[uwvm-int-translator] fn=",
                                      function_index,
@@ -1101,7 +1103,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.i32_stack_top_curr_pos = start_pos;
                     remain.i32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1130,7 +1132,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.i64_stack_top_curr_pos = start_pos;
                     remain.i64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1159,7 +1161,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.f32_stack_top_curr_pos = start_pos;
                     remain.f32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1188,7 +1190,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.f64_stack_top_curr_pos = start_pos;
                     remain.f64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1317,7 +1319,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.i32_stack_top_curr_pos = start_pos;
                     remain.i32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1346,7 +1348,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.i64_stack_top_curr_pos = start_pos;
                     remain.i64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1375,7 +1377,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.f32_stack_top_curr_pos = start_pos;
                     remain.f32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1404,7 +1406,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.f64_stack_top_curr_pos = start_pos;
                     remain.f64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1480,7 +1482,7 @@ auto const stacktop_spill_one_deepest_to{[&](bytecode_vec_t& dst, ::std::size_t 
                                              {
                                                  // segment top (least deep among the deepest `spill_n` values)
                                                  ::std::size_t const seg_top_slot{stacktop_ring_advance_next(currpos, group_cnt - spill_n, begin_pos, end_pos)};
-                                                 if(runtime_log_on) [[unlikely]]
+                                                 if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                                  {
                                                      ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                           u8"[uwvm-int-translator] fn=",
@@ -1506,7 +1508,7 @@ auto const stacktop_spill_one_deepest_to{[&](bytecode_vec_t& dst, ::std::size_t 
                                              else
                                              {
                                                  ::std::size_t const deepest_slot{stacktop_ring_advance_next(currpos, group_cnt - 1uz, begin_pos, end_pos)};
-                                                 if(runtime_log_on) [[unlikely]]
+                                                 if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                                  {
                                                      ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                           u8"[uwvm-int-translator] fn=",
@@ -1586,7 +1588,7 @@ auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_st
                                             // Critical correctness: push opfuncs write into `ring_prev(currpos)`. If the ring is full, that slot
                                             // is occupied by the deepest cached value of that range; spill from the deepest cached overall until
                                             // the target range has a free slot.
-                                            if(runtime_log_on) [[unlikely]]
+                                            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                             {
                                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                      u8"[uwvm-int-translator] fn=",
@@ -1618,7 +1620,7 @@ auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_st
                                             }
 
                                             stacktop_assert_invariants();
-                                            if(runtime_log_on) [[unlikely]]
+                                            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                             {
                                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                      u8"[uwvm-int-translator] fn=",
@@ -1658,7 +1660,7 @@ auto const stacktop_commit_push1_typed{[&](curr_operand_stack_value_type vt) con
 
                                            ++stacktop_cache_count;
                                            ++stacktop_cache_count_ref_for_vt(vt);
-                                           if(runtime_log_on) [[unlikely]]
+                                           if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                            {
                                                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                     u8"[uwvm-int-translator] fn=",
@@ -1724,7 +1726,7 @@ auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
                                              }
                                          }
 
-                                         if(runtime_log_on) [[unlikely]]
+                                         if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                          {
                                              ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                   u8"[uwvm-int-translator] fn=",
@@ -2976,6 +2978,8 @@ auto const emit_tiered_probe_to{
         if(target_frame.tiered_probe_slot >= options.tiered_backedge_osr_entry_count) { return; }
         if(options.tiered_backedge_probe_counter_base_address == 0u) { return; }
         if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_counter_count) { return; }
+        if(options.tiered_backedge_probe_fast_slot_base_address == 0u) { return; }
+        if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_fast_slot_count) { return; }
         if(options.tiered_backedge_probe_hot_threshold == 0uz) { return; }
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
         if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported)
@@ -2984,19 +2988,21 @@ auto const emit_tiered_probe_to{
         }
 #endif
 
+        auto const fast_slot_base{reinterpret_cast<::uwvm2::runtime::compiler::uwvm_int::optable::tiered_backedge_probe_slot_t*>(
+            options.tiered_backedge_probe_fast_slot_base_address)};
+        auto const fast_slot{fast_slot_base + target_frame.tiered_probe_slot};
+        fast_slot->probe_func = options.tiered_backedge_probe_func;
+        fast_slot->switch_func = options.tiered_backedge_switch_func;
+        ::std::atomic_ref<::std::size_t>{fast_slot->counter}.store(0uz, ::std::memory_order_relaxed);
+        fast_slot->threshold = options.tiered_backedge_probe_hot_threshold;
+        fast_slot->slot = target_frame.tiered_probe_slot;
+        fast_slot->module_id = options.curr_wasm_id;
+        fast_slot->local_function_index = local_function_idx;
+        fast_slot->wasm_code_offset = target_frame.tiered_probe_wasm_code_offset;
+        fast_slot->loop_depth = target_frame.tiered_probe_depth;
+
         emit_opfunc_to(dst, translate::get_uwvmint_tiered_backedge_switch_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-        emit_imm_to(dst, options.tiered_backedge_probe_func);
-        emit_imm_to(dst, options.tiered_backedge_switch_func);
-        emit_imm_to(dst, options.tiered_backedge_osr_entry_base_address);
-        emit_imm_to(dst, options.tiered_backedge_osr_entry_count);
-        emit_imm_to(dst, options.tiered_backedge_probe_counter_base_address);
-        emit_imm_to(dst, options.tiered_backedge_probe_counter_count);
-        emit_imm_to(dst, options.tiered_backedge_probe_hot_threshold);
-        emit_imm_to(dst, target_frame.tiered_probe_slot);
-        emit_imm_to(dst, options.curr_wasm_id);
-        emit_imm_to(dst, local_function_idx);
-        emit_imm_to(dst, target_frame.tiered_probe_wasm_code_offset);
-        emit_imm_to(dst, target_frame.tiered_probe_depth);
+        emit_imm_to(dst, reinterpret_cast<::std::uintptr_t>(fast_slot));
     }};
 
 auto const emit_tiered_probe_before_loop_backedge{[&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS

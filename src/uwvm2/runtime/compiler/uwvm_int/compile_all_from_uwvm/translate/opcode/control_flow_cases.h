@@ -288,13 +288,16 @@ case wasm1_code::loop:
                                   {
                                       if(options.tiered_backedge_probe_func == nullptr || options.tiered_backedge_probe_slot_base_address == 0u ||
                                          local_function_idx >= options.tiered_backedge_probe_slot_base_count ||
-                                         options.tiered_backedge_osr_entry_base_address == 0u || options.tiered_backedge_probe_counter_base_address == 0u)
+                                         options.tiered_backedge_osr_entry_base_address == 0u ||
+                                         options.tiered_backedge_probe_counter_base_address == 0u ||
+                                         options.tiered_backedge_probe_fast_slot_base_address == 0u)
                                       {
                                           return SIZE_MAX;
                                       }
                                       auto const slot_base{reinterpret_cast<::std::size_t const*>(options.tiered_backedge_probe_slot_base_address)};
                                       auto const slot{slot_base[local_function_idx] + tiered_probe_next_slot++};
-                                      if(slot >= options.tiered_backedge_osr_entry_count || slot >= options.tiered_backedge_probe_counter_count)
+                                      if(slot >= options.tiered_backedge_osr_entry_count || slot >= options.tiered_backedge_probe_counter_count ||
+                                         slot >= options.tiered_backedge_probe_fast_slot_count)
                                       {
                                           return SIZE_MAX;
                                       }

@@ -24,6 +24,7 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
+# include <atomic>
 # include <bit>
 # include <cstddef>
 # include <cstdint>

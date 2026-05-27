@@ -1068,7 +1068,7 @@ auto const flush_conbine_pending{
         auto const bc_before{bytecode.size()};
         auto const thunks_before{thunks.size()};
 
-        if(runtime_log_on && kind_before != conbine_pending_kind::none) [[unlikely]]
+        if(runtime_log_on && runtime_log_emit_conbine && kind_before != conbine_pending_kind::none) [[unlikely]]
         {
             wasm1_code next_op{};
             ::std::uint_least8_t next_op_u8{};
@@ -2581,7 +2581,7 @@ auto const flush_conbine_pending{
         conbine_pending.kind = conbine_pending_kind::none;
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
 
-        if(runtime_log_on && kind_before != conbine_pending_kind::none) [[unlikely]]
+        if(runtime_log_on && runtime_log_emit_conbine && kind_before != conbine_pending_kind::none) [[unlikely]]
         {
             wasm1_code next_op{};
             ::std::uint_least8_t next_op_u8{};

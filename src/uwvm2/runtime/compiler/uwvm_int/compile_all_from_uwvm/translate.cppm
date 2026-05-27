@@ -23,6 +23,7 @@ module;
 
 // std
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
