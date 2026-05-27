@@ -379,51 +379,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using interpreter_call_indirect_func_t =
         void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
-    using tiered_backedge_probe_func_t =
-        void (*)(::std::size_t wasm_module_id, ::std::size_t function_index, ::std::size_t wasm_code_offset, ::std::size_t loop_depth) noexcept;
-
-    using tiered_backedge_switch_func_t = bool (*)(::std::size_t wasm_module_id,
-                                                   ::std::size_t function_index,
-                                                   ::std::size_t wasm_code_offset,
-                                                   ::std::size_t loop_depth,
-                                                   ::std::size_t slot,
-                                                   ::std::uintptr_t osr_entry_address,
-                                                   ::std::byte** stack_top_ptr,
-                                                   ::std::byte* local_base) noexcept;
-
-    inline constexpr ::std::uintptr_t tiered_backedge_osr_disabled_entry{::std::numeric_limits<::std::uintptr_t>::max()};
-
-    struct tiered_backedge_probe_slot_t
-    {
-        tiered_backedge_probe_func_t probe_func{};
-        tiered_backedge_switch_func_t switch_func{};
-        ::std::uintptr_t osr_entry_address{};
-        ::std::size_t counter{};
-        ::std::size_t threshold{};
-        ::std::size_t slot{};
-        ::std::size_t module_id{};
-        ::std::size_t local_function_index{};
-        ::std::size_t wasm_code_offset{};
-        ::std::size_t loop_depth{};
-    };
-
     struct compile_option
     {
         // Indicates the module number of the currently compiled WASM, used for external function calls.
         ::std::size_t curr_wasm_id{};
-
-        // Tiered-only loop backedge probe. Pure uwvm-int and pure llvm-jit leave these fields zeroed, so their emitted bytecode is unchanged.
-        tiered_backedge_probe_func_t tiered_backedge_probe_func{};
-        tiered_backedge_switch_func_t tiered_backedge_switch_func{};
-        ::std::uintptr_t tiered_backedge_probe_slot_base_address{};
-        ::std::size_t tiered_backedge_probe_slot_base_count{};
-        ::std::uintptr_t tiered_backedge_osr_entry_base_address{};
-        ::std::size_t tiered_backedge_osr_entry_count{};
-        ::std::uintptr_t tiered_backedge_probe_counter_base_address{};
-        ::std::size_t tiered_backedge_probe_counter_count{};
-        ::std::uintptr_t tiered_backedge_probe_fast_slot_base_address{};
-        ::std::size_t tiered_backedge_probe_fast_slot_count{};
-        ::std::size_t tiered_backedge_probe_hot_threshold{4uz};
     };
 
     template <uwvm_int_stack_top_type... Type>

@@ -85,9 +85,6 @@ struct block_t
 
     // Wasm bytecode pointer at the loop start label (first opcode inside the loop body). Used by extra-heavy loop fusion.
     ::std::byte const* wasm_code_curr_at_start_label{};
-    ::std::size_t tiered_probe_slot{SIZE_MAX};
-    ::std::size_t tiered_probe_wasm_code_offset{};
-    ::std::size_t tiered_probe_depth{};
 };
 
 auto const import_func_count{curr_module.imported_function_vec_storage.size()};
@@ -211,7 +208,6 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     operand_stack.clear();
     codegen_operand_stack.clear();
     bool is_polymorphic{};
-    ::std::size_t tiered_probe_next_slot{};
 
     ::uwvm2::runtime::compiler::uwvm_int::optable::local_func_storage_t local_func_symbol{};
 

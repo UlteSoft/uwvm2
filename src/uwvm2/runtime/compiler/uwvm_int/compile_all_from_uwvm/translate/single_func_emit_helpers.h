@@ -2966,50 +2966,6 @@ auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_
                           emit_ptr_label_placeholder(label_id, dst_is_thunk);
                       }};
 
-auto const emit_tiered_probe_to{
-    [&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS
-    {
-        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-        if(options.tiered_backedge_probe_func == nullptr || options.tiered_backedge_switch_func == nullptr || target_frame.tiered_probe_slot == SIZE_MAX)
-        {
-            return;
-        }
-        if(options.tiered_backedge_osr_entry_base_address == 0u) { return; }
-        if(target_frame.tiered_probe_slot >= options.tiered_backedge_osr_entry_count) { return; }
-        if(options.tiered_backedge_probe_counter_base_address == 0u) { return; }
-        if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_counter_count) { return; }
-        if(options.tiered_backedge_probe_fast_slot_base_address == 0u) { return; }
-        if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_fast_slot_count) { return; }
-        if(options.tiered_backedge_probe_hot_threshold == 0uz) { return; }
-#ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-        if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported)
-        {
-            if(!is_polymorphic && stacktop_cache_count != 0uz) { return; }
-        }
-#endif
-
-        auto const fast_slot_base{reinterpret_cast<::uwvm2::runtime::compiler::uwvm_int::optable::tiered_backedge_probe_slot_t*>(
-            options.tiered_backedge_probe_fast_slot_base_address)};
-        auto const fast_slot{fast_slot_base + target_frame.tiered_probe_slot};
-        fast_slot->probe_func = options.tiered_backedge_probe_func;
-        fast_slot->switch_func = options.tiered_backedge_switch_func;
-        ::std::atomic_ref<::std::size_t>{fast_slot->counter}.store(0uz, ::std::memory_order_relaxed);
-        fast_slot->threshold = options.tiered_backedge_probe_hot_threshold;
-        fast_slot->slot = target_frame.tiered_probe_slot;
-        fast_slot->module_id = options.curr_wasm_id;
-        fast_slot->local_function_index = local_function_idx;
-        fast_slot->wasm_code_offset = target_frame.tiered_probe_wasm_code_offset;
-        fast_slot->loop_depth = target_frame.tiered_probe_depth;
-
-        emit_opfunc_to(dst, translate::get_uwvmint_tiered_backedge_switch_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-        emit_imm_to(dst, reinterpret_cast<::std::uintptr_t>(fast_slot));
-    }};
-
-auto const emit_tiered_probe_before_loop_backedge{[&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS
-                                                  {
-                                                      if(target_frame.type == block_type::loop) { emit_tiered_probe_to(dst, target_frame); }
-                                                  }};
-
 [[maybe_unused]] auto const emit_br_to_with_stacktop_transform{
     [&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_is_thunk) constexpr UWVM_THROWS
     {

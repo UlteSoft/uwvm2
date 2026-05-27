@@ -820,18 +820,15 @@
                 {
                     if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                     {
-                        emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                         emit_br_to_with_stacktop_transform(bytecode, target_label_id, false);
                     }
                     else
                     {
-                        emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                         emit_br_to(bytecode, target_label_id, false);
                     }
                 }
                 else
                 {
-                    emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                     emit_br_to(bytecode, target_label_id, false);
                 }
             }
@@ -868,25 +865,21 @@
             {
                 if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                 {
-                    emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                     emit_br_to_with_stacktop_transform(bytecode, target_label_id, false);
                 }
                 else
                 {
-                    emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                     emit_br_to(bytecode, target_label_id, false);
                 }
             }
             else
             {
-                emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
                 emit_br_to(bytecode, target_label_id, false);
             }
         }
     }
     else
     {
-        emit_tiered_probe_before_loop_backedge(bytecode, target_frame);
         emit_br_to(bytecode, target_label_id, false);
     }
 
@@ -2272,23 +2265,8 @@ case wasm1_code::br_if:
             emit_br_if_jump(label_id);
         }};
 
-    auto const maybe_tiered_loop_probe_thunk{[&](::std::size_t label_id) constexpr UWVM_THROWS -> ::std::size_t
-                                             {
-                                                 if(target_frame.type != block_type::loop || target_frame.tiered_probe_slot == SIZE_MAX ||
-                                                    labels.index_unchecked(label_id).in_thunk)
-                                                 {
-                                                     return label_id;
-                                                 }
-                                                 auto const probe_thunk_label_id{new_label(true)};
-                                                 set_label_offset(probe_thunk_label_id, thunks.size());
-                                                 emit_tiered_probe_before_loop_backedge(thunks, target_frame);
-                                                 emit_br_to(thunks, label_id, true);
-                                                 return probe_thunk_label_id;
-                                             }};
-
     auto const emit_br_if_jump_any{[&](::std::size_t label_id) constexpr UWVM_THROWS
                                    {
-                                       auto const actual_label_id{maybe_tiered_loop_probe_thunk(label_id)};
                                        if(runtime_log_on) [[unlikely]]
                                        {
                                            ++runtime_log_stats.cf_br_if_count;
@@ -2302,11 +2280,11 @@ case wasm1_code::br_if:
                                                                     u8" event=bytecode.emit.cf | op=br_if bc=main off=",
                                                                     bytecode.size(),
                                                                     u8" label_id=",
-                                                                    actual_label_id,
+                                                                    label_id,
                                                                     u8"\n");
                                            }
                                        }
-                                       emit_br_if_jump_conbine(actual_label_id);
+                                       emit_br_if_jump_conbine(label_id);
                                    }};
 
     auto const target_label_id{get_branch_target_label_id(target_frame)};
@@ -2320,25 +2298,10 @@ case wasm1_code::br_if:
 # endif
                                           )};
 #else
-    auto const maybe_tiered_loop_probe_thunk{[&](::std::size_t label_id) constexpr UWVM_THROWS -> ::std::size_t
-                                             {
-                                                 if(target_frame.type != block_type::loop || target_frame.tiered_probe_slot == SIZE_MAX ||
-                                                    labels.index_unchecked(label_id).in_thunk)
-                                                 {
-                                                     return label_id;
-                                                 }
-                                                 auto const probe_thunk_label_id{new_label(true)};
-                                                 set_label_offset(probe_thunk_label_id, thunks.size());
-                                                 emit_tiered_probe_before_loop_backedge(thunks, target_frame);
-                                                 emit_br_to(thunks, label_id, true);
-                                                 return probe_thunk_label_id;
-                                             }};
-
     // Combine disabled: `br_if` always consumes an i32 condition from the operand stack.
     auto const emit_br_if_jump_any{
         [&](::std::size_t label_id) constexpr UWVM_THROWS
         {
-            auto const actual_label_id{maybe_tiered_loop_probe_thunk(label_id)};
             if(runtime_log_on) [[unlikely]]
             {
                 ++runtime_log_stats.cf_br_if_count;
@@ -2352,7 +2315,7 @@ case wasm1_code::br_if:
                                          u8" event=bytecode.emit.cf | op=br_if bc=main off=",
                                          bytecode.size(),
                                          u8" label_id=",
-                                         actual_label_id,
+                                         label_id,
                                          u8"\n");
                 }
             }
@@ -2371,7 +2334,7 @@ case wasm1_code::br_if:
             {
                 emit_opfunc_to(bytecode, translate::get_uwvmint_br_if_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
             }
-            emit_ptr_label_placeholder(actual_label_id, false);
+            emit_ptr_label_placeholder(label_id, false);
         }};
 
     auto const target_label_id{get_branch_target_label_id(target_frame)};
@@ -2738,7 +2701,6 @@ case wasm1_code::br_if:
                             {
                                 auto const transform_thunk_label_id{new_label(true)};
                                 set_label_offset(transform_thunk_label_id, thunks.size());
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                                 brif_target_label_id = transform_thunk_label_id;
                             }
@@ -2836,12 +2798,10 @@ case wasm1_code::br_if:
                         stacktop_canonicalize_edge_to_memory(thunks);
                         if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                         {
-                            emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                             emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                         }
                         else
                         {
-                            emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                             emit_br_to(thunks, target_label_id, true);
                         }
                     }
@@ -2853,12 +2813,10 @@ case wasm1_code::br_if:
                         {
                             if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                             }
                             else
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to(thunks, target_label_id, true);
                             }
                         }
@@ -2869,12 +2827,10 @@ case wasm1_code::br_if:
                             stacktop_fill_to_canonical(thunks);
                             if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                             }
                             else
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to(thunks, target_label_id, true);
                             }
                         }
@@ -2896,12 +2852,10 @@ case wasm1_code::br_if:
                             emit_local_get_typed_to(thunks, result_type, internal_temp_local_off);
                             if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                             }
                             else
                             {
-                                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                                 emit_br_to(thunks, target_label_id, true);
                             }
                         }
@@ -2959,7 +2913,6 @@ case wasm1_code::br_if:
                 {
                     auto const transform_thunk_label_id{new_label(true)};
                     set_label_offset(transform_thunk_label_id, thunks.size());
-                    emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                     emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                     brif_target_label_id = transform_thunk_label_id;
                 }
@@ -3046,18 +2999,15 @@ case wasm1_code::br_if:
             {
                 if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                 {
-                    emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                     emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                 }
                 else
                 {
-                    emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                     emit_br_to(thunks, target_label_id, true);
                 }
             }
             else
             {
-                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                 emit_br_to(thunks, target_label_id, true);
             }
 
@@ -3443,7 +3393,6 @@ case wasm1_code::br_table:
                     {
                         auto const transform_thunk_label_id{new_label(true)};
                         set_label_offset(transform_thunk_label_id, thunks.size());
-                        emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                         emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                         br_table_target_label_id = transform_thunk_label_id;
                     }
@@ -3500,18 +3449,15 @@ case wasm1_code::br_table:
             {
                 if(target_frame.type == block_type::loop && stacktop_regtransform_cf_entry)
                 {
-                    emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                     emit_br_to_with_stacktop_transform(thunks, target_label_id, true);
                 }
                 else
                 {
-                    emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                     emit_br_to(thunks, target_label_id, true);
                 }
             }
             else
             {
-                emit_tiered_probe_before_loop_backedge(thunks, target_frame);
                 emit_br_to(thunks, target_label_id, true);
             }
 

@@ -283,28 +283,7 @@ case wasm1_code::loop:
                                   }(),
                                   .end_label_id = new_label(false),
                                   .else_label_id = SIZE_MAX,
-                                  .wasm_code_curr_at_start_label = code_curr,
-                                  .tiered_probe_slot = [&]() constexpr noexcept -> ::std::size_t
-                                  {
-                                      if(options.tiered_backedge_probe_func == nullptr || options.tiered_backedge_probe_slot_base_address == 0u ||
-                                         local_function_idx >= options.tiered_backedge_probe_slot_base_count ||
-                                         options.tiered_backedge_osr_entry_base_address == 0u ||
-                                         options.tiered_backedge_probe_counter_base_address == 0u ||
-                                         options.tiered_backedge_probe_fast_slot_base_address == 0u)
-                                      {
-                                          return SIZE_MAX;
-                                      }
-                                      auto const slot_base{reinterpret_cast<::std::size_t const*>(options.tiered_backedge_probe_slot_base_address)};
-                                      auto const slot{slot_base[local_function_idx] + tiered_probe_next_slot++};
-                                      if(slot >= options.tiered_backedge_osr_entry_count || slot >= options.tiered_backedge_probe_counter_count ||
-                                         slot >= options.tiered_backedge_probe_fast_slot_count)
-                                      {
-                                          return SIZE_MAX;
-                                      }
-                                      return slot;
-                                  }(),
-                                  .tiered_probe_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
-                                  .tiered_probe_depth = control_flow_stack.size()});
+                                  .wasm_code_curr_at_start_label = code_curr});
 
     // Stack-polymorphism is scoped to the current control frame only.
     // Entering a nested frame starts it in reachable mode for validation.

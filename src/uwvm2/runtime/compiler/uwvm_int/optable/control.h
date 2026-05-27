@@ -23,7 +23,6 @@
 
 #ifndef UWVM_MODULE
 // std
-# include <atomic>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -88,59 +87,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void unreachable_tail(Type... /*type*/) UWVM_THROWS
         { unreachable(); }
 
-        [[nodiscard]] inline constexpr bool tiered_backedge_try_switch_or_probe(tiered_backedge_probe_slot_t* slot,
-                                                                                ::std::byte** stack_top_ptr,
-                                                                                ::std::byte* local_base) noexcept
-        {
-            if(slot == nullptr) [[unlikely]] { return false; }
-
-            auto const osr_entry_address{
-                ::std::atomic_ref<::std::uintptr_t>{slot->osr_entry_address}.load(::std::memory_order_acquire)};
-            if(osr_entry_address == tiered_backedge_osr_disabled_entry) { return false; }
-
-            auto const switch_func{slot->switch_func};
-            if(osr_entry_address != 0u && switch_func != nullptr &&
-               switch_func(slot->module_id,
-                           slot->local_function_index,
-                           slot->wasm_code_offset,
-                           slot->loop_depth,
-                           slot->slot,
-                           osr_entry_address,
-                           stack_top_ptr,
-                           local_base))
-            {
-                return true;
-            }
-
-            auto const threshold{slot->threshold};
-            auto const probe_func{slot->probe_func};
-            if(threshold == 0uz || probe_func == nullptr) { return false; }
-
-            auto counter_ref{::std::atomic_ref<::std::size_t>{slot->counter}};
-            if(counter_ref.load(::std::memory_order_relaxed) >= threshold) { return false; }
-
-            auto const count{counter_ref.fetch_add(1uz, ::std::memory_order_relaxed) + 1uz};
-            if(count == threshold)
-            {
-                probe_func(slot->module_id, slot->local_function_index, slot->wasm_code_offset, slot->loop_depth);
-                auto const published_osr_entry_address{
-                    ::std::atomic_ref<::std::uintptr_t>{slot->osr_entry_address}.load(::std::memory_order_acquire)};
-                if(published_osr_entry_address != 0u && published_osr_entry_address != tiered_backedge_osr_disabled_entry && switch_func != nullptr &&
-                   switch_func(slot->module_id,
-                               slot->local_function_index,
-                               slot->wasm_code_offset,
-                               slot->loop_depth,
-                               slot->slot,
-                               published_osr_entry_address,
-                               stack_top_ptr,
-                               local_base))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }  // namespace details
 
     /// @brief `unreachable` opcode (tail-call): traps/terminates the VM.
@@ -375,99 +321,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             get_uwvmint_br_fptr_from_tuple(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
                                            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_br_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
-    }  // namespace translate
-
-    /// @brief Tiered-only loop/backedge switch/probe.
-    /// @details
-    /// - Emitted only when `compile_option::tiered_backedge_switch_func` is non-null.
-    /// - `type[0]` layout: `[opfunc_ptr][tiered_backedge_probe_slot_t*][next_opfunc_ptr]`.
-    /// - The tiered-only hot path reads one slot pointer and one acquire OSR-entry word. If the slot is not ready, the counter slow path is saturated at the
-    ///   hot threshold so tight loops stop doing atomic writes after the first hot notification.
-    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
-        requires (CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_tiered_backedge_switch(Type... type) UWVM_THROWS
-    {
-        static_assert(sizeof...(Type) >= 3uz);
-        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<Type...[1u], ::std::byte*>);
-        static_assert(::std::same_as<Type...[2u], ::std::byte*>);
-
-        type...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>);
-
-        ::std::uintptr_t slot_address;  // no init
-        ::std::memcpy(::std::addressof(slot_address), type...[0], sizeof(slot_address));
-        type...[0] += sizeof(slot_address);
-
-        auto const slot{reinterpret_cast<tiered_backedge_probe_slot_t*>(slot_address)};
-        if(details::tiered_backedge_try_switch_or_probe(slot, ::std::addressof(type...[1]), type...[2])) { return; }
-
-        ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...> next_interpreter;  // no init
-        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
-
-        UWVM_MUSTTAIL return next_interpreter(type...);
-    }
-
-    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
-        requires (!CompileOption.is_tail_call)
-    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_tiered_backedge_switch(TypeRef & ... typeref) UWVM_THROWS
-    {
-        static_assert(sizeof...(TypeRef) >= 3uz);
-        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
-        static_assert(::std::same_as<TypeRef...[1u], ::std::byte*>);
-        static_assert(::std::same_as<TypeRef...[2u], ::std::byte*>);
-        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
-        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
-
-        typeref...[0] += sizeof(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>);
-
-        ::std::uintptr_t slot_address;  // no init
-        ::std::memcpy(::std::addressof(slot_address), typeref...[0], sizeof(slot_address));
-        typeref...[0] += sizeof(slot_address);
-
-        auto const slot{reinterpret_cast<tiered_backedge_probe_slot_t*>(slot_address)};
-        if(details::tiered_backedge_try_switch_or_probe(slot, ::std::addressof(typeref...[1]), typeref...[2]))
-        {
-            typeref...[0] = nullptr;
-            return;
-        }
-    }
-
-    namespace translate
-    {
-        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
-            requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...>
-            get_uwvmint_tiered_backedge_switch_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        { return uwvmint_tiered_backedge_switch<CompileOption, Type...>; }
-
-        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
-            requires (CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_tiered_backedge_switch_fptr_from_tuple(
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_tiered_backedge_switch_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
-
-        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
-            get_uwvmint_tiered_backedge_switch_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        { return uwvmint_tiered_backedge_switch<CompileOption, Type...>; }
-
-        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
-                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
-            requires (!CompileOption.is_tail_call)
-        inline constexpr auto get_uwvmint_tiered_backedge_switch_fptr_from_tuple(
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
-            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
-        { return get_uwvmint_tiered_backedge_switch_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
 
     /// @brief `br_if` opcode (tail-call): conditional branch based on an i32 condition.
