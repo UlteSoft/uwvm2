@@ -7,6 +7,7 @@ struct local_func_storage_t
     ::std::size_t module_id{};
     ::std::size_t function_index{};
     ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* runtime_module_ptr{};
+    ::uwvm2::utils::container::deque<::std::size_t> tiered_osr_loop_slots{};
 };
 
 struct llvm_jit_module_storage_t
@@ -58,6 +59,11 @@ struct compile_option
     ::std::size_t lazy_defined_raw_call_target_count{};
     ::std::uintptr_t lazy_defined_typed_entry_target_base_address{};
     ::std::size_t lazy_defined_typed_entry_target_count{};
+    bool lazy_defined_targets_are_atomic{};
+    bool tiered_emit_loop_osr_entries{};
+    ::std::size_t tiered_loop_osr_entry_count{};
+    ::std::uintptr_t tiered_loop_probe_slot_base_address{};
+    ::std::size_t tiered_loop_probe_slot_base_count{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -567,7 +573,13 @@ namespace details
                                                       ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
                                                       ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
-                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz) UWVM_THROWS
+                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
+                                                      bool lazy_defined_targets_are_atomic = false,
+                                                      bool tiered_emit_loop_osr_entries = false,
+                                                      ::std::size_t tiered_loop_osr_entry_count = 0uz,
+                                                      ::std::uintptr_t tiered_loop_probe_slot_base_address = 0u,
+                                                      ::std::size_t tiered_loop_probe_slot_base_count = 0uz,
+                                                      ::uwvm2::utils::container::deque<::std::size_t>* tiered_osr_loop_slots = nullptr) UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -825,7 +837,13 @@ namespace details
                 lazy_defined_raw_call_target_base_address,
                 lazy_defined_raw_call_target_count,
                 lazy_defined_typed_entry_target_base_address,
-                lazy_defined_typed_entry_target_count)};
+                lazy_defined_typed_entry_target_count,
+                lazy_defined_targets_are_atomic,
+                tiered_emit_loop_osr_entries,
+                tiered_loop_osr_entry_count,
+                tiered_loop_probe_slot_base_address,
+                tiered_loop_probe_slot_base_count,
+                tiered_osr_loop_slots)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -1131,7 +1149,13 @@ namespace details
             options.lazy_defined_raw_call_target_base_address,
             options.lazy_defined_raw_call_target_count,
             options.lazy_defined_typed_entry_target_base_address,
-            options.lazy_defined_typed_entry_target_count);
+            options.lazy_defined_typed_entry_target_count,
+            options.lazy_defined_targets_are_atomic,
+            options.tiered_emit_loop_osr_entries,
+            options.tiered_loop_osr_entry_count,
+            options.tiered_loop_probe_slot_base_address,
+            options.tiered_loop_probe_slot_base_count,
+            ::std::addressof(local_func_storage.tiered_osr_loop_slots));
         return local_func_storage;
     }
 

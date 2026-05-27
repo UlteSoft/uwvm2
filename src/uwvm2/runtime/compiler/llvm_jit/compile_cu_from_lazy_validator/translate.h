@@ -121,7 +121,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
     namespace lazy_runtime_log
     {
-        [[nodiscard]] inline bool enabled() noexcept
+        [[nodiscard]] inline constexpr bool enabled() noexcept
         {
 # ifdef UWVM
             return ::uwvm2::uwvm::io::enable_runtime_log;
@@ -131,17 +131,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         template <typename... Args>
-        inline void line(Args&&... args) noexcept
+        inline constexpr void line(Args&&... args) noexcept
         {
 # ifdef UWVM
             if(!enabled()) { return; }
 
-            auto u8runtime_log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8runtime_log_output)};
-            ::fast_io::operations::decay::stream_ref_decay_lock_guard u8runtime_log_output_lg{
-                ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8runtime_log_output_osr)};
-            auto u8runtime_log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8runtime_log_output_osr)};
-
-            ::fast_io::io::perrln(u8runtime_log_output_ul, u8"[llvm-jit-lazy] ", ::std::forward<Args>(args)...);
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-lazy] ", ::std::forward<Args>(args)...);
 # else
             ((void)args, ...);
 # endif
@@ -180,6 +175,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t raw_entry_address{};
+        ::uwvm2::utils::container::deque<::std::uintptr_t> tiered_osr_entry_addresses{};
+        ::uwvm2::utils::container::deque<::std::size_t> tiered_osr_loop_slots{};
         bool ready{};
 
         lazy_materialized_function_storage_t() = default;
@@ -504,6 +501,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             materialized.ready = false;
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
+            materialized.tiered_osr_entry_addresses.clear();
+            materialized.tiered_osr_loop_slots.clear();
             materialized.llvm_jit_engine.reset();
             materialized.llvm_context_holder.reset();
 
@@ -568,6 +567,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
             if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
 
+            materialized.tiered_osr_loop_slots = materialized.local_func.tiered_osr_loop_slots;
+            for(auto const slot: materialized.tiered_osr_loop_slots)
+            {
+                auto const osr_function_name{all_details::get_llvm_wasm_tiered_osr_function_name(curr_module, function_index_u32, slot)};
+                auto const osr_entry_address{resolve_llvm_function_address(*engine, osr_function_name)};
+                if(osr_entry_address == 0u) [[unlikely]]
+                {
+                    materialized.tiered_osr_entry_addresses.clear();
+                    materialized.tiered_osr_loop_slots.clear();
+                    return false;
+                }
+                materialized.tiered_osr_entry_addresses.push_back(osr_entry_address);
+            }
+
             materialized.entry_address = entry_address;
             materialized.raw_entry_address = raw_entry_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
@@ -591,6 +604,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 materialized.ready = false;
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
+                materialized.tiered_osr_entry_addresses.clear();
+                materialized.tiered_osr_loop_slots.clear();
                 materialized.llvm_jit_engine.reset();
                 materialized.llvm_context_holder.reset();
             }
@@ -659,6 +674,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
 
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+                materialized.tiered_osr_loop_slots = materialized.local_func.tiered_osr_loop_slots;
+                for(auto const slot: materialized.tiered_osr_loop_slots)
+                {
+                    auto const osr_function_name{all_details::get_llvm_wasm_tiered_osr_function_name(curr_module, function_index_u32, slot)};
+                    auto const osr_entry_address{resolve_llvm_function_address(*engine, osr_function_name)};
+                    if(osr_entry_address == 0u) [[unlikely]]
+                    {
+                        materialized.tiered_osr_entry_addresses.clear();
+                        materialized.tiered_osr_loop_slots.clear();
+                        return false;
+                    }
+                    materialized.tiered_osr_entry_addresses.push_back(osr_entry_address);
+                }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
                 materialized.ready = true;
@@ -1287,6 +1315,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         if(!materialized.ready || materialized.entry_address == 0u) { return false; }
 
         function_address = materialized.entry_address;
+        return true;
+    }
+
+    [[nodiscard]] inline bool try_get_lazy_tiered_osr_entries(lazy_module_storage_t const& storage,
+                                                              ::std::size_t local_function_index,
+                                                              ::uwvm2::utils::container::deque<::std::size_t> const*& slots,
+                                                              ::uwvm2::utils::container::deque<::std::uintptr_t> const*& entry_addresses) noexcept
+    {
+        slots = nullptr;
+        entry_addresses = nullptr;
+        if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
+
+        auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+        if(!materialized.ready || materialized.tiered_osr_loop_slots.empty() ||
+           materialized.tiered_osr_loop_slots.size() != materialized.tiered_osr_entry_addresses.size())
+        {
+            return false;
+        }
+
+        slots = ::std::addressof(materialized.tiered_osr_loop_slots);
+        entry_addresses = ::std::addressof(materialized.tiered_osr_entry_addresses);
         return true;
     }
 }

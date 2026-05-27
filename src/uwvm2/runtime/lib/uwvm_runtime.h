@@ -64,6 +64,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
 
+    /// @brief Stop lazy background compilation before a WASI proc_exit leaves the normal run loop.
+    /// @note WASI proc_exit can terminate the process directly. Lazy compiler workers must be joined before that
+    ///       happens, otherwise they may still be inside LLVM or runtime-log code while global objects are being
+    ///       destroyed by the host process exit path.
+    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept;
+
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     /// @brief Clear compiled runtime state before loading a fresh module set in the same process.
     extern "C++" void llvm_jit_reset_runtime_state_host_api() noexcept;
