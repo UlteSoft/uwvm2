@@ -147,8 +147,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details `default_level` preserves each LLVM JIT policy's existing default.
     inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{runtime_llvm_jit_optimization_level_t::default_level};  // [global]
 
-    /// @brief Whether runtime LLVM IR verification is disabled by command line.
-    inline bool runtime_disable_llvm_ir_verifaction{};  // [global]
+    /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
+    inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
 #endif
 
     /// @brief   The global runtime mode.

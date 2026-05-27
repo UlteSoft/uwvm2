@@ -5080,7 +5080,7 @@ namespace uwvm2::runtime::lib
             if(!optimize_runtime_llvm_jit_module(*merged_module,
                                                  *target_machine,
                                                  codegen_opt_level,
-                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction)) [[unlikely]]
+                                                 !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction)) [[unlikely]]
             {
                 if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
                 {
@@ -6268,7 +6268,7 @@ namespace uwvm2::runtime::lib
                         }
                         ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option llvm_jit_opt{};
                         llvm_jit_opt.curr_wasm_id = module_id;
-                        llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction;
+                        llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
                         auto const llvm_jit_translation_start_time{runtime_compile_threads_verbose_now()};
                         rec.llvm_jit_compiled = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_all_from_uwvm(
                             *rec.runtime_module,
@@ -6719,7 +6719,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option llvm_jit_opt{};
                     llvm_jit_opt.curr_wasm_id = module_id;
-                    llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction;
+                    llvm_jit_opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
                     llvm_jit_opt.route_wasm_calls_through_runtime_bridge = true;
                     llvm_jit_opt.lazy_defined_targets_are_atomic = true;
 
@@ -7152,7 +7152,7 @@ namespace uwvm2::runtime::lib
 
                 ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option opt{};
                 opt.curr_wasm_id = module_id;
-                opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction;
+                opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
 
                 rec.llvm_jit_lazy_compile_options.compile_options = opt;
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;

@@ -20,8 +20,8 @@ Source focus:
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
 | `--runtime-aot` | `-Raot` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: full compilation with LLVM JIT. |
 | `--runtime-compiler-log` | `-Rclog` | `[out|err|file <file:path>]` | Once | Runtime backend support | Route runtime compiler logs. |
-| `--runtime-llvm-jit-optimization-level` | None | `[0|1|2|3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Force LLVM JIT optimization level. |
-| `--runtime-disable-llvm-ir-verifaction` | None | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
+| `--runtime-llvm-jit-optimization-level` | `-Rllvm-opt` | `[0|1|2|3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Force LLVM JIT optimization level. |
+| `--runtime-llvm-jit-disable-ir-verifaction` | `-Rllvm-noverify` | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
 
@@ -146,6 +146,7 @@ uwvm --runtime-llvm-jit-optimization-level 0
 uwvm --runtime-llvm-jit-optimization-level 1
 uwvm --runtime-llvm-jit-optimization-level 2
 uwvm --runtime-llvm-jit-optimization-level 3
+uwvm -Rllvm-opt 2
 ```
 
 Behavior:
@@ -163,13 +164,13 @@ Example:
 uwvm --runtime-jit --runtime-llvm-jit-optimization-level 1 --run app.wasm
 ```
 
-## `--runtime-disable-llvm-ir-verifaction`
+## `--runtime-llvm-jit-disable-ir-verifaction`
 
 Behavior:
 
 - LLVM IR verification is enabled by default for LLVM-JIT runtime compilation.
 - This command disables the LLVM IR verifier for LLVM-JIT full, lazy, and tiered runtime paths.
-- It has no alias.
+- Alias: `-Rllvm-noverify`.
 - It has an `is_exist` guard.
 - It is compiled only when `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` is enabled.
 - It does not disable Wasm validation or lazy full-code verification selected by `--runtime-custom-mode lazy+verification`.
@@ -183,7 +184,7 @@ Failure model when verification is enabled:
 Example:
 
 ```bash
-uwvm --runtime-aot --runtime-disable-llvm-ir-verifaction --run app.wasm
+uwvm --runtime-aot --runtime-llvm-jit-disable-ir-verifaction --run app.wasm
 ```
 
 ## `--runtime-compile-threads`
@@ -312,6 +313,6 @@ LLVM JIT without LLVM IR verification:
 uwvm \
   --runtime-custom-mode full \
   --runtime-custom-compiler jit \
-  --runtime-disable-llvm-ir-verifaction \
+  --runtime-llvm-jit-disable-ir-verifaction \
   --run app.wasm
 ```

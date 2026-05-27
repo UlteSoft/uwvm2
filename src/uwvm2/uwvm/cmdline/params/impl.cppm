@@ -52,7 +52,7 @@ export import :runtime_compiler_log;
 export import :runtime_compile_threads;
 export import :runtime_scheduling_policy;
 export import :runtime_llvm_jit_optimization_level;
-export import :runtime_disable_llvm_ir_verifaction;
+export import :runtime_llvm_jit_disable_ir_verifaction;
 export import :runtime_debug_int;
 export import :runtime_int;
 export import :runtime_jit;

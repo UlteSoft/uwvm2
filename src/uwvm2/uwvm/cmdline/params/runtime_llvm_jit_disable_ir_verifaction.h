@@ -43,14 +43,20 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 {
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    namespace details
+    {
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_llvm_jit_disable_ir_verifaction_alias{u8"-Rllvm-noverify"};
+    }  // namespace details
+
 # if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wbraced-scalar-init"
 # endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_disable_llvm_ir_verifaction{
-        .name{u8"--runtime-disable-llvm-ir-verifaction"},
+    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_disable_ir_verifaction{
+        .name{u8"--runtime-llvm-jit-disable-ir-verifaction"},
         .describe{u8"Disable runtime LLVM IR verification for the LLVM JIT backend."},
-        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_disable_llvm_ir_verifaction)},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_disable_ir_verifaction_alias), 1uz}},
+        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 # if defined(__clang__)
 #  pragma clang diagnostic pop

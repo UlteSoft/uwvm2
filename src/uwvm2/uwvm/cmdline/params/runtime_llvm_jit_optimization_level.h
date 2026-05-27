@@ -45,6 +45,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     namespace details
     {
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_llvm_jit_optimization_level_alias{u8"-Rllvm-opt"};
 # if defined(UWVM_MODULE)
         extern "C++"
 # else
@@ -64,6 +65,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--runtime-llvm-jit-optimization-level"},
         .describe{u8"Force the runtime LLVM JIT optimization level."},
         .usage{u8"[0|1|2|3]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_optimization_level_alias), 1uz}},
         .handle{::std::addressof(details::runtime_llvm_jit_optimization_level_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_existed)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
