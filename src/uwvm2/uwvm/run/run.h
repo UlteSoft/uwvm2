@@ -84,38 +84,41 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                            return nullptr;
                                        }};
 
-        auto const is_void_to_void_wasm_func_index{
-            [&](::std::size_t func_index) noexcept -> bool
-            {
-                auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
-                if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { return false; }
+        auto const is_void_to_void_wasm_func_index{[&](::std::size_t func_index) noexcept -> bool
+                                                   {
+                                                       auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+                                                       if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]]
+                                                       {
+                                                           return false;
+                                                       }
 
-                auto const& rt{rt_it->second};
-                auto const import_n{rt.imported_function_vec_storage.size()};
-                auto const local_n{rt.local_defined_function_vec_storage.size()};
-                if(func_index >= import_n + local_n) [[unlikely]] { return false; }
+                                                       auto const& rt{rt_it->second};
+                                                       auto const import_n{rt.imported_function_vec_storage.size()};
+                                                       auto const local_n{rt.local_defined_function_vec_storage.size()};
+                                                       if(func_index >= import_n + local_n) [[unlikely]] { return false; }
 
-                auto const is_void_to_void_ft{[](auto const& ft) constexpr noexcept -> bool
-                                              { return ft.parameter.begin == ft.parameter.end && ft.result.begin == ft.result.end; }};
+                                                       auto const is_void_to_void_ft{
+                                                           [](auto const& ft) constexpr noexcept -> bool
+                                                           { return ft.parameter.begin == ft.parameter.end && ft.result.begin == ft.result.end; }};
 
-                if(func_index < import_n)
-                {
-                    auto const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
-                    auto const leaf{resolve_import_leaf(imp)};
-                    if(leaf == nullptr) [[unlikely]] { return false; }
+                                                       if(func_index < import_n)
+                                                       {
+                                                           auto const imp{::std::addressof(rt.imported_function_vec_storage.index_unchecked(func_index))};
+                                                           auto const leaf{resolve_import_leaf(imp)};
+                                                           if(leaf == nullptr) [[unlikely]] { return false; }
 
-                    // Allow imported entry only when it ultimately resolves to a wasm-defined function.
-                    if(leaf->link_kind != func_link_kind::defined) { return false; }
-                    auto const f{leaf->target.defined_ptr};
-                    if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
-                    return is_void_to_void_ft(*f->function_type_ptr);
-                }
+                                                           // Allow imported entry only when it ultimately resolves to a wasm-defined function.
+                                                           if(leaf->link_kind != func_link_kind::defined) { return false; }
+                                                           auto const f{leaf->target.defined_ptr};
+                                                           if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                                                           return is_void_to_void_ft(*f->function_type_ptr);
+                                                       }
 
-                auto const local_idx{func_index - import_n};
-                auto const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
-                if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
-                return is_void_to_void_ft(*f->function_type_ptr);
-            }};
+                                                       auto const local_idx{func_index - import_n};
+                                                       auto const f{::std::addressof(rt.local_defined_function_vec_storage.index_unchecked(local_idx))};
+                                                       if(f == nullptr || f->function_type_ptr == nullptr) [[unlikely]] { return false; }
+                                                       return is_void_to_void_ft(*f->function_type_ptr);
+                                                   }};
 
         // Prefer start section when present.
         auto const all_module_it{::uwvm2::uwvm::wasm::storage::all_module.find(main_module_name)};
@@ -336,19 +339,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
             }};
 
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
         ::std::size_t max_compile_threads{::uwvm2::utils::thread::hardware_concurrency()};
         if(max_compile_threads == 0uz) [[unlikely]] { max_compile_threads = 1uz; }
         auto const default_compile_threads{calculate_default_runtime_compile_threads(max_compile_threads)};
         auto const aggressive_compile_threads{calculate_aggressive_runtime_compile_threads(max_compile_threads)};
-#else
+# else
         constexpr ::std::size_t max_compile_threads{1uz};
-#endif
+# endif
 
         ::std::size_t resolved_compile_threads{
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
             default_compile_threads
-#endif
+# endif
         };
 
         if(::uwvm2::uwvm::runtime::runtime_mode::runtime_compile_threads_existed)
@@ -357,17 +360,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             if(requested_compile_threads_policy == runtime_compile_threads_policy_t::default_policy)
             {
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 resolved_compile_threads = default_compile_threads;
-#else
+# else
                 resolved_compile_threads = 0uz;
-#endif
+# endif
             }
             else if(requested_compile_threads_policy == runtime_compile_threads_policy_t::aggressive)
             {
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 resolved_compile_threads = aggressive_compile_threads;
-#else
+# else
                 resolved_compile_threads = 0uz;
                 if(::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                 {
@@ -379,7 +382,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                     if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
                 }
-#endif
+# endif
             }
             else
             {
@@ -388,7 +391,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
                     resolved_compile_threads = 0uz;
 
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                     resolved_compile_threads = static_cast<::std::size_t>(requested_compile_threads);
                     if(resolved_compile_threads > max_compile_threads && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                     {
@@ -404,18 +407,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                         if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
                     }
-#else
+# else
                     if(requested_compile_threads != 0 && ::uwvm2::uwvm::io::show_runtime_compile_threads_warning)
                     {
-                        runtime_compile_threads_warn(u8"Requested runtime compile thread count (requested=",
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                     requested_compile_threads,
-                                                     ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                     u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
+                        runtime_compile_threads_warn(
+                            u8"Requested runtime compile thread count (requested=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            requested_compile_threads,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"), but this platform does not provide fast_io::native_thread. Falling back to 0 extra compile threads.");
 
                         if(::uwvm2::uwvm::io::runtime_compile_threads_warning_fatal) [[unlikely]] { runtime_compile_threads_warn_to_fatal(); }
                     }
-#endif
+# endif
                 }
                 else
                 {
@@ -450,7 +454,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                 if(requested_compile_threads_policy == runtime_compile_threads_policy_t::default_policy)
                 {
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
@@ -464,7 +468,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                          max_compile_threads,
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                          u8", per-module full-compile scheduling may adapt below this upper bound). ");
-#else
+# else
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
@@ -474,25 +478,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                          u8"default",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                          u8", fast_io::native_thread unavailable on this platform). ");
-#endif
+# endif
                 }
                 else if(requested_compile_threads_policy == runtime_compile_threads_policy_t::aggressive)
                 {
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-                    runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         resolved_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8" (requested=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         u8"aggressive",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8", detected-max=",
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                                         max_compile_threads,
-                                                         ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                         u8", aggressive-policy=floor(max*2/3), per-module full-compile scheduling may adapt below this upper bound). ");
-#else
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+                    runtime_compile_threads_verbose_info(
+                        u8"Runtime compile thread upper bound resolved to ",
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        resolved_compile_threads,
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        u8" (requested=",
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        u8"aggressive",
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        u8", detected-max=",
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                        max_compile_threads,
+                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                        u8", aggressive-policy=floor(max*2/3), per-module full-compile scheduling may adapt below this upper bound). ");
+# else
                     runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                          resolved_compile_threads,
@@ -502,7 +507,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                          u8"aggressive",
                                                          ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                          u8", fast_io::native_thread unavailable on this platform). ");
-#endif
+# endif
                 }
                 else
                 {
@@ -523,7 +528,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             else
             {
-#ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
+# ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
                 runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
@@ -533,13 +538,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                                      max_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                      u8", per-module full-compile scheduling may adapt below this upper bound). ");
-#else
+# else
                 runtime_compile_threads_verbose_info(u8"Runtime compile thread upper bound resolved to ",
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
                                                      resolved_compile_threads,
                                                      ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                                      u8" by the default policy (fast_io::native_thread unavailable on this platform). ");
-#endif
+# endif
             }
         }
 
@@ -643,7 +648,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         // initialize runtime
         ::uwvm2::uwvm::runtime::initializer::initialize_runtime();
 
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter &&
            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode != ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile) [[unlikely]]
         {
@@ -678,7 +683,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile;
         }
-#endif
+# endif
 
         resolve_runtime_compile_threads();
 
@@ -689,9 +694,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             case ::uwvm2::uwvm::wasm::base::mode::validation:
             {
                 /// this is an vm bug
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 ::std::unreachable();
             }
             case ::uwvm2::uwvm::wasm::base::mode::run:
@@ -700,29 +705,29 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                 {
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile:
                     {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                         bool lazy_backend_supported{};
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  endif
+#  if defined(UWVM_RUNTIME_LLVM_JIT)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#  endif
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
+#  endif
                         if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -742,47 +747,48 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
                         cfg.assume_full_code_verified = false;
                         ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-#else
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                            u8"uwvm: ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                            u8"[fatal] ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"Lazy compilation is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                            u8"(runtime)\n\n",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+# else
+                        ::fast_io::io::perr(
+                            ::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"Lazy compilation is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            u8"(runtime)\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
-#endif
+# endif
 
                         break;
                     }
                     case ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile_with_full_code_verification:
                     {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                         bool lazy_backend_supported{};
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
-# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  endif
+#  if defined(UWVM_RUNTIME_LLVM_JIT)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#  endif
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                         if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                            ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered)
                         {
                             lazy_backend_supported = true;
                         }
-# endif
+#  endif
                         if(!lazy_backend_supported) [[unlikely]]
                         {
                             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -807,19 +813,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
                         cfg.assume_full_code_verified = true;
                         ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
-#else
-                        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                            u8"uwvm: ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                            u8"[fatal] ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"Lazy compilation with full code verification is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                            u8"(runtime)\n\n",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+# else
+                        ::fast_io::io::perr(
+                            ::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"Lazy compilation with full code verification is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            u8"(runtime)\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                         ::fast_io::fast_terminate();
-#endif
+# endif
 
                         break;
                     }
@@ -827,7 +834,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     {
                         switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler)
                         {
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only:
                             {
                                 // full compile + uwvm_int interpreter backend
@@ -837,27 +844,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                                 break;
                             }
-#endif
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# endif
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::debug_interpreter:
                             {
                                 // not supported yet
-                                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                                    u8"uwvm: ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                                    u8"[fatal] ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                                    u8"Debug Interpreter is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
-                                                    u8"(runtime)\n\n",
-                                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                                ::fast_io::io::perr(
+                                    ::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Debug Interpreter is not currently supported. The current VM only supports full compile with int or jit (-Rcm full -Rcc int|jit). ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                                    u8"(runtime)\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
                                 ::fast_io::fast_terminate();
 
                                 break;
                             }
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered:
                             {
                                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -874,8 +882,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                                 break;
                             }
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
                             {
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
@@ -884,13 +892,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
                                 break;
                             }
-#endif
+# endif
                             [[unlikely]] default:
                             {
 /// @warning Maybe I forgot to realize it.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                                 ::std::unreachable();
                             }
                         }
@@ -899,9 +907,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                     }
                     [[unlikely]] default:
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::std::unreachable();
                     }
                 }
@@ -911,9 +919,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             [[unlikely]] default:
             {
                 /// @warning Maybe I forgot to realize it.
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 ::std::unreachable();
             }
         }

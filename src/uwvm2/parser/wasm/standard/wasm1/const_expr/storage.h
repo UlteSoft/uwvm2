@@ -111,7 +111,7 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
 
 UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm::standard::wasm1::const_expr
 {
-    struct wasm1_const_expr_storage_t 
+    struct wasm1_const_expr_storage_t
     {
         ::std::byte const* begin{};
         ::std::byte const* end{};

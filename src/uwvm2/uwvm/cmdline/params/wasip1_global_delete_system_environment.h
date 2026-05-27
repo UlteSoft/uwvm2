@@ -48,8 +48,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_delete_system_environment_alias{u8"--wasip1-delete-system-environment",
-                                                                                                            u8"-I1delsysenv"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_delete_system_environment_alias{
+            u8"--wasip1-delete-system-environment",
+            u8"-I1delsysenv"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
@@ -57,8 +58,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #  endif
             ::uwvm2::utils::cmdline::parameter_return_type
             wasip1_global_delete_system_environment_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                             ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)
@@ -69,7 +70,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-global-delete-system-environment"},
         .describe{u8"Remove a host environment variable from the global-default WASI Preview 1 inheritance set."},
         .usage{u8"<env:str>"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_delete_system_environment_alias.data(), details::wasip1_global_delete_system_environment_alias.size()}},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_delete_system_environment_alias.data(),
+                                                             details::wasip1_global_delete_system_environment_alias.size()}},
         .handle{::std::addressof(details::wasip1_global_delete_system_environment_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

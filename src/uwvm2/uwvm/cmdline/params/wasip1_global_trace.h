@@ -48,15 +48,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline bool wasip1_global_trace_is_exist{};  // [global]
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_trace_alias{u8"--wasip1-trace", u8"-I1trace"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_trace_alias{u8"--wasip1-trace",
+                                                                                                                                   u8"-I1trace"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
             ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_trace_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)

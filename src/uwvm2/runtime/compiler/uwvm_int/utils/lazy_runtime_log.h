@@ -44,8 +44,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::lazy_runtime_lo
             case ::uwvm2::utils::thread::lazy_compile_state::queued: return u8"queued";
             case ::uwvm2::utils::thread::lazy_compile_state::compiling: return u8"compiling";
             case ::uwvm2::utils::thread::lazy_compile_state::compiled: return u8"compiled";
-            case ::uwvm2::utils::thread::lazy_compile_state::failed: return u8"failed";
-            [[unlikely]] default: return u8"unknown";
+            case ::uwvm2::utils::thread::lazy_compile_state::failed:
+                return u8"failed";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
@@ -59,7 +61,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::lazy_runtime_lo
     }
 
     template <typename... Args>
-    inline constexpr void line(Args&&... args) noexcept
+    inline constexpr void line(Args && ... args) noexcept
     {
 #ifdef UWVM
         if(!enabled()) { return; }

@@ -37,7 +37,7 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 {
     /// @brief warning control
-    inline bool show_vm_warning{true};            // [global]
+    inline bool show_vm_warning{true};  // [global]
     // Parser warnings can be extremely noisy (e.g. unused-type reports) and are mostly "allowed but not recommended"
     // checks, so keep them off by default. Use `--log-enable-warning parser` to turn them back on.
     inline bool show_parser_warning{false};       // [global]
@@ -49,14 +49,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
     inline bool show_weak_symbol_warning{true};  // [global]
 # endif
     inline bool show_depend_warning{true};  // [global]
-    inline bool show_wasip1_warning{};  // [global]
+    inline bool show_wasip1_warning{};      // [global]
 # if defined(_WIN32) && !defined(_WIN32_WINDOWS)
     inline bool show_nt_path_warning{true};  // [global]
 # endif
 # if defined(_WIN32) && defined(_WIN32_WINDOWS)
     inline bool show_toctou_warning{true};  // [global]
 # endif
-    inline bool show_runtime_warning{true};  // [global]
+    inline bool show_runtime_warning{true};                  // [global]
     inline bool show_runtime_compile_threads_warning{true};  // [global]
 
     /// @brief wtrap control
@@ -77,7 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::io
 # if defined(_WIN32) && defined(_WIN32_WINDOWS)
     inline bool toctou_warning_fatal{};  // [global]
 # endif
-    inline bool runtime_warning_fatal{};  // [global]
+    inline bool runtime_warning_fatal{};                  // [global]
     inline bool runtime_compile_threads_warning_fatal{};  // [global]
 
 }  // namespace uwvm2::uwvm::io

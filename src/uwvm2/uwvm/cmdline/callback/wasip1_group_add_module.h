@@ -53,9 +53,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  else
     UWVM_GNU_COLD inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_add_module_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                                                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_add_module_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
+                                                                                            para_begin,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto group_arg{para_curr + 1u};
         ::uwvm2::utils::container::u8string_view group_name{};
@@ -67,7 +68,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         auto module_arg{group_arg + 1u};
         ::uwvm2::utils::container::u8string_view module_name{};
-        if(auto const ret{wasip1_group_details::validate_module_arg(::uwvm2::uwvm::cmdline::params::wasip1_group_add_module, module_arg, para_end, module_name)};
+        if(auto const ret{
+               wasip1_group_details::validate_module_arg(::uwvm2::uwvm::cmdline::params::wasip1_group_add_module, module_arg, para_end, module_name)};
            ret != wasip1_group_details::parameter_return_type::def) [[unlikely]]
         {
             return ret;
@@ -76,7 +78,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         auto const group_index{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_named_wasip1_group_index(group_name)};
         if(group_index == ::uwvm2::uwvm::imported::wasi::wasip1::storage::invalid_wasip1_group_index) [[unlikely]]
         {
-            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_group_add_module, u8"WASI Preview 1 module group does not exist.");
+            return wasip1_module_details::print_usage_error(::uwvm2::uwvm::cmdline::params::wasip1_group_add_module,
+                                                            u8"WASI Preview 1 module group does not exist.");
         }
 
         if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::try_add_wasip1_module_to_named_group(module_name, group_index)) [[unlikely]]

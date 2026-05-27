@@ -114,26 +114,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"path_open(",
-                                dirfd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(dirflags)>>>(dirflags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(path_ptrsz),
-                                u8", ",
-                                path_len,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(oflags)>>>(oflags),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_base)>>>(fs_rights_base),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_inheriting)>>>(fs_rights_inheriting),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fdflags)>>>(fdflags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(fd_ptrsz),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"path_open(",
+                dirfd,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(dirflags)>>>(dirflags),
+                u8", ",
+                ::fast_io::mnp::addrvw(path_ptrsz),
+                u8", ",
+                path_len,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(oflags)>>>(oflags),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_base)>>>(fs_rights_base),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_inheriting)>>>(fs_rights_inheriting),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fdflags)>>>(fdflags),
+                u8", ",
+                ::fast_io::mnp::addrvw(fd_ptrsz),
+                u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

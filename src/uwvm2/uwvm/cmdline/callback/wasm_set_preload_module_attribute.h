@@ -59,9 +59,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         inline constexpr ::uwvm2::utils::container::u8string_view supported_memory_access_modes_text{u8"none, copy"};
 #endif
 
-        [[nodiscard]] inline constexpr bool parse_memory_access_mode(
-            ::uwvm2::utils::container::u8string_view text,
-            ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t& out) noexcept
+        [[nodiscard]] inline constexpr bool parse_memory_access_mode(::uwvm2::utils::container::u8string_view text,
+                                                                     ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t& out) noexcept
         {
             using mode = ::uwvm2::uwvm::wasm::type::preload_module_memory_access_mode_t;
 
@@ -86,9 +85,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return false;
         }
 
-        [[nodiscard]] inline constexpr bool parse_memory_index_list(
-            ::uwvm2::utils::container::u8string_view text,
-            ::uwvm2::utils::container::unordered_flat_set<::std::size_t>& out) noexcept
+        [[nodiscard]] inline constexpr bool parse_memory_index_list(::uwvm2::utils::container::u8string_view text,
+                                                                    ::uwvm2::utils::container::unordered_flat_set<::std::size_t>& out) noexcept
         {
             out.clear();
             if(text == u8"all") { return true; }
@@ -117,7 +115,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
             return true;
         }
-    }
+    }  // namespace preload_module_attribute_details
 
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
@@ -169,10 +167,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         // This option creates/updates configuration keyed by a Wasm module name,
         // so validate it here instead of deferring to a later loader path.
-        if(auto const [module_name_pos, module_name_err]{
-               ::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
-                                                                module_name.cbegin(),
-                                                                module_name.cend())};
+        if(auto const [module_name_pos,
+                       module_name_err]{::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
+                                                                                         module_name.cbegin(),
+                                                                                         module_name.cend())};
            module_name_err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
         {
             static_cast<void>(module_name_pos);

@@ -99,10 +99,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
         // This option creates/updates configuration keyed by a Wasm module name,
         // so validate it here instead of deferring to a later loader path.
-        if(auto const [module_name_pos, module_name_err]{
-               ::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
-                                                                module_name.cbegin(),
-                                                                module_name.cend())};
+        if(auto const [module_name_pos,
+                       module_name_err]{::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
+                                                                                         module_name.cbegin(),
+                                                                                         module_name.cend())};
            module_name_err != ::uwvm2::utils::utf::utf_error_code::success) [[unlikely]]
         {
             static_cast<void>(module_name_pos);

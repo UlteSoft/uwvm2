@@ -58,10 +58,7 @@ case wasm1_code::br:
     // not the loop result types. MVP has no block parameters, so a loop label always has arity 0.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"br", target_arity);
-    }
+    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"br", target_arity); }
 
     // type-check the branch arguments if present
     if(target_arity != 0uz)
@@ -76,10 +73,8 @@ case wasm1_code::br:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br";
-                err.err_selectable.br_value_type_mismatch.expected_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -196,10 +191,8 @@ case wasm1_code::br_if:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_if";
-                err.err_selectable.br_value_type_mismatch.expected_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -217,10 +210,7 @@ case wasm1_code::br_if:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_br_if(llvm_jit_emit_state, label_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_br_if(llvm_jit_emit_state, label_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -478,10 +468,8 @@ case wasm1_code::br_table:
             {
                 err.err_curr = op_begin;
                 err.err_selectable.br_value_type_mismatch.op_code_name = u8"br_table";
-                err.err_selectable.br_value_type_mismatch.expected_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
-                err.err_selectable.br_value_type_mismatch.actual_type =
-                    static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
+                err.err_selectable.br_value_type_mismatch.expected_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(expected_type);
+                err.err_selectable.br_value_type_mismatch.actual_type = static_cast<::uwvm2::parser::wasm::standard::wasm1::type::value_type>(actual_type);
                 err.err_code = ::uwvm2::validation::error::code_validation_error_code::br_value_type_mismatch;
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
@@ -530,10 +518,7 @@ case wasm1_code::return_:
 
     ::std::size_t const return_arity{static_cast<::std::size_t>(func_frame.result.end - func_frame.result.begin)};
 
-    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"return", return_arity);
-    }
+    if(!is_polymorphic && concrete_operand_count() < return_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"return", return_arity); }
 
     // Type-check the return values if present. For multi-value, values are validated from the top of the stack.
     if(return_arity != 0uz)

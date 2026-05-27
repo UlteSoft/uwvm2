@@ -50,9 +50,9 @@
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
+# if !(__cpp_pack_indexing >= 202311L)
+#  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
@@ -68,9 +68,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
 
                 ::fast_io::fast_terminate();
             }
@@ -509,11 +509,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_t<Type...> get_uwvmint_tiered_backedge_switch_fptr(
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        {
-            return uwvmint_tiered_backedge_switch<CompileOption, Type...>;
-        }
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_tiered_backedge_switch_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_tiered_backedge_switch<CompileOption, Type...>; }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
@@ -526,11 +524,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
             requires (!CompileOption.is_tail_call)
-        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...> get_uwvmint_tiered_backedge_switch_fptr(
-            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
-        {
-            return uwvmint_tiered_backedge_switch<CompileOption, Type...>;
-        }
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_tiered_backedge_switch_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_tiered_backedge_switch<CompileOption, Type...>; }
 
         template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
                   ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
@@ -578,9 +574,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::uwvm2::runtime::compiler::uwvm_int::optable::
                 get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
 
-#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-#endif
+# endif
         if(cond)
         {
             type...[0] = jmp_ip;
@@ -638,9 +634,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Pop condition from operand stack memory (updates stack pointer `type...[1]`).
         wasm_i32 const cond{::uwvm2::runtime::compiler::uwvm_int::optable::get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
 
-#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-#endif
+# endif
         if(cond)
         {
             type...[0] = jmp_ip;
@@ -741,9 +737,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -958,9 +954,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }

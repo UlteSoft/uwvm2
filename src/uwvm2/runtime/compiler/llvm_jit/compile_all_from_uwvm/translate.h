@@ -92,13 +92,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     extern "C++" void llvm_jit_pop_call_stack_frame() noexcept;
 
     extern "C++" void llvm_jit_tiered_osr_enter_context(::std::size_t module_id,
-                                                         ::std::size_t function_index,
-                                                         ::std::size_t slot,
-                                                         ::std::uintptr_t local_base_address) noexcept;
+                                                        ::std::size_t function_index,
+                                                        ::std::size_t slot,
+                                                        ::std::uintptr_t local_base_address) noexcept;
 
-    extern "C++" ::std::uintptr_t llvm_jit_tiered_osr_take_local_base(::std::size_t module_id,
-                                                                      ::std::size_t function_index,
-                                                                      ::std::size_t slot) noexcept;
+    extern "C++" ::std::uintptr_t llvm_jit_tiered_osr_take_local_base(::std::size_t module_id, ::std::size_t function_index, ::std::size_t slot) noexcept;
 
     extern "C++" void llvm_jit_tiered_osr_clear_context() noexcept;
 

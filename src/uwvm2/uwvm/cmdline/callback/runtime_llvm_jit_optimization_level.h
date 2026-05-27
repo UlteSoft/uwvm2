@@ -54,9 +54,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     UWVM_GNU_COLD inline constexpr
 # endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_llvm_jit_optimization_level_callback(
-            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto print_usage_error{
             []() constexpr noexcept
@@ -120,21 +120,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         using runtime_llvm_jit_optimization_level_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_t;
         switch(optimization_level)
         {
-            case 0u:
-                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level =
-                    runtime_llvm_jit_optimization_level_t::none;
-                break;
-            case 1u:
-                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level =
-                    runtime_llvm_jit_optimization_level_t::less;
-                break;
-            case 2u:
-                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level =
-                    runtime_llvm_jit_optimization_level_t::mid;
-                break;
+            case 0u: ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level = runtime_llvm_jit_optimization_level_t::none; break;
+            case 1u: ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level = runtime_llvm_jit_optimization_level_t::less; break;
+            case 2u: ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level = runtime_llvm_jit_optimization_level_t::mid; break;
             case 3u:
-                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level =
-                    runtime_llvm_jit_optimization_level_t::aggressive;
+                ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level = runtime_llvm_jit_optimization_level_t::aggressive;
                 break;
             default: ::fast_io::fast_terminate();
         }

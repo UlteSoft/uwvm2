@@ -12,9 +12,8 @@ namespace details
 
     using trivial_call_inline_kind = ::uwvm2::runtime::compiler::uwvm_int::optable::trivial_defined_call_kind;
 
-    [[nodiscard]] inline constexpr bool runtime_wasm_function_types_equal(
-        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& a,
-        ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& b) noexcept
+    [[nodiscard]] inline constexpr bool runtime_wasm_function_types_equal(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& a,
+                                                                          ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const& b) noexcept
     {
         auto const a_param_count{static_cast<::std::size_t>(a.parameter.end - a.parameter.begin)};
         auto const b_param_count{static_cast<::std::size_t>(b.parameter.end - b.parameter.begin)};
@@ -43,7 +42,7 @@ namespace details
 
     [[nodiscard]] inline runtime_import_direct_defined_call_resolution_t
         resolve_runtime_import_direct_defined_call(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
-                                                  ::std::size_t import_func_index) noexcept
+                                                   ::std::size_t import_func_index) noexcept
     {
         using imported_function_storage_t = ::uwvm2::uwvm::runtime::storage::imported_function_storage_t;
         using function_link_kind = ::uwvm2::uwvm::runtime::storage::imported_function_link_kind;

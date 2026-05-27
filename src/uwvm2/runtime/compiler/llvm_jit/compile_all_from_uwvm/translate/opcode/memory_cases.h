@@ -418,10 +418,7 @@ case wasm1_code::memory_size:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -491,13 +488,9 @@ case wasm1_code::memory_grow:
     }
 
     // Stack effect: (i32 delta_pages) -> (i32 previous_pages_or_minus1)
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz);
-    }
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"memory.grow", 1uz); }
 
-    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack &&
-                                                   delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
+    if(auto const delta{try_pop_concrete_operand()}; delta.from_stack && delta.type != ::uwvm2::parser::wasm::standard::wasm1::type::value_type::i32)
         [[unlikely]]
     {
         err.err_curr = op_begin;
@@ -511,10 +504,7 @@ case wasm1_code::memory_grow:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, op_begin, code_curr)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;

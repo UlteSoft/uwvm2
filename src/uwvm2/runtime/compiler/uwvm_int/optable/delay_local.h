@@ -47,7 +47,7 @@
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
-#if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
+# if defined(UWVM_ENABLE_UWVM_INT_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_DELAY_LOCAL_SOFT)
     /**
      * @brief "Delay-local" fused opcode implementations.
      *
@@ -2437,7 +2437,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_i32_xor_localget_rhs_fptr<CompileOption, TypeInTuple...>(curr); }
 
     }  // namespace translate
-#endif
+# endif
 }  // namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
 

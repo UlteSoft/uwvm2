@@ -111,9 +111,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
         auto const override_state{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_wasip1_module_override_const(
             ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t::preloaded_dl,
             wd.module_name)};
-        auto const expose_host_api{
-            override_state != nullptr && override_state->expose_host_api_is_set ? override_state->expose_host_api
-                                                                                : ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
+        auto const expose_host_api{override_state != nullptr && override_state->expose_host_api_is_set
+                                       ? override_state->expose_host_api
+                                       : ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api};
 
         if(set_wasip1_host_api_v1 != nullptr)
         {

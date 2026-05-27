@@ -55,9 +55,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using wasm1_code_version_type = ::uwvm2::parser::wasm::standard::wasm1::features::wasm1_code_version;
 
     struct uwvm_interpreter_function_operands_t
-    {
-        ::uwvm2::utils::container::vector<::std::byte> operands{};
-    };
+    { ::uwvm2::utils::container::vector<::std::byte> operands{}; };
 
     struct local_func_storage_t
     {
@@ -139,32 +137,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     namespace details
     {
-#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
-# if defined(__clang__)
+# if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#  if defined(__clang__)
         using float64x1_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
         using float64x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
         using float32x2_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
         using float32x4_t = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(4)]];
-# elif defined(__GNUC__)
+#  elif defined(__GNUC__)
         using float64x1_t = __Float64x1_t;
         using float64x2_t = __Float64x2_t;
         using float32x2_t = __Float32x2_t;
         using float32x4_t = __Float32x4_t;
-# elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
+#  elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
         using float64x1_t = __n64;
         using float64x2_t = __n128;
         using float32x2_t = __n64;
         using float32x4_t = __n128;
-# else
-#  error "missing instruction"
+#  else
+#   error "missing instruction"
+#  endif
 # endif
-#endif
 
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
             get_f32_low_from_f64_slot(::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 v) noexcept
         {
-#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
-# if UWVM_HAS_BUILTIN(__builtin_neon_vget_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
+# if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#  if UWVM_HAS_BUILTIN(__builtin_neon_vget_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float32x2_t s2{::std::bit_cast<float32x2_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)
             {
@@ -172,7 +170,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 s2 = __builtin_shufflevector(s2, s2, 1u, 0u);
             }
             return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(__builtin_neon_vget_lane_f32(s2, 0));
-# elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
+#  elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
             float32x2_t const s2{::std::bit_cast<float32x2_t>(v)};
 
             __builtin_aarch64_im_lane_boundsi(sizeof(s2), sizeof(s2[0]), 0);
@@ -181,44 +179,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 return s2[0];
             }
-# elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
+#  elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
             float64x1_t const d{::fast_io::intrinsics::msvc::arm::neon_duprf64(v)};  // f64 -> __n64
             return ::fast_io::intrinsics::msvc::arm::neon_dups32(d, 0);              // __n64 -> f32
+#  else
+#   error "missing instruction"
+#  endif
 # else
-#  error "missing instruction"
-# endif
-#else
             // x86_64, ...
             auto const f32x2{::std::bit_cast<::uwvm2::utils::container::array<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32, 2uz>>(v)};
             return f32x2.front_unchecked();
-#endif
+# endif
         }
 
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32
             get_f32_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
         {
-#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
-# if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
+# if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#  if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f32) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float32x4_t s4{::std::bit_cast<float32x4_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)
             {
                 s4 = __builtin_shufflevector(s4,
                                              s4,
-#  if defined(__aarch64__) || defined(__arm64ec__)
+#   if defined(__aarch64__) || defined(__arm64ec__)
                                              3,
                                              2,
                                              1,
                                              0
-#  else
+#   else
                                              1,
                                              0,
                                              3,
                                              2
-#  endif
+#   endif
                 );
             }
             return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>(__builtin_neon_vgetq_lane_f32(s4, 0));
-# elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
+#  elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
             float32x4_t const s4{::std::bit_cast<float32x4_t>(v)};
 
             __builtin_aarch64_im_lane_boundsi(sizeof(s4), sizeof(s4[0]), 0);
@@ -227,40 +225,40 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 return s4[0];
             }
-# elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
+#  elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
             return ::fast_io::intrinsics::msvc::arm::neon_dups32q(v, 0);  // __n128 -> f32
+#  else
+#   error "missing instruction"
+#  endif
 # else
-#  error "missing instruction"
-# endif
-#else
             // x86_64, ...
             auto const f32x4{::std::bit_cast<::uwvm2::utils::container::array<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32, 4uz>>(v)};
             return f32x4.front_unchecked();
-#endif
+# endif
         }
 
         UWVM_ALWAYS_INLINE inline constexpr ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64
             get_f64_low_from_v128_slot(::uwvm2::parser::wasm::standard::wasm1p1::type::wasm_v128 v) noexcept
         {
-#if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
-# if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f64) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
+# if defined(__ARM_NEON) && UWVM_INTERPRETER_FORCE_USE_ARM_NEON_TO_SPLIT_V128
+#  if UWVM_HAS_BUILTIN(__builtin_neon_vgetq_lane_f64) && UWVM_HAS_BUILTIN(__builtin_shufflevector)  // clang
             float64x2_t d2{::std::bit_cast<float64x2_t>(v)};
             if constexpr(::std::endian::native == ::std::endian::big)
             {
                 d2 = __builtin_shufflevector(d2,
                                              d2,
-#  if defined(__aarch64__) || defined(__arm64ec__)
+#   if defined(__aarch64__) || defined(__arm64ec__)
                                              1,
                                              0
-#  else
+#   else
                                              0,
                                              1
 
-#  endif
+#   endif
                 );
             }
             return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(__builtin_neon_vgetq_lane_f64(d2, 0));
-# elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
+#  elif UWVM_HAS_BUILTIN(__builtin_aarch64_im_lane_boundsi)  // GNUC
             float64x2_t const d2{::std::bit_cast<float64x2_t>(v)};
 
             __builtin_aarch64_im_lane_boundsi(sizeof(d2), sizeof(d2[0]), 0);
@@ -269,16 +267,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 return d2[0];
             }
-# elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
+#  elif (defined(_MSC_VER) && !defined(__clang__))           // MSVC
             return ::fast_io::intrinsics::msvc::arm::neon_dups64q(v, 0).n64_f64[0];  // __n128 -> f64
+#  else
+#   error "missing instruction"
+#  endif
 # else
-#  error "missing instruction"
-# endif
-#else
             // x86_64, ...
             auto const f64x2{::std::bit_cast<::uwvm2::utils::container::array<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64, 2uz>>(v)};
             return f64x2.front_unchecked();
-#endif
+# endif
         }
     }  // namespace details
 

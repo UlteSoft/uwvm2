@@ -46,11 +46,11 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
-#else
+# else
     UWVM_GNU_COLD inline constexpr
-#endif
+# endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_compiler_log_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
                                                                                          para_begin,
                                                                                      ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
@@ -100,8 +100,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         currp1->type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::occupied_arg;
         auto const log_output_arg{currp1->str};
 
-#if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&               \
-    !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+# if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&              \
+     !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
         auto log_output_path{log_output_arg};
 
         if(log_output_arg == u8"out")
@@ -149,7 +149,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             log_output_path = currp2->str;
         }
 
-#if defined(_WIN32) && !defined(_WIN32_WINDOWS)
+#  if defined(_WIN32) && !defined(_WIN32_WINDOWS)
         if(log_output_path.starts_with(u8"::NT::"))
         {
             // nt path
@@ -191,14 +191,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 }
             }
 
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             try
-# endif
+#   endif
             {
                 // allow symlink
-                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_kernel, log_output_path_nt_subview, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
+                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::io_kernel,
+                                                               log_output_path_nt_subview,
+                                                               ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
             }
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             catch(::fast_io::error e)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -217,20 +219,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     u8"\n");
                 return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
             }
-# endif
+#   endif
         }
         else
         {
             // win32 path
 
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             try
-# endif
+#   endif
             {
                 // allow symlink
                 ::uwvm2::uwvm::io::u8runtime_log_output.reopen(log_output_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
             }
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
             catch(::fast_io::error e)
             {
                 ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -249,19 +251,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                     u8"\n");
                 return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
             }
-# endif
+#   endif
         }
-#else
+#  else
         // posix
 
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
-            try
-# endif
-            {
-                // allow symlink
-                ::uwvm2::uwvm::io::u8runtime_log_output.reopen(log_output_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
-            }
-# if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
+        try
+#   endif
+        {
+            // allow symlink
+            ::uwvm2::uwvm::io::u8runtime_log_output.reopen(log_output_path, ::fast_io::open_mode::out | ::fast_io::open_mode::follow);
+        }
+#   if defined(UWVM_CPP_EXCEPTIONS) && !defined(UWVM_TERMINATE_IMME_WHEN_PARSE)
         catch(::fast_io::error e)
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -278,36 +280,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 e,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL),
                                 u8"\n"
-#  ifndef _WIN32
+#    ifndef _WIN32
                                 u8"\n"
-#  endif
+#    endif
             );
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
-# endif
-# endif
+#   endif
+#  endif
 
         ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::file;
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
-#else
+# else
         // on AVR only support cstdout and cstderr
         if(log_output_arg == u8"out")
         {
-# if defined(__AVR__)
+#  if defined(__AVR__)
             ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8c_stdout());
-# else
+#  else
             ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8out());
-# endif
+#  endif
             ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::out;
             return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
         if(log_output_arg == u8"err")
         {
-# if defined(__AVR__)
+#  if defined(__AVR__)
             ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8c_stderr());
-# else
+#  else
             ::uwvm2::uwvm::io::u8runtime_log_output.reopen(::fast_io::u8err());
-# endif
+#  endif
             ::uwvm2::uwvm::io::runtime_log_output_target = ::uwvm2::uwvm::io::runtime_log_output_target_t::err;
             return ::uwvm2::utils::cmdline::parameter_return_type::def;
         }
@@ -322,7 +324,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
                             u8"\n\n");
         return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
-#endif
+# endif
     }
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params::details

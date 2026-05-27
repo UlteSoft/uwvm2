@@ -55,9 +55,9 @@
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
+# if !(__cpp_pack_indexing >= 202311L)
+#  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
@@ -130,9 +130,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 ::fast_io::fast_terminate();
             }
 
@@ -144,9 +144,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                 ::fast_io::fast_terminate();
             }
 
@@ -352,30 +352,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr bool float_isnan(FloatT v) noexcept
         {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
             return __builtin_isnan(v);
-#else
+# else
             return ::std::isnan(v);
-#endif
+# endif
         }
 
         template <typename FloatT>
         UWVM_ALWAYS_INLINE inline constexpr bool float_signbit(FloatT v) noexcept
         {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
             return __builtin_signbit(v);
-#else
+# else
             return ::std::signbit(v);
-#endif
+# endif
         }
 
         UWVM_ALWAYS_INLINE inline constexpr bool fp_rounding_is_tonearest() noexcept
         {
-#if __has_include(<cfenv>) && defined(FE_TONEAREST)
+# if __has_include(<cfenv>) && defined(FE_TONEAREST)
             return ::std::fegetround() == FE_TONEAREST;
-#else
+# else
             return true;
-#endif
+# endif
         }
 
         template <float_unop Op, typename FloatT>
@@ -383,7 +383,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(Op == float_unop::abs)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_fabsf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_fabs(v); }
                 else
@@ -392,14 +392,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(abs): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::fabs(v);
-#endif
+# endif
             }
             else if constexpr(Op == float_unop::neg) { return -v; }
             else if constexpr(Op == float_unop::ceil)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_ceilf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_ceil(v); }
                 else
@@ -408,13 +408,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(ceil): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::ceil(v);
-#endif
+# endif
             }
             else if constexpr(Op == float_unop::floor)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_floorf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_floor(v); }
                 else
@@ -423,13 +423,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(floor): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::floor(v);
-#endif
+# endif
             }
             else if constexpr(Op == float_unop::trunc)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_truncf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_trunc(v); }
                 else
@@ -438,9 +438,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(trunc): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::trunc(v);
-#endif
+# endif
             }
             else if constexpr(Op == float_unop::nearest)
             {
@@ -463,118 +463,118 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // runtime invariant that the default rounding mode (FE_TONEAREST)
                 // is in effect and not modified.
 
-#if defined(__loongarch_asx)
+# if defined(__loongarch_asx)
                 using f64x4simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64;
                 using f32x8simd [[__gnu__::__vector_size__(32)]] [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
 
                 if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
                 {
-# if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_s)
+#  if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_s)
                     f32x8simd tmp{v, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
                     return __builtin_lasx_xvfrintrne_s(tmp)[0u];
-# else
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-#  if defined(__GNUC__) || defined(__clang__)
-                    return __builtin_nearbyintf(v);
 #  else
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#   endif
+#   if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyintf(v);
+#   else
                     return ::std::nearbyint(v);
+#   endif
 #  endif
-# endif
                 }
                 else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
                 {
-# if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_d)
+#  if UWVM_HAS_BUILTIN(__builtin_lasx_xvfrintrne_d)
                     f64x4simd tmp{v, 0.0, 0.0, 0.0};
                     return __builtin_lasx_xvfrintrne_d(tmp)[0u];
-# else
-                    // Implementation for msvc is not currently being considered; revert to the default implementation.
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-#  if defined(__GNUC__) || defined(__clang__)
-                    return __builtin_nearbyint(v);
 #  else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#   endif
+#   if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyint(v);
+#   else
                     return ::std::nearbyint(v);
+#   endif
 #  endif
-# endif
                 }
                 else
                 {
                     // platform
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
                     return ::std::nearbyint(v);
                 }
 
-#elif defined(__ARM_NEON)
-# if defined(__clang__)
+# elif defined(__ARM_NEON)
+#  if defined(__clang__)
                 using float64x1_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(1)]];
                 using float64x2_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64 [[clang::neon_vector_type(2)]];
                 using float32x2_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(2)]];
                 using float32x4_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32 [[clang::neon_vector_type(4)]];
                 using int8x8_t [[maybe_unused]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i8 [[clang::neon_vector_type(8)]];
-# elif (defined(__GNUC__) && !defined(__clang__))  // gcc
+#  elif (defined(__GNUC__) && !defined(__clang__))  // gcc
                 using float64x1_t [[maybe_unused]] = __Float64x1_t;
                 using float64x2_t [[maybe_unused]] = __Float64x2_t;
                 using float32x2_t [[maybe_unused]] = __Float32x2_t;
                 using float32x4_t [[maybe_unused]] = __Float32x4_t;
-# elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
+#  elif (defined(_MSC_VER) && !defined(__clang__))  // msvc
                 using float64x1_t [[maybe_unused]] = __n64;
                 using float64x2_t [[maybe_unused]] = __n128;
                 using float32x2_t [[maybe_unused]] = __n64;
                 using float32x4_t [[maybe_unused]] = __n128;
-# endif
+#  endif
 
                 if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
                 {
-# if UWVM_HAS_BUILTIN(__builtin_neon_vrndns_f32)
+#  if UWVM_HAS_BUILTIN(__builtin_neon_vrndns_f32)
                     return __builtin_neon_vrndns_f32(v);
-# elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevensf)
+#  elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevensf)
                     return __builtin_aarch64_roundevensf(v);
-# else
-                    // Implementation for msvc is not currently being considered; revert to the default implementation.
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-#  if defined(__GNUC__) || defined(__clang__)
-                    return __builtin_nearbyintf(v);
 #  else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#   endif
+#   if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyintf(v);
+#   else
                     return ::std::nearbyint(v);
+#   endif
 #  endif
-# endif
                 }
                 else if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>)
                 {
-# if UWVM_HAS_BUILTIN(__builtin_neon_vrndn_v)
+#  if UWVM_HAS_BUILTIN(__builtin_neon_vrndn_v)
                     return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(__builtin_neon_vrndn_v(::std::bit_cast<int8x8_t>(v), 10));
-# elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevendf)
+#  elif UWVM_HAS_BUILTIN(__builtin_aarch64_roundevendf)
                     return ::std::bit_cast<::uwvm2::parser::wasm::standard::wasm1::type::wasm_f64>(
                         __builtin_aarch64_roundevendf(::std::bit_cast<float64x1_t>(v)));
-# else
-                    // Implementation for msvc is not currently being considered; revert to the default implementation.
-#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#  endif
-#  if defined(__GNUC__) || defined(__clang__)
-                    return __builtin_nearbyint(v);
 #  else
+                    // Implementation for msvc is not currently being considered; revert to the default implementation.
+#   if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+                    if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
+#   endif
+#   if defined(__GNUC__) || defined(__clang__)
+                    return __builtin_nearbyint(v);
+#   else
                     return ::std::nearbyint(v);
+#   endif
 #  endif
-# endif
                 }
                 else
                 {
                     // platform
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
                     return ::std::nearbyint(v);
                 }
 
-#elif defined(__SSE4_1__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && (defined(__builtin_ia32_roundss) && defined(__builtin_ia32_roundsd))
+# elif defined(__SSE4_1__) && UWVM_HAS_CPP_ATTRIBUTE(__gnu__::__vector_size__) && (defined(__builtin_ia32_roundss) && defined(__builtin_ia32_roundsd))
                 if constexpr(::std::same_as<FloatT, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32>)
                 {
                     using f32x4simd [[__gnu__::__vector_size__(16)]] = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_f32;
@@ -590,17 +590,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 else
                 {
                     // platform
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
                     return ::std::nearbyint(v);
                 }
-#else
+# else
 
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(!fp_rounding_is_tonearest()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
-# if defined(__GNUC__) || defined(__clang__)
+#  endif
+#  if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_nearbyintf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_nearbyint(v); }
                 else
@@ -609,14 +609,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(nearest): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-# else
+#  else
                 return ::std::nearbyint(v);
+#  endif
 # endif
-#endif
             }
             else if constexpr(Op == float_unop::sqrt)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_sqrtf(v); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_sqrt(v); }
                 else
@@ -625,9 +625,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_unop(sqrt): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::sqrt(v);
-#endif
+# endif
             }
             else
             {
@@ -663,7 +663,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             else if constexpr(Op == float_binop::div) { return lhs / rhs; }
             else if constexpr(Op == float_binop::copysign)
             {
-#if defined(__GNUC__) || defined(__clang__)
+# if defined(__GNUC__) || defined(__clang__)
                 if constexpr(::std::same_as<FloatT, wasm_f32>) { return __builtin_copysignf(lhs, rhs); }
                 else if constexpr(::std::same_as<FloatT, wasm_f64>) { return __builtin_copysign(lhs, rhs); }
                 else
@@ -672,9 +672,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                   "eval_float_binop(copysign): GCC/Clang builtin path expects wasm_f32/wasm_f64 only");
                     return {};
                 }
-#else
+# else
                 return ::std::copysign(lhs, rhs);
-#endif
+# endif
             }
             else if constexpr(Op == float_binop::min)
             {
@@ -960,8 +960,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // i32 unary
     // i32 binary
 
-
-
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_i32_div_s(Type... type) UWVM_THROWS
@@ -1208,18 +1206,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
     // ========================
     // i64 numeric
     // ========================
@@ -1299,8 +1285,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     // i64 unary
     // i64 binary
-
-
 
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -1548,18 +1532,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         UWVM_MUSTTAIL return next_interpreter(type...);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
     // ========================
     // f32/f64 numeric (strict-fp)
     // ========================
@@ -1639,19 +1611,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     // f32 unary wrappers
 
-
-
-
-
-
-
     // f32 binary wrappers
-
-
-
-
-
-
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_unop Op, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -1728,19 +1688,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     // f64 unary wrappers
 
-
-
-
-
-
-
     // f64 binary wrappers
-
-
-
-
-
-
 
     // ========================
     // translate helpers
@@ -1768,9 +1716,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }

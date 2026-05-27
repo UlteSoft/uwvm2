@@ -256,7 +256,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     template <::uwvm2::imported::wasi::wasip1::environment::wasip1_memory memory_type, typename... Args>
-    inline void print_wasip1_trace_message(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type>& env, Args&&... args) noexcept
+    inline void print_wasip1_trace_message(::uwvm2::imported::wasi::wasip1::environment::wasip1_environment<memory_type> & env, Args && ... args) noexcept
     {
         using trace_group_kind_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t;
         using trace_output_target_t = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t;
@@ -280,12 +280,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                     }
                     case trace_group_kind_t::custom_group:
                     {
-                        ::fast_io::io::perr(out,
-                                            u8"[wasip1] custom group:\"",
-                                            env.trace_wasip1_group_name_storage,
-                                            u8"\" ",
-                                            args...,
-                                            u8" (wasi-trace)\n");
+                        ::fast_io::io::perr(out, u8"[wasip1] custom group:\"", env.trace_wasip1_group_name_storage, u8"\" ", args..., u8" (wasi-trace)\n");
                         return;
                     }
                     [[unlikely]] default:
@@ -320,7 +315,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                 break;
             }
             case trace_output_target_t::err: [[fallthrough]];
-            case trace_output_target_t::none: [[fallthrough]];
+            case trace_output_target_t::none:
+                [[fallthrough]];
             [[unlikely]] default:
             {
 # if defined(__AVR__)

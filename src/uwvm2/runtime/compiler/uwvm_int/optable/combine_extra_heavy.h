@@ -85,7 +85,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
-#if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
+# if defined(UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS) && defined(UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS)
 
     /**
      * @brief Extra-heavy combined opcodes (ultra-specific mega fusions).
@@ -137,9 +137,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(n, i)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
             [[clang::nomerge]]
-# endif
+#  endif
             if(rem == wasm_i32{})
             {
                 type...[0] = break_ip;
@@ -1365,9 +1365,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::store_local(type...[2u], p_off, next_p);
         bool const take_branch{details::eval_int_cmp<details::int_cmp::ne, wasm_i32, conbine_details::wasm_u32>(next_p, pend)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -1841,7 +1841,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
     }  // namespace translate
 
-#endif
+# endif
 }  // namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
 

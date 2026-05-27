@@ -89,9 +89,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::return_m1_imme;
         }
 
-        [[nodiscard]] inline parameter_return_type apply_trace_target_to_default_env(
-            ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
-            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+        [[nodiscard]] inline parameter_return_type
+            apply_trace_target_to_default_env(::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
+                                              [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
         {
             auto& env{::uwvm2::uwvm::imported::wasi::wasip1::storage::default_wasip1_env};
             auto const target_text{::uwvm2::utils::container::u8string_view{target_arg->str}};
@@ -101,8 +101,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                          env.trace_wasip1_call = false;
                                          env.trace_wasip1_output_target = trace_output_target_t::none;
                                          env.trace_wasip1_output_file_path_storage.clear();
-                                         env.trace_wasip1_group_kind =
-                                             ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::global;
+                                         env.trace_wasip1_group_kind = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::global;
                                          env.trace_wasip1_group_name_storage.clear();
                                      }};
 
@@ -126,15 +125,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 return parameter_return_type::def;
             }
 
-#if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&               \
-    !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+#  if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&             \
+      !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
             if(target_text != u8"file") [[unlikely]] { return print_usage_error(u8"Invalid trace output target."); }
 
             auto file_arg{target_arg + 1u};
-            if(file_arg == para_end || file_arg->type != parameter_type::arg) [[unlikely]]
-            {
-                return print_usage_error(u8"Missing trace output file path.");
-            }
+            if(file_arg == para_end || file_arg->type != parameter_type::arg) [[unlikely]] { return print_usage_error(u8"Missing trace output file path."); }
             file_arg->type = parameter_type::occupied_arg;
             auto const file_path{::uwvm2::utils::container::u8string_view{file_arg->str}};
 
@@ -151,17 +147,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             env.trace_wasip1_output_file_path_storage = ::uwvm2::utils::container::u8string{file_path};
             env.trace_wasip1_group_kind = ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_group_kind_t::global;
             env.trace_wasip1_group_name_storage.clear();
-            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(env.trace_wasip1_output_file, file_path))
-                [[unlikely]]
+            if(!::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(env.trace_wasip1_output_file, file_path)) [[unlikely]]
             {
                 disable_trace();
                 return print_open_error(file_path);
             }
 
             return parameter_return_type::def;
-#else
+#  else
             return print_usage_error(u8"Invalid trace output target.");
-#endif
+#  endif
         }
     }  // namespace wasip1_global_trace_details
 
@@ -170,9 +165,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  else
     UWVM_GNU_COLD inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_trace_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                                             ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_trace_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
+                                                                                        para_begin,
+                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto target_arg{para_curr + 1u};
         if(target_arg == para_end || target_arg->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]

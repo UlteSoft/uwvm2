@@ -122,14 +122,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::utils::cmdline::parameter_parsing_results fake_results[]{
                 {.str = u8"--wasip1-global-mount-dir",
                  .para = ::std::addressof(::uwvm2::uwvm::cmdline::params::wasip1_global_mount_dir),
-                 .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::parameter                                                                      },
-                {.str = wasi_dir,               .para = nullptr,                             .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg},
-                {.str = system_dir,             .para = nullptr,                             .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg}
+                 .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::parameter                                                                             },
+                {.str = wasi_dir,                      .para = nullptr,                             .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg},
+                {.str = system_dir,                    .para = nullptr,                             .type = ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg}
             };
 
-            auto const ret{::uwvm2::uwvm::cmdline::params::details::wasip1_global_mount_dir_callback(fake_results,
-                                                                                              fake_results,
-                                                                                              fake_results + (sizeof(fake_results) / sizeof(fake_results[0])))};
+            auto const ret{
+                ::uwvm2::uwvm::cmdline::params::details::wasip1_global_mount_dir_callback(fake_results,
+                                                                                          fake_results,
+                                                                                          fake_results + (sizeof(fake_results) / sizeof(fake_results[0])))};
 
             ::uwvm2::utils::container::vector<mount_dir_root_t> restored_global_mount_dir_roots{};
             restored_global_mount_dir_roots.reserve(global_mount_dir_count);
@@ -285,7 +286,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             if(limit == 0uz) { limit = ::std::numeric_limits<fd_t>::max(); }
             if(target.fd_limit_is_set) [[unlikely]]
             {
-                return print_usage_error(parameter, u8"Duplicate or conflicting module action. Cannot set fd limit more than once for the same WASI Preview 1 target.");
+                return print_usage_error(parameter,
+                                         u8"Duplicate or conflicting module action. Cannot set fd limit more than once for the same WASI Preview 1 target.");
             }
             target.fd_limit = limit;
             target.fd_limit_is_set = true;
@@ -336,13 +338,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 #  endif
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type apply_module_action(::uwvm2::utils::cmdline::parameter const& parameter,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* mark_action_end,
-                                                                                                ::uwvm2::utils::container::u8string_view action,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* extra1,
-                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-                                                                                                override_state_t& target) noexcept
+        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type
+            apply_module_action(::uwvm2::utils::cmdline::parameter const& parameter,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* mark_begin,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* mark_action_end,
+                                ::uwvm2::utils::container::u8string_view action,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* extra1,
+                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                override_state_t& target) noexcept
         {
             using parameter_return_type = ::uwvm2::utils::cmdline::parameter_return_type;
             using parameter_type = ::uwvm2::utils::cmdline::parameter_parsing_results_type;
@@ -382,11 +385,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
             if(action == u8"expose-host-api")
             {
-                if(auto const ret{
-                       set_bool_option(target.expose_host_api,
-                                       target.expose_host_api_is_set,
-                                       true,
-                                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
+                if(auto const ret{set_bool_option(
+                       target.expose_host_api,
+                       target.expose_host_api_is_set,
+                       true,
+                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
                    ret != parameter_return_type::def) [[unlikely]]
                 {
                     return ret;
@@ -397,11 +400,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 
             if(action == u8"hide-host-api")
             {
-                if(auto const ret{
-                       set_bool_option(target.expose_host_api,
-                                       target.expose_host_api_is_set,
-                                       false,
-                                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
+                if(auto const ret{set_bool_option(
+                       target.expose_host_api,
+                       target.expose_host_api_is_set,
+                       false,
+                       u8"Duplicate or conflicting module action. Cannot combine or repeat expose-host-api/hide-host-api for the same WASI Preview 1 target.")};
                    ret != parameter_return_type::def) [[unlikely]]
                 {
                     return ret;
@@ -488,8 +491,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         }
                         if(target.trace_wasip1_call_is_set) [[unlikely]]
                         {
-                            return print_usage_error(parameter,
-                                                     u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
+                            return print_usage_error(
+                                parameter,
+                                u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
                         }
                         target.trace_wasip1_call = trace_target != trace_output_target_t::none;
                         target.trace_wasip1_call_is_set = true;
@@ -517,8 +521,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                         }
                         if(target.trace_wasip1_call_is_set) [[unlikely]]
                         {
-                            return print_usage_error(parameter,
-                                                     u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
+                            return print_usage_error(
+                                parameter,
+                                u8"Duplicate or conflicting module action. Cannot set trace output more than once for the same WASI Preview 1 target.");
                         }
 
                         ::fast_io::u8native_file test_output{};
@@ -567,7 +572,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 if(extra1 == para_end || extra1->type != parameter_type::arg) [[unlikely]] { return print_usage_error(parameter, u8"Missing argv0."); }
                 if(target.argv0_is_set) [[unlikely]]
                 {
-                    return print_usage_error(parameter, u8"Duplicate or conflicting module action. Cannot set argv0 more than once for the same WASI Preview 1 target.");
+                    return print_usage_error(parameter,
+                                             u8"Duplicate or conflicting module action. Cannot set argv0 more than once for the same WASI Preview 1 target.");
                 }
                 target.argv0_storage = ::uwvm2::utils::container::u8string{extra1->str};
                 target.argv0_is_set = true;
@@ -756,15 +762,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return parameter_return_type::def;
         }
 
-        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type apply_target_action(
-            ::uwvm2::utils::cmdline::parameter const& parameter,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
-            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
-            override_state_t& target,
-            ::uwvm2::utils::container::u8string_view action) noexcept
-        {
-            return apply_module_action(parameter, target_arg, target_arg, action, target_arg + 1u, para_end, target);
-        }
+        [[nodiscard]] inline ::uwvm2::utils::cmdline::parameter_return_type apply_target_action(::uwvm2::utils::cmdline::parameter const& parameter,
+                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* target_arg,
+                                                                                                ::uwvm2::utils::cmdline::parameter_parsing_results* para_end,
+                                                                                                override_state_t& target,
+                                                                                                ::uwvm2::utils::container::u8string_view action) noexcept
+        { return apply_module_action(parameter, target_arg, target_arg, action, target_arg + 1u, para_end, target); }
     }  // namespace wasip1_module_details
 
 # endif

@@ -66,10 +66,7 @@
 # define UWVM_MODULE_EXPORT
 #endif
 
-UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
-{
-    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept;
-}
+UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib { extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept; }
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 {
@@ -211,24 +208,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
                 wasip1_argument_storage.reserve(wasi_argv_size);
                 env.argv.reserve(wasi_argv_size);
 
-                if(use_custom_argv0)
-                {
-                    wasip1_argument_storage.emplace_back(wasip1_argv0_storage);
-                }
+                if(use_custom_argv0) { wasip1_argument_storage.emplace_back(wasip1_argv0_storage); }
 
                 if(wasm_file_ppos != nullptr)
                 {
                     auto curr{wasm_file_ppos + static_cast<::std::ptrdiff_t>(use_custom_argv0)};
-                    for(; curr != pr.end(); ++curr)
-                    {
-                        wasip1_argument_storage.emplace_back(u8string{curr->str});
-                    }
+                    for(; curr != pr.end(); ++curr) { wasip1_argument_storage.emplace_back(u8string{curr->str}); }
                 }
 
-                for(auto const& arg: wasip1_argument_storage)
-                {
-                    env.argv.emplace_back_unchecked(u8string_view{arg.data(), arg.size()});
-                }
+                for(auto const& arg: wasip1_argument_storage) { env.argv.emplace_back_unchecked(u8string_view{arg.data(), arg.size()}); }
             }
         }
 
@@ -334,10 +322,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
             wasip1_environment_storage = ::std::move(env_vec);
             env.envs.clear();
             env.envs.reserve(wasip1_environment_storage.size());
-            for(auto const& e: wasip1_environment_storage)
-            {
-                env.envs.emplace_back_unchecked(u8string_view{e.data(), e.size()});
-            }
+            for(auto const& e: wasip1_environment_storage) { env.envs.emplace_back_unchecked(u8string_view{e.data(), e.size()}); }
         }
 
         // ====== Stronger failure semantics (internal) ======
@@ -838,7 +823,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
         return true;
     }
 
-    inline bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t& state) noexcept
+    inline bool init_wasip1_environment(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_override_t & state) noexcept
     {
         using mount_dir_root_t = ::uwvm2::imported::wasi::wasip1::environment::mount_dir_root_t;
         using u8string = ::uwvm2::utils::container::u8string;
@@ -866,12 +851,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::storage
 
         if(state.env.trace_wasip1_call &&
            state.env.trace_wasip1_output_target == ::uwvm2::imported::wasi::wasip1::environment::trace_wasip1_output_target_t::file &&
-           !::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(state.env.trace_wasip1_output_file,
-                                                                                             ::uwvm2::utils::container::u8string_view{
-                                                                                                 state.env.trace_wasip1_output_file_path_storage.data(),
-                                                                                                 state.env.trace_wasip1_output_file_path_storage.size()},
-                                                                                             false))
-            [[unlikely]]
+           !::uwvm2::uwvm::imported::wasi::wasip1::storage::reopen_wasip1_trace_output_file(
+               state.env.trace_wasip1_output_file,
+               ::uwvm2::utils::container::u8string_view{state.env.trace_wasip1_output_file_path_storage.data(),
+                                                        state.env.trace_wasip1_output_file_path_storage.size()},
+               false)) [[unlikely]]
         {
             return false;
         }

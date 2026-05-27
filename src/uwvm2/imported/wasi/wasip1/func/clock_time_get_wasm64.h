@@ -94,14 +94,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"clock_time_get_wasm64(",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(clock_id)>>>(clock_id),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(precision)>>>(precision),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(time_ptrsz),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"clock_time_get_wasm64(",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(clock_id)>>>(clock_id),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(precision)>>>(precision),
+                u8", ",
+                ::fast_io::mnp::addrvw(time_ptrsz),
+                u8")");
         }
 
         ::fast_io::posix_clock_id id;  // no initialize

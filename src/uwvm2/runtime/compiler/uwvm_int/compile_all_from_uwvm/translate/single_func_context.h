@@ -28,9 +28,7 @@ struct block_result_type
 };
 
 struct operand_stack_storage_t
-{
-    wasm_value_type type{};
-};
+{ wasm_value_type type{}; };
 
 struct block_t
 {
@@ -294,10 +292,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
     auto const operand_stack_pop_unchecked{[&]() constexpr noexcept
                                            {
 #if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
-                                               if(!is_polymorphic && operand_stack.empty()) [[unlikely]]
-                                               {
-                                                   ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-                                               }
+                                               if(!is_polymorphic && operand_stack.empty()) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
 #endif
                                                // Polymorphic stacks model unreachable code, so virtual pops may exceed the
                                                // currently materialized operand depth.
@@ -365,10 +360,7 @@ for(::std::size_t local_function_idx{}; local_function_idx < local_func_count; +
 
     [[maybe_unused]] auto const pop_available_concrete_operands{[&](::std::size_t count) constexpr noexcept
                                                                 {
-                                                                    while(count-- != 0uz && concrete_operand_count() != 0uz)
-                                                                    {
-                                                                        operand_stack_pop_unchecked();
-                                                                    }
+                                                                    while(count-- != 0uz && concrete_operand_count() != 0uz) { operand_stack_pop_unchecked(); }
                                                                 }};
 
     auto const sync_type_stacks_from_codegen_snapshot{[&](curr_operand_stack_type const& snapshot) constexpr UWVM_THROWS

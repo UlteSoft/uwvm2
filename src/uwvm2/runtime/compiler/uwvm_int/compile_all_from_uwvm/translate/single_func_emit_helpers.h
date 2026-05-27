@@ -2964,43 +2964,40 @@ auto const emit_br_to{[&](bytecode_vec_t& dst, ::std::size_t label_id, bool dst_
                           emit_ptr_label_placeholder(label_id, dst_is_thunk);
                       }};
 
-auto const emit_tiered_probe_to{[&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS
-                                {
-                                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                                    if(options.tiered_backedge_probe_func == nullptr || options.tiered_backedge_switch_func == nullptr ||
-                                       target_frame.tiered_probe_slot == SIZE_MAX)
-                                    {
-                                        return;
-                                    }
-                                    if(options.tiered_backedge_osr_entry_base_address == 0u) { return; }
-                                    if(target_frame.tiered_probe_slot >= options.tiered_backedge_osr_entry_count) { return; }
-                                    if(options.tiered_backedge_probe_counter_base_address == 0u) { return; }
-                                    if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_counter_count) { return; }
-                                    if(options.tiered_backedge_probe_hot_threshold == 0uz) { return; }
+auto const emit_tiered_probe_to{
+    [&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS
+    {
+        namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+        if(options.tiered_backedge_probe_func == nullptr || options.tiered_backedge_switch_func == nullptr || target_frame.tiered_probe_slot == SIZE_MAX)
+        {
+            return;
+        }
+        if(options.tiered_backedge_osr_entry_base_address == 0u) { return; }
+        if(target_frame.tiered_probe_slot >= options.tiered_backedge_osr_entry_count) { return; }
+        if(options.tiered_backedge_probe_counter_base_address == 0u) { return; }
+        if(target_frame.tiered_probe_slot >= options.tiered_backedge_probe_counter_count) { return; }
+        if(options.tiered_backedge_probe_hot_threshold == 0uz) { return; }
 #ifdef UWVM_ENABLE_UWVM_INT_COMBINE_OPS
-                                    if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry &&
-                                                 stacktop_regtransform_supported)
-                                    {
-                                        if(!is_polymorphic && stacktop_cache_count != 0uz) { return; }
-                                    }
+        if constexpr(stacktop_enabled && CompileOption.is_tail_call && stacktop_regtransform_cf_entry && stacktop_regtransform_supported)
+        {
+            if(!is_polymorphic && stacktop_cache_count != 0uz) { return; }
+        }
 #endif
 
-                                    emit_opfunc_to(dst,
-                                                   translate::get_uwvmint_tiered_backedge_switch_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                interpreter_tuple));
-                                    emit_imm_to(dst, options.tiered_backedge_probe_func);
-                                    emit_imm_to(dst, options.tiered_backedge_switch_func);
-                                    emit_imm_to(dst, options.tiered_backedge_osr_entry_base_address);
-                                    emit_imm_to(dst, options.tiered_backedge_osr_entry_count);
-                                    emit_imm_to(dst, options.tiered_backedge_probe_counter_base_address);
-                                    emit_imm_to(dst, options.tiered_backedge_probe_counter_count);
-                                    emit_imm_to(dst, options.tiered_backedge_probe_hot_threshold);
-                                    emit_imm_to(dst, target_frame.tiered_probe_slot);
-                                    emit_imm_to(dst, options.curr_wasm_id);
-                                    emit_imm_to(dst, local_function_idx);
-                                    emit_imm_to(dst, target_frame.tiered_probe_wasm_code_offset);
-                                    emit_imm_to(dst, target_frame.tiered_probe_depth);
-                                }};
+        emit_opfunc_to(dst, translate::get_uwvmint_tiered_backedge_switch_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+        emit_imm_to(dst, options.tiered_backedge_probe_func);
+        emit_imm_to(dst, options.tiered_backedge_switch_func);
+        emit_imm_to(dst, options.tiered_backedge_osr_entry_base_address);
+        emit_imm_to(dst, options.tiered_backedge_osr_entry_count);
+        emit_imm_to(dst, options.tiered_backedge_probe_counter_base_address);
+        emit_imm_to(dst, options.tiered_backedge_probe_counter_count);
+        emit_imm_to(dst, options.tiered_backedge_probe_hot_threshold);
+        emit_imm_to(dst, target_frame.tiered_probe_slot);
+        emit_imm_to(dst, options.curr_wasm_id);
+        emit_imm_to(dst, local_function_idx);
+        emit_imm_to(dst, target_frame.tiered_probe_wasm_code_offset);
+        emit_imm_to(dst, target_frame.tiered_probe_depth);
+    }};
 
 auto const emit_tiered_probe_before_loop_backedge{[&](bytecode_vec_t& dst, block_t const& target_frame) constexpr UWVM_THROWS
                                                   {

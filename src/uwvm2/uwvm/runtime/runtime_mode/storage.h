@@ -145,8 +145,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 
     /// @brief Runtime LLVM JIT optimization level override.
     /// @details `default_level` preserves each LLVM JIT policy's existing default.
-    inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{
-        runtime_llvm_jit_optimization_level_t::default_level};  // [global]
+    inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{runtime_llvm_jit_optimization_level_t::default_level};  // [global]
 
     /// @brief Whether runtime LLVM IR verification is disabled by command line.
     inline bool runtime_disable_llvm_ir_verifaction{};  // [global]
@@ -156,10 +155,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     /// @details default = full_compile
     /// @todo    set default to lazy_compile
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
-    };  // [global]
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile};  // [global]
 
-     /// @todo    set default to uwvm_interpreter_llvm_jit_tiered
+    /// @todo    set default to uwvm_interpreter_llvm_jit_tiered
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only

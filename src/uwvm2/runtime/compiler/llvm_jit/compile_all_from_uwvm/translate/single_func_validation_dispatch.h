@@ -61,9 +61,6 @@ for(;;)
 
     if(emit_llvm_jit_active && !llvm_jit_instruction_emitted_inline)
     {
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
-        {
-            emit_llvm_jit_active = false;
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]] { emit_llvm_jit_active = false; }
     }
 }

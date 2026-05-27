@@ -51,9 +51,7 @@ case wasm1_code::i32_const:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
-               {
-                   return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt32Ty(llvm_context), static_cast<::std::int_least64_t>(imm));
-               })) [[unlikely]]
+               { return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt32Ty(llvm_context), static_cast<::std::int_least64_t>(imm)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -114,9 +112,7 @@ case wasm1_code::i64_const:
                llvm_jit_emit_state,
                runtime_operand_stack_value_type::i64,
                [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
-               {
-                   return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt64Ty(llvm_context), static_cast<::std::int_least64_t>(imm));
-               })) [[unlikely]]
+               { return ::llvm::ConstantInt::getSigned(::llvm::Type::getInt64Ty(llvm_context), static_cast<::std::int_least64_t>(imm)); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -171,10 +167,10 @@ case wasm1_code::f32_const:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_constant(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value* { return get_llvm_f32_constant_from_bits(llvm_context, bits); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_constant(llvm_jit_emit_state,
+                                                          runtime_operand_stack_value_type::f32,
+                                                          [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+                                                          { return get_llvm_f32_constant_from_bits(llvm_context, bits); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -229,10 +225,10 @@ case wasm1_code::f64_const:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_constant(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value* { return get_llvm_f64_constant_from_bits(llvm_context, bits); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_constant(llvm_jit_emit_state,
+                                                          runtime_operand_stack_value_type::f64,
+                                                          [&](::llvm::LLVMContext& llvm_context) -> ::llvm::Value*
+                                                          { return get_llvm_f64_constant_from_bits(llvm_context, bits); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -252,7 +248,8 @@ case wasm1_code::i32_eqz:
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); })) [[unlikely]]
+               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -472,7 +469,8 @@ case wasm1_code::i64_eqz:
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); })) [[unlikely]]
+               { return coerce_llvm_bool_to_i32(ir_builder, ir_builder.CreateICmpEQ(operand.value, ::llvm::ConstantInt::get(operand.value->getType(), 0u))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }

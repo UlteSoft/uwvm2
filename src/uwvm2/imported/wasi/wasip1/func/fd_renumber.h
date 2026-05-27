@@ -298,8 +298,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
- u8"fd_renumber(", fd_from, u8", ", fd_to, u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env, u8"fd_renumber(", fd_from, u8", ", fd_to, u8")");
         }
 
         return fd_renumber_base(env, fd_from, fd_to);

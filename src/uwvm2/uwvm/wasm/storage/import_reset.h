@@ -58,8 +58,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
     inline configured_module_import_reset_map_t configured_module_import_reset{};  // [global]
 
-    [[nodiscard]] inline configured_import_reset_vec_t* find_configured_module_import_reset(
-        ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline configured_import_reset_vec_t* find_configured_module_import_reset(::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         if(auto it{configured_module_import_reset.find(module_name)}; it != configured_module_import_reset.end()) [[likely]]
         {
@@ -78,8 +77,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
         return nullptr;
     }
 
-    [[nodiscard]] inline configured_import_reset_vec_t& upsert_configured_module_import_reset(
-        ::uwvm2::utils::container::u8string_view module_name) noexcept
+    [[nodiscard]] inline configured_import_reset_vec_t& upsert_configured_module_import_reset(::uwvm2::utils::container::u8string_view module_name) noexcept
     {
         auto const [it, inserted]{configured_module_import_reset.try_emplace(::uwvm2::utils::container::u8string{module_name})};
         static_cast<void>(inserted);
@@ -96,21 +94,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::storage
 
         for(auto const& rule: *rules)
         {
-            if(rule.import_module_name == import_module_name && rule.import_extern_name == import_extern_name) [[unlikely]]
-            {
-                return ::std::addressof(rule);
-            }
+            if(rule.import_module_name == import_module_name && rule.import_extern_name == import_extern_name) [[unlikely]] { return ::std::addressof(rule); }
         }
 
         return nullptr;
     }
 
-    [[nodiscard]] inline configured_import_reset_t& upsert_configured_import_reset(
-        ::uwvm2::utils::container::u8string_view module_name,
-        ::uwvm2::utils::container::u8string_view import_module_name,
-        ::uwvm2::utils::container::u8string_view import_extern_name,
-        ::uwvm2::utils::container::u8string_view new_import_module_name,
-        ::uwvm2::utils::container::u8string_view new_import_extern_name) noexcept
+    [[nodiscard]] inline configured_import_reset_t& upsert_configured_import_reset(::uwvm2::utils::container::u8string_view module_name,
+                                                                                   ::uwvm2::utils::container::u8string_view import_module_name,
+                                                                                   ::uwvm2::utils::container::u8string_view import_extern_name,
+                                                                                   ::uwvm2::utils::container::u8string_view new_import_module_name,
+                                                                                   ::uwvm2::utils::container::u8string_view new_import_extern_name) noexcept
     {
         auto& rules{upsert_configured_module_import_reset(module_name)};
 

@@ -174,10 +174,7 @@ case wasm1_code::local_get:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_local_get(llvm_jit_emit_state, local_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_local_get(llvm_jit_emit_state, local_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -261,10 +258,7 @@ case wasm1_code::local_set:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_local_set(llvm_jit_emit_state, local_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_local_set(llvm_jit_emit_state, local_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -354,10 +348,7 @@ case wasm1_code::local_tee:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_local_tee(llvm_jit_emit_state, local_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_local_tee(llvm_jit_emit_state, local_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -437,10 +428,7 @@ case wasm1_code::global_get:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_global_get(llvm_jit_emit_state, global_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_global_get(llvm_jit_emit_state, global_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;
@@ -552,10 +540,7 @@ case wasm1_code::global_set:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_global_set(llvm_jit_emit_state, global_index)) [[unlikely]]
-        {
-            disable_inline_llvm_jit_emission();
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_global_set(llvm_jit_emit_state, global_index)) [[unlikely]] { disable_inline_llvm_jit_emission(); }
     }
 
     break;

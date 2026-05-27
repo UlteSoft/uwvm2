@@ -58,9 +58,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     UWVM_GNU_COLD inline constexpr
 #  endif
         ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_set_argv0_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
-                                                                                     para_begin,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
-                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
+                                                                                            para_begin,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto currp1{para_curr + 1u};
 

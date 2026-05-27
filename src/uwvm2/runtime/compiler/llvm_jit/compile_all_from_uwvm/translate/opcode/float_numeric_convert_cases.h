@@ -46,11 +46,11 @@ case wasm1_code::f64_neg:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               llvm_operand_type,
-               llvm_operand_type,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) { return ir_builder.CreateFNeg(operand.value); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       llvm_operand_type,
+                                                       llvm_operand_type,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateFNeg(operand.value); })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -431,12 +431,12 @@ case wasm1_code::i32_wrap_i64:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateTrunc(operand.value, ::llvm::Type::getInt32Ty(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateTrunc(operand.value, ::llvm::Type::getInt32Ty(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -451,20 +451,24 @@ case wasm1_code::i32_trunc_f32_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<float>(
-                       *llvm_module, ir_builder, ::llvm::Type::getInt32Ty(ir_builder.getContext()), true, -2147483904.0f, 2147483648.0f, operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<float>(*llvm_module,
+                                                                                                      ir_builder,
+                                                                                                      ::llvm::Type::getInt32Ty(ir_builder.getContext()),
+                                                                                                      true,
+                                                                                                      -2147483904.0f,
+                                                                                                      2147483648.0f,
+                                                                                                      operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -479,20 +483,24 @@ case wasm1_code::i32_trunc_f64_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<double>(
-                       *llvm_module, ir_builder, ::llvm::Type::getInt32Ty(ir_builder.getContext()), true, -2147483649.0, 2147483648.0, operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<double>(*llvm_module,
+                                                                                                       ir_builder,
+                                                                                                       ::llvm::Type::getInt32Ty(ir_builder.getContext()),
+                                                                                                       true,
+                                                                                                       -2147483649.0,
+                                                                                                       2147483648.0,
+                                                                                                       operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -507,20 +515,24 @@ case wasm1_code::i32_trunc_f32_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<float>(
-                       *llvm_module, ir_builder, ::llvm::Type::getInt32Ty(ir_builder.getContext()), false, -1.0f, 4294967296.0f, operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<float>(*llvm_module,
+                                                                                                      ir_builder,
+                                                                                                      ::llvm::Type::getInt32Ty(ir_builder.getContext()),
+                                                                                                      false,
+                                                                                                      -1.0f,
+                                                                                                      4294967296.0f,
+                                                                                                      operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -535,20 +547,24 @@ case wasm1_code::i32_trunc_f64_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<double>(
-                       *llvm_module, ir_builder, ::llvm::Type::getInt32Ty(ir_builder.getContext()), false, -1.0, 4294967296.0, operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<double>(*llvm_module,
+                                                                                                       ir_builder,
+                                                                                                       ::llvm::Type::getInt32Ty(ir_builder.getContext()),
+                                                                                                       false,
+                                                                                                       -1.0,
+                                                                                                       4294967296.0,
+                                                                                                       operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -563,12 +579,12 @@ case wasm1_code::i64_extend_i32_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateSExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateSExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -583,12 +599,12 @@ case wasm1_code::i64_extend_i32_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateZExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateZExt(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -603,25 +619,24 @@ case wasm1_code::i64_trunc_f32_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<float>(*llvm_module,
-                                                              ir_builder,
-                                                              ::llvm::Type::getInt64Ty(ir_builder.getContext()),
-                                                              true,
-                                                              -9223373136366403584.0f,
-                                                              9223372036854775808.0f,
-                                                              operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<float>(*llvm_module,
+                                                                                                      ir_builder,
+                                                                                                      ::llvm::Type::getInt64Ty(ir_builder.getContext()),
+                                                                                                      true,
+                                                                                                      -9223373136366403584.0f,
+                                                                                                      9223372036854775808.0f,
+                                                                                                      operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -636,25 +651,24 @@ case wasm1_code::i64_trunc_f64_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<double>(*llvm_module,
-                                                               ir_builder,
-                                                               ::llvm::Type::getInt64Ty(ir_builder.getContext()),
-                                                               true,
-                                                               -9223372036854777856.0,
-                                                               9223372036854775808.0,
-                                                               operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<double>(*llvm_module,
+                                                                                                       ir_builder,
+                                                                                                       ::llvm::Type::getInt64Ty(ir_builder.getContext()),
+                                                                                                       true,
+                                                                                                       -9223372036854777856.0,
+                                                                                                       9223372036854775808.0,
+                                                                                                       operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -669,25 +683,24 @@ case wasm1_code::i64_trunc_f32_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<float>(*llvm_module,
-                                                              ir_builder,
-                                                              ::llvm::Type::getInt64Ty(ir_builder.getContext()),
-                                                              false,
-                                                              -1.0f,
-                                                              18446744073709551616.0f,
-                                                              operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<float>(*llvm_module,
+                                                                                                      ir_builder,
+                                                                                                      ::llvm::Type::getInt64Ty(ir_builder.getContext()),
+                                                                                                      false,
+                                                                                                      -1.0f,
+                                                                                                      18446744073709551616.0f,
+                                                                                                      operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -702,25 +715,24 @@ case wasm1_code::i64_trunc_f64_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
-               {
-                   auto insert_block{ir_builder.GetInsertBlock()};
-                   auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
-                   auto llvm_module{function == nullptr ? nullptr : function->getParent()};
-                   if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand) -> ::llvm::Value*
+                                                       {
+                                                           auto insert_block{ir_builder.GetInsertBlock()};
+                                                           auto function{insert_block == nullptr ? nullptr : insert_block->getParent()};
+                                                           auto llvm_module{function == nullptr ? nullptr : function->getParent()};
+                                                           if(llvm_module == nullptr) [[unlikely]] { return nullptr; }
 
-                   return emit_llvm_trunc_float_to_int<double>(*llvm_module,
-                                                               ir_builder,
-                                                               ::llvm::Type::getInt64Ty(ir_builder.getContext()),
-                                                               false,
-                                                               -1.0,
-                                                               18446744073709551616.0,
-                                                               operand.value);
-               })) [[unlikely]]
+                                                           return emit_llvm_trunc_float_to_int<double>(*llvm_module,
+                                                                                                       ir_builder,
+                                                                                                       ::llvm::Type::getInt64Ty(ir_builder.getContext()),
+                                                                                                       false,
+                                                                                                       -1.0,
+                                                                                                       18446744073709551616.0,
+                                                                                                       operand.value);
+                                                       })) [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -735,12 +747,12 @@ case wasm1_code::f32_convert_i32_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -755,12 +767,12 @@ case wasm1_code::f32_convert_i32_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -775,12 +787,12 @@ case wasm1_code::f32_convert_i64_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -795,12 +807,12 @@ case wasm1_code::f32_convert_i64_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -815,12 +827,12 @@ case wasm1_code::f32_demote_f64:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateFPTrunc(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateFPTrunc(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -835,12 +847,12 @@ case wasm1_code::f64_convert_i32_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -855,12 +867,12 @@ case wasm1_code::f64_convert_i32_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -875,12 +887,12 @@ case wasm1_code::f64_convert_i64_s:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateSIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -895,12 +907,12 @@ case wasm1_code::f64_convert_i64_u:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateUIToFP(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -915,12 +927,12 @@ case wasm1_code::f64_promote_f32:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateFPExt(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateFPExt(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -935,12 +947,12 @@ case wasm1_code::i32_reinterpret_f32:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f32,
-               runtime_operand_stack_value_type::i32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getInt32Ty(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getInt32Ty(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -955,12 +967,12 @@ case wasm1_code::i64_reinterpret_f64:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::f64,
-               runtime_operand_stack_value_type::i64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getInt64Ty(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -975,12 +987,12 @@ case wasm1_code::f32_reinterpret_i32:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i32,
-               runtime_operand_stack_value_type::f32,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i32,
+                                                       runtime_operand_stack_value_type::f32,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getFloatTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -995,12 +1007,12 @@ case wasm1_code::f64_reinterpret_i64:
     if(emit_llvm_jit_active)
     {
         llvm_jit_instruction_emitted_inline = true;
-        if(!try_emit_runtime_local_func_llvm_jit_unary(
-               llvm_jit_emit_state,
-               runtime_operand_stack_value_type::i64,
-               runtime_operand_stack_value_type::f64,
-               [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
-               { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); })) [[unlikely]]
+        if(!try_emit_runtime_local_func_llvm_jit_unary(llvm_jit_emit_state,
+                                                       runtime_operand_stack_value_type::i64,
+                                                       runtime_operand_stack_value_type::f64,
+                                                       [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& operand)
+                                                       { return ir_builder.CreateBitCast(operand.value, ::llvm::Type::getDoubleTy(ir_builder.getContext())); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }

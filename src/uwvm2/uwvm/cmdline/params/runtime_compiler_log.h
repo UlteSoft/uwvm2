@@ -46,39 +46,39 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_compiler_log_alias{u8"-Rclog"};
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
         extern "C++"
-#else
+# else
         inline constexpr
-#endif
+# endif
             ::uwvm2::utils::cmdline::parameter_return_type runtime_compiler_log_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                          ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
-#if defined(__clang__)
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wbraced-scalar-init"
+# endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_compiler_log{
         .name{u8"--runtime-compiler-log"},
         .describe{u8"Write runtime compiler logs to stdout, stderr, or a dedicated file."},
         .usage{
-#if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&               \
-    !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
+# if !defined(__AVR__) && !((defined(_WIN32) && !defined(__WINE__)) && defined(_WIN32_WINDOWS)) && !(defined(__MSDOS__) || defined(__DJGPP__)) &&              \
+     !(defined(__NEWLIB__) && !defined(__CYGWIN__)) && !defined(_PICOLIBC__) && !defined(__wasm__)
             u8"[out|err|file <file:path>]"
-#else
+# else
             u8"[out|err]"
-#endif
+# endif
         },
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_compiler_log_alias), 1uz}},
         .handle{::std::addressof(details::runtime_compiler_log_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::io::enable_runtime_log)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
-#if defined(__clang__)
-# pragma clang diagnostic pop
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# endif
 #endif
 }
 
