@@ -216,6 +216,19 @@ Controls “combined opcode” optimizations for `uwvm-int`.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --enable-uwvm-int-combine-ops=soft`
 
+### `--enable-uwvm-int-delay-local=MODE`
+
+Controls delay-local variantization for `uwvm-int`.
+
+- **Default:** `heavy`
+- **Values:**
+  - `none`: Disable delay-local fusions.
+  - `soft`: Enable minimal delay-local fusions.
+  - `heavy`: Enable soft + extended delay-local fusions.
+- **Impact:** Trades compiler/build complexity and code size for more specialized local-get/local-set interpreter paths.
+- **Example:**
+  - `xmake f --execution-int=uwvm-int --enable-uwvm-int-delay-local=soft`
+
 ### `--detailed-debug-check=[y|n]`
 
 Enables a more detailed debug checking mode in **debug** builds (defines `UWVM_ENABLE_DETAILED_DEBUG_CHECK` when `-m debug` is used).
@@ -263,10 +276,12 @@ Registers the shell-driven backend differential fuzzer target in `test/0016.back
 
 - **Default:** `n`
 - **Prerequisite:** `--execution-int=uwvm-int/default` and `--execution-jit=llvm/default`.
-- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full runtime outcomes.
+- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full runtime outcomes. It does not run tiered mode. The compile-time combine/delay-local matrix is available as `test/0016.backend_fuzzer/run_backend_fuzzer_matrix.sh` because it intentionally reconfigures Xmake with nested `xmake f`/`xmake b`.
 - **Example:**
   - `xmake f --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y`
+  - `xmake f -m debug --use-llvm-compiler=y --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined`
   - `xmake test -g backend_fuzzer`
+  - `test/0016.backend_fuzzer/run_backend_fuzzer_matrix.sh`
 
 ### `--debug-timer=[y|n]`
 

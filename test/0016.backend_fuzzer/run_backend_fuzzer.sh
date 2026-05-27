@@ -9,6 +9,31 @@ WABT_ROOT="${UWVM_BACKEND_FUZZER_WABT_ROOT:-${ROOT_DIR}/build/test/third-parties
 WORK_DIR="${UWVM_BACKEND_FUZZER_WORK_DIR:-${ROOT_DIR}/build/test/0016.backend_fuzzer}"
 FUZZ_CASES="${UWVM_BACKEND_FUZZ_CASES:-32}"
 KEEP_WORK=0
+WABT_MVP_FLAGS=(
+  --disable-mutable-globals
+  --disable-saturating-float-to-int
+  --disable-sign-extension
+  --disable-simd
+  --disable-multi-value
+  --disable-bulk-memory
+  --disable-reference-types
+)
+
+setup_sanitizer_env() {
+  case "$(uname -s)" in
+    Darwin)
+      ASAN_OPTIONS="${ASAN_OPTIONS:-halt_on_error=1}"
+      UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1}"
+      export ASAN_OPTIONS UBSAN_OPTIONS
+      ;;
+    *)
+      ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1:halt_on_error=1}"
+      LSAN_OPTIONS="${LSAN_OPTIONS:-print_suppressions=0}"
+      UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1}"
+      export ASAN_OPTIONS LSAN_OPTIONS UBSAN_OPTIONS
+      ;;
+  esac
+}
 
 usage() {
   cat <<'EOF'
@@ -21,6 +46,8 @@ Options:
   --fuzz-cases <n>     Number of generated pseudo-random i32 cases. Default: 32.
   --keep               Keep existing generated work directory contents.
   -h, --help           Show this help.
+
+WABT is run with post-MVP features disabled so the oracle is Wasm MVP/1.0.
 EOF
 }
 
@@ -92,7 +119,13 @@ resolve_uwvm() {
 
   require_tool xmake
   local shown
-  shown="$(cd "${ROOT_DIR}" && xmake show -t uwvm | sed -n 's/^[[:space:]]*targetfile:[[:space:]]*//p' | head -n1 || true)"
+  shown="$(
+    cd "${ROOT_DIR}" &&
+      xmake show -t uwvm --json 2>/dev/null |
+        sed -n 's/.*"targetfile":"\([^"]*\)".*/\1/p' |
+        sed 's#\\/#/#g; s#\\\\#\\#g' |
+        head -n1 || true
+  )"
   if [[ -z "${shown}" ]]; then
     echo "ERR: could not resolve uwvm targetfile; pass --uwvm explicitly" >&2
     exit 2
@@ -410,6 +443,7 @@ show_failure_context() {
 
 main() {
   cd -- "${ROOT_DIR}"
+  setup_sanitizer_env
   resolve_uwvm
   if [[ ! -x "${UWVM_EXE}" ]]; then
     echo "ERR: uwvm executable not found or not executable: ${UWVM_EXE}" >&2
@@ -433,11 +467,11 @@ main() {
     local base wasm ref_out ref_err ref_ec ref_class mode got_out got_err got_ec got_class
     base="$(basename -- "${wat}" .wat)"
     wasm="${WASM_DIR}/${base}.wasm"
-    "${WAT2WASM}" "${wat}" -o "${wasm}"
+    "${WAT2WASM}" "${WABT_MVP_FLAGS[@]}" "${wat}" -o "${wasm}"
 
     ref_out="${LOG_DIR}/${base}.wabt.out"
     ref_err="${LOG_DIR}/${base}.wabt.err"
-    run_and_capture "${ref_out}" "${ref_err}" "${WASM_INTERP}" --run-all-exports "${wasm}"
+    run_and_capture "${ref_out}" "${ref_err}" "${WASM_INTERP}" "${WABT_MVP_FLAGS[@]}" "${wasm}" --run-all-exports
     ref_ec=${CAPTURE_STATUS}
     ref_class="$(classify_wabt_result "${ref_ec}" "${ref_out}" "${ref_err}")"
 
