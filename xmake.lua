@@ -850,6 +850,59 @@ for _, file in ipairs(os.files("test/**.cc")) do
 	end
 end
 
+if get_config("enable-test-backend-fuzzer") then
+	local backend_fuzzer_has_int = get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default"
+	local backend_fuzzer_has_jit = get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default"
+	if not backend_fuzzer_has_int or not backend_fuzzer_has_jit then
+		raise("test/0016.backend_fuzzer requires --execution-int=uwvm-int/default and --execution-jit=llvm/default.")
+	end
+
+	target("backend_fuzzer")
+		set_group("test/0016.backend_fuzzer")
+		set_kind("phony")
+		set_default(false)
+		add_deps("uwvm")
+
+		on_run(function(target)
+			import("core.project.project")
+			local root = os.projectdir()
+			local uwvm_target = project.target("uwvm")
+			local uwvm_file = uwvm_target and uwvm_target:targetfile()
+			if not uwvm_file or uwvm_file == "" then
+				raise("could not resolve uwvm targetfile")
+			end
+			if not path.is_absolute(uwvm_file) then
+				uwvm_file = path.join(root, uwvm_file)
+			end
+			os.execv("bash", {path.join(root, "test/0016.backend_fuzzer/run_backend_fuzzer.sh"), "--uwvm", uwvm_file}, {curdir = root})
+		end)
+
+		on_test(function(target, opt)
+			import("core.project.project")
+			local root = os.projectdir()
+			local uwvm_target = project.target("uwvm")
+			local uwvm_file = uwvm_target and uwvm_target:targetfile()
+			if not uwvm_file or uwvm_file == "" then
+				opt.errors = "could not resolve uwvm targetfile"
+				return false
+			end
+			if not path.is_absolute(uwvm_file) then
+				uwvm_file = path.join(root, uwvm_file)
+			end
+			local status, errors = os.execv("bash", {path.join(root, "test/0016.backend_fuzzer/run_backend_fuzzer.sh"), "--uwvm", uwvm_file},
+				{try = true, curdir = root})
+			if status ~= 0 then
+				opt.errors = errors or ("backend fuzzer failed with exit code: " .. tostring(status))
+				return false
+			end
+			return true
+		end)
+
+		local timeout = tonumber(os.getenv("UWVM_BACKEND_FUZZ_TIMEOUT")) or 600
+		add_tests("run", { group = "backend_fuzzer", realtime_output = true, run_timeout = timeout })
+	target_end()
+end
+
 -- LLVM JIT mirror of the 0013 strict uwvm-int suites. These targets compile the
 -- original 0013 source files with a runner macro that routes Runner::run through
 -- llvm_jit_call_raw_host_api, so the LLVM coverage stays aligned with 0013.

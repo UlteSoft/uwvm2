@@ -257,6 +257,17 @@ Enables a libFuzzer-oriented test mode (currently intended for LLVM environments
 - **Example:**
   - `xmake f --use-llvm-compiler=y --test-libfuzzer=y`
 
+### `--enable-test-backend-fuzzer=[y|n]`
+
+Registers the shell-driven backend differential fuzzer target in `test/0016.backend_fuzzer`.
+
+- **Default:** `n`
+- **Prerequisite:** `--execution-int=uwvm-int/default` and `--execution-jit=llvm/default`.
+- **Impact:** Adds the `backend_fuzzer` phony test target. The target clones/builds WABT tools if needed, generates core Wasm MVP cases, and compares WABT `wasm-interp` with UWVM int/JIT lazy/full runtime outcomes.
+- **Example:**
+  - `xmake f --execution-int=uwvm-int --execution-jit=llvm --enable-test-backend-fuzzer=y`
+  - `xmake test -g backend_fuzzer`
+
 ### `--debug-timer=[y|n]`
 
 Enables timer functionality in modules (defines `UWVM_TIMER`).
