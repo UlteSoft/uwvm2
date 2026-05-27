@@ -194,6 +194,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
     }
 #endif
 
+    template <typename Stm>
+    inline constexpr void version_u8print_default_runtime_policy_impl(Stm && stm) noexcept
+    {
+        ::fast_io::io::perr(::std::forward<Stm>(stm),
+                            u8"  * Default Runtime Policy:\n",
+                            u8"    - Mode: lazy_compile\n",
+#if defined(UWVM_RUNTIME_LLVM_JIT)
+                            u8"    - Backend: llvm_jit_only\n"
+#elif defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                            u8"    - Backend: uwvm_interpreter_llvm_jit_tiered\n"
+#elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+                            u8"    - Backend: uwvm_interpreter_only\n"
+#elif defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+                            u8"    - Backend: debug_interpreter\n"
+#else
+                            u8"    - Backend: none_backend\n"
+#endif
+        );
+    }
+
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
 #else
@@ -1332,6 +1352,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         version_u8print_llvm_jit_impl(u8log_output_ul);
 #endif
+        // Default mode
+        version_u8print_default_runtime_policy_impl(u8log_output_ul);
         // ENDL
         ::fast_io::io::perrln(u8log_output_ul);
 

@@ -152,12 +152,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
 #endif
 
     /// @brief   The global runtime mode.
-    /// @details default = full_compile
-    /// @todo    set default to lazy_compile
+    /// @details default = lazy_compile
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile};  // [global]
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
 
-    /// @todo    set default to uwvm_interpreter_llvm_jit_tiered
+    /// @brief   The global runtime compiler backend.
+    /// @details default = llvm_jit_only when LLVM JIT is available
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
