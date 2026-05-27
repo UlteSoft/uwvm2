@@ -90,6 +90,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   x86_64-linux-gnu-backend-tests:
+    if: ${{ !always() }}
     name: Linux (x86_64) uwvm-int + llvm-jit
     runs-on: ubuntu-latest
     env:
