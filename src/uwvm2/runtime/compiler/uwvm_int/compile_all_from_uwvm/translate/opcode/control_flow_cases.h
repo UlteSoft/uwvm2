@@ -118,30 +118,33 @@ case wasm1_code::block:
     }
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    if(options.enable_tiered_loop_osr_poll && !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+    if constexpr(CompileOption.enable_tiered_loop_osr_poll)
     {
-        auto const result_begin{curr_func_type.result.begin};
-        auto const result_end{curr_func_type.result.end};
-        auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-        if(result_count <= 1uz)
+        if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
         {
-            ::std::size_t result_bytes{};
-            if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
-
-            if(result_count == 0uz || result_bytes != 0uz)
+            auto const result_begin{curr_func_type.result.begin};
+            auto const result_end{curr_func_type.result.end};
+            auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+            if(result_count <= 1uz)
             {
-                namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                    .func_index = function_index,
-                                    .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
-                                    .result_bytes = result_bytes,
-                                    .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
-                                    .countdown = 8192u,
-                                    .reset_countdown = 8192u};
-                emit_opfunc_to(bytecode,
-                               translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                emit_imm(poll_imm);
+                ::std::size_t result_bytes{};
+                if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
+
+                if(result_count == 0uz || result_bytes != 0uz)
+                {
+                    namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                    using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+                    poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
+                                        .func_index = function_index,
+                                        .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
+                                        .result_bytes = result_bytes,
+                                        .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                        .countdown = 8192u,
+                                        .reset_countdown = 8192u};
+                    emit_opfunc_to(bytecode,
+                                   translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                    emit_imm(poll_imm);
+                }
             }
         }
     }
@@ -310,37 +313,40 @@ case wasm1_code::loop:
                                       }
                                       set_label_offset(loop_start, bytecode.size());
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                                      if(options.enable_tiered_loop_osr_poll && !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+                                      if constexpr(CompileOption.enable_tiered_loop_osr_poll)
                                       {
-                                          auto const result_begin{curr_func_type.result.begin};
-                                          auto const result_end{curr_func_type.result.end};
-                                          auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-                                          if(result_count <= 1uz)
+                                          if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
                                           {
-                                              ::std::size_t result_bytes{};
-                                              if(result_count == 1uz)
+                                              auto const result_begin{curr_func_type.result.begin};
+                                              auto const result_end{curr_func_type.result.end};
+                                              auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
+                                              if(result_count <= 1uz)
                                               {
-                                                  result_bytes = operand_stack_valtype_size(result_begin[0]);
-                                              }
+                                                  ::std::size_t result_bytes{};
+                                                  if(result_count == 1uz)
+                                                  {
+                                                      result_bytes = operand_stack_valtype_size(result_begin[0]);
+                                                  }
 
-                                              if(result_count == 0uz || result_bytes != 0uz)
-                                              {
-                                                  namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
-                                                  using poll_imm_t =
-                                                      ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
-                                                  poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                                                      .func_index = function_index,
-                                                                      .loop_wasm_code_offset =
-                                                                          static_cast<::std::size_t>(op_begin - code_begin),
-                                                                      .result_bytes = result_bytes,
-                                                                      .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
-                                                                      .countdown = 1024u,
-                                                                      .reset_countdown = 1024u};
-                                                  emit_opfunc_to(
-                                                      bytecode,
-                                                      translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                 interpreter_tuple));
-                                                  emit_imm(poll_imm);
+                                                  if(result_count == 0uz || result_bytes != 0uz)
+                                                  {
+                                                      namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
+                                                      using poll_imm_t =
+                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+                                                      poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
+                                                                          .func_index = function_index,
+                                                                          .loop_wasm_code_offset =
+                                                                              static_cast<::std::size_t>(op_begin - code_begin),
+                                                                          .result_bytes = result_bytes,
+                                                                          .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                                                          .countdown = 1024u,
+                                                                          .reset_countdown = 1024u};
+                                                      emit_opfunc_to(
+                                                          bytecode,
+                                                          translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop,
+                                                                                                                                     interpreter_tuple));
+                                                      emit_imm(poll_imm);
+                                                  }
                                               }
                                           }
                                       }

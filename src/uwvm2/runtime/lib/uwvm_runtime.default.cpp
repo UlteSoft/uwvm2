@@ -148,6 +148,9 @@ namespace uwvm2::runtime::lib
         using lazy_compile_request_context_t = ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::lazy_compile_request_context;
 
         inline consteval ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t get_curr_target_tranopt() noexcept;
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline consteval ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t get_curr_target_tiered_tranopt() noexcept;
+# endif
         inline void prepare_lazy_background_request_contexts(compiled_module_record& rec) noexcept;
         inline void prioritize_lazy_background_entry(compiled_module_record& rec, ::std::size_t preferred_local_index) noexcept;
         [[nodiscard]] inline bool lazy_background_refill_callback(void*, ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept;
@@ -3496,6 +3499,16 @@ namespace uwvm2::runtime::lib
 
             return res;
         }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline consteval ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t get_curr_target_tiered_tranopt() noexcept
+        {
+            auto res{get_curr_target_tranopt()};
+            res.enable_tiered_loop_osr_poll = true;
+            return res;
+        }
+        static_assert(get_curr_target_tiered_tranopt().enable_tiered_loop_osr_poll);
+# endif
 #endif
 
         [[maybe_unused]] UWVM_ALWAYS_INLINE inline void copy_bytes_small(::std::byte* dst, ::std::byte const* src, ::std::size_t n) noexcept
@@ -3909,7 +3922,8 @@ namespace uwvm2::runtime::lib
 # endif
         }
 
-        inline void ensure_lazy_defined_function_compiled(::std::size_t module_id, ::std::size_t function_index) noexcept
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t TranslateOpt>
+        inline void ensure_lazy_defined_function_compiled_impl(::std::size_t module_id, ::std::size_t function_index) noexcept
         {
             if(!g_runtime.lazy_compile_active) { return; }
 
@@ -3958,10 +3972,9 @@ namespace uwvm2::runtime::lib
                                                                                                                    .err = ::std::addressof(err),
                                                                                                                    .module_name = rec.module_name};
 
-            constexpr auto curr_target_tranopt{get_curr_target_tranopt()};
             auto const request_priority{1u};
             auto request{
-                ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::make_lazy_compile_request<curr_target_tranopt>(ctx, request_priority)};
+                ::uwvm2::runtime::compiler::uwvm_int::compile_cu_from_lazy_validator::make_lazy_compile_request<TranslateOpt>(ctx, request_priority)};
             ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"demand-request module=\"",
                                                                          rec.module_name,
                                                                          u8"\" module_id=",
@@ -3976,15 +3989,25 @@ namespace uwvm2::runtime::lib
                                                                          ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::compile_state_name(st),
                                                                          u8" priority=",
                                                                          request_priority);
-            if(!g_runtime.lazy_scheduler.ensure_ready(request)) [[unlikely]]
-            {
+            if(g_runtime.lazy_scheduler.ensure_ready(request)) [[likely]] { return; }
 # ifdef UWVM_CPP_EXCEPTIONS
-                print_and_terminate_compile_validation_error(rec.module_name, err);
+            print_and_terminate_compile_validation_error(rec.module_name, err);
 # else
-                ::fast_io::fast_terminate();
+            ::fast_io::fast_terminate();
 # endif
-            }
         }
+
+        inline void ensure_lazy_defined_function_compiled(::std::size_t module_id, ::std::size_t function_index) noexcept
+        {
+            ensure_lazy_defined_function_compiled_impl<get_curr_target_tranopt()>(module_id, function_index);
+        }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline void ensure_tiered_lazy_defined_function_compiled(::std::size_t module_id, ::std::size_t function_index) noexcept
+        {
+            ensure_lazy_defined_function_compiled_impl<get_curr_target_tiered_tranopt()>(module_id, function_index);
+        }
+# endif
 
 #endif
 
@@ -4335,20 +4358,29 @@ namespace uwvm2::runtime::lib
                                                              ::std::byte** stack_top_ptr) noexcept
         {
             if(runtime_func == nullptr || compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            ensure_lazy_defined_function_compiled(module_id, function_index);
+            execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, stack_top_ptr);
+        }
+
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            bool tiered_fallback{};
-            if(tiered_runtime_active())
-            {
-                if(try_execute_tiered_llvm_jit_defined_from_stack_active(module_id, function_index, param_bytes, result_bytes, stack_top_ptr)) { return; }
-                record_tiered_interpreter_entry();
-                tiered_fallback = true;
-            }
-            if(tiered_fallback && ::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
+        inline void execute_defined_with_tiered_jit(call_stack_tls_state& call_stack,
+                                                    ::std::size_t module_id,
+                                                    ::std::size_t function_index,
+                                                    runtime_local_func_storage_t const* runtime_func,
+                                                    compiled_local_func_t const* compiled_func,
+                                                    ::std::size_t param_bytes,
+                                                    ::std::size_t result_bytes,
+                                                    ::std::byte** stack_top_ptr) noexcept
+        {
+            if(runtime_func == nullptr || compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            if(try_execute_tiered_llvm_jit_defined_from_stack_active(module_id, function_index, param_bytes, result_bytes, stack_top_ptr)) { return; }
+            record_tiered_interpreter_entry();
+            if(::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
             {
                 auto const outermost{tiered_interpreter_fallback_depth == 0uz};
                 ++tiered_interpreter_fallback_depth;
                 auto const fallback_start_ns{lazy_clock_now_ns()};
-                ensure_lazy_defined_function_compiled(module_id, function_index);
+                ensure_tiered_lazy_defined_function_compiled(module_id, function_index);
                 auto const exec_start_ns{lazy_clock_now_ns()};
                 execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, stack_top_ptr);
                 auto const exec_end_ns{lazy_clock_now_ns()};
@@ -4359,10 +4391,10 @@ namespace uwvm2::runtime::lib
                                                           outermost);
                 return;
             }
-# endif
-            ensure_lazy_defined_function_compiled(module_id, function_index);
+            ensure_tiered_lazy_defined_function_compiled(module_id, function_index);
             execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, stack_top_ptr);
         }
+# endif
 
         inline void execute_defined_with_optional_tiered_jit(call_stack_tls_state& call_stack,
                                                              compiled_defined_func_info const& info,
@@ -4377,6 +4409,36 @@ namespace uwvm2::runtime::lib
                                                      info.result_bytes,
                                                      stack_top_ptr);
         }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline void execute_defined_with_tiered_jit(call_stack_tls_state& call_stack,
+                                                    compiled_defined_func_info const& info,
+                                                    ::std::byte** stack_top_ptr) noexcept
+        {
+            execute_defined_with_tiered_jit(call_stack,
+                                            info.module_id,
+                                            info.function_index,
+                                            info.runtime_func,
+                                            info.compiled_func,
+                                            info.param_bytes,
+                                            info.result_bytes,
+                                            stack_top_ptr);
+        }
+
+        inline void execute_defined_with_tiered_jit(call_stack_tls_state& call_stack,
+                                                    ::uwvm2::runtime::compiler::uwvm_int::optable::compiled_defined_call_info const& info,
+                                                    ::std::byte** stack_top_ptr) noexcept
+        {
+            execute_defined_with_tiered_jit(call_stack,
+                                            info.module_id,
+                                            info.function_index,
+                                            static_cast<runtime_local_func_storage_t const*>(info.runtime_func),
+                                            info.compiled_func,
+                                            info.param_bytes,
+                                            info.result_bytes,
+                                            stack_top_ptr);
+        }
+# endif
 
         inline void execute_defined_with_optional_tiered_jit(
             call_stack_tls_state& call_stack,
@@ -4393,15 +4455,15 @@ namespace uwvm2::runtime::lib
                                                      stack_top_ptr);
         }
 
-        inline void invoke_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
-                                                        call_stack_frame frame,
-                                                        runtime_local_func_storage_t const* runtime_func,
-                                                        compiled_local_func_t const* compiled_func,
-                                                        ::std::size_t param_bytes,
-                                                        ::std::size_t result_bytes,
-                                                        ::std::byte* result_buffer,
-                                                        ::std::byte const* param_buffer,
-                                                        bool try_tiered_jit = true) noexcept
+        template <bool UseTieredEnsure>
+        inline void invoke_compiled_defined_raw_buffers_impl(call_stack_tls_state& call_stack,
+                                                             call_stack_frame frame,
+                                                             runtime_local_func_storage_t const* runtime_func,
+                                                             compiled_local_func_t const* compiled_func,
+                                                             ::std::size_t param_bytes,
+                                                             ::std::size_t result_bytes,
+                                                             ::std::byte* result_buffer,
+                                                             ::std::byte const* param_buffer) noexcept
         {
             if((result_bytes != 0uz && result_buffer == nullptr) || (param_bytes != 0uz && param_buffer == nullptr) || runtime_func == nullptr ||
                compiled_func == nullptr) [[unlikely]]
@@ -4419,46 +4481,44 @@ namespace uwvm2::runtime::lib
             ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
             call_stack_guard g{call_stack, frame.module_id, frame.function_index};
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            bool tiered_fallback{!try_tiered_jit && tiered_runtime_active()};
-            if(try_tiered_jit && tiered_runtime_active())
-            {
-                if(try_execute_tiered_llvm_jit_defined_raw_buffers_active(frame.module_id,
-                                                                           frame.function_index,
-                                                                           param_bytes,
-                                                                           result_bytes,
-                                                                           host_stack_base,
-                                                                           host_stack_base))
-                {
-                    if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
-                    return;
-                }
-                record_tiered_interpreter_entry();
-                tiered_fallback = true;
-            }
-            if(tiered_fallback && ::uwvm2::uwvm::io::enable_runtime_log) [[unlikely]]
-            {
-                auto const outermost{tiered_interpreter_fallback_depth == 0uz};
-                ++tiered_interpreter_fallback_depth;
-                auto const fallback_start_ns{lazy_clock_now_ns()};
-                ensure_lazy_defined_function_compiled(frame.module_id, frame.function_index);
-                auto const exec_start_ns{lazy_clock_now_ns()};
-                execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, ::std::addressof(stack_top_ptr));
-                auto const exec_end_ns{lazy_clock_now_ns()};
-                --tiered_interpreter_fallback_depth;
-                record_tiered_interpreter_fallback_timing(lazy_elapsed_ns(fallback_start_ns, exec_start_ns),
-                                                          lazy_elapsed_ns(exec_start_ns, exec_end_ns),
-                                                          lazy_elapsed_ns(fallback_start_ns, exec_end_ns),
-                                                          outermost);
-
-                if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
-                return;
-            }
+            if constexpr(UseTieredEnsure) { ensure_tiered_lazy_defined_function_compiled(frame.module_id, frame.function_index); }
+            else
 # endif
-            ensure_lazy_defined_function_compiled(frame.module_id, frame.function_index);
+            {
+                ensure_lazy_defined_function_compiled(frame.module_id, frame.function_index);
+            }
             execute_compiled_defined(call_stack, runtime_func, compiled_func, param_bytes, result_bytes, ::std::addressof(stack_top_ptr));
 
             if(result_bytes != 0uz) { ::std::memcpy(result_buffer, host_stack_base, result_bytes); }
         }
+
+        inline void invoke_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
+                                                        call_stack_frame frame,
+                                                        runtime_local_func_storage_t const* runtime_func,
+                                                        compiled_local_func_t const* compiled_func,
+                                                        ::std::size_t param_bytes,
+                                                        ::std::size_t result_bytes,
+                                                        ::std::byte* result_buffer,
+                                                        ::std::byte const* param_buffer) noexcept
+        {
+            invoke_compiled_defined_raw_buffers_impl<false>(
+                call_stack, frame, runtime_func, compiled_func, param_bytes, result_bytes, result_buffer, param_buffer);
+        }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline void invoke_tiered_compiled_defined_raw_buffers(call_stack_tls_state& call_stack,
+                                                               call_stack_frame frame,
+                                                               runtime_local_func_storage_t const* runtime_func,
+                                                               compiled_local_func_t const* compiled_func,
+                                                               ::std::size_t param_bytes,
+                                                               ::std::size_t result_bytes,
+                                                               ::std::byte* result_buffer,
+                                                               ::std::byte const* param_buffer) noexcept
+        {
+            invoke_compiled_defined_raw_buffers_impl<true>(
+                call_stack, frame, runtime_func, compiled_func, param_bytes, result_bytes, result_buffer, param_buffer);
+        }
+# endif
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         [[maybe_unused]] inline void tiered_raw_call_defined_entry(::std::uintptr_t context_address,
@@ -4487,15 +4547,14 @@ namespace uwvm2::runtime::lib
                 return;
             }
             record_tiered_interpreter_entry();
-            invoke_compiled_defined_raw_buffers(call_stack,
-                                                call_stack_frame{info->module_id, info->function_index},
-                                                info->runtime_func,
-                                                info->compiled_func,
-                                                info->param_bytes,
-                                                info->result_bytes,
-                                                result_buffer,
-                                                param_buffer,
-                                                false);
+            invoke_tiered_compiled_defined_raw_buffers(call_stack,
+                                                       call_stack_frame{info->module_id, info->function_index},
+                                                       info->runtime_func,
+                                                       info->compiled_func,
+                                                       info->param_bytes,
+                                                       info->result_bytes,
+                                                       result_buffer,
+                                                       param_buffer);
         }
 # endif
 
@@ -5086,7 +5145,7 @@ namespace uwvm2::runtime::lib
             ::llvm::initializeInstCombine(pass_registry);
             ::llvm::initializeAnalysis(pass_registry);
             ::llvm::initializeTarget(pass_registry);
-            success = !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter() && !::llvm::InitializeNativeTargetAsmParser();
+            success = !::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter();
             return success;
         }
 
@@ -5421,7 +5480,20 @@ namespace uwvm2::runtime::lib
 
         inline void trap_integer_overflow() noexcept { trap_fatal(trap_kind::integer_overflow); }
 
-        inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        template <bool TryTieredJit, typename... Args>
+        UWVM_ALWAYS_INLINE inline void execute_defined_for_bridge(Args&&... args) noexcept
+        {
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            if constexpr(TryTieredJit) { execute_defined_with_tiered_jit(static_cast<Args&&>(args)...); }
+            else
+# endif
+            {
+                execute_defined_with_optional_tiered_jit(static_cast<Args&&>(args)...);
+            }
+        }
+
+        template <bool TryTieredJit>
+        inline void call_bridge_impl(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -5439,7 +5511,7 @@ namespace uwvm2::runtime::lib
 
                 auto& call_stack{get_call_stack()};
                 call_stack_guard g{call_stack, info->module_id, info->function_index};
-                execute_defined_with_optional_tiered_jit(call_stack, *info, stack_top_ptr);
+                execute_defined_for_bridge<TryTieredJit>(call_stack, *info, stack_top_ptr);
                 return;
             }
 
@@ -5466,7 +5538,7 @@ namespace uwvm2::runtime::lib
                 {
                     case cached_import_target::kind::defined:
                     {
-                        execute_defined_with_optional_tiered_jit(call_stack,
+                        execute_defined_for_bridge<TryTieredJit>(call_stack,
                                                                  tgt.frame.module_id,
                                                                  tgt.frame.function_index,
                                                                  tgt.u.defined.runtime_func,
@@ -5506,11 +5578,26 @@ namespace uwvm2::runtime::lib
             if(local_index >= mod_cache.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
             auto const& info{mod_cache.index_unchecked(local_index)};
             if(info.runtime_func != lf) [[unlikely]] { ::fast_io::fast_terminate(); }
-            execute_defined_with_optional_tiered_jit(call_stack, info, stack_top_ptr);
+            execute_defined_for_bridge<TryTieredJit>(call_stack, info, stack_top_ptr);
         }
 
-        inline void
-            call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        inline void call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        {
+            call_bridge_impl<false>(wasm_module_id, func_index, stack_top_ptr);
+        }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline void tiered_call_bridge(::std::size_t wasm_module_id, ::std::size_t func_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        {
+            call_bridge_impl<true>(wasm_module_id, func_index, stack_top_ptr);
+        }
+# endif
+
+        template <bool TryTieredJit>
+        inline void call_indirect_bridge_impl(::std::size_t wasm_module_id,
+                                              ::std::size_t type_index,
+                                              ::std::size_t table_index,
+                                              ::std::byte** stack_top_ptr) UWVM_THROWS
         {
 # if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             if(!g_runtime.compiled_all.load(::std::memory_order_acquire)) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
@@ -5560,7 +5647,7 @@ namespace uwvm2::runtime::lib
                             call_stack_guard g{call_stack, info.module_id, info.function_index};
                             auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                             if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                            execute_defined_with_optional_tiered_jit(call_stack, info, stack_top_ptr);
+                            execute_defined_for_bridge<TryTieredJit>(call_stack, info, stack_top_ptr);
                             return;
                         }
                     }
@@ -5575,7 +5662,7 @@ namespace uwvm2::runtime::lib
                             {
                                 case cached_import_target::kind::defined:
                                 {
-                                    execute_defined_with_optional_tiered_jit(call_stack,
+                                    execute_defined_for_bridge<TryTieredJit>(call_stack,
                                                                              tgt.frame.module_id,
                                                                              tgt.frame.function_index,
                                                                              tgt.u.defined.runtime_func,
@@ -5685,7 +5772,7 @@ namespace uwvm2::runtime::lib
                     call_stack_guard g{call_stack, info.module_id, info.function_index};
                     auto const rf{static_cast<runtime_local_func_storage_t const*>(info.runtime_func)};
                     if(rf == nullptr || info.compiled_func == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
-                    execute_defined_with_optional_tiered_jit(call_stack, info, stack_top_ptr);
+                    execute_defined_for_bridge<TryTieredJit>(call_stack, info, stack_top_ptr);
                     return;
                 }
                 case ::uwvm2::uwvm::runtime::storage::local_defined_table_elem_storage_type_t::func_ref_imported:
@@ -5750,7 +5837,7 @@ namespace uwvm2::runtime::lib
                     {
                         case cached_import_target::kind::defined:
                         {
-                            execute_defined_with_optional_tiered_jit(call_stack,
+                            execute_defined_for_bridge<TryTieredJit>(call_stack,
                                                                      tgt.frame.module_id,
                                                                      tgt.frame.function_index,
                                                                      tgt.u.defined.runtime_func,
@@ -5784,14 +5871,53 @@ namespace uwvm2::runtime::lib
             }
         }
 
+        inline void
+            call_indirect_bridge(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS
+        {
+            call_indirect_bridge_impl<false>(wasm_module_id, type_index, table_index, stack_top_ptr);
+        }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        inline void tiered_call_indirect_bridge(::std::size_t wasm_module_id,
+                                                ::std::size_t type_index,
+                                                ::std::size_t table_index,
+                                                ::std::byte** stack_top_ptr) UWVM_THROWS
+        {
+            call_indirect_bridge_impl<true>(wasm_module_id, type_index, table_index, stack_top_ptr);
+        }
+# endif
+
+        inline void configure_interpreter_call_bridges_for_current_runtime() noexcept
+        {
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            if(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+               ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered)
+            {
+                ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = tiered_call_bridge;
+                ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = tiered_call_indirect_bridge;
+                return;
+            }
+# endif
+            ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
+            ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
+        }
+
         inline void ensure_bridges_initialized() noexcept
         {
-            if(g_runtime.bridges_initialized.load(::std::memory_order_acquire)) { return; }
+            if(g_runtime.bridges_initialized.load(::std::memory_order_acquire))
+            {
+                configure_interpreter_call_bridges_for_current_runtime();
+                return;
+            }
 
             static ::std::atomic_flag init_lock = ATOMIC_FLAG_INIT;
             while(init_lock.test_and_set(::std::memory_order_acquire))
             {
-                if(g_runtime.bridges_initialized.load(::std::memory_order_acquire)) { return; }
+                if(g_runtime.bridges_initialized.load(::std::memory_order_acquire))
+                {
+                    configure_interpreter_call_bridges_for_current_runtime();
+                    return;
+                }
                 ::fast_io::this_thread::yield();
             }
 
@@ -5802,8 +5928,6 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_divide_by_zero_func = trap_integer_divide_by_zero;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func = trap_integer_overflow;
 
-                ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
-                ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
 #if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                 ::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func = tiered_try_enter_loop_osr;
 #endif
@@ -5811,6 +5935,7 @@ namespace uwvm2::runtime::lib
                 g_runtime.bridges_initialized.store(true, ::std::memory_order_release);
             }
 
+            configure_interpreter_call_bridges_for_current_runtime();
             init_lock.clear(::std::memory_order_release);
         }
 #endif
@@ -7165,7 +7290,7 @@ namespace uwvm2::runtime::lib
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;
                 rec.llvm_jit_lazy_compile_options.codegen_opt_level = resolve_runtime_llvm_jit_codegen_opt_level(
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-                    tiered_backend ? ::llvm::CodeGenOptLevel::Default :
+                    tiered_backend ? ::llvm::CodeGenOptLevel::Less :
 # endif
                                    ::llvm::CodeGenOptLevel::Less);
                 rec.llvm_jit_lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
@@ -7198,7 +7323,6 @@ namespace uwvm2::runtime::lib
                 {
                     ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option interpreter_opt{};
                     interpreter_opt.curr_wasm_id = module_id;
-                    interpreter_opt.enable_tiered_loop_osr_poll = true;
 
                     rec.lazy_compile_options.compile_options = interpreter_opt;
                     rec.lazy_compile_options.validation_mode = interpreter_lazy_validation_mode;
@@ -7756,7 +7880,7 @@ namespace uwvm2::runtime::lib
                         }
                     }
 
-                    if(!invoked_tiered_entry) { call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr)); }
+                    if(!invoked_tiered_entry) { tiered_call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr)); }
                 }
                 else
 #  endif

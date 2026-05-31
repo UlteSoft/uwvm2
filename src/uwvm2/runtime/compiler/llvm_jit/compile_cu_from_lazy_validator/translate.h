@@ -335,7 +335,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::llvm::initializeInstCombine(pass_registry);
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
-                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter() && !::llvm::InitializeNativeTargetAsmParser()};
+                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter()};
                 success.store(ok, ::std::memory_order_release);
                 initialized.store(true, ::std::memory_order_release);
             }

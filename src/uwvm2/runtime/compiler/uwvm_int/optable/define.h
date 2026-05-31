@@ -297,6 +297,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ///           }
         bool is_tail_call{};
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        bool enable_tiered_loop_osr_poll{};
+# endif
+
         /// @details  `local_stack_ptr_pos` and `operand_stack_ptr_pos` can be merged; set one of them to `SIZE_MAX`, and the other will be used as the base
         ///           address. If both are set to `SIZE_MAX`, a compile‑time error will occur.
 
@@ -408,9 +412,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     {
         // Indicates the module number of the currently compiled WASM, used for external function calls.
         ::std::size_t curr_wasm_id{};
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        bool enable_tiered_loop_osr_poll{};
-# endif
     };
 
     template <uwvm_int_stack_top_type... Type>
