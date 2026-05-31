@@ -82,6 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     using parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
     using full_function_symbol_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
     using local_func_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::local_func_storage_t;
+    using tiered_loop_reentry_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::tiered_loop_reentry_storage_t;
     using compile_option = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option;
     using llvm_jit_module_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::llvm_jit_module_storage_t;
     using validation_module_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::validation_module_storage_t;
@@ -177,6 +178,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t raw_entry_address{};
+        ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
+        ::uwvm2::utils::container::vector<::std::uintptr_t> tiered_loop_reentry_raw_entry_addresses{};
         bool ready{};
 
         lazy_materialized_function_storage_t() = default;
@@ -497,6 +500,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             materialized.ready = false;
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
+            materialized.tiered_loop_reentries.clear();
+            materialized.tiered_loop_reentry_raw_entry_addresses.clear();
             materialized.llvm_jit_engine.reset();
             materialized.llvm_context_holder.reset();
 
@@ -558,6 +563,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
             if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
 
+            materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
+            materialized.tiered_loop_reentry_raw_entry_addresses.clear();
+            materialized.tiered_loop_reentry_raw_entry_addresses.reserve(materialized.tiered_loop_reentries.size());
+            for(auto const& reentry: materialized.tiered_loop_reentries)
+            {
+                auto const reentry_function_name{
+                    all_details::get_llvm_wasm_tiered_loop_reentry_raw_function_name(curr_module, function_index_u32, reentry.wasm_code_offset)};
+                auto const reentry_address{resolve_llvm_function_address(*engine, reentry_function_name)};
+                if(reentry_address == 0u) [[unlikely]] { return false; }
+                materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
+            }
+
             materialized.entry_address = entry_address;
             materialized.raw_entry_address = raw_entry_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
@@ -581,6 +598,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 materialized.ready = false;
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
+                materialized.tiered_loop_reentries.clear();
+                materialized.tiered_loop_reentry_raw_entry_addresses.clear();
                 materialized.llvm_jit_engine.reset();
                 materialized.llvm_context_holder.reset();
             }
@@ -643,9 +662,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
                 auto const entry_address{resolve_llvm_function_address(*engine, function_name)};
                 auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
-                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
+                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]]
+                {
+                    return false;
+                }
 
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+                materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
+                materialized.tiered_loop_reentry_raw_entry_addresses.clear();
+                materialized.tiered_loop_reentry_raw_entry_addresses.reserve(materialized.tiered_loop_reentries.size());
+                for(auto const& reentry: materialized.tiered_loop_reentries)
+                {
+                    auto const reentry_function_name{
+                        all_details::get_llvm_wasm_tiered_loop_reentry_raw_function_name(curr_module, function_index_u32, reentry.wasm_code_offset)};
+                    auto const reentry_address{resolve_llvm_function_address(*engine, reentry_function_name)};
+                    if(reentry_address == 0u) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
+                }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
                 materialized.ready = true;
@@ -1237,6 +1273,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         function_address = materialized.entry_address;
         return true;
+    }
+
+    [[nodiscard]] inline bool try_get_lazy_tiered_loop_reentry_raw_entry_address(lazy_module_storage_t const& storage,
+                                                                                 ::std::size_t local_function_index,
+                                                                                 ::std::size_t wasm_code_offset,
+                                                                                 ::std::uintptr_t& function_address) noexcept
+    {
+        function_address = 0u;
+        if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
+
+        auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+        if(!materialized.ready ||
+           materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size())
+        {
+            return false;
+        }
+
+        for(::std::size_t i{}; i != materialized.tiered_loop_reentries.size(); ++i)
+        {
+            if(materialized.tiered_loop_reentries.index_unchecked(i).wasm_code_offset != wasm_code_offset) { continue; }
+
+            function_address = materialized.tiered_loop_reentry_raw_entry_addresses.index_unchecked(i);
+            return function_address != 0u;
+        }
+
+        return false;
     }
 
 }

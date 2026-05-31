@@ -219,6 +219,7 @@ namespace uwvm2::runtime::lib
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::std::size_t tiered_switch_count{};
             ::std::size_t tiered_direct_switch_count{};
+            ::uwvm2::utils::container::vector<::std::uint_least8_t> tiered_entry_hot_counters{};
 #endif
 
             // Canonical type-index table for fast call_indirect signature checks.
@@ -1382,15 +1383,6 @@ namespace uwvm2::runtime::lib
         }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-        [[nodiscard]] inline bool tiered_llvm_jit_should_wait_for_function(compiled_module_record const& rec,
-                                                                           ::std::size_t module_id,
-                                                                           ::std::size_t local_function_index) noexcept
-        {
-            if(module_id == g_runtime.lazy_prefetch_module_id && local_function_index == g_runtime.lazy_prefetch_local_function_index) { return true; }
-
-            auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_function_index)};
-            return code_size != 0uz;
-        }
 # endif
 
         inline void prepare_llvm_jit_lazy_background_request_contexts(compiled_module_record& rec) noexcept
@@ -1496,9 +1488,15 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool seed_llvm_jit_lazy_background_entry_direct_graph(compiled_module_record& rec,
                                                                                    ::std::size_t entry_local_function_index) noexcept
         {
-            constexpr ::std::size_t background_graph_budget{96uz};
-
             if(rec.runtime_module == nullptr) [[unlikely]] { return false; }
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                                      ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
+            auto const background_graph_budget{tiered_backend ? 16uz : 96uz};
+# else
+            constexpr ::std::size_t background_graph_budget{96uz};
+# endif
 
             ::uwvm2::utils::container::vector<::std::size_t> graph_order{};
             if(!collect_llvm_jit_lazy_entry_direct_graph_order(*rec.runtime_module, entry_local_function_index, background_graph_budget, graph_order))
@@ -1518,7 +1516,13 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool enqueue_llvm_jit_lazy_background_requests_for_module(compiled_module_record& rec,
                                                                                        ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept
         {
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
+                                      ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
+            auto const refill_request_budget{tiered_backend ? 8uz : 32uz};
+# else
             constexpr ::std::size_t refill_request_budget{32uz};
+# endif
             auto const local_n{rec.lazy_prefetch_order.size()};
             if(local_n == 0uz || rec.runtime_module == nullptr) [[unlikely]] { return false; }
 
@@ -1619,6 +1623,26 @@ namespace uwvm2::runtime::lib
             }
         }
 
+        [[nodiscard]] inline bool tiered_entry_is_hot_enough_to_request_llvm(compiled_module_record& rec, ::std::size_t local_index) noexcept
+        {
+            constexpr ::std::uint_least8_t request_threshold{4u};
+            if(local_index >= rec.tiered_entry_hot_counters.size()) [[unlikely]] { return true; }
+
+            auto& counter{rec.tiered_entry_hot_counters.index_unchecked(local_index)};
+            ::std::atomic_ref<::std::uint_least8_t> counter_ref{counter};
+            auto observed{counter_ref.load(::std::memory_order_relaxed)};
+            for(;;)
+            {
+                if(observed >= request_threshold) { return true; }
+
+                auto const desired{static_cast<::std::uint_least8_t>(observed + 1u)};
+                if(counter_ref.compare_exchange_weak(observed, desired, ::std::memory_order_relaxed, ::std::memory_order_relaxed))
+                {
+                    return desired >= request_threshold;
+                }
+            }
+        }
+
         [[nodiscard]] inline bool try_publish_tiered_ready_llvm_jit_entry(compiled_module_record& rec,
                                                                           ::std::size_t module_id,
                                                                           ::std::size_t local_index,
@@ -1684,18 +1708,11 @@ namespace uwvm2::runtime::lib
             {
                 return tiered_llvm_jit_demand_state::failed;
             }
-
-            if(st == ::uwvm2::utils::thread::lazy_compile_state::queued || st == ::uwvm2::utils::thread::lazy_compile_state::compiling ||
-               tiered_llvm_jit_should_wait_for_function(rec, module_id, local_index))
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::queued || st == ::uwvm2::utils::thread::lazy_compile_state::compiling)
             {
-                if(!ensure_lazy_llvm_jit_defined_function_compiled(module_id, function_index, true)) [[unlikely]]
-                {
-                    return tiered_llvm_jit_demand_state::failed;
-                }
-                return try_publish_tiered_ready_llvm_jit_entry(rec, module_id, local_index, raw_entry_address)
-                           ? tiered_llvm_jit_demand_state::ready
-                           : tiered_llvm_jit_demand_state::unavailable;
+                return tiered_llvm_jit_demand_state::busy;
             }
+            if(!tiered_entry_is_hot_enough_to_request_llvm(rec, local_index)) { return tiered_llvm_jit_demand_state::busy; }
 
             if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]]
             {
@@ -1729,6 +1746,106 @@ namespace uwvm2::runtime::lib
             return request.unit->state.load(::std::memory_order_acquire) == ::uwvm2::utils::thread::lazy_compile_state::failed
                        ? tiered_llvm_jit_demand_state::failed
                        : tiered_llvm_jit_demand_state::busy;
+        }
+
+        [[nodiscard]] inline bool try_get_tiered_ready_loop_reentry(compiled_module_record& rec,
+                                                                    ::std::size_t module_id,
+                                                                    ::std::size_t local_index,
+                                                                    ::std::size_t loop_wasm_code_offset,
+                                                                    ::std::uintptr_t& reentry_address) noexcept
+        {
+            reentry_address = 0u;
+            if(!::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_tiered_loop_reentry_raw_entry_address(
+                   rec.llvm_jit_lazy_compiled,
+                   local_index,
+                   loop_wasm_code_offset,
+                   reentry_address))
+            {
+                return false;
+            }
+
+            ::std::uintptr_t raw_entry_address{};
+            ::std::uintptr_t typed_entry_address{};
+            if(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_raw_entry_address(rec.llvm_jit_lazy_compiled,
+                                                                                                                    local_index,
+                                                                                                                    raw_entry_address))
+            {
+                static_cast<void>(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_entry_address(
+                    rec.llvm_jit_lazy_compiled,
+                    local_index,
+                    typed_entry_address));
+                static_cast<void>(publish_tiered_llvm_jit_entry_targets(rec, module_id, local_index, raw_entry_address, typed_entry_address));
+            }
+
+            return reentry_address != 0u;
+        }
+
+        [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec, ::std::size_t local_index) noexcept
+        {
+            if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() ||
+               local_index >= rec.llvm_jit_lazy_background_request_contexts.size())
+                [[unlikely]]
+            {
+                return false;
+            }
+
+            auto& fn{rec.llvm_jit_lazy_compiled.functions.index_unchecked(local_index)};
+            auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]] { return false; }
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled) { return true; }
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::queued) { return true; }
+            if(st == ::uwvm2::utils::thread::lazy_compile_state::compiling) { return true; }
+            if(fn.primary_cu_index >= rec.llvm_jit_lazy_compiled.compile_units.size()) [[unlikely]] { return false; }
+
+            auto& ctx{rec.llvm_jit_lazy_background_request_contexts.index_unchecked(local_index)};
+            auto request{::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::make_lazy_compile_request(ctx, 2u)};
+            if(request.unit == nullptr || request.compile == nullptr) [[unlikely]] { return false; }
+
+            record_tiered_lazy_miss();
+            if(g_runtime.lazy_scheduler.running()) { static_cast<void>(g_runtime.lazy_scheduler.try_request(request)); }
+            return true;
+        }
+
+        [[nodiscard]] inline bool tiered_try_enter_loop_osr(::std::size_t module_id,
+                                                            ::std::size_t function_index,
+                                                            ::std::size_t loop_wasm_code_offset,
+                                                            ::std::byte* result_buffer,
+                                                            ::std::size_t result_bytes,
+                                                            ::std::byte const* local_base,
+                                                            ::std::size_t local_bytes) noexcept
+        {
+            if(!tiered_runtime_active()) { return false; }
+            if((result_bytes != 0uz && result_buffer == nullptr) || (local_bytes != 0uz && local_base == nullptr)) [[unlikely]]
+            {
+                ::fast_io::fast_terminate();
+            }
+            if(module_id >= g_runtime.modules.size()) [[unlikely]] { return false; }
+
+            auto& rec{g_runtime.modules.index_unchecked(module_id)};
+            auto const runtime_module{rec.runtime_module};
+            if(runtime_module == nullptr) [[unlikely]] { return false; }
+
+            auto const import_n{runtime_module->imported_function_vec_storage.size()};
+            if(function_index < import_n) [[unlikely]] { return false; }
+            auto const local_index{function_index - import_n};
+            if(!tiered_local_function_direct_supported(rec, local_index)) { return false; }
+
+            ::std::uintptr_t reentry_address{};
+            if(!try_get_tiered_ready_loop_reentry(rec, module_id, local_index, loop_wasm_code_offset, reentry_address))
+            {
+                static_cast<void>(try_request_tiered_loop_reentry_compile(rec, local_index));
+                if(!try_get_tiered_ready_loop_reentry(rec, module_id, local_index, loop_wasm_code_offset, reentry_address)) { return false; }
+            }
+
+            using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
+            auto const entry_fn{reinterpret_cast<entry_fn_t>(reentry_address)};
+            entry_fn(0u,
+                     reinterpret_cast<::std::uintptr_t>(result_buffer),
+                     result_bytes,
+                     reinterpret_cast<::std::uintptr_t>(local_base),
+                     local_bytes);
+            record_tiered_llvm_jit_switch(rec);
+            return true;
         }
 
 # endif
@@ -5419,6 +5536,9 @@ namespace uwvm2::runtime::lib
 
                 ::uwvm2::runtime::compiler::uwvm_int::optable::call_func = call_bridge;
                 ::uwvm2::runtime::compiler::uwvm_int::optable::call_indirect_func = call_indirect_bridge;
+#if defined(UWVM_RUNTIME_LLVM_JIT) && defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                ::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func = tiered_try_enter_loop_osr;
+#endif
 
                 g_runtime.bridges_initialized.store(true, ::std::memory_order_release);
             }
@@ -6769,10 +6889,17 @@ namespace uwvm2::runtime::lib
                 ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option opt{};
                 opt.curr_wasm_id = module_id;
                 opt.verify_llvm_jit_ir = !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction;
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                opt.emit_tiered_loop_reentry_entries = tiered_backend;
+# endif
 
                 rec.llvm_jit_lazy_compile_options.compile_options = opt;
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;
-                rec.llvm_jit_lazy_compile_options.codegen_opt_level = resolve_runtime_llvm_jit_codegen_opt_level(::llvm::CodeGenOptLevel::Less);
+                rec.llvm_jit_lazy_compile_options.codegen_opt_level = resolve_runtime_llvm_jit_codegen_opt_level(
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+                    tiered_backend ? ::llvm::CodeGenOptLevel::Default :
+# endif
+                                   ::llvm::CodeGenOptLevel::Less);
                 rec.llvm_jit_lazy_compile_options.validator_module_storage = find_lazy_validator_module_storage(rec.module_name);
                 if(lazy_validation_mode == llvm_jit_lazy_validation_mode_t::validate_on_lazy_compile &&
                    rec.llvm_jit_lazy_compile_options.validator_module_storage == nullptr) [[unlikely]]
@@ -6803,6 +6930,7 @@ namespace uwvm2::runtime::lib
                 {
                     ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option interpreter_opt{};
                     interpreter_opt.curr_wasm_id = module_id;
+                    interpreter_opt.enable_tiered_loop_osr_poll = true;
 
                     rec.lazy_compile_options.compile_options = interpreter_opt;
                     rec.lazy_compile_options.validation_mode = interpreter_lazy_validation_mode;
@@ -6901,7 +7029,10 @@ namespace uwvm2::runtime::lib
                     rec.llvm_jit_lazy_compile_options.compile_options.lazy_defined_targets_are_atomic = false;
                     rec.tiered_switch_count = 0uz;
                     rec.tiered_direct_switch_count = 0uz;
+                    rec.tiered_entry_hot_counters.clear();
+                    rec.tiered_entry_hot_counters.resize(local_n);
                 }
+                else { rec.tiered_entry_hot_counters.clear(); }
 # endif
 
                 rec.llvm_jit_lazy_direct_call_targets.clear();
@@ -7091,7 +7222,7 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            if(g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
+            if(!tiered_backend && g_runtime.lazy_prefetch_module_id < g_runtime.modules.size())
             {
                 auto& preferred_rec{g_runtime.modules.index_unchecked(g_runtime.lazy_prefetch_module_id)};
                 if(!seed_llvm_jit_lazy_background_entry_direct_graph(preferred_rec, g_runtime.lazy_prefetch_local_function_index))
@@ -7101,8 +7232,9 @@ namespace uwvm2::runtime::lib
             }
 
             auto const worker_count{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compile_threads_resolved};
-            auto const has_lazy_background_work{worker_count != 0uz && has_llvm_jit_lazy_background_work()};
-            g_runtime.lazy_scheduler.start({.worker_count = has_lazy_background_work ? worker_count : 0uz,
+            auto const has_lazy_background_work{!tiered_backend && worker_count != 0uz && has_llvm_jit_lazy_background_work()};
+            auto const lazy_scheduler_worker_count{tiered_backend ? (worker_count == 0uz ? 0uz : 1uz) : (has_lazy_background_work ? worker_count : 0uz)};
+            g_runtime.lazy_scheduler.start({.worker_count = lazy_scheduler_worker_count,
                                             .queue_capacity = 0uz,
                                             .refill_callback = has_lazy_background_work ? &llvm_jit_lazy_background_refill_callback : nullptr,
                                             .refill_user_data = nullptr});
@@ -7329,55 +7461,34 @@ namespace uwvm2::runtime::lib
 #  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                 if(tiered_lazy_backend && llvm_jit_entry_module_id < g_runtime.modules.size())
                 {
-                    if(!try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
-                                                                      llvm_jit_entry_function_index,
-                                                                      nullptr,
-                                                                      0uz,
-                                                                      nullptr,
-                                                                      0uz,
-                                                                      true))
+                    bool invoked_tiered_entry{};
+                    auto const& entry_rec{g_runtime.modules.index_unchecked(llvm_jit_entry_module_id)};
+                    auto const entry_runtime_module{entry_rec.runtime_module};
+                    if(entry_runtime_module != nullptr)
                     {
-                        auto const& entry_rec{g_runtime.modules.index_unchecked(llvm_jit_entry_module_id)};
-                        auto const entry_runtime_module{entry_rec.runtime_module};
-                        if(entry_runtime_module != nullptr)
+                        auto const entry_import_n{entry_runtime_module->imported_function_vec_storage.size()};
+                        if(llvm_jit_entry_function_index >= entry_import_n)
                         {
-                            auto const entry_import_n{entry_runtime_module->imported_function_vec_storage.size()};
-                            if(llvm_jit_entry_function_index >= entry_import_n)
+                            auto const entry_local_index{llvm_jit_entry_function_index - entry_import_n};
+                            if(entry_local_index < entry_rec.llvm_jit_lazy_direct_call_targets.size())
                             {
-                                auto const entry_local_index{llvm_jit_entry_function_index - entry_import_n};
-                                if(entry_local_index < entry_rec.llvm_jit_lazy_direct_call_targets.size())
+                                auto const& target{entry_rec.llvm_jit_lazy_direct_call_targets.index_unchecked(entry_local_index)};
+                                auto& entry_address_ref{const_cast<::std::uintptr_t&>(target.entry_address)};
+                                auto& context_address_ref{const_cast<::std::uintptr_t&>(target.context_address)};
+                                auto const entry_address{::std::atomic_ref<::std::uintptr_t>{entry_address_ref}.load(::std::memory_order_acquire)};
+                                auto const context_address{::std::atomic_ref<::std::uintptr_t>{context_address_ref}.load(::std::memory_order_acquire)};
+                                if(entry_address != 0u)
                                 {
-                                    auto const& target{entry_rec.llvm_jit_lazy_direct_call_targets.index_unchecked(entry_local_index)};
-                                    auto& entry_address_ref{const_cast<::std::uintptr_t&>(target.entry_address)};
-                                    auto& context_address_ref{const_cast<::std::uintptr_t&>(target.context_address)};
-                                    auto const entry_address{::std::atomic_ref<::std::uintptr_t>{entry_address_ref}.load(::std::memory_order_acquire)};
-                                    auto const context_address{::std::atomic_ref<::std::uintptr_t>{context_address_ref}.load(::std::memory_order_acquire)};
-                                    if(entry_address != 0u)
-                                    {
-                                        using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
-                                        auto const entry_fn{reinterpret_cast<entry_fn_t>(entry_address)};
-                                        entry_fn(context_address, 0u, 0uz, 0u, 0uz);
-                                    }
-                                    else
-                                    {
-                                        call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
-                                    }
-                                }
-                                else
-                                {
-                                    call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+                                    using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
+                                    auto const entry_fn{reinterpret_cast<entry_fn_t>(entry_address)};
+                                    entry_fn(context_address, 0u, 0uz, 0u, 0uz);
+                                    invoked_tiered_entry = true;
                                 }
                             }
-                            else
-                            {
-                                call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
-                            }
-                        }
-                        else
-                        {
-                            call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
                         }
                     }
+
+                    if(!invoked_tiered_entry) { call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr)); }
                 }
                 else
 #  endif

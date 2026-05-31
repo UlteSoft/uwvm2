@@ -1,3 +1,9 @@
+struct tiered_loop_reentry_storage_t
+{
+    ::std::size_t wasm_code_offset{};
+    ::std::uint_least32_t entry_id{};
+};
+
 struct local_func_storage_t
 {
     ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
@@ -7,6 +13,7 @@ struct local_func_storage_t
     ::std::size_t module_id{};
     ::std::size_t function_index{};
     ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* runtime_module_ptr{};
+    ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
 };
 
 struct llvm_jit_module_storage_t
@@ -58,6 +65,7 @@ struct compile_option
     ::std::uintptr_t lazy_defined_typed_entry_target_base_address{};
     ::std::size_t lazy_defined_typed_entry_target_count{};
     bool lazy_defined_targets_are_atomic{};
+    bool emit_tiered_loop_reentry_entries{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -568,7 +576,10 @@ namespace details
                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
                                                       ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
                                                       ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
-                                                      bool lazy_defined_targets_are_atomic = false) UWVM_THROWS
+                                                      bool lazy_defined_targets_are_atomic = false,
+                                                      bool emit_tiered_loop_reentry_entries = false,
+                                                      ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr)
+        UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -825,7 +836,8 @@ namespace details
                                                                                      lazy_defined_raw_call_target_count,
                                                                                      lazy_defined_typed_entry_target_base_address,
                                                                                      lazy_defined_typed_entry_target_count,
-                                                                                     lazy_defined_targets_are_atomic)};
+                                                                                     lazy_defined_targets_are_atomic,
+                                                                                     emit_tiered_loop_reentry_entries)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -1130,7 +1142,9 @@ namespace details
                                     options.lazy_defined_raw_call_target_count,
                                     options.lazy_defined_typed_entry_target_base_address,
                                     options.lazy_defined_typed_entry_target_count,
-                                    options.lazy_defined_targets_are_atomic);
+                                    options.lazy_defined_targets_are_atomic,
+                                    options.emit_tiered_loop_reentry_entries,
+                                    ::std::addressof(local_func_storage.tiered_loop_reentries));
         return local_func_storage;
     }
 

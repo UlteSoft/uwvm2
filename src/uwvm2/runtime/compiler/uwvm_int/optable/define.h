@@ -379,10 +379,30 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using interpreter_call_indirect_func_t =
         void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
+    using interpreter_tiered_loop_osr_func_t = bool (*)(::std::size_t wasm_module_id,
+                                                        ::std::size_t func_index,
+                                                        ::std::size_t loop_wasm_code_offset,
+                                                        ::std::byte* result_buffer,
+                                                        ::std::size_t result_bytes,
+                                                        ::std::byte const* local_base,
+                                                        ::std::size_t local_bytes) noexcept;
+
+    struct interpreter_tiered_loop_osr_immediate_t
+    {
+        ::std::size_t wasm_module_id{};
+        ::std::size_t func_index{};
+        ::std::size_t loop_wasm_code_offset{};
+        ::std::size_t result_bytes{};
+        ::std::size_t local_bytes{};
+        ::std::uint_least32_t countdown{};
+        ::std::uint_least32_t reset_countdown{};
+    };
+
     struct compile_option
     {
         // Indicates the module number of the currently compiled WASM, used for external function calls.
         ::std::size_t curr_wasm_id{};
+        bool enable_tiered_loop_osr_poll{};
     };
 
     template <uwvm_int_stack_top_type... Type>

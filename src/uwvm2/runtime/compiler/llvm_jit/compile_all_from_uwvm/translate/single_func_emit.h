@@ -626,6 +626,27 @@ struct runtime_direct_callee_resolution_t
 }
 
 [[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_wasm_tiered_core_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                            validation_module_traits_t::wasm_u32 func_index)
+{
+    auto const func_index_uz{static_cast<::std::size_t>(func_index)};
+    return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module), "_tiered_core_func_", func_index_uz);
+}
+
+[[nodiscard]] inline ::uwvm2::utils::container::string
+    get_llvm_wasm_tiered_loop_reentry_raw_function_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
+                                                        validation_module_traits_t::wasm_u32 func_index,
+                                                        ::std::size_t wasm_code_offset)
+{
+    auto const func_index_uz{static_cast<::std::size_t>(func_index)};
+    return ::uwvm2::utils::container::concat_uwvm(get_llvm_runtime_module_symbol_prefix(runtime_module),
+                                                  "_tiered_loop_raw_func_",
+                                                  func_index_uz,
+                                                  "_off_",
+                                                  wasm_code_offset);
+}
+
+[[nodiscard]] inline ::uwvm2::utils::container::string
     get_llvm_wasm_function_ir_module_name(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& runtime_module,
                                           validation_module_traits_t::wasm_u32 func_index)
 {
@@ -2177,12 +2198,18 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::std::uintptr_t lazy_defined_typed_entry_target_base_address{};
     ::std::size_t lazy_defined_typed_entry_target_count{};
     bool lazy_defined_targets_are_atomic{};
+    bool emit_tiered_loop_reentry_entries{};
     local_func_storage_t const* local_func_storage_ptr{};
     ::uwvm2::utils::container::vector<runtime_operand_stack_value_type> local_types{};
     ::uwvm2::utils::container::vector<::std::size_t> local_offsets{};
     ::llvm::LLVMContext* llvm_context_holder{};
     ::llvm::Module* llvm_module{};
     ::llvm::Function* llvm_function{};
+    ::llvm::Function* llvm_public_entry_function{};
+    ::llvm::BasicBlock* tiered_core_entry_block{};
+    ::llvm::BasicBlock* tiered_core_normal_init_block{};
+    ::llvm::Argument* tiered_core_entry_id_arg{};
+    ::llvm::Argument* tiered_core_local_base_arg{};
     ::uwvm2::utils::container::owned_ptr<::llvm::IRBuilder<>> ir_builder{};
     ::uwvm2::utils::container::vector<::llvm::AllocaInst*> local_pointers{};
     runtime_memory_access_info_t memory0_access_info{};
@@ -2194,6 +2221,9 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ::uwvm2::utils::container::vector<llvm_jit_stack_value_t> operand_stack{};
     ::uwvm2::utils::container::vector<llvm_jit_control_context_t> control_stack{};
     ::uwvm2::utils::container::vector<llvm_jit_branch_target_t> branch_target_stack{};
+    ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
+    ::uwvm2::utils::container::vector<::llvm::BasicBlock*> tiered_loop_reentry_blocks{};
+    ::std::size_t current_wasm_op_offset{SIZE_MAX};
     ::std::size_t unreachable_control_depth{};
 };
 
@@ -2219,7 +2249,8 @@ struct runtime_local_func_llvm_jit_emit_state_t
                                                                              ::std::size_t lazy_defined_raw_call_target_count = 0uz,
                                                                              ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
                                                                              ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
-                                                                             bool lazy_defined_targets_are_atomic = false)
+                                                                             bool lazy_defined_targets_are_atomic = false,
+                                                                             bool emit_tiered_loop_reentry_entries = false)
 {
     state = {};
     state.verify_llvm_jit_ir = verify_llvm_jit_ir;
@@ -2229,6 +2260,7 @@ struct runtime_local_func_llvm_jit_emit_state_t
     state.lazy_defined_typed_entry_target_base_address = lazy_defined_typed_entry_target_base_address;
     state.lazy_defined_typed_entry_target_count = lazy_defined_typed_entry_target_count;
     state.lazy_defined_targets_are_atomic = lazy_defined_targets_are_atomic;
+    state.emit_tiered_loop_reentry_entries = emit_tiered_loop_reentry_entries;
 
     auto function_type_ptr{local_func_storage.function_type_ptr};
     auto wasm_code_ptr{local_func_storage.wasm_code_ptr};
@@ -2306,24 +2338,73 @@ struct runtime_local_func_llvm_jit_emit_state_t
     auto llvm_function_type{::llvm::FunctionType::get(llvm_result_type, llvm_parameter_types, false)};
     auto const function_name{
         get_llvm_wasm_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
-    state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(function_name));
-    if(state.llvm_function == nullptr)
+    state.llvm_public_entry_function = state.llvm_module->getFunction(get_llvm_string_ref(function_name));
+    if(state.llvm_public_entry_function == nullptr)
     {
-        state.llvm_function =
+        state.llvm_public_entry_function =
             ::llvm::Function::Create(llvm_function_type, ::llvm::Function::ExternalLinkage, get_llvm_string_ref(function_name), state.llvm_module);
     }
     else
     {
-        if(state.llvm_function->getFunctionType() != llvm_function_type || !state.llvm_function->empty()) [[unlikely]] { return false; }
-        state.llvm_function->setLinkage(::llvm::Function::ExternalLinkage);
+        if(state.llvm_public_entry_function->getFunctionType() != llvm_function_type || !state.llvm_public_entry_function->empty()) [[unlikely]]
+        {
+            return false;
+        }
+        state.llvm_public_entry_function->setLinkage(::llvm::Function::ExternalLinkage);
     }
-    if(state.llvm_function == nullptr) [[unlikely]] { return false; }
-    apply_llvm_jit_wasm_calling_conv(*state.llvm_function);
+    if(state.llvm_public_entry_function == nullptr) [[unlikely]] { return false; }
+    apply_llvm_jit_wasm_calling_conv(*state.llvm_public_entry_function);
+
+    if(emit_tiered_loop_reentry_entries)
+    {
+        auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+        ::uwvm2::utils::container::vector<::llvm::Type*> core_parameter_types{};
+        core_parameter_types.reserve(llvm_parameter_types.size() + 2uz);
+        core_parameter_types.push_back(::llvm::Type::getInt32Ty(llvm_context));
+        core_parameter_types.push_back(llvm_intptr_type);
+        for(auto param_type: llvm_parameter_types) { core_parameter_types.push_back(param_type); }
+
+        auto core_function_type{::llvm::FunctionType::get(llvm_result_type, core_parameter_types, false)};
+        auto const core_function_name{
+            get_llvm_wasm_tiered_core_function_name(*runtime_module_ptr, static_cast<validation_module_traits_t::wasm_u32>(local_func_storage.function_index))};
+        state.llvm_function = state.llvm_module->getFunction(get_llvm_string_ref(core_function_name));
+        if(state.llvm_function == nullptr)
+        {
+            state.llvm_function =
+                ::llvm::Function::Create(core_function_type, ::llvm::Function::InternalLinkage, get_llvm_string_ref(core_function_name), state.llvm_module);
+        }
+        else
+        {
+            if(state.llvm_function->getFunctionType() != core_function_type || !state.llvm_function->empty()) [[unlikely]] { return false; }
+            state.llvm_function->setLinkage(::llvm::Function::InternalLinkage);
+        }
+        if(state.llvm_function == nullptr) [[unlikely]] { return false; }
+        apply_llvm_jit_wasm_calling_conv(*state.llvm_function);
+
+        state.tiered_core_entry_id_arg = state.llvm_function->getArg(0u);
+        state.tiered_core_local_base_arg = state.llvm_function->getArg(1u);
+        if(state.tiered_core_entry_id_arg == nullptr || state.tiered_core_local_base_arg == nullptr) [[unlikely]] { return false; }
+    }
+    else
+    {
+        state.llvm_function = state.llvm_public_entry_function;
+    }
 
     auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", state.llvm_function)};
     if(entry_block == nullptr) [[unlikely]] { return false; }
-    state.ir_builder = ::uwvm2::utils::container::make_owned<::llvm::IRBuilder<>>(entry_block);
-    if(!emit_runtime_local_func_llvm_jit_call_stack_push(*state.ir_builder, local_func_storage.module_id, local_func_storage.function_index)) [[unlikely]]
+    state.tiered_core_entry_block = entry_block;
+
+    ::llvm::BasicBlock* body_init_block{entry_block};
+    if(emit_tiered_loop_reentry_entries)
+    {
+        body_init_block = ::llvm::BasicBlock::Create(llvm_context, "tiered.normal.init", state.llvm_function);
+        if(body_init_block == nullptr) [[unlikely]] { return false; }
+        state.tiered_core_normal_init_block = body_init_block;
+    }
+
+    state.ir_builder = ::uwvm2::utils::container::make_owned<::llvm::IRBuilder<>>(body_init_block);
+    if(!emit_tiered_loop_reentry_entries &&
+       !emit_runtime_local_func_llvm_jit_call_stack_push(*state.ir_builder, local_func_storage.module_id, local_func_storage.function_index)) [[unlikely]]
     {
         return false;
     }
@@ -2338,7 +2419,11 @@ struct runtime_local_func_llvm_jit_emit_state_t
         auto local_pointer{create_llvm_jit_entry_block_alloca(*state.ir_builder, llvm_local_type, nullptr, "")};
         state.local_pointers.push_back(local_pointer);
 
-        if(local_index < func_parameter_count_uz) { state.ir_builder->CreateStore(state.llvm_function->getArg(local_index), local_pointer); }
+        if(local_index < func_parameter_count_uz)
+        {
+            auto const core_arg_index{emit_tiered_loop_reentry_entries ? local_index + 2uz : local_index};
+            state.ir_builder->CreateStore(state.llvm_function->getArg(core_arg_index), local_pointer);
+        }
         else
         {
             auto zero_constant{get_llvm_zero_constant_from_wasm_value_type(llvm_context, local_type)};
@@ -2394,12 +2479,12 @@ struct runtime_local_func_llvm_jit_emit_state_t
     ir_builder.SetInsertPoint(state.return_block);
     if(state.func_result_count_uz == 0uz)
     {
-        if(!emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
+        if(!state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
         ir_builder.CreateRetVoid();
     }
     else if(state.return_phi != nullptr && state.return_phi->getNumIncomingValues() != 0u)
     {
-        if(!emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
+        if(!state.emit_tiered_loop_reentry_entries && !emit_runtime_local_func_llvm_jit_call_stack_pop(ir_builder)) [[unlikely]] { return false; }
         ir_builder.CreateRet(state.return_phi);
     }
     else
@@ -2408,12 +2493,262 @@ struct runtime_local_func_llvm_jit_emit_state_t
         ir_builder.CreateUnreachable();
     }
 
+    auto const emit_runtime_local_func_llvm_jit_tiered_core_dispatch{
+        [&]() -> bool
+        {
+            if(!state.emit_tiered_loop_reentry_entries) { return true; }
+            if(state.llvm_context_holder == nullptr || state.llvm_module == nullptr || state.llvm_function == nullptr ||
+               state.tiered_core_entry_block == nullptr || state.tiered_core_normal_init_block == nullptr || state.tiered_core_entry_id_arg == nullptr ||
+               state.tiered_core_local_base_arg == nullptr)
+                [[unlikely]]
+            {
+                return false;
+            }
+            if(state.tiered_loop_reentries.size() != state.tiered_loop_reentry_blocks.size()) [[unlikely]] { return false; }
+
+            auto& llvm_context{*state.llvm_context_holder};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto llvm_i8_type{::llvm::Type::getInt8Ty(llvm_context)};
+            auto llvm_i8_ptr_type{get_llvm_pointer_type(llvm_i8_type)};
+            if(llvm_i8_ptr_type == nullptr) [[unlikely]] { return false; }
+
+            ::llvm::IRBuilder<> entry_builder(state.tiered_core_entry_block);
+            auto switch_inst{entry_builder.CreateSwitch(state.tiered_core_entry_id_arg,
+                                                        state.tiered_core_normal_init_block,
+                                                        static_cast<unsigned>(state.tiered_loop_reentries.size()))};
+
+            for(::std::size_t i{}; i != state.tiered_loop_reentries.size(); ++i)
+            {
+                auto const& reentry{state.tiered_loop_reentries.index_unchecked(i)};
+                auto target_block{state.tiered_loop_reentry_blocks.index_unchecked(i)};
+                if(target_block == nullptr) [[unlikely]] { return false; }
+
+                auto load_block{::llvm::BasicBlock::Create(llvm_context, "tiered.osr.load", state.llvm_function)};
+                if(load_block == nullptr) [[unlikely]] { return false; }
+
+                switch_inst->addCase(::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), reentry.entry_id), load_block);
+
+                ::llvm::IRBuilder<> load_builder(load_block);
+                auto local_base_ptr{load_builder.CreateIntToPtr(state.tiered_core_local_base_arg, llvm_i8_ptr_type, "tiered.local.base")};
+                for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
+                {
+                    auto llvm_local_type{get_llvm_type_from_wasm_value_type(llvm_context, state.local_types.index_unchecked(local_index))};
+                    auto local_pointer{state.local_pointers.index_unchecked(local_index)};
+                    if(llvm_local_type == nullptr || local_pointer == nullptr) [[unlikely]] { return false; }
+
+                    auto local_address{load_builder.CreateInBoundsGEP(llvm_i8_type,
+                                                                       local_base_ptr,
+                                                                       {::llvm::ConstantInt::get(llvm_intptr_type,
+                                                                                                 state.local_offsets.index_unchecked(local_index))},
+                                                                       "tiered.local.addr")};
+                    auto typed_local_address{
+                        load_builder.CreateBitCast(local_address, get_llvm_pointer_type(llvm_local_type), "tiered.local.typed.addr")};
+                    load_builder.CreateStore(load_builder.CreateLoad(llvm_local_type, typed_local_address, "tiered.local"), local_pointer);
+                }
+                load_builder.CreateBr(target_block);
+            }
+
+            return true;
+        }};
+
+    auto const emit_runtime_local_func_llvm_jit_tiered_public_entry_wrapper{
+        [&]() -> bool
+        {
+            if(!state.emit_tiered_loop_reentry_entries) { return true; }
+            auto const local_func_storage_ptr{state.local_func_storage_ptr};
+            auto const llvm_module{state.llvm_module};
+            auto const core_function{state.llvm_function};
+            auto public_function{state.llvm_public_entry_function};
+            auto const llvm_context_holder{state.llvm_context_holder};
+            if(local_func_storage_ptr == nullptr || llvm_module == nullptr || core_function == nullptr || public_function == nullptr ||
+               llvm_context_holder == nullptr)
+                [[unlikely]]
+            {
+                return false;
+            }
+            if(!public_function->empty()) [[unlikely]] { return false; }
+
+            auto& llvm_context{*llvm_context_holder};
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", public_function)};
+            if(entry_block == nullptr) [[unlikely]] { return false; }
+            ::llvm::IRBuilder<> public_builder(entry_block);
+
+            if(!emit_runtime_local_func_llvm_jit_call_stack_push(public_builder,
+                                                                 local_func_storage_ptr->module_id,
+                                                                 local_func_storage_ptr->function_index))
+                [[unlikely]]
+            {
+                return false;
+            }
+
+            ::uwvm2::utils::container::vector<::llvm::Value*> core_arguments{};
+            core_arguments.reserve(public_function->arg_size() + 2uz);
+            core_arguments.push_back(::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), 0u));
+            core_arguments.push_back(::llvm::ConstantInt::get(llvm_intptr_type, 0u));
+            for(auto& arg: public_function->args()) { core_arguments.push_back(::std::addressof(arg)); }
+
+            auto core_call{apply_llvm_jit_wasm_calling_conv(public_builder.CreateCall(core_function, core_arguments))};
+            if(!emit_runtime_local_func_llvm_jit_call_stack_pop(public_builder)) [[unlikely]] { return false; }
+
+            if(public_function->getReturnType()->isVoidTy()) { public_builder.CreateRetVoid(); }
+            else { public_builder.CreateRet(core_call); }
+
+            return verify_llvm_jit_function(*public_function, state.verify_llvm_jit_ir);
+        }};
+
+    auto const get_tiered_osr_local_bytes{
+        [&]() -> ::std::size_t
+        {
+            ::std::size_t local_bytes{};
+            for(::std::size_t local_index{}; local_index != state.local_types.size(); ++local_index)
+            {
+                auto const abi_size{get_runtime_wasm_value_type_abi_size(state.local_types.index_unchecked(local_index))};
+                auto const offset{state.local_offsets.index_unchecked(local_index)};
+                if(abi_size == 0uz || offset > (::std::numeric_limits<::std::size_t>::max() - abi_size)) [[unlikely]] { return 0uz; }
+                auto const end{offset + abi_size};
+                if(end > local_bytes) { local_bytes = end; }
+            }
+            return local_bytes;
+        }};
+
+    auto const emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers{
+        [&]() -> bool
+        {
+            if(!state.emit_tiered_loop_reentry_entries) { return true; }
+            auto const local_func_storage_ptr{state.local_func_storage_ptr};
+            auto const llvm_module{state.llvm_module};
+            auto const core_function{state.llvm_function};
+            auto const llvm_context_holder{state.llvm_context_holder};
+            if(local_func_storage_ptr == nullptr || llvm_module == nullptr || core_function == nullptr || llvm_context_holder == nullptr) [[unlikely]]
+            {
+                return false;
+            }
+
+            auto const runtime_module_ptr{local_func_storage_ptr->runtime_module_ptr};
+            auto const function_type_ptr{local_func_storage_ptr->function_type_ptr};
+            if(runtime_module_ptr == nullptr || function_type_ptr == nullptr) [[unlikely]] { return false; }
+
+            using wasm_u32 = validation_module_traits_t::wasm_u32;
+            auto const function_index_uz{local_func_storage_ptr->function_index};
+            if(function_index_uz > static_cast<::std::size_t>((::std::numeric_limits<wasm_u32>::max)())) [[unlikely]] { return false; }
+            auto const function_index{static_cast<wasm_u32>(function_index_uz)};
+
+            auto& llvm_context{*llvm_context_holder};
+            auto raw_entry_function_type{get_llvm_runtime_raw_call_target_entry_function_type(llvm_context)};
+            if(raw_entry_function_type == nullptr) [[unlikely]] { return false; }
+
+            auto const abi_layout{get_runtime_wasm_call_abi_layout(*function_type_ptr)};
+            if(!abi_layout.valid) [[unlikely]] { return false; }
+
+            auto const local_bytes{get_tiered_osr_local_bytes()};
+            if(!state.local_types.empty() && local_bytes == 0uz) [[unlikely]] { return false; }
+
+            auto llvm_intptr_type{::llvm::Type::getIntNTy(llvm_context, static_cast<unsigned>(sizeof(::std::uintptr_t) * 8u))};
+            auto llvm_i8_type{::llvm::Type::getInt8Ty(llvm_context)};
+            auto llvm_i8_ptr_type{get_llvm_pointer_type(llvm_i8_type)};
+            if(llvm_i8_ptr_type == nullptr) [[unlikely]] { return false; }
+
+            auto const result_begin{function_type_ptr->result.begin};
+
+            for(auto const& reentry: state.tiered_loop_reentries)
+            {
+                auto const reentry_function_name{
+                    get_llvm_wasm_tiered_loop_reentry_raw_function_name(*runtime_module_ptr, function_index, reentry.wasm_code_offset)};
+                auto reentry_function{llvm_module->getFunction(get_llvm_string_ref(reentry_function_name))};
+                if(reentry_function == nullptr)
+                {
+                    reentry_function = ::llvm::Function::Create(raw_entry_function_type,
+                                                                ::llvm::Function::ExternalLinkage,
+                                                                get_llvm_string_ref(reentry_function_name),
+                                                                llvm_module);
+                }
+                else
+                {
+                    if(reentry_function->getFunctionType() != raw_entry_function_type || !reentry_function->empty()) [[unlikely]] { return false; }
+                    reentry_function->setLinkage(::llvm::Function::ExternalLinkage);
+                }
+                if(reentry_function == nullptr) [[unlikely]] { return false; }
+                apply_llvm_jit_host_calling_conv(*reentry_function);
+
+                auto entry_block{::llvm::BasicBlock::Create(llvm_context, "entry", reentry_function)};
+                if(entry_block == nullptr) [[unlikely]] { return false; }
+                ::llvm::IRBuilder<> osr_builder(entry_block);
+
+                auto const result_buffer_address{reentry_function->getArg(1u)};
+                auto const result_bytes{reentry_function->getArg(2u)};
+                auto const local_base_address{reentry_function->getArg(3u)};
+                auto const local_base_bytes{reentry_function->getArg(4u)};
+                if(result_buffer_address == nullptr || result_bytes == nullptr || local_base_address == nullptr || local_base_bytes == nullptr) [[unlikely]]
+                {
+                    return false;
+                }
+
+                emit_llvm_conditional_trap(*llvm_module,
+                                           osr_builder,
+                                           osr_builder.CreateICmpNE(local_base_bytes, ::llvm::ConstantInt::get(llvm_intptr_type, local_bytes)));
+                emit_llvm_conditional_trap(*llvm_module,
+                                           osr_builder,
+                                           osr_builder.CreateICmpNE(result_bytes, ::llvm::ConstantInt::get(llvm_intptr_type, abi_layout.result_bytes)));
+                if(local_bytes != 0uz)
+                {
+                    emit_llvm_conditional_trap(*llvm_module,
+                                               osr_builder,
+                                               osr_builder.CreateICmpEQ(local_base_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+                }
+                if(abi_layout.result_bytes != 0uz)
+                {
+                    emit_llvm_conditional_trap(*llvm_module,
+                                               osr_builder,
+                                               osr_builder.CreateICmpEQ(result_buffer_address, ::llvm::ConstantInt::get(llvm_intptr_type, 0u)));
+                }
+
+                ::uwvm2::utils::container::vector<::llvm::Value*> core_arguments{};
+                core_arguments.reserve(abi_layout.parameter_count + 2uz);
+                core_arguments.push_back(::llvm::ConstantInt::get(::llvm::Type::getInt32Ty(llvm_context), reentry.entry_id));
+                core_arguments.push_back(local_base_address);
+                auto const parameter_begin{function_type_ptr->parameter.begin};
+                for(::std::size_t parameter_index{}; parameter_index != abi_layout.parameter_count; ++parameter_index)
+                {
+                    auto llvm_param_type{
+                        get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(parameter_begin[parameter_index]))};
+                    if(llvm_param_type == nullptr) [[unlikely]] { return false; }
+                    core_arguments.push_back(::llvm::Constant::getNullValue(llvm_param_type));
+                }
+
+                auto core_call{apply_llvm_jit_wasm_calling_conv(osr_builder.CreateCall(core_function, core_arguments))};
+                if(abi_layout.result_count == 1uz)
+                {
+                    auto llvm_result_type{get_llvm_type_from_wasm_value_type(llvm_context, static_cast<runtime_operand_stack_value_type>(result_begin[0]))};
+                    if(llvm_result_type == nullptr || core_function->getReturnType() != llvm_result_type) [[unlikely]] { return false; }
+
+                    auto result_buffer_base{osr_builder.CreateIntToPtr(result_buffer_address, llvm_i8_ptr_type, "tiered.result.base")};
+                    auto typed_result_address{
+                        osr_builder.CreateBitCast(result_buffer_base, get_llvm_pointer_type(llvm_result_type), "tiered.result.typed.addr")};
+                    osr_builder.CreateStore(core_call, typed_result_address);
+                }
+
+                osr_builder.CreateRetVoid();
+                if(!verify_llvm_jit_function(*reentry_function, state.verify_llvm_jit_ir)) [[unlikely]] { return false; }
+            }
+
+            return true;
+        }};
+
+    if(!emit_runtime_local_func_llvm_jit_tiered_core_dispatch() ||
+       !emit_runtime_local_func_llvm_jit_tiered_public_entry_wrapper() ||
+       !emit_runtime_local_func_llvm_jit_tiered_loop_reentry_wrappers())
+        [[unlikely]]
+    {
+        return false;
+    }
+
     auto const emit_runtime_local_func_llvm_jit_raw_entry_wrapper{
         [&]() -> bool
         {
             auto const local_func_storage_ptr{state.local_func_storage_ptr};
             auto const llvm_module{state.llvm_module};
-            auto const llvm_function{state.llvm_function};
+            auto const llvm_function{state.llvm_public_entry_function};
             auto const llvm_context_holder{state.llvm_context_holder};
             if(local_func_storage_ptr == nullptr || llvm_module == nullptr || llvm_function == nullptr || llvm_context_holder == nullptr) [[unlikely]]
             {
@@ -2628,6 +2963,27 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     while(state.operand_stack.size() > target_size) { state.operand_stack.pop_back(); }
 }
 
+[[nodiscard]] inline bool try_record_runtime_local_func_llvm_jit_tiered_reentry(runtime_local_func_llvm_jit_emit_state_t& state,
+                                                                                ::llvm::BasicBlock* target_block)
+{
+    if(!state.emit_tiered_loop_reentry_entries || !state.operand_stack.empty() || state.current_wasm_op_offset == SIZE_MAX) { return true; }
+    if(target_block == nullptr) [[unlikely]] { return false; }
+    if(state.tiered_loop_reentries.size() != state.tiered_loop_reentry_blocks.size()) [[unlikely]] { return false; }
+
+    auto const next_entry_id{state.tiered_loop_reentries.size() + 1uz};
+    if(next_entry_id > static_cast<::std::size_t>((::std::numeric_limits<::std::uint_least32_t>::max)())) { return true; }
+
+    for(auto const& reentry: state.tiered_loop_reentries)
+    {
+        if(reentry.wasm_code_offset == state.current_wasm_op_offset) { return true; }
+    }
+
+    state.tiered_loop_reentries.push_back({.wasm_code_offset = state.current_wasm_op_offset,
+                                           .entry_id = static_cast<::std::uint_least32_t>(next_entry_id)});
+    state.tiered_loop_reentry_blocks.push_back(target_block);
+    return true;
+}
+
 [[nodiscard]] inline bool try_emit_runtime_local_func_llvm_jit_unreachable(runtime_local_func_llvm_jit_emit_state_t& state)
 {
     if(!state.valid || state.llvm_module == nullptr || state.ir_builder == nullptr || state.control_stack.empty()) [[unlikely]] { return false; }
@@ -2660,6 +3016,21 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
     auto end_block{::llvm::BasicBlock::Create(llvm_context, "block.end", state.llvm_function)};
     auto end_phi{create_runtime_local_func_llvm_jit_optional_result_phi(llvm_context, end_block, block_result, "block.result")};
     if(get_runtime_block_result_count(block_result) == 1uz && end_phi == nullptr) [[unlikely]] { return false; }
+
+    if(state.emit_tiered_loop_reentry_entries && state.operand_stack.empty() && state.current_wasm_op_offset != SIZE_MAX)
+    {
+        if(state.ir_builder == nullptr) [[unlikely]] { return false; }
+        auto& ir_builder{*state.ir_builder};
+        auto current_block{ir_builder.GetInsertBlock()};
+        if(current_block == nullptr || llvm_jit_basic_block_has_terminator(current_block)) [[unlikely]] { return false; }
+
+        auto block_body_block{::llvm::BasicBlock::Create(llvm_context, "block.body", state.llvm_function)};
+        if(block_body_block == nullptr) [[unlikely]] { return false; }
+
+        ir_builder.CreateBr(block_body_block);
+        ir_builder.SetInsertPoint(block_body_block);
+        if(!try_record_runtime_local_func_llvm_jit_tiered_reentry(state, block_body_block)) [[unlikely]] { return false; }
+    }
 
     auto const control_stack_index{state.control_stack.size()};
     state.control_stack.push_back({.type = llvm_jit_control_context_type::block,
@@ -2702,6 +3073,8 @@ inline void truncate_runtime_local_func_llvm_jit_operand_stack_to(runtime_local_
 
     ir_builder.CreateBr(loop_body_block);
     ir_builder.SetInsertPoint(loop_body_block);
+
+    if(!try_record_runtime_local_func_llvm_jit_tiered_reentry(state, loop_body_block)) [[unlikely]] { return false; }
 
     auto const control_stack_index{state.control_stack.size()};
     state.control_stack.push_back({.type = llvm_jit_control_context_type::loop,
@@ -5102,6 +5475,14 @@ template <typename CreateValue>
 
     wasm1_code curr_opbase;
     ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
+    if(state.local_func_storage_ptr != nullptr && state.local_func_storage_ptr->code_begin != nullptr && code_curr >= state.local_func_storage_ptr->code_begin)
+    {
+        state.current_wasm_op_offset = static_cast<::std::size_t>(code_curr - state.local_func_storage_ptr->code_begin);
+    }
+    else
+    {
+        state.current_wasm_op_offset = SIZE_MAX;
+    }
 
     if(!control_stack.back().is_reachable)
     {
