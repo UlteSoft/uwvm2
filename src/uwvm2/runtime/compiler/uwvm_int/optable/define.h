@@ -379,13 +379,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using interpreter_call_indirect_func_t =
         void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
+    inline constexpr ::std::uintptr_t interpreter_tiered_loop_osr_disabled_state_address{::std::numeric_limits<::std::uintptr_t>::max()};
+
     using interpreter_tiered_loop_osr_func_t = bool (*)(::std::size_t wasm_module_id,
                                                         ::std::size_t func_index,
                                                         ::std::size_t loop_wasm_code_offset,
                                                         ::std::byte* result_buffer,
                                                         ::std::size_t result_bytes,
                                                         ::std::byte const* local_base,
-                                                        ::std::size_t local_bytes) noexcept;
+                                                        ::std::size_t local_bytes,
+                                                        ::std::uintptr_t* compile_state_address_ptr) noexcept;
 
     struct interpreter_tiered_loop_osr_immediate_t
     {
@@ -396,6 +399,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::size_t local_bytes{};
         ::std::uint_least32_t countdown{};
         ::std::uint_least32_t reset_countdown{};
+        ::std::uintptr_t compile_state_address{};
     };
 
     struct compile_option
