@@ -117,6 +117,7 @@ case wasm1_code::block:
         }
     }
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     if(options.enable_tiered_loop_osr_poll && !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
     {
         auto const result_begin{curr_func_type.result.begin};
@@ -144,6 +145,7 @@ case wasm1_code::block:
             }
         }
     }
+#endif
 
     control_flow_stack.push_back({.result = block_result,
                                   .operand_stack_base = operand_stack.size(),
@@ -307,6 +309,7 @@ case wasm1_code::loop:
                                           }
                                       }
                                       set_label_offset(loop_start, bytecode.size());
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                                       if(options.enable_tiered_loop_osr_poll && !is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
                                       {
                                           auto const result_begin{curr_func_type.result.begin};
@@ -341,6 +344,7 @@ case wasm1_code::loop:
                                               }
                                           }
                                       }
+#endif
                                       return loop_start;
                                   }(),
                                   .end_label_id = new_label(false),

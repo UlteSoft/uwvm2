@@ -59,6 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
     namespace details
     {
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         template <typename T>
         UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr T load_interpreter_imm_field(::std::byte const* ip) noexcept
         {
@@ -69,12 +70,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         template <typename T>
         UWVM_ALWAYS_INLINE inline constexpr void store_interpreter_imm_field(::std::byte const* ip, T const& value) noexcept
-        {
-            ::std::memcpy(const_cast<::std::byte*>(ip), ::std::addressof(value), sizeof(value));
-        }
+        { ::std::memcpy(const_cast<::std::byte*>(ip), ::std::addressof(value), sizeof(value)); }
 
-        UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr bool
-            tiered_loop_osr_countdown_expired(::std::byte const* countdown_ip) noexcept
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr bool tiered_loop_osr_countdown_expired(::std::byte const* countdown_ip) noexcept
         {
             auto countdown{load_interpreter_imm_field<::std::uint_least32_t>(countdown_ip)};
             if(countdown <= 1u) { return true; }
@@ -91,8 +89,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             poll_runtime
         };
 
-        UWVM_ALWAYS_INLINE [[nodiscard]] inline tiered_loop_osr_fast_poll_state
-            tiered_loop_osr_check_fast_state(::std::uintptr_t state_address, ::std::byte const* state_address_ip) noexcept
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline tiered_loop_osr_fast_poll_state tiered_loop_osr_check_fast_state(::std::uintptr_t state_address,
+                                                                                                                 ::std::byte const* state_address_ip) noexcept
         {
             if(state_address == 0u) { return tiered_loop_osr_fast_poll_state::countdown; }
             if(state_address == ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_disabled_state_address)
@@ -112,6 +110,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             if(state == ::uwvm2::utils::thread::lazy_compile_state::uncompiled) [[unlikely]] { return tiered_loop_osr_fast_poll_state::countdown; }
             return tiered_loop_osr_fast_poll_state::skip;
         }
+# endif
 
         /// @brief Runtime trap bridge: handles the Wasm `unreachable` trap.
         /// @details
@@ -379,6 +378,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_br_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
               ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -410,15 +410,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memcpy(::std::addressof(imm), imm_ip, sizeof(imm));
 
             auto const callback{::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func};
-            if(callback != nullptr &&
-               callback(imm.wasm_module_id,
-                        imm.func_index,
-                        imm.loop_wasm_code_offset,
-                        type...[1u],
-                        imm.result_bytes,
-                        type...[2u],
-                        imm.local_bytes,
-                        ::std::addressof(imm.compile_state_address)))
+            if(callback != nullptr && callback(imm.wasm_module_id,
+                                               imm.func_index,
+                                               imm.loop_wasm_code_offset,
+                                               type...[1u],
+                                               imm.result_bytes,
+                                               type...[2u],
+                                               imm.local_bytes,
+                                               ::std::addressof(imm.compile_state_address)))
             {
                 return;
             }
@@ -470,15 +469,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::std::memcpy(::std::addressof(imm), imm_ip, sizeof(imm));
 
             auto const callback{::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func};
-            if(callback != nullptr &&
-               callback(imm.wasm_module_id,
-                        imm.func_index,
-                        imm.loop_wasm_code_offset,
-                        typeref...[1u],
-                        imm.result_bytes,
-                        typeref...[2u],
-                        imm.local_bytes,
-                        ::std::addressof(imm.compile_state_address)))
+            if(callback != nullptr && callback(imm.wasm_module_id,
+                                               imm.func_index,
+                                               imm.loop_wasm_code_offset,
+                                               typeref...[1u],
+                                               imm.result_bytes,
+                                               typeref...[2u],
+                                               imm.local_bytes,
+                                               ::std::addressof(imm.compile_state_address)))
             {
                 typeref...[1u] += imm.result_bytes;
                 typeref...[0u] = nullptr;
@@ -524,6 +522,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_tiered_loop_osr_poll_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
+# endif
 
     /// @brief `br_if` opcode (tail-call): conditional branch based on an i32 condition.
     /// @details

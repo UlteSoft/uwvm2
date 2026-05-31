@@ -379,6 +379,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     using interpreter_call_indirect_func_t =
         void (*)(::std::size_t wasm_module_id, ::std::size_t type_index, ::std::size_t table_index, ::std::byte** stack_top_ptr) UWVM_THROWS;
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     inline constexpr ::std::uintptr_t interpreter_tiered_loop_osr_disabled_state_address{::std::numeric_limits<::std::uintptr_t>::max()};
 
     using interpreter_tiered_loop_osr_func_t = bool (*)(::std::size_t wasm_module_id,
@@ -401,12 +402,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::uint_least32_t reset_countdown{};
         ::std::uintptr_t compile_state_address{};
     };
+# endif
 
     struct compile_option
     {
         // Indicates the module number of the currently compiled WASM, used for external function calls.
         ::std::size_t curr_wasm_id{};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         bool enable_tiered_loop_osr_poll{};
+# endif
     };
 
     template <uwvm_int_stack_top_type... Type>
