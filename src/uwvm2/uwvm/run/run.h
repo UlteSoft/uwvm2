@@ -374,48 +374,25 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return true;
     }
 
-    [[nodiscard]] inline constexpr bool wasm_entry_binary_digit(char8_t ch, ::std::uint_least8_t& value) noexcept
-    {
-        ::std::uint_least8_t parsed{};
-        auto const first{::std::addressof(ch)};
-        auto const [next, err]{::fast_io::parse_by_scan(first, first + 1u, ::fast_io::mnp::bin_get<true, false, false>(parsed))};
-        if(err != ::fast_io::parse_code::ok || next != first + 1u) { return false; }
-        value = parsed;
-        return true;
-    }
-
-    template <typename T, ::std::uint_least8_t Base, ::std::int_least64_t BitsPerDigit>
-    [[nodiscard]] inline bool parse_wasm_entry_prefixed_binary_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
+    // Fallback for exact C-style hexadecimal floating literals, e.g. 0x1.8p0.
+    template <typename T>
+    [[nodiscard]] inline bool parse_wasm_entry_hexfloat_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
         if(*first == u8'-' || *first == u8'+') { return false; }
 
-        if constexpr(Base == 16u)
-        {
-            if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'x' && first[1] != u8'X')) { return false; }
-        }
-        else
-        {
-            static_assert(Base == 2u);
-            if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'b' && first[1] != u8'B')) { return false; }
-        }
+        if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'x' && first[1] != u8'X')) { return false; }
         first += 2;
 
         long double significand{};
         bool has_digit{};
-        ::std::int_least64_t fractional_digits{};
-
-        auto parse_digit{[](char8_t ch, ::std::uint_least8_t& digit) constexpr noexcept
-                         {
-                             if constexpr(Base == 16u) { return wasm_entry_hex_digit(ch, digit); }
-                             else { return wasm_entry_binary_digit(ch, digit); }
-                         }};
+        ::std::int_least64_t fractional_hex_digits{};
 
         while(first != last)
         {
             ::std::uint_least8_t digit{};
-            if(!parse_digit(*first, digit)) { break; }
-            significand = significand * static_cast<long double>(Base) + static_cast<long double>(digit);
+            if(!wasm_entry_hex_digit(*first, digit)) { break; }
+            significand = significand * 16.0L + static_cast<long double>(digit);
             has_digit = true;
             ++first;
         }
@@ -426,10 +403,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             while(first != last)
             {
                 ::std::uint_least8_t digit{};
-                if(!parse_digit(*first, digit)) { break; }
-                significand = significand * static_cast<long double>(Base) + static_cast<long double>(digit);
+                if(!wasm_entry_hex_digit(*first, digit)) { break; }
+                significand = significand * 16.0L + static_cast<long double>(digit);
                 has_digit = true;
-                ++fractional_digits;
+                ++fractional_hex_digits;
                 ++first;
             }
         }
@@ -447,7 +424,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const [next, err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::dec_get<true, false>(exponent))};
         if(err != ::fast_io::parse_code::ok || next != last) { return false; }
 
-        auto const adjusted_exponent{exponent - fractional_digits * BitsPerDigit};
+        auto const adjusted_exponent{exponent - fractional_hex_digits * 4};
         if(adjusted_exponent > static_cast<::std::int_least64_t>((::std::numeric_limits<int>::max)()))
         {
             out = (::std::numeric_limits<T>::infinity)();
@@ -465,13 +442,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
     }
 
     template <typename T>
-    [[nodiscard]] inline bool parse_wasm_entry_prefixed_binary_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
-    {
-        return parse_wasm_entry_prefixed_binary_float_range<T, 16u, 4>(first, last, out) ||
-               parse_wasm_entry_prefixed_binary_float_range<T, 2u, 1>(first, last, out);
-    }
-
-    template <typename T>
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
         if(first == last) { return false; }
@@ -484,7 +454,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
         if(err == ::fast_io::parse_code::ok && next == last) { return true; }
 #endif
-        return parse_wasm_entry_prefixed_binary_float_range(first, last, out);
+        return parse_wasm_entry_hexfloat_range(first, last, out);
     }
 
     template <typename T>
