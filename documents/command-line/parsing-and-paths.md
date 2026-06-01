@@ -61,12 +61,17 @@ uwvm --run app.wasm --runtime-jit
 
 Most callbacks can only consume tokens that preprocessing classified as `arg`. Because tokens beginning with `-` are normally classified as parameters, a value like `-1` would usually be treated as an option.
 
-`--runtime-compile-threads` is the exception. Its parameter definition has a `pretreatment` hook. If the next raw token starts with `-` followed by a digit, preprocessing pre-marks it as an occupied value, so the callback can parse it as a signed `ssize_t`.
+Some options define a `pretreatment` hook for value-shaped tokens that would otherwise look like parameters.
+
+`--runtime-compile-threads` uses pretreatment for its signed thread-count value. If the next raw token starts with `-` followed by a digit, preprocessing pre-marks it as an occupied value, so the callback can parse it as a signed `ssize_t`.
+
+`--wasm-set-start-func` also uses pretreatment. After its required decimal local-function index has been recognized, preprocessing marks following tokens as function arguments until it reaches a token whose first byte is `-` and whose next byte is not a C digit. This means `-1` and `-3.0e4` stay with `--wasm-set-start-func`, while `--log-verbose`, `--run`, `-r`, `--`, and `-foo` remain host parameters. The hook does not validate those argument tokens; the runtime entry parser later reports type-specific errors.
 
 Supported:
 
 ```bash
 uwvm --runtime-compile-threads -1 --run app.wasm
+uwvm --wasm-set-start-func 0 -1 -3.0e4 --run app.wasm
 ```
 
 Do not assume other numeric options accept negative-looking tokens in the same way. `size_t` options are unsigned anyway, and options without pretreatment cannot consume a `-...` token as data.
