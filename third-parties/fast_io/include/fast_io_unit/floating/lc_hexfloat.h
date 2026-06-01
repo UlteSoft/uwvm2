@@ -31,7 +31,7 @@ inline constexpr char_type *lc_print_rsvhexfloat_define_impl(char_type *iter, fl
 	}
 	if constexpr (showbase)
 	{
-		iter = print_reserve_show_base_impl<16, showbase_uppercase>(iter);
+		iter = print_reserve_show_base_impl<16, showbase_uppercase, false>(iter);
 	}
 	if (!mantissa && !exponent)
 	{

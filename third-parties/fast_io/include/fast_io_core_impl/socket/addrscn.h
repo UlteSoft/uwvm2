@@ -32,7 +32,7 @@ struct ip_scan_state_t
 	// overflow/partial state at the length boundary.
 
 	static inline constexpr auto max_size{
-		::fast_io::details::print_integer_reserved_size_cache<10, false, false, ::std::uint_least16_t> + 1};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, false, false, ::std::uint_least16_t> + 1};
 	::fast_io::freestanding::array<char_type, max_size> buffer;
 	scan_integral_context_phase integer_phase{};
 	::std::uint_least8_t size{};
@@ -58,7 +58,7 @@ scn_cnt_define_inaddr_impl(char_type const *begin, char_type const *end, posix_i
 	{
 		return {begin, parse_code::invalid};
 	}
-	auto [itr0, ec0] = scan_int_contiguous_define_impl<10, true, false, false>(begin, begin + 3, t.address[0]);
+	auto [itr0, ec0] = scan_int_contiguous_define_impl<10, true, false, false, false>(begin, begin + 3, t.address[0]);
 	if (ec0 != parse_code::ok) [[unlikely]]
 	{
 		return {itr0, ec0};
@@ -76,7 +76,7 @@ scn_cnt_define_inaddr_impl(char_type const *begin, char_type const *end, posix_i
 		return {begin, parse_code::invalid};
 	}
 	++begin;
-	auto [itr1, ec1] = scan_int_contiguous_define_impl<10, true, false, false>(begin, begin + 3, t.address[1]);
+	auto [itr1, ec1] = scan_int_contiguous_define_impl<10, true, false, false, false>(begin, begin + 3, t.address[1]);
 	if (ec1 != parse_code::ok) [[unlikely]]
 	{
 		return {itr1, ec1};
@@ -98,7 +98,7 @@ scn_cnt_define_inaddr_impl(char_type const *begin, char_type const *end, posix_i
 	{
 		return {begin, parse_code::invalid};
 	}
-	auto [itr2, ec2] = scan_int_contiguous_define_impl<10, true, false, false>(begin, begin + 3, t.address[2]);
+	auto [itr2, ec2] = scan_int_contiguous_define_impl<10, true, false, false, false>(begin, begin + 3, t.address[2]);
 	if (ec2 != parse_code::ok) [[unlikely]]
 	{
 		return {itr2, ec2};
@@ -116,7 +116,7 @@ scn_cnt_define_inaddr_impl(char_type const *begin, char_type const *end, posix_i
 		return {begin, parse_code::invalid};
 	}
 	++begin;
-	auto [itr3, ec3] = scan_int_contiguous_define_impl<10, true, false, false>(begin, end, t.address[3]);
+	auto [itr3, ec3] = scan_int_contiguous_define_impl<10, true, false, false, false>(begin, end, t.address[3]);
 	if (ec3 != parse_code::ok) [[unlikely]]
 	{
 		return {itr3, ec3};
@@ -145,7 +145,7 @@ scn_ctx_define_inaddr_impl(ipv4_scan_state_t<char_type> &state, char_type const 
 		{
 			return {begin, parse_code::partial};
 		}
-		auto [itr, ec] = scan_context_define_parse_impl<10, false, false, false>(state, begin, end, t.address[0]);
+		auto [itr, ec] = scan_context_define_parse_impl<10, false, false, false, false>(state, begin, end, t.address[0]);
 		if (ec != parse_code::ok) [[unlikely]]
 		{
 			return {itr, ec};
@@ -183,7 +183,7 @@ scn_ctx_define_inaddr_impl(ipv4_scan_state_t<char_type> &state, char_type const 
 		{
 			return {begin, parse_code::partial};
 		}
-		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t.address[1]);
+		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t.address[1]);
 		if (ec != parse_code::ok) [[unlikely]]
 		{
 			return {itr, ec};
@@ -221,7 +221,7 @@ scn_ctx_define_inaddr_impl(ipv4_scan_state_t<char_type> &state, char_type const 
 		{
 			return {begin, parse_code::partial};
 		}
-		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t.address[2]);
+		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t.address[2]);
 		if (ec != parse_code::ok) [[unlikely]]
 		{
 			return {itr, ec};
@@ -259,7 +259,7 @@ scn_ctx_define_inaddr_impl(ipv4_scan_state_t<char_type> &state, char_type const 
 		{
 			return {begin, parse_code::partial};
 		}
-		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t.address[3]);
+		auto [itr, ec] = scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t.address[3]);
 		if (ec != parse_code::ok) [[unlikely]]
 		{
 			return {itr, ec};
@@ -291,7 +291,7 @@ inline constexpr parse_result<char_type const *> scn_cnt_define_port_impl(char_t
 		return {begin, parse_code::invalid};
 	}
 	++begin;
-	return scan_int_contiguous_define_impl<10, true, false, false>(begin, end, t);
+	return scan_int_contiguous_define_impl<10, true, false, false, false>(begin, end, t);
 }
 
 template <::std::integral char_type>
@@ -318,7 +318,7 @@ inline constexpr parse_result<char_type const *> scn_ctx_define_port_impl(ip_por
 		{
 			return {begin, parse_code::partial};
 		}
-		return scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t);
+		return scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t);
 	default:;
 		::fast_io::unreachable();
 	}

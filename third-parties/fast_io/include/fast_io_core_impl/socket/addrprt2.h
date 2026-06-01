@@ -36,7 +36,7 @@ template <::std::integral char_type>
 inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, posix_in_addr>) noexcept
 {
 	constexpr ::std::size_t char_unsigned_sz{
-		::fast_io::details::print_integer_reserved_size_cache<10, false, false, char unsigned>};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, false, false, char unsigned>};
 	constexpr ::std::size_t res{char_unsigned_sz * 4 + 3};
 	return res;
 }
@@ -54,7 +54,7 @@ inline constexpr ::std::size_t print_reserve_size(io_reserve_type_t<char_type, i
 	constexpr ::std::size_t char_unsigned_sz{print_reserve_size(io_reserve_type<char_type, posix_in_addr>)};
 	constexpr ::std::size_t res{
 		char_unsigned_sz + 1 +
-		::fast_io::details::print_integer_reserved_size_cache<10, false, false, ::std::uint_least16_t>};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, false, false, ::std::uint_least16_t>};
 	return res;
 }
 

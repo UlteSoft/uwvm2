@@ -136,7 +136,7 @@ inline constexpr parse_result<char_type const *> chrono_scan_year_impl(char_type
 	}
 	if (details::char_is_digit<10, char_type>(*itr)) [[unlikely]]
 	{
-		auto [itr2, ec] = scan_int_contiguous_define_impl<10, true, false, false>(begin, end, retval);
+		auto [itr2, ec] = scan_int_contiguous_define_impl<10, true, false, false, false>(begin, end, retval);
 		if (ec != parse_code::ok) [[unlikely]]
 		{
 			return {itr, ec};
@@ -198,7 +198,7 @@ chrono_scan_decimal_fraction_part_never_overflow_impl(char_type const *begin, ch
 	{
 		new_end = end;
 	}
-	auto [itr, ec] = scan_int_contiguous_define_impl<10, true, false, true>(begin, new_end, retval);
+	auto [itr, ec] = scan_int_contiguous_define_impl<10, true, false, true, false>(begin, new_end, retval);
 	if (ec != parse_code::ok) [[unlikely]]
 	{
 		return {itr, ec};

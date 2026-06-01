@@ -867,7 +867,7 @@ struct timestamp_scan_context_buffer_max_size_t
 private:
 	template <typename T>
 	static inline constexpr auto size_common{
-		::fast_io::details::print_integer_reserved_size_cache<10, false, ::fast_io::details::my_signed_integral<T>, T>};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, ::fast_io::details::my_signed_integral<T>, false, T>};
 
 public:
 	static inline constexpr auto year_size = size_common<::std::int_least64_t>;
@@ -893,7 +893,7 @@ inline constexpr parse_result<char_type const *>
 scn_cnt_define_unix_timestamp_impl(char_type const *begin, char_type const *end, unix_timestamp &t) noexcept
 {
 	// TODO: whether to accept C-like floatings such as 2. and .2
-	auto [itr, ec] = scan_int_contiguous_define_impl<10, false, false, false>(begin, end, t.seconds);
+	auto [itr, ec] = scan_int_contiguous_define_impl<10, false, false, false, false>(begin, end, t.seconds);
 	if (ec != parse_code::ok) [[unlikely]]
 	{
 		return {itr, ec};
@@ -1073,7 +1073,7 @@ scn_ctx_define_unix_timestamp_impl(timestamp_scan_state_t<char_type> &state, cha
 	{
 	case scan_timestamp_context_phase::year:
 	{
-		auto [itr, ec] = scan_context_define_parse_impl<10, false, false, true>(state, begin, end, t.seconds);
+		auto [itr, ec] = scan_context_define_parse_impl<10, false, false, true, false>(state, begin, end, t.seconds);
 		if (ec != parse_code::ok)
 		{
 			return {itr, ec};
@@ -1432,7 +1432,7 @@ scan_iso8601_context_year_phase(timestamp_scan_state_t<char_type> &state, char_t
 			if (char_is_digit<10, char_type>(*itr)) [[unlikely]]
 			{
 				state.integer_phase = scan_integral_context_phase::digit;
-				return scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t);
+				return scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t);
 			}
 			else
 			{
@@ -1478,7 +1478,7 @@ scan_iso8601_context_year_phase(timestamp_scan_state_t<char_type> &state, char_t
 				if (char_is_digit<10, char_type>(*begin)) [[unlikely]]
 				{
 					state.integer_phase = scan_integral_context_phase::digit;
-					return scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t);
+					return scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t);
 				}
 				else
 				{
@@ -1497,7 +1497,7 @@ scan_iso8601_context_year_phase(timestamp_scan_state_t<char_type> &state, char_t
 		}
 	}
 	default:
-		return scan_context_define_parse_impl<10, true, false, false>(state, begin, end, t);
+		return scan_context_define_parse_impl<10, true, false, false, false>(state, begin, end, t);
 	}
 }
 

@@ -50,7 +50,7 @@ inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f
 	}
 	if constexpr (showbase)
 	{
-		iter = print_reserve_show_base_impl<16, showbase_uppercase>(iter);
+		iter = print_reserve_show_base_impl<16, showbase_uppercase, false>(iter);
 	}
 	if (!mantissa && !exponent)
 	{
@@ -92,8 +92,8 @@ inline constexpr char_type *print_rsvhexfloat_define_impl(char_type *iter, flt f
 
 template <bool showbase, typename mantissa_type>
 inline constexpr ::std::size_t print_rsvhexfloat_size_cache{
-	print_integer_reserved_size_cache<16, showbase, true, mantissa_type> + 6 +
-	print_integer_reserved_size_cache<10, true, true, ::std::int_least32_t>};
+	print_integer_reserved_size_cache<16, showbase, true, false, mantissa_type> + 6 +
+	print_integer_reserved_size_cache<10, true, true, false, ::std::int_least32_t>};
 
 } // namespace details
 
