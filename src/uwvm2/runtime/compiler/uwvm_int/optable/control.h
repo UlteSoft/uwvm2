@@ -82,6 +82,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             return false;
         }
 
+        UWVM_ALWAYS_INLINE inline constexpr void tiered_loop_osr_reset_countdown(::std::byte const* imm_ip) noexcept
+        {
+            using imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+            auto const reset_countdown_ip{imm_ip + offsetof(imm_t, reset_countdown)};
+            auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
+            auto const reset_countdown{load_interpreter_imm_field<::std::uint_least32_t>(reset_countdown_ip)};
+            auto const next_countdown{reset_countdown == 0u ? 1u : reset_countdown};
+            store_interpreter_imm_field(countdown_ip, next_countdown);
+        }
+
         enum class tiered_loop_osr_fast_poll_state : unsigned
         {
             skip,
@@ -402,6 +412,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
             poll_now = details::tiered_loop_osr_countdown_expired(countdown_ip);
+            if(poll_now)
+            {
+                auto const request_countdown_ip{imm_ip + offsetof(imm_t, request_countdown)};
+                poll_now = details::tiered_loop_osr_countdown_expired(request_countdown_ip);
+                if(!poll_now) { details::tiered_loop_osr_reset_countdown(imm_ip); }
+            }
         }
 
         if(poll_now)
@@ -461,6 +477,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
             poll_now = details::tiered_loop_osr_countdown_expired(countdown_ip);
+            if(poll_now)
+            {
+                auto const request_countdown_ip{imm_ip + offsetof(imm_t, request_countdown)};
+                poll_now = details::tiered_loop_osr_countdown_expired(request_countdown_ip);
+                if(!poll_now) { details::tiered_loop_osr_reset_countdown(imm_ip); }
+            }
         }
 
         if(poll_now)

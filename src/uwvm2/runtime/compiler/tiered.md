@@ -49,9 +49,9 @@ Each module owns independent tiered state:
 - `tiered_full_ready` is an atomic byte published with release semantics after
   Tier 2 entries have been materialized and written into the target tables.
 - `tiered_switch_count` and `tiered_direct_switch_count` count successful
-  transitions into native code. Tier 2 is requested after a small native-switch
-  threshold, and the request has background priority so it cannot overtake a
-  demand LLVM lazy request.
+  transitions into native code. Tier 2 is requested only after a sustained
+  native-switch threshold, and the request has background priority so it cannot
+  overtake a demand LLVM lazy request.
 
 The expected progression is:
 
@@ -161,9 +161,23 @@ The log names use the `tiered_full_*` prefix for full-tier data and
 
 ## Tuning Notes
 
-The current trigger is intentionally modest: after 64 successful switches into
-native tiered code, the module enqueues Tier 2. This avoids forcing a full LLVM
-materialization for very short programs while still promoting workloads that
-return to tiered native code repeatedly. If long single-entry kernels need faster
-promotion, the trigger should become a combined condition based on native
-execution time, switch count, function count, and remaining lazy queue depth.
+The current trigger waits for 65536 successful switches into native tiered code
+before enqueueing Tier 2. This keeps Tier 2 from stealing CPU from a hot
+single-entry run that is still trying to reach Tier 1 loop reentry, while still
+promoting workloads that repeatedly return to native tiered code.
+
+Tier 1 policy is counter-only: elapsed time is reported in logs, but it does
+not decide when tiering happens. Ordinary function-entry misses require 4096
+misses on the same local function before the bridge enqueues LLVM work.
+
+Loop OSR uses mutable bytecode immediates as per-loop counters. Loop headers in
+functions of at least 4096 bytes poll after 4 iterations and then retry every 64
+missed polls, and require 4096 expired polls before requesting LLVM. Functions
+of at least 1024 bytes poll after 16 iterations, retry every 128 missed polls,
+and require 512 expired polls before requesting LLVM. Smaller functions poll
+every 1024 iterations and require 2048 expired polls before requesting LLVM.
+Block polls keep the older 8192-iteration cadence, but use request-count
+thresholds of 4096, 512, or 64 expired polls for large, medium, and small
+functions respectively. This keeps short hot helpers from starting expensive
+LLVM materialization while still promoting loops that have proven hot by
+executed backedge counts.

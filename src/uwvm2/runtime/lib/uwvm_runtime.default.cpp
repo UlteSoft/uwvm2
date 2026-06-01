@@ -238,7 +238,7 @@ namespace uwvm2::runtime::lib
             ::std::size_t tiered_direct_switch_count{};
             ::std::size_t tiered_full_request_count{};
             ::std::size_t tiered_full_publish_count{};
-            ::uwvm2::utils::container::vector<::std::uint_least8_t> tiered_entry_hot_counters{};
+            ::uwvm2::utils::container::vector<::std::uint_least32_t> tiered_entry_hot_counters{};
 #endif
 
             // Canonical type-index table for fast call_indirect signature checks.
@@ -1803,7 +1803,7 @@ namespace uwvm2::runtime::lib
             failed
         };
 
-        constexpr ::std::size_t tiered_full_compile_switch_threshold{64uz};
+        constexpr ::std::size_t tiered_full_compile_switch_threshold{65536uz};
 
         [[nodiscard]] inline bool tiered_full_ready(compiled_module_record const& rec) noexcept
         {
@@ -2103,22 +2103,23 @@ namespace uwvm2::runtime::lib
             g_runtime.tiered_int_outer_total_time_ns.store(0u, ::std::memory_order_relaxed);
         }
 
+        constexpr ::std::uint_least32_t tiered_entry_hot_request_threshold{4096u};
+
         [[nodiscard]] inline bool tiered_entry_is_hot_enough_to_request_llvm(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
-            constexpr ::std::uint_least8_t request_threshold{4u};
             if(local_index >= rec.tiered_entry_hot_counters.size()) [[unlikely]] { return true; }
 
             auto& counter{rec.tiered_entry_hot_counters.index_unchecked(local_index)};
-            ::std::atomic_ref<::std::uint_least8_t> counter_ref{counter};
+            ::std::atomic_ref<::std::uint_least32_t> counter_ref{counter};
             auto observed{counter_ref.load(::std::memory_order_relaxed)};
             for(;;)
             {
-                if(observed >= request_threshold) { return true; }
+                if(observed >= tiered_entry_hot_request_threshold) { return true; }
 
-                auto const desired{static_cast<::std::uint_least8_t>(observed + 1u)};
+                auto const desired{observed + 1u};
                 if(counter_ref.compare_exchange_weak(observed, desired, ::std::memory_order_relaxed, ::std::memory_order_relaxed))
                 {
-                    return desired >= request_threshold;
+                    return desired >= tiered_entry_hot_request_threshold;
                 }
             }
         }
@@ -2243,41 +2244,48 @@ namespace uwvm2::runtime::lib
                                                                     ::std::uintptr_t& reentry_address) noexcept
         {
             reentry_address = 0u;
-            if(tiered_full_ready(rec))
-            {
-                ::std::uintptr_t full_raw_entry_address{};
-                static_cast<void>(try_publish_tiered_ready_full_llvm_jit_entry(rec, module_id, local_index, full_raw_entry_address));
-                return false;
-            }
-
-            if(!::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_tiered_loop_reentry_raw_entry_address(
+            auto const full_ready{tiered_full_ready(rec)};
+            if(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_tiered_loop_reentry_raw_entry_address(
                    rec.llvm_jit_lazy_compiled,
                    local_index,
                    loop_wasm_code_offset,
                    reentry_address))
             {
-                return false;
+                if(!full_ready)
+                {
+                    ::std::uintptr_t raw_entry_address{};
+                    ::std::uintptr_t typed_entry_address{};
+                    if(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_raw_entry_address(rec.llvm_jit_lazy_compiled,
+                                                                                                                            local_index,
+                                                                                                                            raw_entry_address))
+                    {
+                        static_cast<void>(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_entry_address(
+                            rec.llvm_jit_lazy_compiled,
+                            local_index,
+                            typed_entry_address));
+                        static_cast<void>(publish_tiered_llvm_jit_entry_targets(rec, module_id, local_index, raw_entry_address, typed_entry_address));
+                    }
+                }
+                else
+                {
+                    ::std::uintptr_t full_raw_entry_address{};
+                    static_cast<void>(try_publish_tiered_ready_full_llvm_jit_entry(rec, module_id, local_index, full_raw_entry_address));
+                }
+
+                return reentry_address != 0u;
             }
 
-            ::std::uintptr_t raw_entry_address{};
-            ::std::uintptr_t typed_entry_address{};
-            if(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_raw_entry_address(rec.llvm_jit_lazy_compiled,
-                                                                                                                    local_index,
-                                                                                                                    raw_entry_address))
+            if(full_ready)
             {
-                static_cast<void>(::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::try_get_lazy_entry_address(
-                    rec.llvm_jit_lazy_compiled,
-                    local_index,
-                    typed_entry_address));
-                static_cast<void>(publish_tiered_llvm_jit_entry_targets(rec, module_id, local_index, raw_entry_address, typed_entry_address));
+                ::std::uintptr_t full_raw_entry_address{};
+                static_cast<void>(try_publish_tiered_ready_full_llvm_jit_entry(rec, module_id, local_index, full_raw_entry_address));
             }
 
-            return reentry_address != 0u;
+            return false;
         }
 
         [[nodiscard]] inline bool try_request_tiered_loop_reentry_compile(compiled_module_record& rec, ::std::size_t local_index) noexcept
         {
-            if(tiered_full_ready(rec)) { return false; }
             if(local_index >= rec.llvm_jit_lazy_compiled.functions.size() ||
                local_index >= rec.llvm_jit_lazy_background_request_contexts.size())
                 [[unlikely]]
