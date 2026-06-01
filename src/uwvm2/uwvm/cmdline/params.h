@@ -100,6 +100,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_optimization_level),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_disable_ir_verifaction),
 # endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_uwvm_int_lazy_interpreter),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_llvm_full_jit),
+# endif
 #endif
 
         // wasi

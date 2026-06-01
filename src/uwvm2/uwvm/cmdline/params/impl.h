@@ -58,6 +58,8 @@
 # include "runtime_jit.h"
 # include "runtime_aot.h"
 # include "runtime_tiered.h"
+# include "runtime_tiered_disable_uwvm_int_lazy_interpreter.h"
+# include "runtime_tiered_disable_llvm_full_jit.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"

@@ -56,6 +56,21 @@ The expected progression is:
 Tier 0 interpreter -> Tier 1 lazy native -> Tier 2 full native
 ```
 
+Tier 1 is mandatory. It is the center of the tiered backend and cannot be
+disabled. Tier 0 and Tier 2 are controlled independently:
+
+- `--runtime-tiered-disable-uwvm-int-lazy-interpreter`
+  (`-Rtiered-disable-t0`) disables the Tier 0 interpreter fallback. In this
+  mode, a miss in the tiered entry path synchronously materializes the LLVM lazy
+  function and executes that native entry; `uwvm-int` lazy storage is not
+  initialized for tiered execution.
+- `--runtime-tiered-disable-llvm-full-jit` (`-Rtiered-disable-t2`) disables the
+  background full-module LLVM JIT request path. Tier 1 LLVM lazy JIT remains
+  active.
+- Disabling both Tier 0 and Tier 2 leaves the tiered shortcut as LLVM lazy JIT:
+  the initial raw targets, lazy publication path, and background lazy scheduler
+  use the same policy as `llvm_jit_only` lazy mode.
+
 Failure is non-fatal for tiered execution. If Tier 2 translation or
 materialization fails, the state becomes `failed` and execution continues with
 Tier 0/Tier 1. This is important because Tier 2 is an optimization, not a

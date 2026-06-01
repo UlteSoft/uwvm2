@@ -151,6 +151,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
 #endif
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    /// @brief Whether Tier 0 uwvm-int lazy interpreter fallback is disabled in tiered mode.
+    inline bool runtime_tiered_disable_uwvm_int_lazy_interpreter{};  // [global]
+
+    /// @brief Whether Tier 2 background full-module LLVM JIT is disabled in tiered mode.
+    inline bool runtime_tiered_disable_llvm_full_jit{};  // [global]
+#endif
+
     /// @brief   The global runtime mode.
     /// @details default = lazy_compile
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{

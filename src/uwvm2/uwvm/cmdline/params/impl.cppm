@@ -58,6 +58,8 @@ export import :runtime_int;
 export import :runtime_jit;
 export import :runtime_aot;
 export import :runtime_tiered;
+export import :runtime_tiered_disable_uwvm_int_lazy_interpreter;
+export import :runtime_tiered_disable_llvm_full_jit;
 
 // wasi
 export import :wasi_disable_utf8_check;
