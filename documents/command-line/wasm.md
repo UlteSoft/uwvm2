@@ -83,7 +83,7 @@ Behavior:
 - The selected function may have parameters and results only from the currently supported scalar set: `i32`, `i64`, `f32`, and `f64`.
 - The number of supplied argument tokens must exactly match the selected function's parameter count.
 - Argument parsing happens after the main module is loaded and initialized enough for runtime entry resolution, so arity, type, and range errors are runtime-entry fatal diagnostics.
-- With `--log-verbose`, the resolved local index, import-inclusive Wasm function index, import count, function type, input tokens, and parsed values are printed before invocation. Integer verbose lines use `bin`, `oct`, `sdec`, `udec`, and `hex`.
+- With `--log-verbose`, the resolved local index, import-inclusive Wasm function index, import count, function type, input tokens, and parsed values are printed before invocation. Integer verbose lines use `bin`, `oct`, `sdec`, `udec`, and `hex`; floating-point `bitfloat(hex)` is printed with the full bit width, so f32 uses 8 hex digits and f64 uses 16 hex digits after `0x`.
 
 Argument token collection:
 
