@@ -42,10 +42,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline bool wasm_set_start_func_is_exist{};  // [global]
+        inline constexpr ::uwvm2::utils::container::u8string_view wasm_set_start_func_alias{u8"-Wstart"};
 #if defined(UWVM_MODULE)
         extern "C++"
 #else
-        inline constexpr
+        inline
 #endif
             void wasm_set_start_func_pretreatment(char8_t const* const*&,
                                                   char8_t const* const*,
@@ -68,6 +69,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasm-set-start-func"},
         .describe{u8"Run a main-module local defined Wasm function as the entry function."},
         .usage{u8"<local-func:u32> [[i32|i64|f32|f64] ...]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasm_set_start_func_alias), 1uz}},
         .handle{::std::addressof(details::wasm_set_start_func_callback)},
         .pretreatment{::std::addressof(details::wasm_set_start_func_pretreatment)},
         .is_exist{::std::addressof(details::wasm_set_start_func_is_exist)},

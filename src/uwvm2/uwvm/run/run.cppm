@@ -23,9 +23,11 @@
 module;
 
 // std
-#include <concepts>
+#include <bit>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <memory>

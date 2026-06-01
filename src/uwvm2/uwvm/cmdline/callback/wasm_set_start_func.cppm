@@ -22,8 +22,12 @@
 module;
 
 // std
-#include <concepts>
+#include <bit>
+#include <charconv>
+#include <cstddef>
 #include <cstdint>
+#include <cmath>
+#include <limits>
 #include <memory>
 // macro
 #include <uwvm2/utils/macro/push_macros.h>
@@ -35,6 +39,7 @@ import fast_io;
 import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.cmdline;
+import uwvm2.parser.wasm.standard;
 import uwvm2.uwvm.io;
 import uwvm2.uwvm.utils.ansies;
 import uwvm2.uwvm.cmdline;

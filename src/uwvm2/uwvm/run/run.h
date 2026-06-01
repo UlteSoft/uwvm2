@@ -24,8 +24,11 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <bit>
+# include <charconv>
 # include <cstddef>
 # include <cstdint>
+# include <cmath>
 # include <cstring>
 # include <limits>
 # include <memory>
@@ -290,6 +293,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         }
     }
 
+    template <typename ScanManipulator>
+    [[nodiscard]] inline constexpr bool wasm_entry_scan_exact(char8_t const* first, char8_t const* last, ScanManipulator scan_manipulator) noexcept
+    {
+        auto const [next, err]{::fast_io::parse_by_scan(first, last, scan_manipulator)};
+        return err == ::fast_io::parse_code::ok && next == last;
+    }
+
+    template <bool allow_signed_decimal, typename Out, typename Unsigned>
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_integer(::uwvm2::utils::container::u8string_view str, Out& out) noexcept
+    {
+        static_assert(sizeof(Out) == sizeof(Unsigned));
+        auto const first{str.cbegin()};
+        auto const last{str.cend()};
+        if(first == last) [[unlikely]] { return false; }
+
+        if constexpr(allow_signed_decimal)
+        {
+            Out signed_value; // no init necessary
+            if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(signed_value)))
+            {
+                out = signed_value;
+                return true;
+            }
+        }
+
+        Unsigned unsigned_value; // no init necessary
+        if(wasm_entry_scan_exact(first, last, ::fast_io::mnp::dec_get<true, false>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::hex_get<true, false, true>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::bin_get<true, false, true>(unsigned_value)) ||
+           wasm_entry_scan_exact(first, last, ::fast_io::mnp::oct_get<true, false, true, true>(unsigned_value)))
+        {
+            out = ::std::bit_cast<Out>(unsigned_value);
+            return true;
+        }
+
+        return false;
+    }
+
     template <typename... Args>
     [[noreturn]] inline void wasm_set_start_func_fatal(Args&&... args) noexcept
     {
@@ -305,76 +346,168 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         ::fast_io::fast_terminate();
     }
 
-    [[nodiscard]] inline constexpr bool parse_wasm_entry_i32(::uwvm2::utils::container::u8string_view str, ::std::uint32_t& out) noexcept
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_i32(::uwvm2::utils::container::u8string_view str,
+                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32& out) noexcept
     {
-        if(str.empty()) [[unlikely]] { return false; }
-        if(str.front_unchecked() == u8'-' || str.front_unchecked() == u8'+')
-        {
-            ::std::int32_t value{};
-            auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
-            if(err == ::fast_io::parse_code::ok && next == str.cend())
-            {
-                out = static_cast<::std::uint32_t>(value);
-                return true;
-            }
-            return false;
-        }
-
-        ::std::uint32_t value{};
-        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
-        if(err == ::fast_io::parse_code::ok && next == str.cend())
-        {
-            out = value;
-            return true;
-        }
-        return false;
+        using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+        using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+        static_assert(sizeof(wasm_i32) == 4uz && sizeof(wasm_u32) == 4uz);
+        return parse_wasm_entry_integer<true, wasm_i32, wasm_u32>(str, out);
     }
 
-    [[nodiscard]] inline constexpr bool parse_wasm_entry_i64(::uwvm2::utils::container::u8string_view str, ::std::uint64_t& out) noexcept
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_i64(::uwvm2::utils::container::u8string_view str,
+                                                             ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64& out) noexcept
     {
-        if(str.empty()) [[unlikely]] { return false; }
-        if(str.front_unchecked() == u8'-' || str.front_unchecked() == u8'+')
+        using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+        using wasm_u64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
+        static_assert(sizeof(wasm_i64) == 8uz && sizeof(wasm_u64) == 8uz);
+        return parse_wasm_entry_integer<true, wasm_i64, wasm_u64>(str, out);
+    }
+
+    [[nodiscard]] inline constexpr bool wasm_entry_hex_digit(char8_t ch, ::std::uint_least8_t& value) noexcept
+    {
+        ::std::uint_least8_t parsed{};
+        auto const first{::std::addressof(ch)};
+        auto const [next, err]{::fast_io::parse_by_scan(first, first + 1u, ::fast_io::mnp::hex_get<true, false, false>(parsed))};
+        if(err != ::fast_io::parse_code::ok || next != first + 1u) { return false; }
+        value = parsed;
+        return true;
+    }
+
+    [[nodiscard]] inline constexpr bool wasm_entry_binary_digit(char8_t ch, ::std::uint_least8_t& value) noexcept
+    {
+        ::std::uint_least8_t parsed{};
+        auto const first{::std::addressof(ch)};
+        auto const [next, err]{::fast_io::parse_by_scan(first, first + 1u, ::fast_io::mnp::bin_get<true, false, false>(parsed))};
+        if(err != ::fast_io::parse_code::ok || next != first + 1u) { return false; }
+        value = parsed;
+        return true;
+    }
+
+    template <typename T, ::std::uint_least8_t Base, ::std::int_least64_t BitsPerDigit>
+    [[nodiscard]] inline bool parse_wasm_entry_prefixed_binary_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
+    {
+        if(first == last) { return false; }
+        if(*first == u8'-' || *first == u8'+') { return false; }
+
+        if constexpr(Base == 16u)
         {
-            ::std::int64_t value{};
-            auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
-            if(err == ::fast_io::parse_code::ok && next == str.cend())
-            {
-                out = static_cast<::std::uint64_t>(value);
-                return true;
-            }
-            return false;
+            if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'x' && first[1] != u8'X')) { return false; }
+        }
+        else
+        {
+            static_assert(Base == 2u);
+            if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'b' && first[1] != u8'B')) { return false; }
+        }
+        first += 2;
+
+        long double significand{};
+        bool has_digit{};
+        ::std::int_least64_t fractional_digits{};
+
+        auto parse_digit{[](char8_t ch, ::std::uint_least8_t& digit) constexpr noexcept
+                         {
+                             if constexpr(Base == 16u) { return wasm_entry_hex_digit(ch, digit); }
+                             else { return wasm_entry_binary_digit(ch, digit); }
+                         }};
+
+        while(first != last)
+        {
+            ::std::uint_least8_t digit{};
+            if(!parse_digit(*first, digit)) { break; }
+            significand = significand * static_cast<long double>(Base) + static_cast<long double>(digit);
+            has_digit = true;
+            ++first;
         }
 
-        ::std::uint64_t value{};
-        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
-        if(err == ::fast_io::parse_code::ok && next == str.cend())
+        if(first != last && *first == u8'.')
         {
-            out = value;
+            ++first;
+            while(first != last)
+            {
+                ::std::uint_least8_t digit{};
+                if(!parse_digit(*first, digit)) { break; }
+                significand = significand * static_cast<long double>(Base) + static_cast<long double>(digit);
+                has_digit = true;
+                ++fractional_digits;
+                ++first;
+            }
+        }
+
+        ::std::int_least64_t exponent{};
+        if(!has_digit || first == last || (*first != u8'p' && *first != u8'P')) { return false; }
+        ++first;
+        if(first == last) { return false; }
+        if(*first == u8'+')
+        {
+            ++first;
+            if(first == last) { return false; }
+        }
+
+        auto const [next, err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::dec_get<true, false>(exponent))};
+        if(err != ::fast_io::parse_code::ok || next != last) { return false; }
+
+        auto const adjusted_exponent{exponent - fractional_digits * BitsPerDigit};
+        if(adjusted_exponent > static_cast<::std::int_least64_t>((::std::numeric_limits<int>::max)()))
+        {
+            out = (::std::numeric_limits<T>::infinity)();
             return true;
         }
-        return false;
+        if(adjusted_exponent < static_cast<::std::int_least64_t>((::std::numeric_limits<int>::min)()))
+        {
+            out = static_cast<T>(0.0);
+            return true;
+        }
+
+        auto const scaled{::std::ldexp(significand, static_cast<int>(adjusted_exponent))};
+        out = static_cast<T>(scaled);
+        return true;
     }
 
     template <typename T>
-    [[nodiscard]] inline constexpr bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T& out) noexcept
+    [[nodiscard]] inline bool parse_wasm_entry_prefixed_binary_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
-#if defined(FAST_IO_NOT_USE_FAST_FLOAT)
-        static_cast<void>(str);
-        static_cast<void>(out);
-        return false;
-#else
-        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), out)};
-        return err == ::fast_io::parse_code::ok && next == str.cend();
-#endif
+        return parse_wasm_entry_prefixed_binary_float_range<T, 16u, 4>(first, last, out) ||
+               parse_wasm_entry_prefixed_binary_float_range<T, 2u, 1>(first, last, out);
     }
 
-    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(
+    template <typename T>
+    [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
+    {
+        if(first == last) { return false; }
+#if defined(FAST_IO_NOT_USE_FAST_FLOAT)
+        auto const char_first{reinterpret_cast<char const*>(first)};
+        auto const char_last{reinterpret_cast<char const*>(last)};
+        auto const [next, err]{::std::from_chars(char_first, char_last, out, ::std::chars_format::general)};
+        if(err == ::std::errc{} && next == char_last) { return true; }
+#else
+        auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
+        if(err == ::fast_io::parse_code::ok && next == last) { return true; }
+#endif
+        return parse_wasm_entry_prefixed_binary_float_range(first, last, out);
+    }
+
+    template <typename T>
+    [[nodiscard]] inline bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T& out) noexcept
+    {
+        auto first{str.cbegin()};
+        auto last{str.cend()};
+        if(parse_wasm_entry_float_range(first, last, out)) { return true; }
+        if(first != last && (last[-1] == u8'f' || last[-1] == u8'F'))
+        {
+            --last;
+            if(parse_wasm_entry_float_range(first, last, out)) { return true; }
+        }
+        return false;
+    }
+
+    [[nodiscard]] inline ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(
         ::uwvm2::utils::container::u8string_view str) noexcept
     {
-        ::std::uint32_t i32_value{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 i32_value{};
         if(parse_wasm_entry_i32(str, i32_value)) { return {u8"i32/i64 literal"}; }
 
-        ::std::uint64_t i64_value{};
+        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 i64_value{};
         if(parse_wasm_entry_i64(str, i64_value)) { return {u8"i64 literal"}; }
 
         float f32_value{};
@@ -401,6 +534,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
         }
         ::fast_io::io::perr(output, u8")");
+    }
+
+    template <typename Output>
+    inline void print_wasm_entry_info_prefix(Output& output) noexcept
+    {
+        ::fast_io::io::perr(output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                            u8"[info]  ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
     }
 
     template <typename FunctionType, typename Tokens>
@@ -433,11 +577,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                             argument_tokens.size(),
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                            u8".\n  function type: ");
+                            u8".\n");
+        print_wasm_entry_info_prefix(u8log_output_ul);
+        ::fast_io::io::perr(u8log_output_ul, u8"function type: ");
         print_wasm_entry_type_span(u8log_output_ul, ft.parameter.begin, ft.parameter.end);
         ::fast_io::io::perr(u8log_output_ul, u8" -> ");
         print_wasm_entry_type_span(u8log_output_ul, ft.result.begin, ft.result.end);
-        ::fast_io::io::perr(u8log_output_ul, u8"\n  input types:   (");
+        ::fast_io::io::perr(u8log_output_ul, u8"\n");
+        print_wasm_entry_info_prefix(u8log_output_ul);
+        ::fast_io::io::perr(u8log_output_ul, u8"input types:   (");
         for(::std::size_t i{}; i != argument_tokens.size(); ++i)
         {
             if(i != 0uz) { ::fast_io::io::perr(u8log_output_ul, u8", "); }
@@ -469,6 +617,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         offset += sizeof(T);
     }
 
+    template <typename T>
+    [[nodiscard]] inline T read_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte> const& buffer, ::std::size_t& offset) noexcept
+    {
+        static_assert(::std::is_trivially_copyable_v<T>);
+        if(offset > buffer.size() || sizeof(T) > buffer.size() - offset) [[unlikely]] { ::fast_io::fast_terminate(); }
+        T value{};
+        ::std::memcpy(::std::addressof(value), buffer.data() + offset, sizeof(T));
+        offset += sizeof(T);
+        return value;
+    }
+
     inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte>& buffer,
                                          ::std::size_t& offset,
                                          ::uwvm2::utils::container::u8string_view arg,
@@ -480,7 +639,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         {
             case wasm_value_type::i32:
             {
-                ::std::uint32_t value{};
+                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32 value{};
                 if(!parse_wasm_entry_i32(arg, value)) [[unlikely]]
                 {
                     wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected i32, got \"", arg, u8"\".");
@@ -490,7 +649,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             }
             case wasm_value_type::i64:
             {
-                ::std::uint64_t value{};
+                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64 value{};
                 if(!parse_wasm_entry_i64(arg, value)) [[unlikely]]
                 {
                     wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected i64, got \"", arg, u8"\".");
@@ -525,6 +684,198 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                                           u8". Only i32, i64, f32, and f64 are currently supported.");
             }
         }
+    }
+
+    template <typename Output, typename Signed, typename Unsigned>
+    inline void print_wasm_entry_integer_formats(Output& output, Signed value) noexcept
+    {
+        static_assert(sizeof(Signed) == sizeof(Unsigned));
+        auto const bits{::std::bit_cast<Unsigned>(value)};
+        ::fast_io::io::perr(output,
+                            u8"bin=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::fast_io::mnp::bin<true>(bits),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8", oct=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::fast_io::mnp::oct<true, false, true>(bits),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8", dec=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::fast_io::mnp::dec(value),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8", hex=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            ::fast_io::mnp::hex0x(bits),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+    }
+
+    template <typename Output>
+    inline void print_wasm_entry_argument_verbose(Output& output,
+                                                  ::uwvm2::utils::container::vector<::std::byte> const& buffer,
+                                                  ::std::size_t& offset,
+                                                  ::uwvm2::utils::container::u8string_view arg,
+                                                  ::std::uint_least8_t type_code,
+                                                  ::std::size_t arg_index) noexcept
+    {
+        using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+
+        ::fast_io::io::perr(output,
+                            u8"#",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            arg_index,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            wasm_entry_type_name(type_code),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" input=\"",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                            arg,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"\" => ");
+
+        switch(static_cast<wasm_value_type>(type_code))
+        {
+            case wasm_value_type::i32:
+            {
+                using wasm_i32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32;
+                using wasm_u32 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32;
+                auto const value{read_wasm_entry_value<wasm_i32>(buffer, offset)};
+                print_wasm_entry_integer_formats<Output, wasm_i32, wasm_u32>(output, value);
+                break;
+            }
+            case wasm_value_type::i64:
+            {
+                using wasm_i64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i64;
+                using wasm_u64 = ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u64;
+                auto const value{read_wasm_entry_value<wasm_i64>(buffer, offset)};
+                print_wasm_entry_integer_formats<Output, wasm_i64, wasm_u64>(output, value);
+                break;
+            }
+            case wasm_value_type::f32:
+            {
+                auto const value{read_wasm_entry_value<float>(buffer, offset)};
+                ::std::uint32_t bits{};
+                ::std::memcpy(::std::addressof(bits), ::std::addressof(value), sizeof(bits));
+                ::fast_io::io::perr(output,
+                                    u8"value=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::general(value),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", hexfloat=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::hexfloat(value),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", bitfloat(hex)=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::hex0x<true>(bits),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                break;
+            }
+            case wasm_value_type::f64:
+            {
+                auto const value{read_wasm_entry_value<double>(buffer, offset)};
+                ::std::uint64_t bits{};
+                ::std::memcpy(::std::addressof(bits), ::std::addressof(value), sizeof(bits));
+                ::fast_io::io::perr(output,
+                                    u8"value=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::general(value),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", hexfloat=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::hexfloat(value),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", bitfloat(hex)=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::fast_io::mnp::hex0x<true>(bits),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+                break;
+            }
+            default: ::fast_io::fast_terminate();
+        }
+
+        ::fast_io::io::perr(output, u8"\n");
+    }
+
+    template <typename FunctionType, typename Tokens>
+    inline void print_wasm_set_start_func_verbose(::std::uint32_t local_function_index,
+                                                  ::std::size_t function_index,
+                                                  ::std::size_t import_count,
+                                                  FunctionType const& ft,
+                                                  Tokens const& argument_tokens,
+                                                  ::uwvm2::utils::container::vector<::std::byte> const& param_buffer) noexcept
+    {
+        constexpr ::uwvm2::utils::container::u8string_view body_indent{u8"              "};
+        constexpr ::uwvm2::utils::container::u8string_view argument_indent{u8"                "};
+
+        // Emit the multi-line verbose record as one locked output unit.
+        auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
+        ::fast_io::operations::decay::stream_ref_decay_lock_guard u8log_output_lg{
+            ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8log_output_osr)};
+        auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
+
+        ::fast_io::io::perr(u8log_output_ul,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),
+                            u8"[info]  ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"--wasm-set-start-func resolved.\n",
+                            body_indent,
+                            u8"local-defined func index: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            local_function_index,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"\n",
+                            body_indent,
+                            u8"wasm func index:          ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            function_index,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" (import-inclusive, import-count=",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            import_count,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8")\n",
+                            body_indent,
+                            u8"function type:            ");
+        print_wasm_entry_type_span(u8log_output_ul, ft.parameter.begin, ft.parameter.end);
+        ::fast_io::io::perr(u8log_output_ul, u8" -> ");
+        print_wasm_entry_type_span(u8log_output_ul, ft.result.begin, ft.result.end);
+        ::fast_io::io::perr(u8log_output_ul, u8"\n", body_indent, u8"arguments:\n");
+
+        if(argument_tokens.empty())
+        {
+            ::fast_io::io::perr(u8log_output_ul, argument_indent, u8"<none>\n");
+        }
+        else
+        {
+            ::std::size_t offset{};
+            for(::std::size_t i{}; i != argument_tokens.size(); ++i)
+            {
+                // The caller already checked arity, so this token and parameter-type lookup are range-proven.
+                ::fast_io::io::perr(u8log_output_ul, argument_indent);
+                print_wasm_entry_argument_verbose(u8log_output_ul,
+                                                  param_buffer,
+                                                  offset,
+                                                  argument_tokens.index_unchecked(i),
+                                                  wasm_entry_type_code(ft.parameter.begin[i]),
+                                                  i);
+            }
+            if(offset != param_buffer.size()) [[unlikely]] { ::fast_io::fast_terminate(); }
+        }
+
+        ::fast_io::io::perr(u8log_output_ul,
+                            body_indent,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                            u8"[",
+                            ::uwvm2::uwvm::io::get_local_realtime(),
+                            u8"] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_ORANGE),
+                            u8"(verbose)\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
     }
 
     template <typename ValueTypePtr>
@@ -598,7 +949,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         auto const param_bytes{calculate_wasm_entry_abi_bytes(ft->parameter.begin, ft->parameter.end, false)};
         auto const result_bytes{calculate_wasm_entry_abi_bytes(ft->result.begin, ft->result.end, true)};
 
-        entry.function_index = rt.imported_function_vec_storage.size() + local_index;
+        auto const import_count{rt.imported_function_vec_storage.size()};
+        entry.function_index = import_count + local_index;
         entry.param_buffer.resize(param_bytes);
         entry.result_buffer.resize(result_bytes);
 
@@ -609,6 +961,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
             pack_wasm_entry_argument(entry.param_buffer, offset, requested.argument_tokens.index_unchecked(i), wasm_entry_type_code(ft->parameter.begin[i]), i);
         }
         if(offset != param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+        {
+            print_wasm_set_start_func_verbose(requested.local_function_index,
+                                              entry.function_index,
+                                              import_count,
+                                              *ft,
+                                              requested.argument_tokens,
+                                              entry.param_buffer);
+        }
 
         return entry;
     }
