@@ -2,6 +2,7 @@
 
 #include "punning.h"
 #include "hexfloat.h"
+#include "fast_float.h"
 #include "roundtrip.h"
 
 namespace fast_io

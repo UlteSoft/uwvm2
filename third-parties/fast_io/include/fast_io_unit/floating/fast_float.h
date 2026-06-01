@@ -22,8 +22,6 @@ concept fast_float_supported_floating_point =
 		return ::fast_float::chars_format::fixed;
 	case floating_format::scientific:
 		return ::fast_float::chars_format::scientific;
-	case floating_format::hexfloat:
-		return ::fast_float::chars_format::hex;
 	case floating_format::general:
 	case floating_format::decimal:
 	default:
@@ -75,6 +73,7 @@ scan_alias_define(io_alias_t, T &value) noexcept
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags,
 		  details::fast_float_supported_floating_point T>
+	requires(flags.floating != ::fast_io::manipulators::floating_format::hexfloat)
 inline constexpr ::fast_io::parse_result<char_type const *>
 scan_contiguous_define(io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, T &>>,
 					   char_type const *begin, char_type const *end,

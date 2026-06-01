@@ -28,7 +28,6 @@
 # include <charconv>
 # include <cstddef>
 # include <cstdint>
-# include <cmath>
 # include <cstring>
 # include <limits>
 # include <memory>
@@ -364,83 +363,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
         return parse_wasm_entry_integer<true, wasm_i64, wasm_u64>(str, out);
     }
 
-    [[nodiscard]] inline constexpr bool wasm_entry_hex_digit(char8_t ch, ::std::uint_least8_t& value) noexcept
-    {
-        ::std::uint_least8_t parsed{};
-        auto const first{::std::addressof(ch)};
-        auto const [next, err]{::fast_io::parse_by_scan(first, first + 1u, ::fast_io::mnp::hex_get<true, false, false>(parsed))};
-        if(err != ::fast_io::parse_code::ok || next != first + 1u) { return false; }
-        value = parsed;
-        return true;
-    }
-
-    // Fallback for exact C-style hexadecimal floating literals, e.g. 0x1.8p0.
-    template <typename T>
-    [[nodiscard]] inline bool parse_wasm_entry_hexfloat_range(char8_t const* first, char8_t const* last, T& out) noexcept
-    {
-        if(first == last) { return false; }
-        if(*first == u8'-' || *first == u8'+') { return false; }
-
-        if(last - first < 2 || first[0] != u8'0' || (first[1] != u8'x' && first[1] != u8'X')) { return false; }
-        first += 2;
-
-        long double significand{};
-        bool has_digit{};
-        ::std::int_least64_t fractional_hex_digits{};
-
-        while(first != last)
-        {
-            ::std::uint_least8_t digit{};
-            if(!wasm_entry_hex_digit(*first, digit)) { break; }
-            significand = significand * 16.0L + static_cast<long double>(digit);
-            has_digit = true;
-            ++first;
-        }
-
-        if(first != last && *first == u8'.')
-        {
-            ++first;
-            while(first != last)
-            {
-                ::std::uint_least8_t digit{};
-                if(!wasm_entry_hex_digit(*first, digit)) { break; }
-                significand = significand * 16.0L + static_cast<long double>(digit);
-                has_digit = true;
-                ++fractional_hex_digits;
-                ++first;
-            }
-        }
-
-        ::std::int_least64_t exponent{};
-        if(!has_digit || first == last || (*first != u8'p' && *first != u8'P')) { return false; }
-        ++first;
-        if(first == last) { return false; }
-        if(*first == u8'+')
-        {
-            ++first;
-            if(first == last) { return false; }
-        }
-
-        auto const [next, err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::dec_get<true, false>(exponent))};
-        if(err != ::fast_io::parse_code::ok || next != last) { return false; }
-
-        auto const adjusted_exponent{exponent - fractional_hex_digits * 4};
-        if(adjusted_exponent > static_cast<::std::int_least64_t>((::std::numeric_limits<int>::max)()))
-        {
-            out = (::std::numeric_limits<T>::infinity)();
-            return true;
-        }
-        if(adjusted_exponent < static_cast<::std::int_least64_t>((::std::numeric_limits<int>::min)()))
-        {
-            out = static_cast<T>(0.0);
-            return true;
-        }
-
-        auto const scaled{::std::ldexp(significand, static_cast<int>(adjusted_exponent))};
-        out = static_cast<T>(scaled);
-        return true;
-    }
-
     template <typename T>
     [[nodiscard]] inline bool parse_wasm_entry_float_range(char8_t const* first, char8_t const* last, T& out) noexcept
     {
@@ -453,8 +375,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 #else
         auto const [next, err]{::fast_io::parse_by_scan(first, last, out)};
         if(err == ::fast_io::parse_code::ok && next == last) { return true; }
+        auto const [hex_next, hex_err]{::fast_io::parse_by_scan(first, last, ::fast_io::mnp::hexfloat_get<true, true>(out))};
+        if(hex_err == ::fast_io::parse_code::ok && hex_next == last) { return true; }
 #endif
-        return parse_wasm_entry_hexfloat_range(first, last, out);
+        return false;
     }
 
     template <typename T>
