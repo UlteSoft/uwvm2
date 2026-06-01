@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
  * @copyright   APL-2.0 License
  */
 
@@ -22,19 +21,25 @@
 
 module;
 
-export module uwvm2.uwvm.wasm.storage;
-export import :mode;
-export import :execute_wasm;
-export import :preloaded_wasm;
-export import :local_preload;
-export import :local_imported;
-export import :preloaded_dl;
-export import :weak_symbol;
-export import :preload_module_attribute;
-export import :memory_limit;
-export import :import_reset;
-export import :start_func;
-export import :all_module;
+// std
+#include <concepts>
+#include <cstdint>
+#include <memory>
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.cmdline.callback:wasm_set_start_func;
+
+import fast_io;
+import uwvm2.utils.container;
+import uwvm2.utils.ansies;
+import uwvm2.utils.cmdline;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
+import uwvm2.uwvm.cmdline;
+import uwvm2.uwvm.cmdline.params;
+import uwvm2.uwvm.wasm.storage;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -43,4 +48,4 @@ export import :all_module;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "wasm_set_start_func.h"

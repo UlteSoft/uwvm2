@@ -82,6 +82,7 @@
 #include "fast_io_core_impl/simd/impl.h"
 #include "fast_io_core_impl/simd_find.h"
 #include "fast_io_core_impl/integers/sto/sto_contiguous.h"
+#include "fast_io_core_impl/floating/sto/fast_float.h"
 
 #include "fast_io_core_impl/integers/chrono.h"
 #include "fast_io_core_impl/iso/isos.h"

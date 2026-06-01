@@ -26,6 +26,8 @@
 // std
 # include <cstddef>
 # include <cstdint>
+# include <cstring>
+# include <limits>
 # include <memory>
 # include <type_traits>
 # include <utility>
@@ -244,6 +246,371 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             u8"\": expected start section or exported function \"_start\"/\"main\" with signature () -> ().\n\n",
                             ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
         ::fast_io::fast_terminate();
+    }
+
+    struct runtime_entry_invocation
+    {
+        ::std::size_t function_index{};
+        ::uwvm2::utils::container::vector<::std::byte> param_buffer{};
+        ::uwvm2::utils::container::vector<::std::byte> result_buffer{};
+    };
+
+    [[nodiscard]] inline constexpr ::std::uint_least8_t wasm_entry_type_code(auto type) noexcept
+    { return static_cast<::std::uint_least8_t>(type); }
+
+    [[nodiscard]] inline constexpr ::std::size_t wasm_entry_scalar_abi_size(::std::uint_least8_t code) noexcept
+    {
+        using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+        switch(static_cast<wasm_value_type>(code))
+        {
+            case wasm_value_type::i32: return 4uz;
+            case wasm_value_type::i64: return 8uz;
+            case wasm_value_type::f32: return 4uz;
+            case wasm_value_type::f64: return 8uz;
+            default: return 0uz;
+        }
+    }
+
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view wasm_entry_type_name(::std::uint_least8_t code) noexcept
+    {
+        using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+        switch(static_cast<wasm_value_type>(code))
+        {
+            case wasm_value_type::i32: return {u8"i32"};
+            case wasm_value_type::i64: return {u8"i64"};
+            case wasm_value_type::f32: return {u8"f32"};
+            case wasm_value_type::f64: return {u8"f64"};
+            default:
+            {
+                if(code == static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::v128)) { return {u8"v128"}; }
+                if(code == static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::funcref)) { return {u8"funcref"}; }
+                if(code == static_cast<::std::uint_least8_t>(::uwvm2::parser::wasm::standard::wasm1p1::type::value_type::externref)) { return {u8"externref"}; }
+                return {u8"unknown"};
+            }
+        }
+    }
+
+    template <typename... Args>
+    [[noreturn]] inline void wasm_set_start_func_fatal(Args&&... args) noexcept
+    {
+        ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            ::std::forward<Args>(args)...,
+                            u8"\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        ::fast_io::fast_terminate();
+    }
+
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_i32(::uwvm2::utils::container::u8string_view str, ::std::uint32_t& out) noexcept
+    {
+        if(str.empty()) [[unlikely]] { return false; }
+        if(str.front_unchecked() == u8'-' || str.front_unchecked() == u8'+')
+        {
+            ::std::int32_t value{};
+            auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
+            if(err == ::fast_io::parse_code::ok && next == str.cend())
+            {
+                out = static_cast<::std::uint32_t>(value);
+                return true;
+            }
+            return false;
+        }
+
+        ::std::uint32_t value{};
+        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
+        if(err == ::fast_io::parse_code::ok && next == str.cend())
+        {
+            out = value;
+            return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_i64(::uwvm2::utils::container::u8string_view str, ::std::uint64_t& out) noexcept
+    {
+        if(str.empty()) [[unlikely]] { return false; }
+        if(str.front_unchecked() == u8'-' || str.front_unchecked() == u8'+')
+        {
+            ::std::int64_t value{};
+            auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
+            if(err == ::fast_io::parse_code::ok && next == str.cend())
+            {
+                out = static_cast<::std::uint64_t>(value);
+                return true;
+            }
+            return false;
+        }
+
+        ::std::uint64_t value{};
+        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), value)};
+        if(err == ::fast_io::parse_code::ok && next == str.cend())
+        {
+            out = value;
+            return true;
+        }
+        return false;
+    }
+
+    template <typename T>
+    [[nodiscard]] inline constexpr bool parse_wasm_entry_float(::uwvm2::utils::container::u8string_view str, T& out) noexcept
+    {
+#if defined(FAST_IO_NOT_USE_FAST_FLOAT)
+        static_cast<void>(str);
+        static_cast<void>(out);
+        return false;
+#else
+        auto const [next, err]{::fast_io::parse_by_scan(str.cbegin(), str.cend(), out)};
+        return err == ::fast_io::parse_code::ok && next == str.cend();
+#endif
+    }
+
+    [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view wasm_entry_input_literal_type(
+        ::uwvm2::utils::container::u8string_view str) noexcept
+    {
+        ::std::uint32_t i32_value{};
+        if(parse_wasm_entry_i32(str, i32_value)) { return {u8"i32/i64 literal"}; }
+
+        ::std::uint64_t i64_value{};
+        if(parse_wasm_entry_i64(str, i64_value)) { return {u8"i64 literal"}; }
+
+        float f32_value{};
+        if(parse_wasm_entry_float(str, f32_value)) { return {u8"f32/f64 literal"}; }
+
+        double f64_value{};
+        if(parse_wasm_entry_float(str, f64_value)) { return {u8"f64 literal"}; }
+
+        return {u8"unknown literal"};
+    }
+
+    template <typename Output, typename ValueTypePtr>
+    inline void print_wasm_entry_type_span(Output& output, ValueTypePtr begin, ValueTypePtr end) noexcept
+    {
+        ::fast_io::io::perr(output, u8"(");
+        bool first{true};
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            if(!first) { ::fast_io::io::perr(output, u8", "); }
+            first = false;
+            ::fast_io::io::perr(output,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                wasm_entry_type_name(wasm_entry_type_code(*curr)),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+        }
+        ::fast_io::io::perr(output, u8")");
+    }
+
+    template <typename FunctionType, typename Tokens>
+    [[noreturn]] inline void wasm_set_start_func_arity_mismatch_fatal(::std::uint32_t local_function_index,
+                                                                      FunctionType const& ft,
+                                                                      Tokens const& argument_tokens) noexcept
+    {
+        auto const param_count{static_cast<::std::size_t>(ft.parameter.end - ft.parameter.begin)};
+        // Emit this multi-part diagnostic under one stream lock, then write through the unlocked stream reference.
+        auto u8log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8log_output)};
+        ::fast_io::operations::decay::stream_ref_decay_lock_guard u8log_output_lg{
+            ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8log_output_osr)};
+        auto u8log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8log_output_osr)};
+
+        ::fast_io::io::perr(u8log_output_ul,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                            u8"uwvm: ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                            u8"[fatal] ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8"--wasm-set-start-func argument count mismatch for local function ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            local_function_index,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8": expected ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                            param_count,
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8" argument(s), got ",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                            argument_tokens.size(),
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                            u8".\n  function type: ");
+        print_wasm_entry_type_span(u8log_output_ul, ft.parameter.begin, ft.parameter.end);
+        ::fast_io::io::perr(u8log_output_ul, u8" -> ");
+        print_wasm_entry_type_span(u8log_output_ul, ft.result.begin, ft.result.end);
+        ::fast_io::io::perr(u8log_output_ul, u8"\n  input types:   (");
+        for(::std::size_t i{}; i != argument_tokens.size(); ++i)
+        {
+            if(i != 0uz) { ::fast_io::io::perr(u8log_output_ul, u8", "); }
+            // The loop bound is exactly `argument_tokens.size()`, so this unchecked lookup is range-proven here.
+            auto const arg{argument_tokens.index_unchecked(i)};
+            ::fast_io::io::perr(u8log_output_ul,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                wasm_entry_input_literal_type(arg),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8" ",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_GREEN),
+                                u8"\"",
+                                arg,
+                                u8"\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE));
+        }
+        ::fast_io::io::perr(u8log_output_ul,
+                            u8")\n\n",
+                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+        ::fast_io::fast_terminate();
+    }
+
+    template <typename T>
+    inline void write_wasm_entry_value(::uwvm2::utils::container::vector<::std::byte>& buffer, ::std::size_t& offset, T const& value) noexcept
+    {
+        static_assert(::std::is_trivially_copyable_v<T>);
+        if(offset > buffer.size() || sizeof(T) > buffer.size() - offset) [[unlikely]] { ::fast_io::fast_terminate(); }
+        ::std::memcpy(buffer.data() + offset, ::std::addressof(value), sizeof(T));
+        offset += sizeof(T);
+    }
+
+    inline void pack_wasm_entry_argument(::uwvm2::utils::container::vector<::std::byte>& buffer,
+                                         ::std::size_t& offset,
+                                         ::uwvm2::utils::container::u8string_view arg,
+                                         ::std::uint_least8_t type_code,
+                                         ::std::size_t arg_index) noexcept
+    {
+        using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
+        switch(static_cast<wasm_value_type>(type_code))
+        {
+            case wasm_value_type::i32:
+            {
+                ::std::uint32_t value{};
+                if(!parse_wasm_entry_i32(arg, value)) [[unlikely]]
+                {
+                    wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected i32, got \"", arg, u8"\".");
+                }
+                write_wasm_entry_value(buffer, offset, value);
+                break;
+            }
+            case wasm_value_type::i64:
+            {
+                ::std::uint64_t value{};
+                if(!parse_wasm_entry_i64(arg, value)) [[unlikely]]
+                {
+                    wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected i64, got \"", arg, u8"\".");
+                }
+                write_wasm_entry_value(buffer, offset, value);
+                break;
+            }
+            case wasm_value_type::f32:
+            {
+                float value{};
+                if(!parse_wasm_entry_float(arg, value)) [[unlikely]]
+                {
+                    wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected f32, got \"", arg, u8"\".");
+                }
+                write_wasm_entry_value(buffer, offset, value);
+                break;
+            }
+            case wasm_value_type::f64:
+            {
+                double value{};
+                if(!parse_wasm_entry_float(arg, value)) [[unlikely]]
+                {
+                    wasm_set_start_func_fatal(u8"Invalid argument #", arg_index, u8" for --wasm-set-start-func: expected f64, got \"", arg, u8"\".");
+                }
+                write_wasm_entry_value(buffer, offset, value);
+                break;
+            }
+            default:
+            {
+                wasm_set_start_func_fatal(u8"Unsupported --wasm-set-start-func parameter type: ",
+                                          wasm_entry_type_name(type_code),
+                                          u8". Only i32, i64, f32, and f64 are currently supported.");
+            }
+        }
+    }
+
+    template <typename ValueTypePtr>
+    [[nodiscard]] inline ::std::size_t calculate_wasm_entry_abi_bytes(ValueTypePtr begin, ValueTypePtr end, bool is_result) noexcept
+    {
+        ::std::size_t total{};
+        for(auto curr{begin}; curr != end; ++curr)
+        {
+            auto const type_code{wasm_entry_type_code(*curr)};
+            auto const size{wasm_entry_scalar_abi_size(type_code)};
+            if(size == 0uz) [[unlikely]]
+            {
+                auto const kind{is_result ? ::uwvm2::utils::container::u8string_view{u8"result"}
+                                          : ::uwvm2::utils::container::u8string_view{u8"parameter"}};
+                wasm_set_start_func_fatal(u8"Unsupported --wasm-set-start-func ",
+                                          kind,
+                                          u8" type: ",
+                                          wasm_entry_type_name(type_code),
+                                          u8". Only i32, i64, f32, and f64 are currently supported.");
+            }
+            if(total > (::std::numeric_limits<::std::size_t>::max() - size)) [[unlikely]] { ::fast_io::fast_terminate(); }
+            total += size;
+        }
+        return total;
+    }
+
+    inline void configure_runtime_entry_buffers(auto& cfg, runtime_entry_invocation& entry) noexcept
+    {
+        cfg.entry_function_index = entry.function_index;
+        cfg.entry_abi_buffers.param_buffer = entry.param_buffer.empty() ? nullptr : entry.param_buffer.data();
+        cfg.entry_abi_buffers.param_bytes = entry.param_buffer.size();
+        cfg.entry_abi_buffers.result_buffer = entry.result_buffer.empty() ? nullptr : entry.result_buffer.data();
+        cfg.entry_abi_buffers.result_bytes = entry.result_buffer.size();
+    }
+
+    inline runtime_entry_invocation resolve_runtime_entry_invocation(::uwvm2::utils::container::u8string_view main_module_name) noexcept
+    {
+        runtime_entry_invocation entry{};
+        auto const& requested{::uwvm2::uwvm::wasm::storage::start_func_call};
+        if(!requested.enabled)
+        {
+            entry.function_index = resolve_default_first_entry_function_index(main_module_name);
+            return entry;
+        }
+
+        auto const rt_it{::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.find(main_module_name)};
+        if(rt_it == ::uwvm2::uwvm::runtime::storage::wasm_module_runtime_storage.end()) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const& rt{rt_it->second};
+        auto const local_index{static_cast<::std::size_t>(requested.local_function_index)};
+        auto const local_n{rt.local_defined_function_vec_storage.size()};
+        if(local_index >= local_n) [[unlikely]]
+        {
+            wasm_set_start_func_fatal(u8"--wasm-set-start-func selected local function index ",
+                                      requested.local_function_index,
+                                      u8", but the main module only has ",
+                                      local_n,
+                                      u8" local defined functions. The index is local-defined, not import-inclusive.");
+        }
+
+        auto const& runtime_func{rt.local_defined_function_vec_storage.index_unchecked(local_index)};
+        auto const ft{runtime_func.function_type_ptr};
+        if(ft == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        auto const param_count{static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin)};
+        if(requested.argument_tokens.size() != param_count) [[unlikely]]
+        {
+            wasm_set_start_func_arity_mismatch_fatal(requested.local_function_index, *ft, requested.argument_tokens);
+        }
+
+        auto const param_bytes{calculate_wasm_entry_abi_bytes(ft->parameter.begin, ft->parameter.end, false)};
+        auto const result_bytes{calculate_wasm_entry_abi_bytes(ft->result.begin, ft->result.end, true)};
+
+        entry.function_index = rt.imported_function_vec_storage.size() + local_index;
+        entry.param_buffer.resize(param_bytes);
+        entry.result_buffer.resize(result_bytes);
+
+        ::std::size_t offset{};
+        for(::std::size_t i{}; i != param_count; ++i)
+        {
+            // The arity check above proves `argument_tokens.size() == param_count`; this unchecked lookup is bounded by the loop.
+            pack_wasm_entry_argument(entry.param_buffer, offset, requested.argument_tokens.index_unchecked(i), wasm_entry_type_code(ft->parameter.begin[i]), i);
+        }
+        if(offset != param_bytes) [[unlikely]] { ::fast_io::fast_terminate(); }
+
+        return entry;
     }
 
     inline constexpr ::std::size_t calculate_default_runtime_compile_threads(::std::size_t max_compile_threads) noexcept
@@ -686,6 +1053,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # endif
 
         resolve_runtime_compile_threads();
+        auto runtime_entry{resolve_runtime_entry_invocation(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name)};
 
         // run vm
         switch(::uwvm2::uwvm::wasm::storage::execute_wasm_mode)
@@ -744,7 +1112,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         }
 
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-                        cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                        configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = false;
                         ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 # else
@@ -810,7 +1178,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                         }
 
                         ::uwvm2::runtime::lib::lazy_compile_run_config cfg{};
-                        cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                        configure_runtime_entry_buffers(cfg, runtime_entry);
                         cfg.assume_full_code_verified = true;
                         ::uwvm2::runtime::lib::lazy_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 # else
@@ -839,7 +1207,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             {
                                 // full compile + uwvm_int interpreter backend
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-                                cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                                configure_runtime_entry_buffers(cfg, runtime_entry);
                                 ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;
@@ -887,7 +1255,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
                             case ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only:
                             {
                                 ::uwvm2::runtime::lib::full_compile_run_config cfg{};
-                                cfg.entry_function_index = resolve_default_first_entry_function_index(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name);
+                                configure_runtime_entry_buffers(cfg, runtime_entry);
                                 ::uwvm2::runtime::lib::full_compile_and_run_main_module(::uwvm2::uwvm::wasm::storage::execute_wasm.module_name, cfg);
 
                                 break;

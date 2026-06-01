@@ -2493,6 +2493,68 @@ namespace uwvm2::runtime::lib
             return total;
         }
 
+        inline void validate_entry_run_buffers(::uwvm2::utils::container::u8string_view main_module_name,
+                                               ::std::size_t param_count,
+                                               ::std::size_t param_bytes,
+                                               ::std::size_t result_count,
+                                               ::std::size_t result_bytes,
+                                               ::std::byte const* param_buffer,
+                                               ::std::size_t configured_param_bytes,
+                                               ::std::byte* result_buffer,
+                                               ::std::size_t configured_result_bytes) noexcept
+        {
+            if((param_count != 0uz && param_bytes == 0uz) || (result_count != 0uz && result_bytes == 0uz)) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Entry function signature contains value types unsupported by the runtime entry ABI (module=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    main_module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+
+            if(configured_param_bytes != param_bytes || configured_result_bytes != result_bytes ||
+               (param_bytes != 0uz && param_buffer == nullptr) || (result_bytes != 0uz && result_buffer == nullptr)) [[unlikely]]
+            {
+                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                    u8"uwvm: ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
+                                    u8"[fatal] ",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"Entry function ABI buffers do not match the function signature (module=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    main_module_name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\", expected-param-bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    param_bytes,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", configured-param-bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    configured_param_bytes,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", expected-result-bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    result_bytes,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", configured-result-bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                    configured_result_bytes,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8").\n\n",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
+                ::fast_io::fast_terminate();
+            }
+        }
+
         [[nodiscard]] inline constexpr func_sig_view func_sig_from_defined(runtime_local_func_storage_t const* f) noexcept
         {
             auto const ft{f->function_type_ptr};
@@ -5895,7 +5957,7 @@ namespace uwvm2::runtime::lib
             return true;
         }
 
-        [[nodiscard]] inline bool try_invoke_runtime_llvm_jit_defined_entry(::std::size_t module_id, ::std::size_t function_index) noexcept
+        [[nodiscard, maybe_unused]] inline bool try_invoke_runtime_llvm_jit_defined_entry(::std::size_t module_id, ::std::size_t function_index) noexcept
         {
             // Enter generated code through the raw wrapper so the C++ boundary keeps the host ABI even when typed Wasm bodies use a private ABI.
             return try_invoke_runtime_llvm_jit_raw_defined_entry(module_id, function_index, nullptr, 0uz, nullptr, 0uz);
@@ -8229,25 +8291,17 @@ namespace uwvm2::runtime::lib
                 ::fast_io::fast_terminate();
             }
 
-            if(tgt.sig.params.size != 0uz || tgt.sig.results.size != 0uz) [[unlikely]]
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Entry function signature is not () -> () (module=\"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    main_module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"\").\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                ::fast_io::fast_terminate();
-            }
-
             param_bytes = tgt.param_bytes;
             result_bytes = tgt.result_bytes;
+            validate_entry_run_buffers(main_module_name,
+                                       tgt.sig.params.size,
+                                       param_bytes,
+                                       tgt.sig.results.size,
+                                       result_bytes,
+                                       cfg.entry_abi_buffers.param_buffer,
+                                       cfg.entry_abi_buffers.param_bytes,
+                                       cfg.entry_abi_buffers.result_buffer,
+                                       cfg.entry_abi_buffers.result_bytes);
 # if defined(UWVM_RUNTIME_LLVM_JIT)
             llvm_jit_entry_module_id = tgt.frame.module_id;
             llvm_jit_entry_function_index = tgt.frame.function_index;
@@ -8263,25 +8317,19 @@ namespace uwvm2::runtime::lib
             auto const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
             if(entry_info.runtime_func != expected_rt) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            if(entry_info.param_bytes != 0uz || entry_info.result_bytes != 0uz) [[unlikely]]
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Entry function signature is not () -> () (module=\"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    main_module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"\").\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                ::fast_io::fast_terminate();
-            }
-
             param_bytes = entry_info.param_bytes;
             result_bytes = entry_info.result_bytes;
+            auto const ft{expected_rt->function_type_ptr};
+            if(ft == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            validate_entry_run_buffers(main_module_name,
+                                       static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin),
+                                       param_bytes,
+                                       static_cast<::std::size_t>(ft->result.end - ft->result.begin),
+                                       result_bytes,
+                                       cfg.entry_abi_buffers.param_buffer,
+                                       cfg.entry_abi_buffers.param_bytes,
+                                       cfg.entry_abi_buffers.result_buffer,
+                                       cfg.entry_abi_buffers.result_bytes);
         }
 
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
@@ -8291,14 +8339,21 @@ namespace uwvm2::runtime::lib
         heap_buf_guard host_stack_guard{};
         ::std::byte* host_stack_base{};
         UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(host_stack_base, stack_bytes, host_stack_guard);
+        if(param_bytes != 0uz) { ::std::memcpy(host_stack_base, cfg.entry_abi_buffers.param_buffer, param_bytes); }
         ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
+        bool entry_result_on_stack{};
 # endif
 
         auto const lazy_exec_start{lazy_log_enabled ? lazy_clock_now() : ::fast_io::unix_timestamp{}};
 # if defined(UWVM_RUNTIME_LLVM_JIT)
         if(llvm_jit_lazy_backend)
         {
-            if(!try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id, llvm_jit_entry_function_index, nullptr, 0uz, nullptr, 0uz)) [[unlikely]]
+            if(!try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
+                                                              llvm_jit_entry_function_index,
+                                                              cfg.entry_abi_buffers.result_buffer,
+                                                              result_bytes,
+                                                              cfg.entry_abi_buffers.param_buffer,
+                                                              param_bytes)) [[unlikely]]
             {
                 ::fast_io::fast_terminate();
             }
@@ -8334,7 +8389,11 @@ namespace uwvm2::runtime::lib
                                 {
                                     using entry_fn_t = void (*)(::std::uintptr_t, ::std::uintptr_t, ::std::size_t, ::std::uintptr_t, ::std::size_t);
                                     auto const entry_fn{reinterpret_cast<entry_fn_t>(entry_address)};
-                                    entry_fn(context_address, 0u, 0uz, 0u, 0uz);
+                                    entry_fn(context_address,
+                                             pointer_to_uintptr(cfg.entry_abi_buffers.result_buffer),
+                                             result_bytes,
+                                             pointer_to_uintptr(cfg.entry_abi_buffers.param_buffer),
+                                             param_bytes);
                                     invoked_tiered_entry = true;
                                 }
                             }
@@ -8347,10 +8406,10 @@ namespace uwvm2::runtime::lib
                         {
                             if(!try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
                                                                               llvm_jit_entry_function_index,
-                                                                              nullptr,
-                                                                              0uz,
-                                                                              nullptr,
-                                                                              0uz,
+                                                                              cfg.entry_abi_buffers.result_buffer,
+                                                                              result_bytes,
+                                                                              cfg.entry_abi_buffers.param_buffer,
+                                                                              param_bytes,
                                                                               true)) [[unlikely]]
                             {
                                 ::fast_io::fast_terminate();
@@ -8359,12 +8418,16 @@ namespace uwvm2::runtime::lib
                         else
                         {
                             tiered_call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+                            entry_result_on_stack = true;
                         }
                     }
                 }
                 else
 #  endif
+                {
                     call_bridge(main_id, cfg.entry_function_index, ::std::addressof(stack_top_ptr));
+                    entry_result_on_stack = true;
+                }
             }
 #  ifdef UWVM_CPP_EXCEPTIONS
             catch(::fast_io::error)
@@ -8377,6 +8440,10 @@ namespace uwvm2::runtime::lib
         {
             ::fast_io::fast_terminate();
         }
+# endif
+
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+        if(entry_result_on_stack && result_bytes != 0uz) { ::std::memcpy(cfg.entry_abi_buffers.result_buffer, host_stack_base, result_bytes); }
 # endif
 
         auto const lazy_exec_end{lazy_log_enabled ? lazy_clock_now() : ::fast_io::unix_timestamp{}};
@@ -8447,26 +8514,17 @@ namespace uwvm2::runtime::lib
                 ::fast_io::fast_terminate();
             }
 
-            // We don't pass host arguments; require `() -> ()`.
-            if(tgt.sig.params.size != 0uz || tgt.sig.results.size != 0uz) [[unlikely]]
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Entry function signature is not () -> () (module=\"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    main_module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"\").\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                ::fast_io::fast_terminate();
-            }
-
             param_bytes = tgt.param_bytes;
             result_bytes = tgt.result_bytes;
+            validate_entry_run_buffers(main_module_name,
+                                       tgt.sig.params.size,
+                                       param_bytes,
+                                       tgt.sig.results.size,
+                                       result_bytes,
+                                       cfg.entry_abi_buffers.param_buffer,
+                                       cfg.entry_abi_buffers.param_bytes,
+                                       cfg.entry_abi_buffers.result_buffer,
+                                       cfg.entry_abi_buffers.result_bytes);
 #if defined(UWVM_RUNTIME_LLVM_JIT)
             llvm_jit_entry_module_id = tgt.frame.module_id;
             llvm_jit_entry_function_index = tgt.frame.function_index;
@@ -8482,32 +8540,30 @@ namespace uwvm2::runtime::lib
             auto const expected_rt{::std::addressof(main_module->local_defined_function_vec_storage.index_unchecked(local_index))};
             if(entry_info.runtime_func != expected_rt) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            // We don't pass host arguments; require `() -> ()`.
-            if(entry_info.param_bytes != 0uz || entry_info.result_bytes != 0uz) [[unlikely]]
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_RED),
-                                    u8"[fatal] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Entry function signature is not () -> () (module=\"",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
-                                    main_module_name,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"\").\n\n",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL));
-                ::fast_io::fast_terminate();
-            }
-
             param_bytes = entry_info.param_bytes;
             result_bytes = entry_info.result_bytes;
+            auto const ft{expected_rt->function_type_ptr};
+            if(ft == nullptr) [[unlikely]] { ::fast_io::fast_terminate(); }
+            validate_entry_run_buffers(main_module_name,
+                                       static_cast<::std::size_t>(ft->parameter.end - ft->parameter.begin),
+                                       param_bytes,
+                                       static_cast<::std::size_t>(ft->result.end - ft->result.begin),
+                                       result_bytes,
+                                       cfg.entry_abi_buffers.param_buffer,
+                                       cfg.entry_abi_buffers.param_bytes,
+                                       cfg.entry_abi_buffers.result_buffer,
+                                       cfg.entry_abi_buffers.result_bytes);
         }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
         if(runtime_compiler_requests_llvm_jit_translation())
         {
-            if(try_invoke_runtime_llvm_jit_defined_entry(llvm_jit_entry_module_id, llvm_jit_entry_function_index))
+            if(try_invoke_runtime_llvm_jit_raw_defined_entry(llvm_jit_entry_module_id,
+                                                             llvm_jit_entry_function_index,
+                                                             cfg.entry_abi_buffers.result_buffer,
+                                                             result_bytes,
+                                                             cfg.entry_abi_buffers.param_buffer,
+                                                             param_bytes))
             {
                 erase_current_thread_state();
                 return;
@@ -8560,6 +8616,7 @@ namespace uwvm2::runtime::lib
         heap_buf_guard host_stack_guard{};
         ::std::byte* host_stack_base{};
         UWVM_STACK_OR_HEAP_ALLOC_ZEROED_BYTES_NONNULL(host_stack_base, stack_bytes, host_stack_guard);
+        if(param_bytes != 0uz) { ::std::memcpy(host_stack_base, cfg.entry_abi_buffers.param_buffer, param_bytes); }
         ::std::byte* stack_top_ptr{host_stack_base + param_bytes};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -8574,6 +8631,7 @@ namespace uwvm2::runtime::lib
             trap_fatal(trap_kind::uncatched_int_tag);
         }
 # endif
+        if(result_bytes != 0uz) { ::std::memcpy(cfg.entry_abi_buffers.result_buffer, host_stack_base, result_bytes); }
 
         // Currently only main-thread execution exists. Clean up current thread state on exit to avoid state growth and
         // possible thread-id reuse issues. Do NOT `clear()` here: main-thread exit does not imply other threads exit.

@@ -33,6 +33,7 @@ export import :debug_test;
 
 // wasm
 export import :wasm_set_main_module_name;
+export import :wasm_set_start_func;
 export import :wasm_preload_library;
 export import :wasm_register_dl;
 export import :wasm_reset_import;

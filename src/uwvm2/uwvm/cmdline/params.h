@@ -59,6 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
             // wasm
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_main_module_name),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_start_func),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_preload_library),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_depend_recursion_limit),
 #if defined(UWVM_SUPPORT_PRELOAD_DL)

@@ -33,5 +33,6 @@
 # include "preload_module_attribute.h"
 # include "memory_limit.h"
 # include "import_reset.h"
+# include "start_func.h"
 # include "all_module.h"
 #endif

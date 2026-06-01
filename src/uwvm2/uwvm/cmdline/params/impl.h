@@ -34,6 +34,7 @@
 
 // wasm
 # include "wasm_set_main_module_name.h"
+# include "wasm_set_start_func.h"
 # include "wasm_preload_library.h"
 # include "wasm_register_dl.h"
 # include "wasm_reset_import.h"

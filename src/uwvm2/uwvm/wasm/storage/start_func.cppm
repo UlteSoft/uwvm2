@@ -1,4 +1,4 @@
-﻿/*************************************************************
+/*************************************************************
  * UlteSoft WebAssembly Virtual Machine (Version 2)          *
  * Copyright (c) 2025-present UlteSoft. All rights reserved. *
  * Licensed under the APL-2.0 License (see LICENSE file).    *
@@ -7,7 +7,6 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-28
  * @copyright   APL-2.0 License
  */
 
@@ -22,19 +21,12 @@
 
 module;
 
-export module uwvm2.uwvm.wasm.storage;
-export import :mode;
-export import :execute_wasm;
-export import :preloaded_wasm;
-export import :local_preload;
-export import :local_imported;
-export import :preloaded_dl;
-export import :weak_symbol;
-export import :preload_module_attribute;
-export import :memory_limit;
-export import :import_reset;
-export import :start_func;
-export import :all_module;
+// std
+#include <cstdint>
+
+export module uwvm2.uwvm.wasm.storage:start_func;
+
+import uwvm2.utils.container;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -43,4 +35,4 @@ export import :all_module;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "start_func.h"
