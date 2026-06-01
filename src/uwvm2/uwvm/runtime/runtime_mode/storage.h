@@ -165,9 +165,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
 
     /// @brief   The global runtime compiler backend.
-    /// @details default = llvm_jit_only when LLVM JIT is available
+    /// @details default = uwvm_interpreter_llvm_jit_tiered when the tiered backend is available
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered
+#elif defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
 #elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only

@@ -200,10 +200,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         ::fast_io::io::perr(::std::forward<Stm>(stm),
                             u8"  * Default Runtime Policy:\n",
                             u8"    - Mode: lazy_compile\n",
-#if defined(UWVM_RUNTIME_LLVM_JIT)
-                            u8"    - Backend: llvm_jit_only\n"
-#elif defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                             u8"    - Backend: uwvm_interpreter_llvm_jit_tiered\n"
+#elif defined(UWVM_RUNTIME_LLVM_JIT)
+                            u8"    - Backend: llvm_jit_only\n"
 #elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                             u8"    - Backend: uwvm_interpreter_only\n"
 #elif defined(UWVM_RUNTIME_DEBUG_INTERPRETER)

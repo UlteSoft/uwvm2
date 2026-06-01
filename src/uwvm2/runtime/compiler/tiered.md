@@ -5,6 +5,9 @@ This document describes the three-tier runtime compiler used by
 close to LLVM lazy JIT, avoid blocking when native code is not ready, and still
 provide a whole-module native tier for long-running workloads.
 
+When the tiered backend is compiled in, it is the default lazy runtime backend.
+`--runtime-jit` remains available as an explicit opt-in for pure LLVM lazy JIT.
+
 ## Tier Overview
 
 The tiered backend has three execution tiers:

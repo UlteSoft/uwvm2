@@ -63,7 +63,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 # endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_jit{
         .name{u8"--runtime-jit"},
-        .describe{u8"Shortcut for lazy compile with the LLVM JIT backend (DEFAULT)."},
+        .describe{u8"Shortcut for lazy compile with the LLVM JIT backend."},
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_jit_alias), 1uz}},
         .handle{::std::addressof(details::runtime_jit_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed)},
