@@ -173,12 +173,13 @@ Tier 1 policy is counter-only: elapsed time is reported in logs, but it does
 not decide when tiering happens. Ordinary function-entry misses require 4096
 misses on the same local function before the bridge enqueues LLVM work for
 small modules. The threshold scales up for large modules and large functions:
-modules with at least 512 local functions require 16384 entry misses, and
-modules with at least 1024 local functions require 65536 entry misses. Compile
-units of up to 128/512/1024 bytes can lower that large-module threshold back to
+modules with at least 512 local functions require 16384 entry misses, modules
+with at least 1024 local functions require 65536 entry misses, and modules with
+at least 4096 local functions require 131072 entry misses. Compile units of up
+to 128/512/1024 bytes can lower that large-module threshold back to
 8192/16384/32768 misses while the module has fewer than 4096 local functions,
 because tiny helpers are cheap to materialize and often sit on hot indirect-call
-paths. Modules at CPython scale keep the larger 65536 entry-miss threshold even
+paths. Modules at CPython scale keep the larger 131072 entry-miss threshold even
 for tiny helpers. Compile units of at least 4096/8192 bytes require at least
 65536/262144 entry misses, and compile units of at least 32768 bytes are kept
 out of entry-triggered lazy LLVM. This keeps large projects such as SQLite or
