@@ -2887,49 +2887,55 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
                     auto const& function_type{typesec.types.index_unchecked(type_idx)};
                     auto const& code_type{codesec.codes.index_unchecked(i)};
-                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+
+                    if constexpr(false)
                     {
-                        auto const param_count{safe_ptr_range_size(function_type.parameter.begin, function_type.parameter.end)};
-                        auto const result_count{safe_ptr_range_size(function_type.result.begin, function_type.result.end)};
-                        auto const code_body_bytes{safe_ptr_range_size(code_type.body.code_begin, code_type.body.code_end)};
-                        auto const expr_bytes{safe_ptr_range_size(code_type.body.expr_begin, code_type.body.code_end)};
-                        verbose_module_info(u8"Init: bind local function/code (local_func_idx=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            i,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", wasm_func_idx=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            imported_func_count + i,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", type_idx=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            type_idx,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", params=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            param_count,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", results=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            result_count,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", local_decl_groups=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            code_type.locals.size(),
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", local_values=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            code_type.all_local_count,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", code_body_bytes=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            code_body_bytes,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8", expr_bytes=",
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
-                                            expr_bytes,
-                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                            u8"). ");
+                        // Too verbose
+
+                        if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                        {
+                            auto const param_count{safe_ptr_range_size(function_type.parameter.begin, function_type.parameter.end)};
+                            auto const result_count{safe_ptr_range_size(function_type.result.begin, function_type.result.end)};
+                            auto const code_body_bytes{safe_ptr_range_size(code_type.body.code_begin, code_type.body.code_end)};
+                            auto const expr_bytes{safe_ptr_range_size(code_type.body.expr_begin, code_type.body.code_end)};
+                            verbose_module_info(u8"Init: bind local function/code (local_func_idx=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                i,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", wasm_func_idx=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                imported_func_count + i,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", type_idx=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                type_idx,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", params=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                param_count,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", results=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                result_count,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", local_decl_groups=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                code_type.locals.size(),
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", local_values=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                code_type.all_local_count,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", code_body_bytes=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                code_body_bytes,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8", expr_bytes=",
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                                expr_bytes,
+                                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                u8"). ");
+                        }
                     }
 
                     ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t f{};
