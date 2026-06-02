@@ -55,10 +55,7 @@
     // not result types.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"br", target_arity);
-    }
+    if(!is_polymorphic && concrete_operand_count() < target_arity) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"br", target_arity); }
 
     if(target_arity != 0uz)
     {
@@ -78,7 +75,6 @@
                 ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
             }
         }
-
     }
 
     // Translate: `br` requires stack-shape repair before jumping because the interpreter `br` opcode does not unwind the operand stack.
@@ -975,7 +971,7 @@ case wasm1_code::br_if:
     // not result types.
     auto const target_arity{target_frame.type == block_type::loop ? 0uz : static_cast<::std::size_t>(target_frame.result.end - target_frame.result.begin)};
 
-    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const target_arity_plus_cond_overflows{target_arity == max_operand_stack_requirement};
     auto const required_stack_size{target_arity_plus_cond_overflows ? max_operand_stack_requirement : (target_arity + 1uz)};
 
@@ -3100,15 +3096,12 @@ case wasm1_code::br_table:
     // reservation/allocation, preventing attacker-controlled oversized `target_count` values from
     // amplifying into excessive memory requests.
     auto const remaining_bytes{static_cast<::std::size_t>(code_end - code_curr)};
-    auto constexpr max_br_table_label_count{::std::numeric_limits<::std::size_t>::max()};
+    constexpr auto max_br_table_label_count{::std::numeric_limits<::std::size_t>::max()};
     bool target_count_exceeds_size_t{};
     ::std::size_t target_count_uz{};
     if constexpr(::std::numeric_limits<wasm_u32>::max() > max_br_table_label_count)
     {
-        if(target_count > max_br_table_label_count) [[unlikely]]
-        {
-            target_count_exceeds_size_t = true;
-        }
+        if(target_count > max_br_table_label_count) [[unlikely]] { target_count_exceeds_size_t = true; }
         else
         {
             target_count_uz = static_cast<::std::size_t>(target_count);
@@ -3120,8 +3113,7 @@ case wasm1_code::br_table:
     }
 
     auto const target_count_plus_default_overflows{!target_count_exceeds_size_t && target_count_uz == max_br_table_label_count};
-    if(target_count_exceeds_size_t || target_count_plus_default_overflows || remaining_bytes == 0uz || target_count_uz >= remaining_bytes)
-        [[unlikely]]
+    if(target_count_exceeds_size_t || target_count_plus_default_overflows || remaining_bytes == 0uz || target_count_uz >= remaining_bytes) [[unlikely]]
     {
         err.err_curr = op_begin;
         err.err_selectable.br_table_target_count_exceeds_remaining_bytes.target_count = target_count;
@@ -3276,7 +3268,7 @@ case wasm1_code::br_table:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    auto constexpr max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
+    constexpr auto max_operand_stack_requirement{::std::numeric_limits<::std::size_t>::max()};
     auto const expected_arity_plus_index_overflows{expected_arity == max_operand_stack_requirement};
     auto const required_stack_size{expected_arity_plus_index_overflows ? max_operand_stack_requirement : (expected_arity + 1uz)};
 

@@ -94,20 +94,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         {
             auto group_arg{para_curr + 1u};
             ::uwvm2::utils::container::u8string_view group_name{};
-            if(auto const ret{validate_group_arg(parameter, group_arg, para_end, group_name)}; ret != parameter_return_type::def) [[unlikely]]
-            {
-                return ret;
-            }
+            if(auto const ret{validate_group_arg(parameter, group_arg, para_end, group_name)}; ret != parameter_return_type::def) [[unlikely]] { return ret; }
 
             auto target{::uwvm2::uwvm::imported::wasi::wasip1::storage::find_named_wasip1_group(group_name)};
-            if(target == nullptr) [[unlikely]]
-            {
-                return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 module group does not exist.");
-            }
+            if(target == nullptr) [[unlikely]] { return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 module group does not exist."); }
 
             return wasip1_module_details::apply_target_action(parameter, group_arg, para_end, *target, action);
         }
-    }
+    }  // namespace wasip1_group_details
 
 # endif
 #endif

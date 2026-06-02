@@ -49,29 +49,28 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
-#else
+# else
     UWVM_GNU_COLD inline constexpr
-#endif
-        ::uwvm2::utils::cmdline::parameter_return_type runtime_scheduling_policy_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results*
-                                                                                               para_begin,
-                                                                                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                                                           ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+# endif
+        ::uwvm2::utils::cmdline::parameter_return_type runtime_scheduling_policy_callback(
+            [[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results * para_begin,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+            ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
-        auto print_usage_error{
-            []() constexpr noexcept
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                    u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Usage: ",
-                                    ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
-                                    u8"\n\n");
-            }};
+        auto print_usage_error{[]() constexpr noexcept
+                               {
+                                   ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                       u8"uwvm: ",
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                       u8"[error] ",
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                       u8"Usage: ",
+                                                       ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
+                                                       u8"\n\n");
+                               }};
 
         auto print_invalid_size_error{
             [](::uwvm2::utils::container::u8string_view split_size_str) constexpr noexcept

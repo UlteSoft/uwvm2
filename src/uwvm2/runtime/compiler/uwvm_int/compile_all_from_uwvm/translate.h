@@ -24,6 +24,7 @@
 #ifndef UWVM_MODULE
 // std
 # include <algorithm>
+# include <atomic>
 # include <bit>
 # include <cstddef>
 # include <cstdint>
@@ -59,8 +60,8 @@
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm
 {
-#include "translate/details.h"
-#include "translate/single_func.h"
+# include "translate/details.h"
+# include "translate/single_func.h"
 }
 #endif
 

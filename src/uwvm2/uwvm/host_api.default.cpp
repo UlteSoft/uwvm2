@@ -54,7 +54,11 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t
     uwvm_wasip1_clock_res_get(::uwvm2::imported::wasi::wasip1::abi::clockid_t clock_id,
                               ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_t resolution_ptrsz) noexcept
-{ return ::uwvm2::imported::wasi::wasip1::func::clock_res_get(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), clock_id, resolution_ptrsz); }
+{
+    return ::uwvm2::imported::wasi::wasip1::func::clock_res_get(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(),
+                                                                clock_id,
+                                                                resolution_ptrsz);
+}
 
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_clock_time_get(::uwvm2::imported::wasi::wasip1::abi::clockid_t clock_id,
                                                                                     ::uwvm2::imported::wasi::wasip1::abi::timestamp_t precision,
@@ -388,7 +392,10 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_poll_oneoff
 }
 
 extern "C" void uwvm_wasip1_proc_exit(::uwvm2::imported::wasi::wasip1::abi::exitcode_t code) noexcept
-{ return ::uwvm2::imported::wasi::wasip1::func::proc_exit(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code); }
+{
+    ::uwvm2::runtime::lib::lazy_compile_stop_before_proc_exit_host_api();
+    return ::uwvm2::imported::wasi::wasip1::func::proc_exit(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code);
+}
 
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_proc_raise(::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
 { return ::uwvm2::imported::wasi::wasip1::func::proc_raise(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code); }
@@ -519,7 +526,13 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
                                  [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t offset,
                                  [[maybe_unused]] ::uwvm2::imported::wasi::wasip1::abi::filesize_wasm64_t len,
                                  ::uwvm2::imported::wasi::wasip1::abi::advice_wasm64_t advice) noexcept
-{ return ::uwvm2::imported::wasi::wasip1::func::fd_advise_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), fd, offset, len, advice); }
+{
+    return ::uwvm2::imported::wasi::wasip1::func::fd_advise_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(),
+                                                                   fd,
+                                                                   offset,
+                                                                   len,
+                                                                   advice);
+}
 
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
     uwvm_wasip1_fd_allocate_wasm64(::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd,
@@ -630,7 +643,13 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t iovs,
                                ::uwvm2::imported::wasi::wasip1::abi::wasi_size_wasm64_t iovs_len,
                                ::uwvm2::imported::wasi::wasip1::abi::wasi_void_ptr_wasm64_t nread) noexcept
-{ return ::uwvm2::imported::wasi::wasip1::func::fd_read_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), fd, iovs, iovs_len, nread); }
+{
+    return ::uwvm2::imported::wasi::wasip1::func::fd_read_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(),
+                                                                 fd,
+                                                                 iovs,
+                                                                 iovs_len,
+                                                                 nread);
+}
 
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
     uwvm_wasip1_fd_readdir_wasm64(::uwvm2::imported::wasi::wasip1::abi::wasi_posix_fd_wasm64_t fd,
@@ -859,7 +878,10 @@ extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t
 }
 
 extern "C" void uwvm_wasip1_proc_exit_wasm64(::uwvm2::imported::wasi::wasip1::abi::exitcode_wasm64_t code) noexcept
-{ return ::uwvm2::imported::wasi::wasip1::func::proc_exit_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code); }
+{
+    ::uwvm2::runtime::lib::lazy_compile_stop_before_proc_exit_host_api();
+    return ::uwvm2::imported::wasi::wasip1::func::proc_exit_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code);
+}
 
 extern "C" ::uwvm2::imported::wasi::wasip1::abi::errno_t uwvm_wasip1_proc_raise_wasm64(::uwvm2::imported::wasi::wasip1::abi::signal_t code) noexcept
 { return ::uwvm2::imported::wasi::wasip1::func::proc_raise_wasm64(::uwvm2::uwvm::imported::wasi::wasip1::storage::current_wasip1_env(), code); }

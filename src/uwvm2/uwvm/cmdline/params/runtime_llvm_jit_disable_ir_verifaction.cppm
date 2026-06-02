@@ -29,7 +29,7 @@ module;
 #include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 
-export module uwvm2.uwvm.cmdline.params:runtime_disable_llvm_ir_verifaction;
+export module uwvm2.uwvm.cmdline.params:runtime_llvm_jit_disable_ir_verifaction;
 
 import fast_io;
 import uwvm2.utils.container;
@@ -43,4 +43,4 @@ import uwvm2.uwvm.runtime.runtime_mode;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "runtime_disable_llvm_ir_verifaction.h"
+#include "runtime_llvm_jit_disable_ir_verifaction.h"

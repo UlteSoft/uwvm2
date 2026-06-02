@@ -377,11 +377,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(trace_wasip1_call) [[unlikely]]
         {
             ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"sock_shutdown(",
-                                sock_fd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(how)>>>(how),
-                                u8")");
+                                                                              u8"sock_shutdown(",
+                                                                              sock_fd,
+                                                                              u8", ",
+                                                                              static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(how)>>>(how),
+                                                                              u8")");
         }
 
         return sock_shutdown_base(env, sock_fd, how);

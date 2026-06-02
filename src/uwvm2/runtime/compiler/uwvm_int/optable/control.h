@@ -23,6 +23,7 @@
 
 #ifndef UWVM_MODULE
 // std
+# include <atomic>
 # include <cstddef>
 # include <cstdint>
 # include <cstring>
@@ -40,6 +41,7 @@
 # include <uwvm2/utils/debug/impl.h>
 # include <uwvm2/parser/wasm/standard/wasm1/impl.h>
 # include <uwvm2/object/impl.h>
+# include <uwvm2/utils/thread/impl.h>
 # include "define.h"
 # include "storage.h"
 #endif
@@ -49,14 +51,77 @@
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
+# if !(__cpp_pack_indexing >= 202311L)
+#  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
     namespace details
     {
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        template <typename T>
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr T load_interpreter_imm_field(::std::byte const* ip) noexcept
+        {
+            T value;  // no init
+            ::std::memcpy(::std::addressof(value), ip, sizeof(value));
+            return value;
+        }
+
+        template <typename T>
+        UWVM_ALWAYS_INLINE inline constexpr void store_interpreter_imm_field(::std::byte const* ip, T const& value) noexcept
+        { ::std::memcpy(const_cast<::std::byte*>(ip), ::std::addressof(value), sizeof(value)); }
+
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline constexpr bool tiered_loop_osr_countdown_expired(::std::byte const* countdown_ip) noexcept
+        {
+            auto countdown{load_interpreter_imm_field<::std::uint_least32_t>(countdown_ip)};
+            if(countdown <= 1u) { return true; }
+
+            --countdown;
+            store_interpreter_imm_field(countdown_ip, countdown);
+            return false;
+        }
+
+        UWVM_ALWAYS_INLINE inline constexpr void tiered_loop_osr_reset_countdown(::std::byte const* imm_ip) noexcept
+        {
+            using imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+            auto const reset_countdown_ip{imm_ip + offsetof(imm_t, reset_countdown)};
+            auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
+            auto const reset_countdown{load_interpreter_imm_field<::std::uint_least32_t>(reset_countdown_ip)};
+            auto const next_countdown{reset_countdown == 0u ? 1u : reset_countdown};
+            store_interpreter_imm_field(countdown_ip, next_countdown);
+        }
+
+        enum class tiered_loop_osr_fast_poll_state : unsigned
+        {
+            skip,
+            countdown,
+            poll_runtime
+        };
+
+        UWVM_ALWAYS_INLINE [[nodiscard]] inline tiered_loop_osr_fast_poll_state tiered_loop_osr_check_fast_state(::std::uintptr_t state_address,
+                                                                                                                 ::std::byte const* state_address_ip) noexcept
+        {
+            if(state_address == 0u) { return tiered_loop_osr_fast_poll_state::countdown; }
+            if(state_address == ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_disabled_state_address)
+            {
+                return tiered_loop_osr_fast_poll_state::skip;
+            }
+
+            auto const state_ptr{reinterpret_cast<::std::atomic<::uwvm2::utils::thread::lazy_compile_state> const*>(state_address)};
+            auto const state{state_ptr->load(::std::memory_order_acquire)};
+            if(state == ::uwvm2::utils::thread::lazy_compile_state::compiled) { return tiered_loop_osr_fast_poll_state::poll_runtime; }
+            if(state == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]]
+            {
+                auto const disabled{::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_disabled_state_address};
+                store_interpreter_imm_field(state_address_ip, disabled);
+                return tiered_loop_osr_fast_poll_state::skip;
+            }
+            if(state == ::uwvm2::utils::thread::lazy_compile_state::uncompiled) [[unlikely]] { return tiered_loop_osr_fast_poll_state::countdown; }
+            return tiered_loop_osr_fast_poll_state::skip;
+        }
+# endif
+
         /// @brief Runtime trap bridge: handles the Wasm `unreachable` trap.
         /// @details
         /// - Stack-top optimization: not applicable.
@@ -67,9 +132,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
 
                 ::fast_io::fast_terminate();
             }
@@ -86,6 +151,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             requires (CompileOption.is_tail_call)
         UWVM_INTERPRETER_OPFUNC_COLD_MACRO UWVM_NOINLINE inline constexpr void unreachable_tail(Type... /*type*/) UWVM_THROWS
         { unreachable(); }
+
     }  // namespace details
 
     /// @brief `unreachable` opcode (tail-call): traps/terminates the VM.
@@ -322,6 +388,164 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_br_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
     }  // namespace translate
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+        requires (CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_tiered_loop_osr_poll(Type... type) UWVM_THROWS
+    {
+        static_assert(sizeof...(Type) >= 3uz);
+        static_assert(::std::same_as<Type...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<Type...[2u]>, ::std::byte*>);
+
+        using opfunc_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_t<Type...>;
+        using imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+
+        auto const imm_ip{type...[0] + sizeof(opfunc_t)};
+        auto const next_ip{imm_ip + sizeof(imm_t)};
+        auto const state_address_ip{imm_ip + offsetof(imm_t, compile_state_address)};
+        auto const state_address{details::load_interpreter_imm_field<::std::uintptr_t>(state_address_ip)};
+        auto const fast_state{details::tiered_loop_osr_check_fast_state(state_address, state_address_ip)};
+        bool poll_now{fast_state == details::tiered_loop_osr_fast_poll_state::poll_runtime};
+        if(fast_state == details::tiered_loop_osr_fast_poll_state::countdown)
+        {
+            auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
+            poll_now = details::tiered_loop_osr_countdown_expired(countdown_ip);
+            if(poll_now)
+            {
+                auto const request_countdown_ip{imm_ip + offsetof(imm_t, request_countdown)};
+                poll_now = details::tiered_loop_osr_countdown_expired(request_countdown_ip);
+                if(!poll_now) { details::tiered_loop_osr_reset_countdown(imm_ip); }
+            }
+        }
+
+        if(poll_now)
+        {
+            imm_t imm;  // no init
+            ::std::memcpy(::std::addressof(imm), imm_ip, sizeof(imm));
+
+            auto const callback{::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func};
+            if(callback != nullptr && callback(imm.wasm_module_id,
+                                               imm.func_index,
+                                               imm.loop_wasm_code_offset,
+                                               type...[1u],
+                                               imm.result_bytes,
+                                               type...[2u],
+                                               imm.local_bytes,
+                                               ::std::addressof(imm.compile_state_address)))
+            {
+                return;
+            }
+
+            imm.countdown = imm.reset_countdown == 0u ? 1u : imm.reset_countdown;
+            ::std::memcpy(const_cast<::std::byte*>(imm_ip), ::std::addressof(imm), sizeof(imm));
+        }
+
+        type...[0] = next_ip;
+        opfunc_t next_interpreter;  // no init
+        ::std::memcpy(::std::addressof(next_interpreter), type...[0], sizeof(next_interpreter));
+
+        UWVM_MUSTTAIL return next_interpreter(type...);
+    }
+
+    template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+              ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeRef>
+        requires (!CompileOption.is_tail_call)
+    UWVM_INTERPRETER_OPFUNC_HOT_MACRO inline constexpr void uwvmint_tiered_loop_osr_poll(TypeRef & ... typeref) UWVM_THROWS
+    {
+        static_assert(sizeof...(TypeRef) >= 3uz);
+        static_assert(::std::same_as<TypeRef...[0u], ::std::byte const*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[1u]>, ::std::byte*>);
+        static_assert(::std::same_as<::std::remove_cvref_t<TypeRef...[2u]>, ::std::byte*>);
+        static_assert(CompileOption.i32_stack_top_begin_pos == SIZE_MAX && CompileOption.i32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.i64_stack_top_begin_pos == SIZE_MAX && CompileOption.i64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f32_stack_top_begin_pos == SIZE_MAX && CompileOption.f32_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.f64_stack_top_begin_pos == SIZE_MAX && CompileOption.f64_stack_top_end_pos == SIZE_MAX);
+        static_assert(CompileOption.v128_stack_top_begin_pos == SIZE_MAX && CompileOption.v128_stack_top_end_pos == SIZE_MAX);
+
+        using opfunc_t = ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_opfunc_byref_t<TypeRef...>;
+        using imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
+
+        auto const imm_ip{typeref...[0] + sizeof(opfunc_t)};
+        auto const next_ip{imm_ip + sizeof(imm_t)};
+        auto const state_address_ip{imm_ip + offsetof(imm_t, compile_state_address)};
+        auto const state_address{details::load_interpreter_imm_field<::std::uintptr_t>(state_address_ip)};
+        auto const fast_state{details::tiered_loop_osr_check_fast_state(state_address, state_address_ip)};
+        bool poll_now{fast_state == details::tiered_loop_osr_fast_poll_state::poll_runtime};
+        if(fast_state == details::tiered_loop_osr_fast_poll_state::countdown)
+        {
+            auto const countdown_ip{imm_ip + offsetof(imm_t, countdown)};
+            poll_now = details::tiered_loop_osr_countdown_expired(countdown_ip);
+            if(poll_now)
+            {
+                auto const request_countdown_ip{imm_ip + offsetof(imm_t, request_countdown)};
+                poll_now = details::tiered_loop_osr_countdown_expired(request_countdown_ip);
+                if(!poll_now) { details::tiered_loop_osr_reset_countdown(imm_ip); }
+            }
+        }
+
+        if(poll_now)
+        {
+            imm_t imm;  // no init
+            ::std::memcpy(::std::addressof(imm), imm_ip, sizeof(imm));
+
+            auto const callback{::uwvm2::runtime::compiler::uwvm_int::optable::tiered_loop_osr_func};
+            if(callback != nullptr && callback(imm.wasm_module_id,
+                                               imm.func_index,
+                                               imm.loop_wasm_code_offset,
+                                               typeref...[1u],
+                                               imm.result_bytes,
+                                               typeref...[2u],
+                                               imm.local_bytes,
+                                               ::std::addressof(imm.compile_state_address)))
+            {
+                typeref...[1u] += imm.result_bytes;
+                typeref...[0u] = nullptr;
+                return;
+            }
+
+            imm.countdown = imm.reset_countdown == 0u ? 1u : imm.reset_countdown;
+            ::std::memcpy(const_cast<::std::byte*>(imm_ip), ::std::addressof(imm), sizeof(imm));
+        }
+
+        typeref...[0u] = next_ip;
+    }
+
+    namespace translate
+    {
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_t<Type...>
+            get_uwvmint_tiered_loop_osr_poll_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_tiered_loop_osr_poll<CompileOption, Type...>; }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
+            requires (CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple(
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_tiered_loop_osr_poll_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... Type>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr uwvm_interpreter_opfunc_byref_t<Type...>
+            get_uwvmint_tiered_loop_osr_poll_fptr(::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const&) noexcept
+        { return uwvmint_tiered_loop_osr_poll<CompileOption, Type...>; }
+
+        template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption,
+                  ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_int_stack_top_type... TypeInTuple>
+            requires (!CompileOption.is_tail_call)
+        inline constexpr auto get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple(
+            ::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_stacktop_currpos_t const& curr_stacktop,
+            ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
+        { return get_uwvmint_tiered_loop_osr_poll_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
+    }  // namespace translate
+# endif
+
     /// @brief `br_if` opcode (tail-call): conditional branch based on an i32 condition.
     /// @details
     /// - Stack-top optimization: supported for the i32 condition when i32 stack-top caching is enabled; `curr_i32_stack_top` selects which cached slot is read.
@@ -359,9 +583,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             ::uwvm2::runtime::compiler::uwvm_int::optable::
                 get_curr_val_from_operand_stack_top<CompileOption, ::uwvm2::parser::wasm::standard::wasm1::type::wasm_i32, curr_i32_stack_top>(type...)};
 
-#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-#endif
+# endif
         if(cond)
         {
             type...[0] = jmp_ip;
@@ -419,9 +643,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         // Pop condition from operand stack memory (updates stack pointer `type...[1]`).
         wasm_i32 const cond{::uwvm2::runtime::compiler::uwvm_int::optable::get_curr_val_from_operand_stack_cache<wasm_i32>(type...)};
 
-#if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-#endif
+# endif
         if(cond)
         {
             type...[0] = jmp_ip;
@@ -522,9 +746,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -739,9 +963,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }

@@ -114,26 +114,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"path_open_wasm64(",
-                                dirfd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(dirflags)>>>(dirflags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(path_ptrsz),
-                                u8", ",
-                                path_len,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(oflags)>>>(oflags),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_base)>>>(fs_rights_base),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_inheriting)>>>(fs_rights_inheriting),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fdflags)>>>(fdflags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(fd_ptrsz),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"path_open_wasm64(",
+                dirfd,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(dirflags)>>>(dirflags),
+                u8", ",
+                ::fast_io::mnp::addrvw(path_ptrsz),
+                u8", ",
+                path_len,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(oflags)>>>(oflags),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_base)>>>(fs_rights_base),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fs_rights_inheriting)>>>(fs_rights_inheriting),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fdflags)>>>(fdflags),
+                u8", ",
+                ::fast_io::mnp::addrvw(fd_ptrsz),
+                u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.
@@ -600,17 +601,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                             if(is_dir)
                                             {
-                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                                storage_dir_stack = curr_dir_stack;
-
-                                                for(auto& dir_with_name_curr: path_stack)
-                                                {
-                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                                }
-
                                                 ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -662,6 +652,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 }
 # endif
 
+                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                                storage_dir_stack = curr_dir_stack;
+
+                                                for(auto& dir_with_name_curr: path_stack)
+                                                {
+                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                                }
+
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
                                                 newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
@@ -692,17 +693,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                             if(is_dir)
                                             {
-                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                                storage_dir_stack = curr_dir_stack;
-
-                                                for(auto& dir_with_name_curr: path_stack)
-                                                {
-                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                                }
-
                                                 ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -756,6 +746,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 }
 # endif
 
+                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                                storage_dir_stack = curr_dir_stack;
+
+                                                for(auto& dir_with_name_curr: path_stack)
+                                                {
+                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                                }
+
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
                                                 newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
@@ -790,17 +791,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     if(is_dir)
                                     {
-                                        auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                        storage_dir_stack = curr_dir_stack;
-
-                                        for(auto& dir_with_name_curr: path_stack)
-                                        {
-                                            // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                            auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                            newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                        }
-
                                         ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -851,6 +841,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
 # endif
+
+                                        auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                        storage_dir_stack = curr_dir_stack;
+
+                                        for(auto& dir_with_name_curr: path_stack)
+                                        {
+                                            // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                            auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                            newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                        }
 
                                         auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                         newdir.ptr->dir_stack.name = ::std::move(open_file_name);
@@ -926,17 +927,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                             if(is_dir)
                                             {
-                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                                storage_dir_stack = curr_dir_stack;
-
-                                                for(auto& dir_with_name_curr: path_stack)
-                                                {
-                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                                }
-
                                                 ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -988,6 +978,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 }
 # endif
 
+                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                                storage_dir_stack = curr_dir_stack;
+
+                                                for(auto& dir_with_name_curr: path_stack)
+                                                {
+                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                                }
+
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
                                                 newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
@@ -1018,17 +1019,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                         {
                                             if(is_dir)
                                             {
-                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                                storage_dir_stack = curr_dir_stack;
-
-                                                for(auto& dir_with_name_curr: path_stack)
-                                                {
-                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                                }
-
                                                 ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -1082,6 +1072,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                                 }
 # endif
 
+                                                auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                                storage_dir_stack = curr_dir_stack;
+
+                                                for(auto& dir_with_name_curr: path_stack)
+                                                {
+                                                    // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                                    auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                                    newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                                    newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                                }
+
                                                 auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                                 newdir.ptr->dir_stack.name = ::std::move(open_file_name);
                                                 newdir.ptr->dir_stack.storage.file = ::std::move(new_dir_file);
@@ -1116,17 +1117,6 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
                                     if(is_dir)
                                     {
-                                        auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
-                                        storage_dir_stack = curr_dir_stack;
-
-                                        for(auto& dir_with_name_curr: path_stack)
-                                        {
-                                            // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
-                                            auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
-                                            newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
-                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
-                                        }
-
                                         ::fast_io::dir_file new_dir_file{};
 
 # ifdef UWVM_CPP_EXCEPTIONS
@@ -1177,6 +1167,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
                                             return ::uwvm2::imported::wasi::wasip1::func::path_errno_from_fast_io_error(e);
                                         }
 # endif
+
+                                        auto& storage_dir_stack{new_wasi_fd.fd_p->wasi_fd.ptr->wasi_fd_storage.storage.dir_stack};
+                                        storage_dir_stack = curr_dir_stack;
+
+                                        for(auto& dir_with_name_curr: path_stack)
+                                        {
+                                            // Create a new `dir_file` by moving an existing one to ensure no touch-and-touch-out issues.
+                                            auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
+                                            newdir.ptr->dir_stack.name = ::std::move(dir_with_name_curr.name);
+                                            newdir.ptr->dir_stack.storage.file = ::std::move(dir_with_name_curr.file);
+                                        }
 
                                         auto& newdir{storage_dir_stack.dir_stack.emplace_back()};
                                         newdir.ptr->dir_stack.name = ::std::move(open_file_name);
@@ -1526,4 +1527,3 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 # include <uwvm2/utils/macro/pop_macros.h>
 # include <uwvm2/uwvm_predefine/utils/ansies/uwvm_color_pop_macro.h>
 #endif
-

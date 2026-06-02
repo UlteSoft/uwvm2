@@ -48,16 +48,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_socket_udp_connect_alias{u8"--wasip1-socket-udp-connect",
-                                                                                                     u8"-I1udpcon"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_socket_udp_connect_alias{
+            u8"--wasip1-socket-udp-connect",
+            u8"-I1udpcon"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_socket_udp_connect_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                              ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                              ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type
+            wasip1_global_socket_udp_connect_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 #  if defined(__clang__)
@@ -72,7 +74,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
                u8"|unix <path>"
 #  endif
                u8"]"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_socket_udp_connect_alias.data(), details::wasip1_global_socket_udp_connect_alias.size()}},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_socket_udp_connect_alias.data(),
+                                                             details::wasip1_global_socket_udp_connect_alias.size()}},
         .handle{::std::addressof(details::wasip1_global_socket_udp_connect_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
 #  if defined(__clang__)

@@ -119,8 +119,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             case lazy_execution_unit_kind::function: return u8"function";
             case lazy_execution_unit_kind::block: return u8"block";
             case lazy_execution_unit_kind::loop: return u8"loop";
-            case lazy_execution_unit_kind::if_: return u8"if";
-            [[unlikely]] default: return u8"unknown";
+            case lazy_execution_unit_kind::if_:
+                return u8"if";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
@@ -130,8 +132,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         {
             case lazy_compile_unit_kind::function: return u8"function";
             case lazy_compile_unit_kind::execution_unit: return u8"execution_unit";
-            case lazy_compile_unit_kind::code_size_group: return u8"code_size_group";
-            [[unlikely]] default: return u8"unknown";
+            case lazy_compile_unit_kind::code_size_group:
+                return u8"code_size_group";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
@@ -140,8 +144,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         switch(scope)
         {
             case lazy_materialization_scope::whole_function: return u8"whole_function";
-            case lazy_materialization_scope::execution_unit_range: return u8"execution_unit_range";
-            [[unlikely]] default: return u8"unknown";
+            case lazy_materialization_scope::execution_unit_range:
+                return u8"execution_unit_range";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
@@ -225,10 +231,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             lazy_execution_unit_kind kind{lazy_execution_unit_kind::function};
         };
 
-        [[nodiscard]] inline constexpr ::std::size_t active_parent_eu_index(lazy_split_control_frame const& frame) noexcept
-        {
-            return frame.eu_index;
-        }
+        [[nodiscard]] inline constexpr ::std::size_t active_parent_eu_index(lazy_split_control_frame const& frame) noexcept { return frame.eu_index; }
 
         [[nodiscard]] inline constexpr ::std::size_t byte_offset(::std::byte const* base, ::std::byte const* curr) noexcept
         { return static_cast<::std::size_t>(curr - base); }
@@ -733,11 +736,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
         }
 
-        [[nodiscard]] inline auto
-            match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
-        {
-            return ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::match_trivial_call_inline_body(code_ptr);
-        }
+        [[nodiscard]] inline auto match_trivial_call_inline_body(::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_wasm_code_t const* code_ptr) noexcept
+        { return ::uwvm2::runtime::compiler::uwvm_int::compile_all_from_uwvm::details::match_trivial_call_inline_body(code_ptr); }
 
         inline void fill_lazy_local_defined_call_info(runtime_module_storage_t const& curr_module,
                                                       ::uwvm2::runtime::compiler::uwvm_int::optable::compile_option const& options,
@@ -758,7 +758,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                 info.function_index = import_func_count + i;
             }
 
-#include "../compile_all_from_uwvm/translate/single_func_call_info.h"
+# include "../compile_all_from_uwvm/translate/single_func_call_info.h"
         }
 
         inline constexpr void aggregate_lazy_local_function_storage(full_function_symbol_t& storage) noexcept
@@ -868,27 +868,27 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             }
 
             ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-start module=\"",
-                                                          ctx->module_name,
-                                                          u8"\" module_id=",
-                                                          ctx->options.compile_options.curr_wasm_id,
-                                                          u8" local_fn=",
-                                                          cu.local_function_index,
-                                                          u8" fn=",
-                                                          fn.function_index,
-                                                          u8" cu=",
-                                                          ctx->compile_unit_index,
-                                                          u8" cu_kind=",
-                                                          lazy_compile_unit_kind_name(cu.kind),
-                                                          u8" scope=",
-                                                          lazy_materialization_scope_name(cu.materialization_scope),
-                                                          u8" eu=[",
-                                                          cu.begin_eu_index,
-                                                          u8",",
-                                                          cu.end_eu_index,
-                                                          u8") offset=",
-                                                          cu.code_offset,
-                                                          u8" size=",
-                                                          cu.code_size);
+                                                                         ctx->module_name,
+                                                                         u8"\" module_id=",
+                                                                         ctx->options.compile_options.curr_wasm_id,
+                                                                         u8" local_fn=",
+                                                                         cu.local_function_index,
+                                                                         u8" fn=",
+                                                                         fn.function_index,
+                                                                         u8" cu=",
+                                                                         ctx->compile_unit_index,
+                                                                         u8" cu_kind=",
+                                                                         lazy_compile_unit_kind_name(cu.kind),
+                                                                         u8" scope=",
+                                                                         lazy_materialization_scope_name(cu.materialization_scope),
+                                                                         u8" eu=[",
+                                                                         cu.begin_eu_index,
+                                                                         u8",",
+                                                                         cu.end_eu_index,
+                                                                         u8") offset=",
+                                                                         cu.code_offset,
+                                                                         u8" size=",
+                                                                         cu.code_size);
 
 # ifdef UWVM_CPP_EXCEPTIONS
             try
@@ -913,21 +913,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 # endif
                 }
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-end module=\"",
-                                                              ctx->module_name,
-                                                              u8"\" module_id=",
-                                                              ctx->options.compile_options.curr_wasm_id,
-                                                              u8" local_fn=",
-                                                              cu.local_function_index,
-                                                              u8" fn=",
-                                                              fn.function_index,
-                                                              u8" cu=",
-                                                              ctx->compile_unit_index,
-                                                              u8" state=compiled cu_count=",
-                                                              fn.cu_count,
-                                                              u8" eu_count=",
-                                                              fn.eu_count,
-                                                              u8" time=",
-                                                              compile_end_time - compile_start_time);
+                                                                             ctx->module_name,
+                                                                             u8"\" module_id=",
+                                                                             ctx->options.compile_options.curr_wasm_id,
+                                                                             u8" local_fn=",
+                                                                             cu.local_function_index,
+                                                                             u8" fn=",
+                                                                             fn.function_index,
+                                                                             u8" cu=",
+                                                                             ctx->compile_unit_index,
+                                                                             u8" state=compiled cu_count=",
+                                                                             fn.cu_count,
+                                                                             u8" eu_count=",
+                                                                             fn.eu_count,
+                                                                             u8" time=",
+                                                                             compile_end_time - compile_start_time);
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
@@ -946,17 +946,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                     }
                 }
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-end module=\"",
-                                                              ctx->module_name,
-                                                              u8"\" module_id=",
-                                                              ctx->options.compile_options.curr_wasm_id,
-                                                              u8" local_fn=",
-                                                              cu.local_function_index,
-                                                              u8" fn=",
-                                                              fn.function_index,
-                                                              u8" cu=",
-                                                              ctx->compile_unit_index,
-                                                              u8" state=failed time=",
-                                                              compile_end_time - compile_start_time);
+                                                                             ctx->module_name,
+                                                                             u8"\" module_id=",
+                                                                             ctx->options.compile_options.curr_wasm_id,
+                                                                             u8" local_fn=",
+                                                                             cu.local_function_index,
+                                                                             u8" fn=",
+                                                                             fn.function_index,
+                                                                             u8" cu=",
+                                                                             ctx->compile_unit_index,
+                                                                             u8" state=failed time=",
+                                                                             compile_end_time - compile_start_time);
             }
 # endif
         }
@@ -1016,23 +1016,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         auto& fn{storage.functions.index_unchecked(cu.local_function_index)};
 
         ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-start module_id=",
-                                                      options.compile_options.curr_wasm_id,
-                                                      u8" local_fn=",
-                                                      cu.local_function_index,
-                                                      u8" cu=",
-                                                      compile_unit_index,
-                                                      u8" cu_kind=",
-                                                      lazy_compile_unit_kind_name(cu.kind),
-                                                      u8" scope=",
-                                                      lazy_materialization_scope_name(cu.materialization_scope),
-                                                      u8" eu=[",
-                                                      cu.begin_eu_index,
-                                                      u8",",
-                                                      cu.end_eu_index,
-                                                      u8") offset=",
-                                                      cu.code_offset,
-                                                      u8" size=",
-                                                      cu.code_size);
+                                                                     options.compile_options.curr_wasm_id,
+                                                                     u8" local_fn=",
+                                                                     cu.local_function_index,
+                                                                     u8" cu=",
+                                                                     compile_unit_index,
+                                                                     u8" cu_kind=",
+                                                                     lazy_compile_unit_kind_name(cu.kind),
+                                                                     u8" scope=",
+                                                                     lazy_materialization_scope_name(cu.materialization_scope),
+                                                                     u8" eu=[",
+                                                                     cu.begin_eu_index,
+                                                                     u8",",
+                                                                     cu.end_eu_index,
+                                                                     u8") offset=",
+                                                                     cu.code_offset,
+                                                                     u8" size=",
+                                                                     cu.code_size);
 
         bool counted_wait{};
         for(;;)
@@ -1041,12 +1041,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             if(st == ::uwvm2::utils::thread::lazy_compile_state::compiled)
             {
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-hit module_id=",
-                                                              options.compile_options.curr_wasm_id,
-                                                              u8" local_fn=",
-                                                              cu.local_function_index,
-                                                              u8" cu=",
-                                                              compile_unit_index,
-                                                              u8" state=compiled");
+                                                                             options.compile_options.curr_wasm_id,
+                                                                             u8" local_fn=",
+                                                                             cu.local_function_index,
+                                                                             u8" cu=",
+                                                                             compile_unit_index,
+                                                                             u8" state=compiled");
                 return;
             }
             if(st == ::uwvm2::utils::thread::lazy_compile_state::failed) [[unlikely]] { ::fast_io::fast_terminate(); }
@@ -1059,12 +1059,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
                                                                           ::std::memory_order_acquire))
                 {
                     ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-claim module_id=",
-                                                                  options.compile_options.curr_wasm_id,
-                                                                  u8" local_fn=",
-                                                                  cu.local_function_index,
-                                                                  u8" cu=",
-                                                                  compile_unit_index,
-                                                                  u8" state=uncompiled->compiling");
+                                                                                 options.compile_options.curr_wasm_id,
+                                                                                 u8" local_fn=",
+                                                                                 cu.local_function_index,
+                                                                                 u8" cu=",
+                                                                                 compile_unit_index,
+                                                                                 u8" state=uncompiled->compiling");
                     break;
                 }
                 continue;
@@ -1073,13 +1073,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
             if(!counted_wait)
             {
                 ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-wait module_id=",
-                                                              options.compile_options.curr_wasm_id,
-                                                              u8" local_fn=",
-                                                              cu.local_function_index,
-                                                              u8" cu=",
-                                                              compile_unit_index,
-                                                              u8" state=",
-                                                              ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::compile_state_name(st));
+                                                                             options.compile_options.curr_wasm_id,
+                                                                             u8" local_fn=",
+                                                                             cu.local_function_index,
+                                                                             u8" cu=",
+                                                                             compile_unit_index,
+                                                                             u8" state=",
+                                                                             ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::compile_state_name(st));
                 counted_wait = true;
             }
             ::uwvm2::utils::thread::lazy_compile_thread_yield();
@@ -1104,13 +1104,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
 # endif
         }
         ::uwvm2::runtime::compiler::uwvm_int::lazy_runtime_log::line(u8"compile-cu-end module_id=",
-                                                      options.compile_options.curr_wasm_id,
-                                                      u8" local_fn=",
-                                                      cu.local_function_index,
-                                                      u8" cu=",
-                                                      compile_unit_index,
-                                                      u8" state=compiled time=",
-                                                      compile_end_time - compile_start_time);
+                                                                     options.compile_options.curr_wasm_id,
+                                                                     u8" local_fn=",
+                                                                     cu.local_function_index,
+                                                                     u8" cu=",
+                                                                     compile_unit_index,
+                                                                     u8" state=compiled time=",
+                                                                     compile_end_time - compile_start_time);
     }
 
     template <::uwvm2::runtime::compiler::uwvm_int::optable::uwvm_interpreter_translate_option_t CompileOption>
@@ -1124,11 +1124,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::compile_cu_from
         auto& fn{ctx.lazy_storage->functions.index_unchecked(cu.local_function_index)};
 
         auto unit{cu.materialization_scope == lazy_materialization_scope::whole_function ? ::std::addressof(fn.materialization_state)
-                                                                                          : ::std::addressof(cu.state)};
-        return {.unit = unit,
-                .compile = details::lazy_compile_request_entry<CompileOption>,
-                .user_data = ::std::addressof(ctx),
-                .priority = priority};
+                                                                                         : ::std::addressof(cu.state)};
+        return {.unit = unit, .compile = details::lazy_compile_request_entry<CompileOption>, .user_data = ::std::addressof(ctx), .priority = priority};
     }
 }
 #endif

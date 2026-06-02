@@ -87,11 +87,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
-        if(trace_wasip1_call) [[unlikely]]
-        {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
- u8"sched_yield_wasm64()");
-        }
+        if(trace_wasip1_call) [[unlikely]] { ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env, u8"sched_yield_wasm64()"); }
 
         return ::uwvm2::imported::wasi::wasip1::func::sched_yield_impl(env);
     }

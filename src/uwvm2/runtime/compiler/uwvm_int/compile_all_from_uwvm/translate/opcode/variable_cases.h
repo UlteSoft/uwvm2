@@ -714,61 +714,72 @@ case wasm1_code::local_get:
                     }
                 }
 # endif
-                auto const try_form_common_add_2local_window{
-                    [&]() constexpr UWVM_THROWS -> bool
-                    {
-                        if(code_curr == code_end) { return false; }
+                auto const try_form_common_add_2local_window{[&]() constexpr UWVM_THROWS -> bool
+                                                             {
+                                                                 if(code_curr == code_end) { return false; }
 
-                        wasm1_code add_op{};  // init
-                        ::std::memcpy(::std::addressof(add_op), code_curr, sizeof(add_op));
+                                                                 wasm1_code add_op{};  // init
+                                                                 ::std::memcpy(::std::addressof(add_op), code_curr, sizeof(add_op));
 
-                        wasm1_code expected_add{};
-                        if(curr_local_type == curr_operand_stack_value_type::i32) { expected_add = wasm1_code::i32_add; }
-                        else if(curr_local_type == curr_operand_stack_value_type::i64) { expected_add = wasm1_code::i64_add; }
+                                                                 wasm1_code expected_add{};
+                                                                 if(curr_local_type == curr_operand_stack_value_type::i32)
+                                                                 {
+                                                                     expected_add = wasm1_code::i32_add;
+                                                                 }
+                                                                 else if(curr_local_type == curr_operand_stack_value_type::i64)
+                                                                 {
+                                                                     expected_add = wasm1_code::i64_add;
+                                                                 }
 # ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
-                        else if(curr_local_type == curr_operand_stack_value_type::f32) { expected_add = wasm1_code::f32_add; }
-                        else if(curr_local_type == curr_operand_stack_value_type::f64) { expected_add = wasm1_code::f64_add; }
+                                                                 else if(curr_local_type == curr_operand_stack_value_type::f32)
+                                                                 {
+                                                                     expected_add = wasm1_code::f32_add;
+                                                                 }
+                                                                 else if(curr_local_type == curr_operand_stack_value_type::f64)
+                                                                 {
+                                                                     expected_add = wasm1_code::f64_add;
+                                                                 }
 # endif
-                        else
-                        {
-                            return false;
-                        }
+                                                                 else
+                                                                 {
+                                                                     return false;
+                                                                 }
 
-                        if(add_op != expected_add) { return false; }
-                        if(static_cast<::std::size_t>(code_end - code_curr) < 2uz) { return false; }
+                                                                 if(add_op != expected_add) { return false; }
+                                                                 if(static_cast<::std::size_t>(code_end - code_curr) < 2uz) { return false; }
 
-                        wasm1_code update_op{};  // init
-                        ::std::memcpy(::std::addressof(update_op), code_curr + 1uz, sizeof(update_op));
-                        if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
+                                                                 wasm1_code update_op{};  // init
+                                                                 ::std::memcpy(::std::addressof(update_op), code_curr + 1uz, sizeof(update_op));
+                                                                 if(update_op != wasm1_code::local_set && update_op != wasm1_code::local_tee) { return false; }
 
-                        wasm_u32 next_local_index{};
-                        using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
-                        auto const [next_local_index_next,
-                                    next_local_index_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 2uz),
-                                                                                   reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                                   ::fast_io::mnp::leb128_get(next_local_index))};
+                                                                 wasm_u32 next_local_index{};
+                                                                 using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                                                 auto const [next_local_index_next, next_local_index_err]{
+                                                                     ::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr + 2uz),
+                                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                              ::fast_io::mnp::leb128_get(next_local_index))};
 
-                        if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
-                           local_type_from_index(next_local_index) != curr_local_type)
-                        {
-                            return false;
-                        }
+                                                                 if(next_local_index_err != ::fast_io::parse_code::ok || next_local_index >= all_local_count ||
+                                                                    local_type_from_index(next_local_index) != curr_local_type)
+                                                                 {
+                                                                     return false;
+                                                                 }
 
-                        if(curr_local_type == curr_operand_stack_value_type::i32 && update_op == wasm1_code::local_tee)
-                        {
-                            auto const after_local_tee{reinterpret_cast<::std::byte const*>(next_local_index_next)};
-                            if(after_local_tee != code_end)
-                            {
-                                wasm1_code after_tee{};  // init
-                                ::std::memcpy(::std::addressof(after_tee), after_local_tee, sizeof(after_tee));
-                                if(after_tee == wasm1_code::br_if) { return false; }
-                            }
-                        }
+                                                                 if(curr_local_type == curr_operand_stack_value_type::i32 && update_op == wasm1_code::local_tee)
+                                                                 {
+                                                                     auto const after_local_tee{reinterpret_cast<::std::byte const*>(next_local_index_next)};
+                                                                     if(after_local_tee != code_end)
+                                                                     {
+                                                                         wasm1_code after_tee{};  // init
+                                                                         ::std::memcpy(::std::addressof(after_tee), after_local_tee, sizeof(after_tee));
+                                                                         if(after_tee == wasm1_code::br_if) { return false; }
+                                                                     }
+                                                                 }
 
-                        conbine_pending.kind = conbine_pending_kind::local_get2;
-                        conbine_pending.off2 = local_off;
-                        return true;
-                    }};
+                                                                 conbine_pending.kind = conbine_pending_kind::local_get2;
+                                                                 conbine_pending.off2 = local_off;
+                                                                 return true;
+                                                             }};
 
                 if(try_form_common_add_2local_window()) { break; }
 # ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
@@ -1121,10 +1132,7 @@ case wasm1_code::local_set:
 
     bool have_set_operand{};
     curr_operand_stack_value_type set_operand_type{};
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"local.set", 1uz);
-    }
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"local.set", 1uz); }
     else if(auto const value{try_peek_concrete_operand()}; value.from_stack)
     {
         have_set_operand = true;
@@ -1842,10 +1850,7 @@ case wasm1_code::local_tee:
 
     if(concrete_operand_count() == 0uz) [[unlikely]]
     {
-        if(!is_polymorphic)
-        {
-            report_operand_stack_underflow(op_begin, u8"local.tee", 1uz);
-        }
+        if(!is_polymorphic) { report_operand_stack_underflow(op_begin, u8"local.tee", 1uz); }
         else
         {
             operand_stack_push(curr_local_type);
@@ -2767,10 +2772,7 @@ case wasm1_code::global_set:
         ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
     }
 
-    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"global.set", 1uz);
-    }
+    if(!is_polymorphic && concrete_operand_count() == 0uz) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"global.set", 1uz); }
     else if(auto const value{try_pop_concrete_operand()}; value.from_stack)
     {
         if(value.type != curr_global_type) [[unlikely]]

@@ -50,7 +50,8 @@
 UWVM_MODULE_EXPORT namespace uwvm2::object::memory::linear
 {
     /// @brief Execute `fn(memory_begin, byte_length)` against a consistent linear-memory snapshot.
-    /// @note  For allocator-backed multi-threaded memories, the callback runs under exclusive access: grow and other in-flight memory operations must drain first.
+    /// @note  For allocator-backed multi-threaded memories, the callback runs under exclusive access: grow and other in-flight memory operations must drain
+    /// first.
     template <typename MemoryT, typename Fn>
     [[nodiscard]] inline constexpr bool with_memory_access_snapshot(MemoryT const& memory, Fn&& fn) noexcept
     {

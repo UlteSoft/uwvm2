@@ -65,9 +65,18 @@ function def_build(opt)
 		add_defines("UWVM_TIMER")
 	end
 
-	local enable_multithread_allocator_mem = get_config("use-multithread-allocator-memory")
-	if enable_multithread_allocator_mem then
+	local wasm_memory_model = get_config("wasm-memory-model") or "default"
+	if wasm_memory_model == "default" then
+		-- Keep the existing automatic backend selection.
+	elseif wasm_memory_model == "mmap" then
+		add_defines("UWVM_FORCE_USE_MMAP")
+	elseif wasm_memory_model == "multi-thread-alloc" then
+		add_defines("UWVM_FORCE_DISABLE_MMAP")
 		add_defines("UWVM_USE_MULTITHREAD_ALLOCATOR")
+	elseif wasm_memory_model == "single-thread-alloc" then
+		add_defines("UWVM_FORCE_DISABLE_MMAP")
+	else
+		error("unsupported wasm-memory-model: " .. tostring(wasm_memory_model))
 	end
 
 	local disable_local_imported_wasip1 = get_config("disable-local-imported-wasip1")
@@ -311,6 +320,9 @@ function def_build(opt)
 	)
 end
 
+local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
+	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
+
 target("uwvm")
 	set_kind("binary")
 	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
@@ -321,6 +333,9 @@ target("uwvm")
 
 	local is_debug_mode = is_mode("debug")  -- public all modules in debug mode
 	local enable_cxx_module = get_config("use-cxx-module")
+
+	-- third-parties/fast_float
+	add_includedirs("third-parties/fast_float/include")
 
 	-- third-parties/fast_io
 	add_includedirs("third-parties/fast_io/include")
@@ -377,78 +392,83 @@ target("uwvm")
 		add_files("src/uwvm2/uwvm/host_api.default.cpp")
 	end
 
-	-- uwvm_runtime (shared full-compile runtime unit for int/jit backends)
-	if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-		(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
-		add_deps("uwvm_runtime")
-	end
+	-- uwvm_runtime also provides non-backend host API shims used by uwvm.
+	add_deps("uwvm_runtime")
 
 target_end()
 
--- uwvm_runtime: build the shared full-compile runtime unit separately so it can use its own FP flags.
-if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
-	target("uwvm_runtime")
-		set_kind("object")
-		def_build({ skip_static_libcxx = true })
-			
-		-- Interpreter/runtime execution unit: disable observable floating-point side effects
-		-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
-		add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
+-- uwvm_runtime: build the shared runtime unit separately so it can use its own FP flags.
+target("uwvm_runtime")
+	set_kind("object")
+	def_build({ skip_static_libcxx = true })
 
-		-- third-parties/fast_io
-		add_includedirs("third-parties/fast_io/include")
+	-- Interpreter/runtime execution unit: disable observable floating-point side effects
+	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
+	add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
 
+	-- third-parties/fast_float
+	add_includedirs("third-parties/fast_float/include")
+
+	-- third-parties/fast_io
+	add_includedirs("third-parties/fast_io/include")
+
+	if enable_cxx_module then
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+	end
+
+	-- third-parties/bizwen
+	add_includedirs("third-parties/bizwen/include")
+
+	-- third-parties/boost
+	add_includedirs("third-parties/boost_unordered/include")
+
+	-- src
+	add_includedirs("src/")
+
+	add_defines("UWVM=2")
+
+	if enable_cxx_module then
+		-- uwvm predefine
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+		-- utils
+		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+		-- object
+		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+		-- imported
+		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+		-- wasm parser
+		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+		-- validation
+		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
+		-- uwvm
+		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+
+		-- runtime
+		add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
+	end
+
+	if uwvm_has_runtime_backend then
 		if enable_cxx_module then
-			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-		end
-		-- third-parties/bizwen
-		add_includedirs("third-parties/bizwen/include")
-		-- third-parties/boost
-		add_includedirs("third-parties/boost_unordered/include")
-
-		-- src
-		add_includedirs("src/")
-
-		add_defines("UWVM=2")
-
-		if enable_cxx_module then
-			-- uwvm predefine
-			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-			-- utils
-			add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-			-- object
-			add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-			-- imported
-			add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-			-- wasm parser
-			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-			-- validation
-			add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-			-- uwvm
-			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-
-			-- runtime
-			add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
-		end
-
-		if enable_cxx_module then
-			-- uwvm int main
 			add_files("src/uwvm2/runtime/lib/uwvm_runtime.module.cpp")
 		else
-			-- uwvm int main
 			add_files("src/uwvm2/runtime/lib/uwvm_runtime.default.cpp")
 		end
-		
-	target_end()
-end
+	else
+		if enable_cxx_module then
+			add_files("src/uwvm2/runtime/lib/uwvm_stub_runtime.module.cpp")
+		else
+			add_files("src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp")
+		end
+	end
+
+target_end()
 
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do
@@ -488,6 +508,9 @@ for _, file in ipairs(os.files("test/**.cc")) do
 		set_default(false)
 
 		local enable_cxx_module = get_config("use-cxx-module")
+
+		-- third-parties/fast_float
+		add_includedirs("third-parties/fast_float/include")
 
 		-- third-parties/fast_io
 		add_includedirs("third-parties/fast_io/include")
@@ -850,6 +873,59 @@ for _, file in ipairs(os.files("test/**.cc")) do
 	end
 end
 
+if get_config("enable-test-backend-fuzzer") then
+	local backend_fuzzer_has_int = get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default"
+	local backend_fuzzer_has_jit = get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default"
+	if not backend_fuzzer_has_int or not backend_fuzzer_has_jit then
+		raise("test/0016.backend_fuzzer requires --execution-int=uwvm-int/default and --execution-jit=llvm/default.")
+	end
+
+	target("backend_fuzzer")
+		set_group("test/0016.backend_fuzzer")
+		set_kind("phony")
+		set_default(false)
+		add_deps("uwvm")
+
+		on_run(function(target)
+			import("core.project.project")
+			local root = os.projectdir()
+			local uwvm_target = project.target("uwvm")
+			local uwvm_file = uwvm_target and uwvm_target:targetfile()
+			if not uwvm_file or uwvm_file == "" then
+				raise("could not resolve uwvm targetfile")
+			end
+			if not path.is_absolute(uwvm_file) then
+				uwvm_file = path.join(root, uwvm_file)
+			end
+			os.execv("bash", {path.join(root, "test/0016.backend_fuzzer/run_backend_fuzzer.sh"), "--uwvm", uwvm_file}, {curdir = root})
+		end)
+
+		on_test(function(target, opt)
+			import("core.project.project")
+			local root = os.projectdir()
+			local uwvm_target = project.target("uwvm")
+			local uwvm_file = uwvm_target and uwvm_target:targetfile()
+			if not uwvm_file or uwvm_file == "" then
+				opt.errors = "could not resolve uwvm targetfile"
+				return false
+			end
+			if not path.is_absolute(uwvm_file) then
+				uwvm_file = path.join(root, uwvm_file)
+			end
+			local status, errors = os.execv("bash", {path.join(root, "test/0016.backend_fuzzer/run_backend_fuzzer.sh"), "--uwvm", uwvm_file},
+				{try = true, curdir = root})
+			if status ~= 0 then
+				opt.errors = errors or ("backend fuzzer failed with exit code: " .. tostring(status))
+				return false
+			end
+			return true
+		end)
+
+		local timeout = tonumber(os.getenv("UWVM_BACKEND_FUZZ_TIMEOUT")) or 600
+		add_tests("run", { group = "backend_fuzzer", realtime_output = true, run_timeout = timeout })
+	target_end()
+end
+
 -- LLVM JIT mirror of the 0013 strict uwvm-int suites. These targets compile the
 -- original 0013 source files with a runner macro that routes Runner::run through
 -- llvm_jit_call_raw_host_api, so the LLVM coverage stays aligned with 0013.
@@ -875,6 +951,9 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			set_default(false)
 
 			local enable_cxx_module = get_config("use-cxx-module")
+
+			-- third-parties/fast_float
+			add_includedirs("third-parties/fast_float/include")
 
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")
@@ -960,6 +1039,9 @@ if get_config("enable-test-llvm-jit") and ((get_config("execution-jit") == "llvm
 			set_default(false)
 
 			local enable_cxx_module = get_config("use-cxx-module")
+
+			-- third-parties/fast_float
+			add_includedirs("third-parties/fast_float/include")
 
 			-- third-parties/fast_io
 			add_includedirs("third-parties/fast_io/include")

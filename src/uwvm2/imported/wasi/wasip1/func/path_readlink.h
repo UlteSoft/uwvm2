@@ -112,19 +112,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(trace_wasip1_call) [[unlikely]]
         {
             ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"path_readlink(",
-                                fd,
-                                u8", ",
-                                ::fast_io::mnp::addrvw(path_ptrsz),
-                                u8", ",
-                                path_len,
-                                u8", ",
-                                ::fast_io::mnp::addrvw(buf_ptrsz),
-                                u8", ",
-                                buf_len,
-                                u8", ",
-                                ::fast_io::mnp::addrvw(buf_used_ptrsz),
-                                u8")");
+                                                                              u8"path_readlink(",
+                                                                              fd,
+                                                                              u8", ",
+                                                                              ::fast_io::mnp::addrvw(path_ptrsz),
+                                                                              u8", ",
+                                                                              path_len,
+                                                                              u8", ",
+                                                                              ::fast_io::mnp::addrvw(buf_ptrsz),
+                                                                              u8", ",
+                                                                              buf_len,
+                                                                              u8", ",
+                                                                              ::fast_io::mnp::addrvw(buf_used_ptrsz),
+                                                                              u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

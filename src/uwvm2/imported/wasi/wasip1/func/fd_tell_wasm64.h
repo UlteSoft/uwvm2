@@ -102,12 +102,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"fd_tell_wasm64(",
-                                fd,
-                                u8", ",
-                                ::fast_io::mnp::addrvw(tell_ptrsz),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env, u8"fd_tell_wasm64(", fd, u8", ", ::fast_io::mnp::addrvw(tell_ptrsz), u8")");
         }
 
         if(fd < 0) [[unlikely]] { return ::uwvm2::imported::wasi::wasip1::abi::errno_wasm64_t::ebadf; }

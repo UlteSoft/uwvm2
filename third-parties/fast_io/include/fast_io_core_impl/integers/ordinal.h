@@ -24,10 +24,12 @@ inline constexpr auto ordinal(T t) noexcept
 namespace details
 {
 
-template <::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos, bool uppercase, bool full, ::std::integral char_type, typename T>
+template <::std::size_t base, bool showbase, bool uppercase_showbase, bool showpos, bool uppercase, bool full,
+		  bool modern_octal, ::std::integral char_type, typename T>
 inline constexpr char_type *prrsv_ordinal_impl(char_type *iter, T t) noexcept
 {
-	iter = ::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full>(iter, t);
+	iter = ::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase,
+															 full, modern_octal>(iter, t);
 	std::uint_least8_t prefix_kind{};
 	if (t / 100 % 10 == 1)
 	{
@@ -78,13 +80,16 @@ inline constexpr char_type *prrsv_ordinal_impl(char_type *iter, T t) noexcept
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, ::fast_io::details::my_integral T>
 inline constexpr ::std::size_t print_reserve_size(::fast_io::io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, ::fast_io::manipulators::ordinal_t<T>>>)
 {
-	return ::fast_io::details::print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, T> + 2u;
+	return ::fast_io::details::print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, flags.modern_octal, T> +
+		   2u;
 }
 
 template <::std::integral char_type, ::fast_io::manipulators::scalar_flags flags, typename T>
 inline constexpr char_type *print_reserve_define(::fast_io::io_reserve_type_t<char_type, ::fast_io::manipulators::scalar_manip_t<flags, ::fast_io::manipulators::ordinal_t<T>>>, char_type *iter, ::fast_io::manipulators::scalar_manip_t<flags, ::fast_io::manipulators::ordinal_t<T>> t) noexcept
 {
-	return ::fast_io::details::prrsv_ordinal_impl<flags.base, flags.showbase, flags.uppercase_showbase, flags.showpos, flags.uppercase, flags.full>(iter, t.reference.reference);
+	return ::fast_io::details::prrsv_ordinal_impl<flags.base, flags.showbase, flags.uppercase_showbase, flags.showpos,
+												  flags.uppercase, flags.full, flags.modern_octal>(iter,
+																								   t.reference.reference);
 }
 
 } // namespace fast_io

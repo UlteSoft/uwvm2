@@ -453,6 +453,17 @@ option("enable-test-llvm-jit", function()
     set_default(false)
 end)
 
+option("enable-test-backend-fuzzer", function()
+    set_description
+    (
+        "Register the shell-driven 0016 backend differential fuzzer target.",
+        "default = false",
+        [[    true: register test/0016.backend_fuzzer backend fuzzer target.]],
+        [[    false: skip registering the backend fuzzer target.]]
+    )
+    set_default(false)
+end)
+
 -- uwvm Debug Option
 
 option("debug-timer", function()
@@ -476,13 +487,18 @@ option("fno-exceptions", function()
     set_default(false)
 end)
 
-option("use-multithread-allocator-memory", function()
+option("wasm-memory-model", function()
     set_description
     (
-        "Enable on platforms that do not support mmap but support multithreading.",
-        "default = false"
+        "Select the WebAssembly linear memory backend.",
+        "default: keep the platform default selection.",
+        "mmap: force the mmap/VirtualAlloc backend and fail when unavailable.",
+        "multi-thread-alloc: force the multithread allocator backend and fail when unavailable.",
+        "single-thread-alloc: force the single-thread allocator backend.",
+        "default = default"
     )
-    set_default(false)
+    set_default("default")
+    set_values("default", "mmap", "multi-thread-alloc", "single-thread-alloc")
 end)
 
 option("disable-local-imported-wasip1", function()

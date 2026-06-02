@@ -48,9 +48,9 @@
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
+# if !(__cpp_pack_indexing >= 202311L)
+#  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
@@ -242,10 +242,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         template <::std::unsigned_integral I>
         UWVM_ALWAYS_INLINE inline constexpr bool add_overflow(I a, I b, I& result) noexcept
         {
-#if defined(_MSC_VER) && !defined(__clang__)
+# if defined(_MSC_VER) && !defined(__clang__)
             if UWVM_IF_NOT_CONSTEVAL
             {
-# if defined(_M_X64) && !(defined(_M_ARM64EC) || defined(__arm64ec__))
+#  if defined(_M_X64) && !(defined(_M_ARM64EC) || defined(__arm64ec__))
                 if constexpr(::std::same_as<I, ::std::uint64_t>)
                 {
                     // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
@@ -273,7 +273,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return result < a;
                 }
 
-# elif defined(_M_X32)
+#  elif defined(_M_X32)
                 if constexpr(::std::same_as<I, ::std::uint32_t>)
                 {
                     // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
@@ -295,10 +295,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return result < a;
                 }
 
-# else  // ARM, ARM64, ARM64ec
+#  else  // ARM, ARM64, ARM64ec
                 result = static_cast<I>(a + b);
                 return result < a;
-# endif
+#  endif
             }
             else
             {
@@ -306,14 +306,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 return result < a;
             }
 
-#elif UWVM_HAS_BUILTIN(__builtin_add_overflow)
+# elif UWVM_HAS_BUILTIN(__builtin_add_overflow)
             // Parameters can't be filled with ::std::addressof(i), to ensure determinism of exceptions.
             return __builtin_add_overflow(a, b, ::std::addressof(result));
 
-#else
+# else
             result = static_cast<I>(a + b);
             return result < a;
-#endif
+# endif
         }
 
         UWVM_GNU_COLD [[noreturn]] inline void memory_oob_terminate(::std::size_t memory_idx,
@@ -340,9 +340,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 [[maybe_unused]] auto const memory_begin{memory.memory_begin};
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
 
                 // mmap backend:
                 // - Full protection: no check on hot path, rely on page protection.
@@ -350,9 +350,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 // - custom_page < platform_page: must do per-access dynamic bounds check using the atomic memory length.
                 if(memory.require_dynamic_determination_memory_size())
                 {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                     if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
                     auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
                     if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
                        effective_offset.offset > static_cast<::std::uint_least64_t>(memory_length - wasm_bytes)) [[unlikely]]
@@ -367,38 +367,38 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         // 64-bit platform:
                         // - wasm32: full protection → no check
                         // - wasm64: partial fixed protection (1<<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index)
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                         if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64) [[unlikely]]
                         {
                             if(effective_offset.offset_65_bit ||
                                !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index>(effective_offset.offset))
                             {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                                 if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
                                 auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
                                 memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                             }
                         }
-#endif
+# endif
                     }
                     else
                     {
                         // 32-bit platform: always partial fixed protection (1<<::uwvm2::object::memory::linear::max_partial_protection_wasm32_index).
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                         if(effective_offset.offset_65_bit ||
                            !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm32_index>(effective_offset.offset))
                         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
                             auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
                             memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
                         }
-#else
+# else
                         // Compiled without mmap support; this branch should never be used.
                         ::fast_io::fast_terminate();
-#endif
+# endif
                     }
                 }
             }
@@ -406,9 +406,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             {
                 [[maybe_unused]] auto const memory_begin{memory.memory_begin};
 
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
 
                 auto const memory_length{memory.memory_length};
                 if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
@@ -435,23 +435,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
                 if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
                 {
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                     if(memory.status == ::uwvm2::object::memory::linear::mmap_memory_status_t::wasm64)
                     {
                         return effective_offset.offset_65_bit ||
                                !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm64_index>(effective_offset.offset);
                     }
-#endif
+# endif
                     return false;
                 }
                 else
                 {
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                     return effective_offset.offset_65_bit ||
                            !offset_in_pow2_bound<::uwvm2::object::memory::linear::max_partial_protection_wasm32_index>(effective_offset.offset);
-#else
+# else
                     return true;
-#endif
+# endif
                 }
             }
             else
@@ -467,9 +467,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(requires { memory.memory_length_p; })
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
                 return memory.memory_length_p->load(::std::memory_order_acquire);
             }
             else
@@ -501,9 +501,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(memory.growing_flag_p == nullptr || memory.active_ops_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
 
                 unsigned spin_count{};
                 for(;;)
@@ -536,9 +536,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if constexpr(!MemoryT::can_mmap && MemoryT::support_multi_thread)
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 if(memory.growing_flag_p == nullptr || memory.active_ops_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-#endif
+# endif
 
                 memory.active_ops_p->fetch_sub(1uz, ::std::memory_order_release);
                 memory.active_ops_p->notify_one();
@@ -556,18 +556,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                       ::std::size_t wasm_bytes) noexcept
         { check_memory_bounds_unlocked(memory, memory_idx, memory_static_offset, effective_offset, wasm_bytes); }
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_full([[maybe_unused]] native_memory_t const& memory,
                                                                         [[maybe_unused]] ::std::size_t memory_idx,
                                                                         [[maybe_unused]] ::std::uint_least64_t memory_static_offset,
                                                                         [[maybe_unused]] memory_offset_t effective_offset,
                                                                         [[maybe_unused]] ::std::size_t wasm_bytes) noexcept
         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const memory_begin{memory.memory_begin};
             if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
         }
 
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_mmap_path(native_memory_t const& memory,
@@ -576,11 +576,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                         memory_offset_t effective_offset,
                                                                         ::std::size_t wasm_bytes) noexcept
         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const memory_begin{memory.memory_begin};
             if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
 
             if constexpr(sizeof(::std::size_t) >= sizeof(::std::uint_least64_t))
             {
@@ -608,11 +608,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                          memory_offset_t effective_offset,
                                                                          ::std::size_t wasm_bytes) noexcept
         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const memory_begin{memory.memory_begin};
             if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
             if(memory.memory_length_p == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
 
             auto const memory_length{memory.memory_length_p->load(::std::memory_order_acquire)};
             if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
@@ -621,17 +621,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
             }
         }
-#else
+# else
         UWVM_ALWAYS_INLINE inline constexpr void bounds_check_allocator(native_memory_t const& memory,
                                                                         ::std::size_t memory_idx,
                                                                         ::std::uint_least64_t memory_static_offset,
                                                                         memory_offset_t effective_offset,
                                                                         ::std::size_t wasm_bytes) noexcept
         {
-# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+#  if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
             auto const memory_begin{memory.memory_begin};
             if(memory_begin == nullptr) [[unlikely]] { ::uwvm2::utils::debug::trap_and_inform_bug_pos(); }
-# endif
+#  endif
 
             auto const memory_length{memory.memory_length};
             if(effective_offset.offset_65_bit || wasm_bytes > memory_length ||
@@ -640,7 +640,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 memory_oob_terminate(memory_idx, memory_static_offset, effective_offset, memory_length, wasm_bytes);
             }
         }
-#endif
+# endif
 
         UWVM_ALWAYS_INLINE inline constexpr memory_offset_t wasm32_effective_offset(wasm_i32 addr, wasm_u32 static_offset) noexcept
         {
@@ -1240,7 +1240,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_load_ptr{
         details::memop::i32_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_load_mmap_full_ptr{
@@ -1255,19 +1255,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_load_mmap_judge_ptr{
         details::memop::i32_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_load_multithread_allocator_ptr{
         details::memop::i32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_load_singlethread_allocator_ptr{
         details::memop::i32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `i64.load` opcode (tail-call): loads a 64-bit little-endian value from linear memory.
     /// @details
@@ -1282,7 +1282,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_load_ptr{
         details::memop::i64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_i64_stack_top,
@@ -1306,8 +1306,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_load_mmap_judge_ptr{
         details::memop::i64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_i64_stack_top,
@@ -1315,7 +1315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_load_multithread_allocator_ptr{
         details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_i64_stack_top,
@@ -1323,8 +1323,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_load_singlethread_allocator_ptr{
         details::memop::i64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_i64_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `f32.load` opcode (tail-call): loads a 32-bit little-endian float from linear memory.
     /// @details
@@ -1339,7 +1339,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_load_ptr{
         details::memop::f32_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f32_stack_top,
@@ -1363,8 +1363,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_load_mmap_judge_ptr{
         details::memop::f32_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f32_stack_top,
@@ -1372,7 +1372,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_load_multithread_allocator_ptr{
         details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f32_stack_top,
@@ -1380,8 +1380,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_load_singlethread_allocator_ptr{
         details::memop::f32_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `f64.load` opcode (tail-call): loads a 64-bit little-endian float from linear memory.
     /// @details
@@ -1397,7 +1397,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_load_ptr{
         details::memop::f64_load<details::bounds_check_generic, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f64_stack_top,
@@ -1421,8 +1421,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_load_mmap_judge_ptr{
         details::memop::f64_load<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f64_stack_top,
@@ -1430,7 +1430,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_load_multithread_allocator_ptr{
         details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i32_stack_top,
               ::std::size_t curr_f64_stack_top,
@@ -1438,8 +1438,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_load_singlethread_allocator_ptr{
         details::memop::f64_load<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, curr_f64_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     namespace details::memop
     {
@@ -2406,7 +2406,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_store_ptr{
         details::memop::i32_store<details::bounds_check_generic, CompileOption, curr_i32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_store_mmap_full_ptr{
@@ -2421,19 +2421,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_store_mmap_judge_ptr{
         details::memop::i32_store<details::bounds_check_mmap_judge, CompileOption, curr_i32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_store_multithread_allocator_ptr{
         details::memop::i32_store<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption, ::std::size_t curr_i32_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i32_store_singlethread_allocator_ptr{
         details::memop::i32_store<details::bounds_check_allocator, CompileOption, curr_i32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `i64.store` opcode (tail-call): stores a 64-bit value to linear memory.
     /// @details
@@ -2448,7 +2448,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_store_ptr{
         details::memop::i64_store<details::bounds_check_generic, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2472,8 +2472,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_store_mmap_judge_ptr{
         details::memop::i64_store<details::bounds_check_mmap_judge, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2481,7 +2481,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_store_multithread_allocator_ptr{
         details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_i64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2489,8 +2489,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_i64_store_singlethread_allocator_ptr{
         details::memop::i64_store<details::bounds_check_allocator, CompileOption, curr_i64_stack_top, curr_i32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `f32.store` opcode (tail-call): stores a 32-bit float to linear memory.
     /// @details
@@ -2505,7 +2505,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_store_ptr{
         details::memop::f32_store<details::bounds_check_generic, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f32_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2529,8 +2529,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_store_mmap_judge_ptr{
         details::memop::f32_store<details::bounds_check_mmap_judge, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f32_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2538,7 +2538,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_store_multithread_allocator_ptr{
         details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f32_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2546,8 +2546,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f32_store_singlethread_allocator_ptr{
         details::memop::f32_store<details::bounds_check_allocator, CompileOption, curr_f32_stack_top, curr_i32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `f64.store` opcode (tail-call): stores a 64-bit float to linear memory.
     /// @details
@@ -2562,7 +2562,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_store_ptr{
         details::memop::f64_store<details::bounds_check_generic, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>};
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2586,8 +2586,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_store_mmap_judge_ptr{
         details::memop::f64_store<details::bounds_check_mmap_judge, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>};
-#else
-# if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
+# else
+#  if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2595,7 +2595,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_store_multithread_allocator_ptr{
         details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>};
-# else
+#  else
     template <uwvm_interpreter_translate_option_t CompileOption,
               ::std::size_t curr_f64_stack_top,
               ::std::size_t curr_i32_stack_top,
@@ -2603,8 +2603,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         requires (CompileOption.is_tail_call)
     inline constexpr uwvm_interpreter_opfunc_t<Type...> uwvmint_f64_store_singlethread_allocator_ptr{
         details::memop::f64_store<details::bounds_check_allocator, CompileOption, curr_f64_stack_top, curr_i32_stack_top, Type...>};
+#  endif
 # endif
-#endif
 
     /// @brief `i32.store{8,16}` core (tail-call): stores the low N bytes of an i32 value to linear memory.
     /// @details
@@ -3408,9 +3408,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         }
                         else
                         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                             ::fast_io::fast_terminate();
                         }
                     }
@@ -3425,9 +3425,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -3454,9 +3454,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -3521,9 +3521,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -3584,9 +3584,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         }
                         else
                         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                             ::fast_io::fast_terminate();
                         }
                     }
@@ -3607,9 +3607,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -3645,7 +3645,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 }
             }
 
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
             enum class mmap_variant : unsigned
             {
                 full,
@@ -3669,7 +3669,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     return mmap_variant::path;
                 }
             }
-#endif
+# endif
 
             template <uwvm_interpreter_translate_option_t CompileOption,
                       ::std::size_t Begin,
@@ -3681,7 +3681,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...> select_mem_fptr_or_default(::std::size_t pos,
                                                                                            op_details::native_memory_t const& memory) noexcept
             {
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                 switch(select_mmap_variant(memory))
                 {
                     case mmap_variant::full:
@@ -3725,11 +3725,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                     Type...>(pos);
                     }
                 }
-#else
+# else
                 (void)memory;
                 return select_stacktop_fptr_or_default_with<CompileOption, Begin, End, OpWithBoundsCheck, &op_details::bounds_check_allocator, Extra, Type...>(
                     pos);
-#endif
+# endif
             }
 
             template <uwvm_interpreter_translate_option_t CompileOption,
@@ -3744,7 +3744,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             inline constexpr uwvm_interpreter_opfunc_t<Type...>
                 select_mem_fptr_or_default_2d(::std::size_t out_pos, ::std::size_t in_pos, op_details::native_memory_t const& memory) noexcept
             {
-#if defined(UWVM_SUPPORT_MMAP)
+# if defined(UWVM_SUPPORT_MMAP)
                 switch(select_mmap_variant(memory))
                 {
                     case mmap_variant::full:
@@ -3796,7 +3796,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                        Type...>(out_pos, in_pos);
                     }
                 }
-#else
+# else
                 (void)memory;
                 return select_stacktop_fptr_or_default_with_2d<CompileOption,
                                                                OutBegin,
@@ -3807,7 +3807,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                &op_details::bounds_check_allocator,
                                                                Extra,
                                                                Type...>(out_pos, in_pos);
-#endif
+# endif
             }
 
             // ===== Memory-aware op wrappers (bounds policy is chosen by translator) =====

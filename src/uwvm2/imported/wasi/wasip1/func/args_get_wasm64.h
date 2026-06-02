@@ -83,11 +83,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
         if(trace_wasip1_call) [[unlikely]]
         {
             ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"args_get_wasm64(",
-                                ::fast_io::mnp::addrvw(argv_ptrsz),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(argv_buf_ptrsz),
-                                u8")");
+                                                                              u8"args_get_wasm64(",
+                                                                              ::fast_io::mnp::addrvw(argv_ptrsz),
+                                                                              u8", ",
+                                                                              ::fast_io::mnp::addrvw(argv_buf_ptrsz),
+                                                                              u8")");
         }
 
         auto const argv_vec_size{env.argv.size()};

@@ -1,25 +1,23 @@
 import("common")
 import("lib.detect.find_tool")
 
-local llvm_jit_base_components = {
+local llvm_jit_required_components = {
     "core",
     "support",
     "analysis",
     "target",
-    "passes",
     "linker",
-    "irreader",
-    "asmparser",
     "executionengine",
     "mcjit",
-    "runtimedyld",
-    "object",
-    "mc",
     "scalaropts",
-    "mcdisassembler",
     "transformutils",
     "instcombine",
-    "debuginfodwarf"
+    "bitreader",
+    "bitwriter"
+}
+
+local llvm_jit_optional_components = {
+    "targetparser"
 }
 
 local llvm_jit_terminal_component_candidates = {
@@ -27,7 +25,82 @@ local llvm_jit_terminal_component_candidates = {
     "all-targetasmparsers"
 }
 
+local llvm_component_link_names = {
+    analysis = { "LLVMAnalysis" },
+    bitreader = { "LLVMBitReader" },
+    bitwriter = { "LLVMBitWriter" },
+    core = { "LLVMCore" },
+    executionengine = { "LLVMExecutionEngine" },
+    instcombine = { "LLVMInstCombine" },
+    linker = { "LLVMLinker" },
+    mcjit = { "LLVMMCJIT" },
+    scalaropts = { "LLVMScalarOpts" },
+    support = { "LLVMSupport" },
+    target = { "LLVMTarget" },
+    targetparser = { "LLVMTargetParser" },
+    transformutils = { "LLVMTransformUtils" }
+}
+
+local llvm_native_target_link_names = {
+    aarch64 = { "LLVMAArch64CodeGen", "LLVMAArch64Desc", "LLVMAArch64Info" },
+    arm = { "LLVMARMCodeGen", "LLVMARMDesc", "LLVMARMInfo" },
+    loongarch = { "LLVMLoongArchCodeGen", "LLVMLoongArchDesc", "LLVMLoongArchInfo" },
+    mips = { "LLVMMipsCodeGen", "LLVMMipsDesc", "LLVMMipsInfo" },
+    powerpc = { "LLVMPowerPCCodeGen", "LLVMPowerPCDesc", "LLVMPowerPCInfo" },
+    riscv = { "LLVMRISCVCodeGen", "LLVMRISCVDesc", "LLVMRISCVInfo" },
+    sparc = { "LLVMSparcCodeGen", "LLVMSparcDesc", "LLVMSparcInfo" },
+    systemz = { "LLVMSystemZCodeGen", "LLVMSystemZDesc", "LLVMSystemZInfo" },
+    x86 = { "LLVMX86CodeGen", "LLVMX86Desc", "LLVMX86Info" }
+}
+
 local _run_llvm_config
+
+local function _llvm_host_target_component_candidates()
+    local arch = (get_config("arch") or os.arch() or ""):lower()
+    local candidates = {}
+
+    if arch == "arm64" or arch == "aarch64" then
+        table.insert(candidates, "aarch64")
+    elseif arch == "x86_64" or arch == "x64" or arch == "amd64" or arch == "i386" or arch == "x86" then
+        table.insert(candidates, "x86")
+    elseif arch:find("riscv") then
+        table.insert(candidates, "riscv")
+    elseif arch:find("loongarch") then
+        table.insert(candidates, "loongarch")
+    elseif arch:find("ppc") or arch:find("powerpc") then
+        table.insert(candidates, "powerpc")
+    elseif arch:find("mips") then
+        table.insert(candidates, "mips")
+    elseif arch:find("s390") or arch:find("systemz") then
+        table.insert(candidates, "systemz")
+    elseif arch:find("sparc") then
+        table.insert(candidates, "sparc")
+    end
+    return candidates
+end
+
+local function _llvm_host_target_components(available)
+    local components = {}
+    for _, component in ipairs(_llvm_host_target_component_candidates()) do
+        if available[component] then
+            table.insert(components, component)
+        end
+    end
+    return components
+end
+
+local function _llvm_jit_base_components(available)
+    local components = {}
+    for _, component in ipairs(llvm_jit_required_components) do
+        table.insert(components, component)
+    end
+    for _, component in ipairs(llvm_jit_optional_components) do
+        if available[component] then
+            table.insert(components, component)
+        end
+    end
+    return components
+end
 
 local function _endswith(str, suffix)
     return suffix == "" or str:sub(-#suffix) == suffix
@@ -567,11 +640,116 @@ local function _run_required_llvm_link_query(llvm_config, args)
     return output
 end
 
+local function _strip_llvm_library_filename(filename)
+    if not filename or filename == "" then
+        return nil
+    end
+
+    local name = path.basename(filename)
+    local lower = name:lower()
+    for _, suffix in ipairs({ ".dll.a", ".dylib", ".so", ".a", ".lib" }) do
+        if _endswith(lower, suffix) then
+            name = name:sub(1, #name - #suffix)
+            break
+        end
+    end
+    if name:startswith("lib") and #name > 3 then
+        name = name:sub(4)
+    end
+    return name
+end
+
+local function _llvm_link_name_from_flag(flag)
+    if not flag or flag == "" then
+        return nil
+    end
+    if flag:startswith("-l:") then
+        return _strip_llvm_library_filename(flag:sub(4))
+    end
+    if flag:startswith("-l") and #flag > 2 then
+        return flag:sub(3)
+    end
+    if _is_library_path(flag) or (not flag:find("[/\\]") and _endswith(flag:lower(), ".lib")) then
+        return _strip_llvm_library_filename(flag)
+    end
+    return nil
+end
+
+local function _append_llvm_link_names(names, seen, values)
+    for _, name in ipairs(values or {}) do
+        _append_unique_string(names, seen, name)
+    end
+end
+
+local function _llvm_direct_link_names(base_components, target_components)
+    local names = {}
+    local seen = {}
+
+    for _, component in ipairs(base_components) do
+        _append_llvm_link_names(names, seen, llvm_component_link_names[component])
+    end
+
+    local native_target_components = {}
+    local native_seen = {}
+    for _, component in ipairs(target_components or {}) do
+        if llvm_native_target_link_names[component] then
+            _append_unique_string(native_target_components, native_seen, component)
+        end
+    end
+    if #native_target_components == 0 then
+        for _, component in ipairs(_llvm_host_target_component_candidates()) do
+            if llvm_native_target_link_names[component] then
+                _append_unique_string(native_target_components, native_seen, component)
+            end
+        end
+    end
+
+    for _, component in ipairs(native_target_components) do
+        _append_llvm_link_names(names, seen, llvm_native_target_link_names[component])
+    end
+
+    return names
+end
+
+local function _filter_llvm_dynamic_link_flags(flags, direct_link_names)
+    local keep = {}
+    for _, name in ipairs(direct_link_names or {}) do
+        keep[name] = true
+    end
+
+    local filtered = {}
+    local filtered_seen = {}
+    local monolithic = {}
+    local monolithic_seen = {}
+    for _, flag in ipairs(os.argv(flags or "")) do
+        local link_name = _llvm_link_name_from_flag(flag)
+        if link_name == "LLVM" or link_name:match("^LLVM%-") then
+            _append_unique_string(monolithic, monolithic_seen, flag)
+        elseif link_name and keep[link_name] then
+            _append_unique_string(filtered, filtered_seen, flag)
+        end
+    end
+
+    if #filtered == 0 and #monolithic ~= 0 then
+        return table.concat(monolithic, " ")
+    end
+    return table.concat(filtered, " ")
+end
+
 local function _resolve_llvm_jit_components(llvm_config, link_static)
     local components_text = _run_llvm_config(llvm_config, { "--components" })
     local available = {}
     for _, component in ipairs(os.argv(components_text or "")) do
         available[component] = true
+    end
+    local base_components = _llvm_jit_base_components(available)
+    local host_target_components = _llvm_host_target_components(available)
+
+    local native_components = {}
+    if available["nativecodegen"] then
+        table.insert(native_components, "nativecodegen")
+    elseif available["native"] then
+        table.insert(native_components, "native")
     end
 
     local asmparser_components = {}
@@ -583,6 +761,18 @@ local function _resolve_llvm_jit_components(llvm_config, link_static)
     table.sort(asmparser_components)
 
     local candidate_sets = {}
+    if #native_components ~= 0 then
+        table.insert(candidate_sets, {
+            name = "native-codegen",
+            components = native_components
+        })
+    end
+    if #host_target_components ~= 0 then
+        table.insert(candidate_sets, {
+            name = "host-target",
+            components = host_target_components
+        })
+    end
     for _, component in ipairs(llvm_jit_terminal_component_candidates) do
         table.insert(candidate_sets, {
             name = component,
@@ -602,20 +792,27 @@ local function _resolve_llvm_jit_components(llvm_config, link_static)
 
     local last_errors
     for _, candidate in ipairs(candidate_sets) do
-        local args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), table.join(llvm_jit_base_components, candidate.components))
+        local args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), table.join(base_components, candidate.components))
         local libs_output, errors = _run_llvm_config(llvm_config, args)
         if errors then
             last_errors = tostring(errors):trim()
         end
         if libs_output then
             local components = {}
-            for _, component in ipairs(llvm_jit_base_components) do
+            for _, component in ipairs(base_components) do
                 table.insert(components, component)
             end
             for _, component in ipairs(candidate.components) do
                 table.insert(components, component)
             end
-            return components, libs_output
+            if not link_static and #host_target_components ~= 0 then
+                local direct_link_names = _llvm_direct_link_names(base_components, host_target_components)
+                local direct_libs_output = _filter_llvm_dynamic_link_flags(libs_output, direct_link_names)
+                if direct_libs_output ~= "" then
+                    libs_output = direct_libs_output
+                end
+            end
+            return components, libs_output, host_target_components
         end
     end
 
@@ -641,7 +838,7 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system"
 
     local cache_key = table.concat({
-        "llvm-jit-v7",
+        "llvm-jit-v13",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
@@ -660,7 +857,7 @@ function get_llvm_jit_options()
     local libdir = _run_llvm_config(llvm_config, { "--libdir" })
     local cxxflags = _run_llvm_config(llvm_config, { "--cxxflags" })
     local system_libs = _run_llvm_config(llvm_config, link_static and { "--link-static", "--system-libs" } or { "--system-libs" }) or ""
-    local components, libs = _resolve_llvm_jit_components(llvm_config, link_static)
+    local components, libs, host_target_components = _resolve_llvm_jit_components(llvm_config, link_static)
 
     assert(includedir and includedir ~= "",
         string.format([[Failed to query "%s --includedir"]], llvm_config.program))
@@ -690,25 +887,49 @@ function get_llvm_jit_options()
     _parse_llvm_linkflags(libs, result, seen, "links")
 
     -- Some LLVM builds omit explicit JIT driver libraries and/or the native
-    -- target codegen family from wide component sets such as the all-target
-    -- asmparser aggregates. Re-add them explicitly so MCJIT-backed runtime
-    -- linking remains stable across LLVM distributions.
+    -- target codegen family from component queries. Re-add them explicitly so
+    -- MCJIT-backed runtime linking remains stable across LLVM distributions.
     local explicit_jit_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
         "executionengine",
         "mcjit",
-        "native",
         "nativecodegen"
     })
     local explicit_jit_libs = link_static and _run_required_llvm_link_query(llvm_config, explicit_jit_args)
         or (_run_llvm_config(llvm_config, explicit_jit_args) or "")
+    if explicit_jit_libs == "" then
+        explicit_jit_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
+            "executionengine",
+            "mcjit",
+            "native"
+        })
+        explicit_jit_libs = link_static and _run_required_llvm_link_query(llvm_config, explicit_jit_args)
+            or (_run_llvm_config(llvm_config, explicit_jit_args) or "")
+    end
+    if not link_static and explicit_jit_libs and explicit_jit_libs ~= "" and host_target_components and #host_target_components ~= 0 then
+        local explicit_direct_link_names = _llvm_direct_link_names({ "executionengine", "mcjit" }, host_target_components)
+        local explicit_direct_jit_libs = _filter_llvm_dynamic_link_flags(explicit_jit_libs, explicit_direct_link_names)
+        if explicit_direct_jit_libs ~= "" then
+            explicit_jit_libs = explicit_direct_jit_libs
+        end
+    end
     _parse_llvm_linkflags(explicit_jit_libs, result, seen, "links")
 
-    local native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), {
-        "native",
-        "nativecodegen"
-    })
-    result.native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
+    local native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "nativecodegen" })
+    local native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
         or (_run_llvm_config(llvm_config, native_codegen_args) or "")
+    if not native_codegen_linkflags or native_codegen_linkflags == "" then
+        native_codegen_args = _llvm_link_query_args(link_static, _llvm_library_query(link_static), { "native" })
+        native_codegen_linkflags = link_static and _run_required_llvm_link_query(llvm_config, native_codegen_args)
+            or (_run_llvm_config(llvm_config, native_codegen_args) or "")
+    end
+    if not link_static and native_codegen_linkflags and native_codegen_linkflags ~= "" and host_target_components and #host_target_components ~= 0 then
+        local direct_native_link_names = _llvm_direct_link_names({}, host_target_components)
+        local direct_native_codegen_linkflags = _filter_llvm_dynamic_link_flags(native_codegen_linkflags, direct_native_link_names)
+        if direct_native_codegen_linkflags ~= "" then
+            native_codegen_linkflags = direct_native_codegen_linkflags
+        end
+    end
+    result.native_codegen_linkflags = native_codegen_linkflags
 
     cprint("detecting for llvm-jit ... ${color.success}%s (%s), component set: %s",
         llvm_config.program,

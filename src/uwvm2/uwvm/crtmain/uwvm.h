@@ -84,6 +84,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         return ::uwvm2::uwvm::run::run();
     }
 
+    /// @brief    whole process time
+    /// @details  The destructor for this global variable is called during `atexit`, and the initializer is called during `.init_array`
+    ///           there are no other global dependencies.
+    inline ::uwvm2::uwvm::global::process_time whole_process_time{};  // [global]
+
 #if !((defined(_WIN32) && !defined(__CYGWIN__)) && !defined(_WIN32_WINDOWS))  // NOT WINNT
 
     /// @brief      uwvm c++ main function (nont winnt)
@@ -151,10 +156,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         using char8_t_const_ptr_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const* const*;
         auto const argv_u8{reinterpret_cast<char8_t_const_ptr_const_may_alias_ptr>(argv)};
 
-#if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
+# if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
         // fast_io network service (on win9x = wsa, on linux = dummy)
         ::fast_io::net_service service{};
-#endif
+# endif
 
         // u8main
         return uwvm_uz_u8main(argc_uz, argv_u8);
@@ -187,10 +192,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         auto const argc_uz{u8_cmdline.argc};
         auto const argv_u8{u8_cmdline.argv.data()};
 
-#if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
+# if defined(_WIN32) || (!defined(__wasi__) && __has_include(<sys/socket.h>) && __has_include(<netinet/in.h>))
         // fast_io network service
         ::fast_io::net_service service{};
-#endif
+# endif
 
         // u8main
         return uwvm_uz_u8main(argc_uz, argv_u8);

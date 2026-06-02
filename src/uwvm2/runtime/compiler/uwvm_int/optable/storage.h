@@ -51,6 +51,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t unreachable_func{};                         // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_call_func_t call_func{};                           // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_call_indirect_func_t call_indirect_func{};         // [global]
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    inline ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_func_t tiered_loop_osr_func{};     // [global]
+# endif
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_invalid_conversion_to_integer_func{};  // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_integer_divide_by_zero_func{};         // [global]
     inline ::uwvm2::runtime::compiler::uwvm_int::optable::unreachable_func_t trap_integer_overflow_func{};               // [global]

@@ -34,6 +34,7 @@
 
 // wasm
 # include "wasm_set_main_module_name.h"
+# include "wasm_set_start_func.h"
 # include "wasm_preload_library.h"
 # include "wasm_register_dl.h"
 # include "wasm_reset_import.h"
@@ -51,12 +52,15 @@
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
 # include "runtime_scheduling_policy.h"
-# include "runtime_disable_llvm_ir_verifaction.h"
+# include "runtime_llvm_jit_optimization_level.h"
+# include "runtime_llvm_jit_disable_ir_verifaction.h"
 # include "runtime_debug_int.h"
 # include "runtime_int.h"
 # include "runtime_jit.h"
 # include "runtime_aot.h"
 # include "runtime_tiered.h"
+# include "runtime_tiered_disable_uwvm_int_lazy_interpreter.h"
+# include "runtime_tiered_disable_llvm_full_jit.h"
 
 // wasi
 # include "wasi_disable_utf8_check.h"

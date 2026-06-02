@@ -33,6 +33,7 @@ export import :weak_symbol;
 export import :preload_module_attribute;
 export import :memory_limit;
 export import :import_reset;
+export import :start_func;
 export import :all_module;
 
 #ifndef UWVM_MODULE

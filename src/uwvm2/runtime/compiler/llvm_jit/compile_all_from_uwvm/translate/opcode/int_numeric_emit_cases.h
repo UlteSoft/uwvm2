@@ -201,7 +201,8 @@ case wasm1_code::i32_rotl:
     ++code_curr;
     if(!emit_binary(runtime_operand_stack_value_type::i32,
                     runtime_operand_stack_value_type::i32,
-                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) { return emit_llvm_rotl(ir_builder, left.value, right.value); }))
+                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+                    { return emit_llvm_rotl(ir_builder, left.value, right.value); }))
     {
         return result;
     }
@@ -212,7 +213,8 @@ case wasm1_code::i32_rotr:
     ++code_curr;
     if(!emit_binary(runtime_operand_stack_value_type::i32,
                     runtime_operand_stack_value_type::i32,
-                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) { return emit_llvm_rotr(ir_builder, left.value, right.value); }))
+                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+                    { return emit_llvm_rotr(ir_builder, left.value, right.value); }))
     {
         return result;
     }
@@ -325,7 +327,8 @@ case wasm1_code::i64_rotl:
     ++code_curr;
     if(!emit_binary(runtime_operand_stack_value_type::i64,
                     runtime_operand_stack_value_type::i64,
-                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) { return emit_llvm_rotl(ir_builder, left.value, right.value); }))
+                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+                    { return emit_llvm_rotl(ir_builder, left.value, right.value); }))
     {
         return result;
     }
@@ -336,7 +339,8 @@ case wasm1_code::i64_rotr:
     ++code_curr;
     if(!emit_binary(runtime_operand_stack_value_type::i64,
                     runtime_operand_stack_value_type::i64,
-                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right) { return emit_llvm_rotr(ir_builder, left.value, right.value); }))
+                    [&](llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
+                    { return emit_llvm_rotr(ir_builder, left.value, right.value); }))
     {
         return result;
     }

@@ -1,7 +1,11 @@
 ﻿bool const runtime_log_on{uwvm2::uwvm::io::enable_runtime_log};
-// Verbose emit logging for offline analysis (enabled only when `-Rclog` is used).
-constexpr bool runtime_log_emit_opfuncs{true};
-constexpr bool runtime_log_emit_cf{true};
+// Keep `-Rclog` useful for runtime decisions without dumping every emitted op.
+constexpr bool runtime_log_emit_opfuncs{false};
+constexpr bool runtime_log_emit_cf{false};
+constexpr bool runtime_log_emit_wasm_ops{false};
+constexpr bool runtime_log_emit_stacktop{false};
+constexpr bool runtime_log_emit_conbine{false};
+constexpr bool runtime_log_emit_func_stats{true};
 
 struct runtime_log_stats_t
 {
@@ -878,9 +882,9 @@ auto const emit_stacktop_spill1_typed_to{
     {
         if constexpr(stacktop_enabled)
         {
-            if(runtime_log_on) [[unlikely]]
+            if(runtime_log_on) [[unlikely]] { ++runtime_log_stats.stacktop_spill1_count; }
+            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
             {
-                ++runtime_log_stats.stacktop_spill1_count;
                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                      u8"[uwvm-int-translator] fn=",
                                      function_index,
@@ -1099,7 +1103,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.i32_stack_top_curr_pos = start_pos;
                     remain.i32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1128,7 +1132,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.i64_stack_top_curr_pos = start_pos;
                     remain.i64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1157,7 +1161,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.f32_stack_top_curr_pos = start_pos;
                     remain.f32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1186,7 +1190,7 @@ auto const emit_stacktop_spill1_typed_to{
                 {
                     tmp_currpos.f64_stack_top_curr_pos = start_pos;
                     remain.f64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1315,7 +1319,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.i32_stack_top_curr_pos = start_pos;
                     remain.i32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1344,7 +1348,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.i64_stack_top_curr_pos = start_pos;
                     remain.i64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1373,7 +1377,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.f32_stack_top_curr_pos = start_pos;
                     remain.f32_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1402,7 +1406,7 @@ auto const emit_stacktop_fill1_typed_to{
                 {
                     tmp_currpos.f64_stack_top_curr_pos = start_pos;
                     remain.f64_stack_top_remain_size = count;
-                    if(runtime_log_on) [[unlikely]]
+                    if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                     {
                         ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                              u8"[uwvm-int-translator] fn=",
@@ -1478,7 +1482,7 @@ auto const stacktop_spill_one_deepest_to{[&](bytecode_vec_t& dst, ::std::size_t 
                                              {
                                                  // segment top (least deep among the deepest `spill_n` values)
                                                  ::std::size_t const seg_top_slot{stacktop_ring_advance_next(currpos, group_cnt - spill_n, begin_pos, end_pos)};
-                                                 if(runtime_log_on) [[unlikely]]
+                                                 if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                                  {
                                                      ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                           u8"[uwvm-int-translator] fn=",
@@ -1504,7 +1508,7 @@ auto const stacktop_spill_one_deepest_to{[&](bytecode_vec_t& dst, ::std::size_t 
                                              else
                                              {
                                                  ::std::size_t const deepest_slot{stacktop_ring_advance_next(currpos, group_cnt - 1uz, begin_pos, end_pos)};
-                                                 if(runtime_log_on) [[unlikely]]
+                                                 if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                                  {
                                                      ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                           u8"[uwvm-int-translator] fn=",
@@ -1584,7 +1588,7 @@ auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_st
                                             // Critical correctness: push opfuncs write into `ring_prev(currpos)`. If the ring is full, that slot
                                             // is occupied by the deepest cached value of that range; spill from the deepest cached overall until
                                             // the target range has a free slot.
-                                            if(runtime_log_on) [[unlikely]]
+                                            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                             {
                                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                      u8"[uwvm-int-translator] fn=",
@@ -1616,7 +1620,7 @@ auto const stacktop_prepare_push1_typed{[&](bytecode_vec_t& dst, curr_operand_st
                                             }
 
                                             stacktop_assert_invariants();
-                                            if(runtime_log_on) [[unlikely]]
+                                            if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                             {
                                                 ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                      u8"[uwvm-int-translator] fn=",
@@ -1656,7 +1660,7 @@ auto const stacktop_commit_push1_typed{[&](curr_operand_stack_value_type vt) con
 
                                            ++stacktop_cache_count;
                                            ++stacktop_cache_count_ref_for_vt(vt);
-                                           if(runtime_log_on) [[unlikely]]
+                                           if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                            {
                                                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                     u8"[uwvm-int-translator] fn=",
@@ -1722,7 +1726,7 @@ auto const stacktop_commit_pop_n{[&](::std::size_t n) constexpr noexcept
                                              }
                                          }
 
-                                         if(runtime_log_on) [[unlikely]]
+                                         if(runtime_log_on && runtime_log_emit_stacktop) [[unlikely]]
                                          {
                                              ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                                                   u8"[uwvm-int-translator] fn=",

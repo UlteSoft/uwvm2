@@ -127,7 +127,7 @@ namespace
                                                .err = ::std::addressof(err),
                                                .module_name = module_name};
 
-        auto request{make_lazy_compile_request<Opt>(ctx, priority)};
+        auto request{::uwvm2test::uwvm_int_lazy::make_lazy_compile_request<Opt>(ctx, priority)};
         UWVM2TEST_REQUIRE(request.unit != nullptr);
         UWVM2TEST_REQUIRE(request.compile != nullptr);
 

@@ -53,9 +53,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 #  else
     UWVM_GNU_COLD inline constexpr
 #  endif
-        ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_create_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results* para_begin,
-                                                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
-                                                            ::uwvm2::utils::cmdline::parameter_parsing_results* para_end) noexcept
+        ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_create_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
+                                                                                        para_begin,
+                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
+                                                                                    ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
         auto group_arg{para_curr + 1u};
         ::uwvm2::utils::container::u8string_view group_name{};

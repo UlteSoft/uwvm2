@@ -398,10 +398,10 @@ inline constexpr ::std::size_t print_reserve_size(
 	using nocvreftype = ::std::remove_cvref_t<iptype>;
 
 	constexpr ::std::size_t portsize{
-		::fast_io::details::print_integer_reserved_size_cache<10, false, false, ::std::uint_least16_t>};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, false, false, ::std::uint_least16_t>};
 
 	constexpr ::std::size_t v4intsize{
-		::fast_io::details::print_integer_reserved_size_cache<10, false, false, char unsigned>};
+		::fast_io::details::print_integer_reserved_size_cache<10, false, false, false, char unsigned>};
 
 	constexpr ::std::size_t v4totalsize{(v4intsize + 1) * 4 - 1};
 

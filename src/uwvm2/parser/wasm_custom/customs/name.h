@@ -79,9 +79,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::parser::wasm_custom::customs
     };
 
     struct name_parser_param_t
-    {
-        name_parser_limit_t name_parser_limit{};
-    };
+    { name_parser_limit_t name_parser_limit{}; };
 
     inline constexpr void parse_name_storage(name_storage_t & ns,
                                              ::std::byte const* const begin,

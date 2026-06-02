@@ -8,6 +8,7 @@ Source focus:
 - `src/uwvm2/uwvm/wasm/loader/load_and_check_modules.h`
 - `src/uwvm2/uwvm/wasm/loader/dl.h`
 - `src/uwvm2/uwvm/wasm/storage/**`
+- `src/uwvm2/uwvm/run/run.h`
 - `src/uwvm2/uwvm/runtime/initializer/init.h`
 - `src/uwvm2/uwvm/runtime/initializer/init_limit.h`
 
@@ -16,6 +17,7 @@ Source focus:
 | Command | Aliases | Arguments | Repeatability | Availability | Behavior |
 | --- | --- | --- | --- | --- | --- |
 | `--wasm-set-main-module-name` | `-Wname` | `<name:str>` | Once | Core Wasm | Override the internal name used for the main module. |
+| `--wasm-set-start-func` | `-Wstart` | `<local-func:u32-dec> [[i32|i64|f32|f64] ...]` | Once | Core Wasm | Run a selected main-module local-defined function as the runtime entry. |
 | `--wasm-preload-library` | `-Wpre` | `<wasm:path> (<rename:str>)` | Repeatable | Core Wasm | Load a Wasm file immediately as a preload dynamic library. |
 | `--wasm-register-dl` | `-Wdl` | `<dl:path> (<rename:str>)` | Repeatable | `UWVM_SUPPORT_PRELOAD_DL` | Load a native dynamic library and register its C API exports as a Wasm module. |
 | `--wasm-reset-import` | `-Wresimp` | `<module:str> <import-module:str> <import-extern:str> <new-import-module:str> <new-import-extern:str>` | Repeatable | Core Wasm | Rewrite a Wasm file module's import binding during runtime initialization. |
@@ -62,6 +64,59 @@ Loader behavior:
 - Parser errors are reported through the parser diagnostic path and cause the load command to fail.
 
 Verbose mode (`--log-verbose`) adds progress messages for loading, format detection, and parsing.
+
+## `--wasm-set-start-func`
+
+Syntax:
+
+```bash
+uwvm --wasm-set-start-func <local-func:u32-dec> [arg ...] --run app.wasm
+uwvm -Wstart <local-func:u32-dec> [arg ...] -r app.wasm
+```
+
+Behavior:
+
+- Selects a local-defined function in the main module and runs it as the runtime entry function.
+- `<local-func:u32-dec>` is a zero-based local-defined function index, not an import-inclusive Wasm function index.
+- The local-function index is parsed only as decimal `u32`. Prefix forms such as `0x0`, `0b0`, and `0o0` are rejected for the function index.
+- The option is guarded by `is_exist`; a second occurrence is a duplicate-parameter error.
+- The selected function may have parameters and results only from the currently supported scalar set: `i32`, `i64`, `f32`, and `f64`.
+- The number of supplied argument tokens must exactly match the selected function's parameter count.
+- Argument parsing happens after the main module is loaded and initialized enough for runtime entry resolution, so arity, type, and range errors are runtime-entry fatal diagnostics.
+- With `--log-verbose`, the resolved local index, import-inclusive Wasm function index, import count, function type, input tokens, and parsed values are printed before invocation. Integer verbose lines use `bin`, `oct`, `sdec`, `udec`, and `hex`; floating-point `bitfloat(hex)` is printed with the full bit width, so f32 uses 8 hex digits and f64 uses 16 hex digits after `0x`.
+
+Argument token collection:
+
+- After the decimal local-function index, preprocessing marks following tokens as `--wasm-set-start-func` arguments until the next host-parameter-looking token.
+- A host-parameter-looking token is one whose first byte is `-` and whose next byte is not a C digit.
+- This keeps negative decimal values such as `-1`, `-2`, `-3.0e4`, and `-4.5` attached to the command.
+- It stops before `--log-verbose`, `--run`, `-r`, `--`, and ordinary unknown options such as `-foo`.
+- Tokens beginning with `+` are not treated specially. They are collected as argument tokens and then accepted or rejected by the runtime-entry parser.
+- Malformed positive-looking tokens are still collected. For example, `0xfffffffgff` becomes a function argument and is reported as an invalid `i32` argument if the selected parameter is `i32`, not as an unconsumed host option.
+
+Integer arguments:
+
+| Parameter type | Accepted forms | Notes |
+| --- | --- | --- |
+| `i32` | signed decimal; unsigned decimal; `0x`/`0X` hexadecimal; `0b`/`0B` binary; `0o`/`0O` octal | Unsigned forms are bit-cast to `i32`, so `4294967295` and `0xffffffff` mean `-1`. Prefixed forms do not accept a leading sign. |
+| `i64` | signed decimal; unsigned decimal; `0x`/`0X` hexadecimal; `0b`/`0B` binary; `0o`/`0O` octal | Unsigned forms are bit-cast to `i64`, so `18446744073709551615` and `0xffffffffffffffff` mean `-1`. Prefixed forms do not accept a leading sign. |
+
+Floating-point arguments:
+
+| Parameter type | Accepted forms | Notes |
+| --- | --- | --- |
+| `f32` | ordinary decimal/general float; optional trailing `f`/`F`; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `3.5`, `-3.0e4`, `3.5f`, `0x1.8p0`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
+| `f64` | ordinary decimal/general float; optional trailing `f`/`F`; C-style hexadecimal float beginning with `0x`/`0X` and using a `p`/`P` exponent | Examples: `4.5`, `-4.5`, `0X1.2P1`. Binary-prefixed float forms such as `0b1.001p1` are rejected. Leading `+` is rejected. |
+
+Examples:
+
+```bash
+uwvm --wasm-set-start-func 0 --run app.wasm
+uwvm --wasm-set-start-func 3 -1 0xffffffffffffffff 3.5 0x1.2p1 --log-verbose --run app.wasm
+uwvm -Wstart 353 0xfffffffgff -r app.wasm
+```
+
+In the last example, `0xfffffffgff` is collected as an entry-function argument. If local function `353` expects `i32`, the runtime-entry parser reports it as an invalid `i32` argument.
 
 ## `--wasm-preload-library`
 

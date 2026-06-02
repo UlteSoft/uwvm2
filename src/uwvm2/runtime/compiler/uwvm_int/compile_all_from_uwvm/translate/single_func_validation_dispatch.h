@@ -1068,7 +1068,7 @@ auto const flush_conbine_pending{
         auto const bc_before{bytecode.size()};
         auto const thunks_before{thunks.size()};
 
-        if(runtime_log_on && kind_before != conbine_pending_kind::none) [[unlikely]]
+        if(runtime_log_on && runtime_log_emit_conbine && kind_before != conbine_pending_kind::none) [[unlikely]]
         {
             wasm1_code next_op{};
             ::std::uint_least8_t next_op_u8{};
@@ -2581,7 +2581,7 @@ auto const flush_conbine_pending{
         conbine_pending.kind = conbine_pending_kind::none;
         conbine_pending.brif_cmp = conbine_brif_cmp_kind::none;
 
-        if(runtime_log_on && kind_before != conbine_pending_kind::none) [[unlikely]]
+        if(runtime_log_on && runtime_log_emit_conbine && kind_before != conbine_pending_kind::none) [[unlikely]]
         {
             wasm1_code next_op{};
             ::std::uint_least8_t next_op_u8{};
@@ -3501,7 +3501,7 @@ auto const runtime_log_wasm_op_state{[&]([[maybe_unused]] ::uwvm2::utils::contai
                                          [[maybe_unused]] ::std::uint_least64_t opfunc_main_before,
                                          [[maybe_unused]] ::std::uint_least64_t opfunc_thunk_before) constexpr noexcept
                                      {
-                                         if(!runtime_log_on) [[likely]] { return; }
+                                         if(!runtime_log_on || !runtime_log_emit_wasm_ops) [[likely]] { return; }
 
                                          auto const bc_delta{bytecode.size() - bytecode_before};
                                          auto const thunk_delta{thunks.size() - thunks_before};
@@ -3739,7 +3739,7 @@ for(;;)
 
     wasm1_code curr_opbase;  // no initialize necessary
     ::std::memcpy(::std::addressof(curr_opbase), code_curr, sizeof(wasm1_code));
-    if(runtime_log_on) [[unlikely]]
+    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
     {
         runtime_log_curr_ip = static_cast<::std::size_t>(op_begin - code_begin);
         ++runtime_log_stats.wasm_op_count;
@@ -3769,7 +3769,7 @@ for(;;)
     ::std::uint_least64_t opfunc_main_before{};
     ::std::uint_least64_t opfunc_thunk_before{};
 
-    if(runtime_log_on) [[unlikely]]
+    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
     {
         bytecode_before = bytecode.size();
         thunks_before = thunks.size();
@@ -3797,7 +3797,7 @@ for(;;)
         }
     }
 
-    if(runtime_log_on) [[unlikely]]
+    if(runtime_log_on && runtime_log_emit_wasm_ops) [[unlikely]]
     {
         runtime_log_wasm_op_state(u8"wasm.op.after", curr_opbase, op_begin, bytecode_before, thunks_before, opfunc_main_before, opfunc_thunk_before);
     }

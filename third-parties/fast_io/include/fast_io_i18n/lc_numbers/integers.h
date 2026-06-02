@@ -9,7 +9,7 @@ template <::std::integral char_type, manipulators::scalar_flags flags, typename 
 inline constexpr ::std::size_t lc_print_reserve_size_int_cal(basic_lc_all<char_type> const *__restrict all) noexcept
 {
 	constexpr ::std::size_t static_size{
-		print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, ::std::remove_cv_t<T>>};
+		print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, flags.modern_octal, ::std::remove_cv_t<T>>};
 	constexpr ::std::size_t static_sizem1{static_size - 1};
 	return static_size + static_sizem1 * all->numeric.thousands_sep.len;
 }
@@ -334,13 +334,14 @@ inline constexpr char_type *lc_print_reserve_integral_withfull_main_impl(basic_l
 }
 
 template <::std::size_t base, bool showbase = false, bool uppercase_showbase = false, bool showpos = false,
-		  bool uppercase = false, bool full = false, typename int_type, ::std::integral char_type>
+		  bool uppercase = false, bool full = false, bool modern_octal = false, typename int_type,
+		  ::std::integral char_type>
 inline constexpr char_type *lc_print_reserve_integral_define(basic_lc_all<char_type> const *__restrict all,
 															 char_type *first, int_type t) noexcept
 {
 	if constexpr (base <= 10 && uppercase)
 	{
-		return print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, false, full>(
+		return print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, false, full, modern_octal>(
 			first, t); // prevent duplications
 	}
 	else
@@ -384,7 +385,7 @@ inline constexpr char_type *lc_print_reserve_integral_define(basic_lc_all<char_t
 		}
 		if constexpr (showbase && (base != 10))
 		{
-			first = print_reserve_show_base_impl<base, uppercase_showbase>(first);
+			first = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(first);
 		}
 		return lc_print_reserve_integral_withfull_main_impl<full, base, uppercase>(all, first, u);
 	}
@@ -446,14 +447,14 @@ inline constexpr char_type *print_reserve_define(basic_lc_all<char_type> const *
 	if constexpr (::std::same_as<::std::remove_cv_t<T>, ::std::byte>)
 	{
 		return details::lc_print_reserve_integral_define<flags.base, flags.showbase, flags.uppercase_showbase,
-														 flags.showpos, flags.uppercase, flags.full>(
-			iter, static_cast<char8_t>(t.reference));
+														 flags.showpos, flags.uppercase, flags.full,
+														 flags.modern_octal>(all, iter, static_cast<char8_t>(t.reference));
 	}
 	else
 	{
 		return details::lc_print_reserve_integral_define<flags.base, flags.showbase, flags.uppercase_showbase,
-														 flags.showpos, flags.uppercase, flags.full>(all, iter,
-																									 t.reference);
+														 flags.showpos, flags.uppercase, flags.full,
+														 flags.modern_octal>(all, iter, t.reference);
 	}
 }
 

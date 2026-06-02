@@ -313,7 +313,8 @@ case wasm1_code::i32_shl:
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -333,7 +334,8 @@ case wasm1_code::i32_shr_s:
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -353,7 +355,8 @@ case wasm1_code::i32_shr_u:
                runtime_operand_stack_value_type::i32,
                runtime_operand_stack_value_type::i32,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -716,7 +719,8 @@ case wasm1_code::i64_shl:
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateShl(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -736,7 +740,8 @@ case wasm1_code::i64_shr_s:
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateAShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }
@@ -756,7 +761,8 @@ case wasm1_code::i64_shr_u:
                runtime_operand_stack_value_type::i64,
                runtime_operand_stack_value_type::i64,
                [&](::llvm::IRBuilder<>& ir_builder, llvm_jit_stack_value_t const& left, llvm_jit_stack_value_t const& right)
-               { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); })) [[unlikely]]
+               { return ir_builder.CreateLShr(left.value, emit_llvm_shift_count_mask(ir_builder, right.value, get_llvm_integer_bit_width(left.value))); }))
+            [[unlikely]]
         {
             disable_inline_llvm_jit_emission();
         }

@@ -82,6 +82,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     using parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
     using full_function_symbol_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
     using local_func_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::local_func_storage_t;
+    using tiered_loop_reentry_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::tiered_loop_reentry_storage_t;
     using compile_option = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::compile_option;
     using llvm_jit_module_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::llvm_jit_module_storage_t;
     using validation_module_storage_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::details::validation_module_storage_t;
@@ -101,8 +102,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     {
         switch(kind)
         {
-            case lazy_compile_unit_kind::function: return u8"function";
-            [[unlikely]] default: return u8"unknown";
+            case lazy_compile_unit_kind::function:
+                return u8"function";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
@@ -114,14 +117,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             case ::uwvm2::utils::thread::lazy_compile_state::queued: return u8"queued";
             case ::uwvm2::utils::thread::lazy_compile_state::compiling: return u8"compiling";
             case ::uwvm2::utils::thread::lazy_compile_state::compiled: return u8"compiled";
-            case ::uwvm2::utils::thread::lazy_compile_state::failed: return u8"failed";
-            [[unlikely]] default: return u8"unknown";
+            case ::uwvm2::utils::thread::lazy_compile_state::failed:
+                return u8"failed";
+            [[unlikely]] default:
+                return u8"unknown";
         }
     }
 
     namespace lazy_runtime_log
     {
-        [[nodiscard]] inline bool enabled() noexcept
+        [[nodiscard]] inline constexpr bool enabled() noexcept
         {
 # ifdef UWVM
             return ::uwvm2::uwvm::io::enable_runtime_log;
@@ -131,17 +136,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         }
 
         template <typename... Args>
-        inline void line(Args&&... args) noexcept
+        inline constexpr void line(Args&&... args) noexcept
         {
 # ifdef UWVM
             if(!enabled()) { return; }
 
-            auto u8runtime_log_output_osr{::fast_io::operations::output_stream_ref(::uwvm2::uwvm::io::u8runtime_log_output)};
-            ::fast_io::operations::decay::stream_ref_decay_lock_guard u8runtime_log_output_lg{
-                ::fast_io::operations::decay::output_stream_mutex_ref_decay(u8runtime_log_output_osr)};
-            auto u8runtime_log_output_ul{::fast_io::operations::decay::output_stream_unlocked_ref_decay(u8runtime_log_output_osr)};
-
-            ::fast_io::io::perrln(u8runtime_log_output_ul, u8"[llvm-jit-lazy] ", ::std::forward<Args>(args)...);
+            ::fast_io::io::perrln(::uwvm2::uwvm::io::u8runtime_log_output, u8"[llvm-jit-lazy] ", ::std::forward<Args>(args)...);
 # else
             ((void)args, ...);
 # endif
@@ -149,9 +149,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     }  // namespace lazy_runtime_log
 
     struct lazy_split_config
-    {
-        ::std::size_t cu_code_size{4096uz};
-    };
+    { ::std::size_t cu_code_size{4096uz}; };
 
     struct lazy_compile_unit_storage_t
     {
@@ -180,6 +178,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         ::uwvm2::utils::container::delete_owned_ptr<::llvm::ExecutionEngine> llvm_jit_engine{};
         ::std::uintptr_t entry_address{};
         ::std::uintptr_t raw_entry_address{};
+        ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
+        ::uwvm2::utils::container::vector<::std::uintptr_t> tiered_loop_reentry_raw_entry_addresses{};
         bool ready{};
 
         lazy_materialized_function_storage_t() = default;
@@ -268,9 +268,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                              .code_size = byte_offset(code_begin, code_end),
                                              .kind = lazy_compile_unit_kind::function});
 
-            storage.functions.index_unchecked(local_function_index) = {.function_index = function_index,
-                                                                       .local_function_index = local_function_index,
-                                                                       .primary_cu_index = cu_index};
+            storage.functions.index_unchecked(
+                local_function_index) = {.function_index = function_index, .local_function_index = local_function_index, .primary_cu_index = cu_index};
             storage.compiled.local_funcs.index_unchecked(local_function_index) = local_func_storage;
         }
 
@@ -336,8 +335,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 ::llvm::initializeInstCombine(pass_registry);
                 ::llvm::initializeAnalysis(pass_registry);
                 ::llvm::initializeTarget(pass_registry);
-                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter() &&
-                              !::llvm::InitializeNativeTargetAsmParser()};
+                auto const ok{!::llvm::InitializeNativeTarget() && !::llvm::InitializeNativeTargetAsmPrinter()};
                 success.store(ok, ::std::memory_order_release);
                 initialized.store(true, ::std::memory_order_release);
             }
@@ -355,9 +353,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 mattrs.reserve(host_features.size());
                 for(auto const& [feature_name, feature_enabled]: host_features)
                 {
-                    mattrs.push_back(::uwvm2::utils::container::concat_uwvm(
-                        feature_enabled ? "+" : "-",
-                        ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
+                    mattrs.push_back(::uwvm2::utils::container::concat_uwvm(feature_enabled ? "+" : "-",
+                                                                            ::uwvm2::utils::container::string_view{feature_name.data(), feature_name.size()}));
                 }
             }
             return mattrs;
@@ -365,20 +362,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline llvm_jit_native_target_config const& get_llvm_jit_native_target_config()
         {
-            static llvm_jit_native_target_config config{
-                .cpu_name = []()
-                {
-                    auto const host_cpu_name{::llvm::sys::getHostCPUName()};
-                    return ::uwvm2::utils::container::string{
-                        ::uwvm2::utils::container::string_view{host_cpu_name.data(), host_cpu_name.size()}};
-                }(),
-                .feature_storage = get_llvm_jit_host_target_attribute_storage()};
+            static llvm_jit_native_target_config config{.cpu_name =
+                                                            []()
+                                                        {
+                                                            auto const host_cpu_name{::llvm::sys::getHostCPUName()};
+                                                            return ::uwvm2::utils::container::string{
+                                                                ::uwvm2::utils::container::string_view{host_cpu_name.data(), host_cpu_name.size()}
+                                                            };
+                                                        }(),
+                                                        .feature_storage = get_llvm_jit_host_target_attribute_storage()};
             return config;
         }
 
-        inline void append_llvm_jit_host_target_attribute_refs(
-            ::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
-            ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs)
+        inline void append_llvm_jit_host_target_attribute_refs(::uwvm2::utils::container::vector<::uwvm2::utils::container::string> const& attr_storage,
+                                                               ::llvm::SmallVector<::llvm::StringRef, 16>& attr_refs)
         {
             attr_refs.clear();
             attr_refs.reserve(attr_storage.size());
@@ -408,8 +405,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             }
         }
 
-        inline void append_unique_local_function_index(::uwvm2::utils::container::vector<::std::size_t>& out,
-                                                       ::std::size_t local_function_index)
+        inline void append_unique_local_function_index(::uwvm2::utils::container::vector<::std::size_t>& out, ::std::size_t local_function_index)
         {
             if(::std::find(out.begin(), out.end(), local_function_index) == out.end()) { out.push_back(local_function_index); }
         }
@@ -504,6 +500,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             materialized.ready = false;
             materialized.entry_address = 0u;
             materialized.raw_entry_address = 0u;
+            materialized.tiered_loop_reentries.clear();
+            materialized.tiered_loop_reentry_raw_entry_addresses.clear();
             materialized.llvm_jit_engine.reset();
             materialized.llvm_context_holder.reset();
 
@@ -535,10 +533,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module,
-                                              *target_machine,
-                                              options.codegen_opt_level,
-                                              options.compile_options.verify_llvm_jit_ir))
+            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
                 [[unlikely]]
             {
                 return false;
@@ -568,6 +563,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
             if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
 
+            materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
+            materialized.tiered_loop_reentry_raw_entry_addresses.clear();
+            materialized.tiered_loop_reentry_raw_entry_addresses.reserve(materialized.tiered_loop_reentries.size());
+            for(auto const& reentry: materialized.tiered_loop_reentries)
+            {
+                auto const reentry_function_name{
+                    all_details::get_llvm_wasm_tiered_loop_reentry_raw_function_name(curr_module, function_index_u32, reentry.wasm_code_offset)};
+                auto const reentry_address{resolve_llvm_function_address(*engine, reentry_function_name)};
+                if(reentry_address == 0u) [[unlikely]] { return false; }
+                materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
+            }
+
             materialized.entry_address = entry_address;
             materialized.raw_entry_address = raw_entry_address;
             materialized.llvm_context_holder = ::std::move(llvm_context_holder);
@@ -591,6 +598,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 materialized.ready = false;
                 materialized.entry_address = 0u;
                 materialized.raw_entry_address = 0u;
+                materialized.tiered_loop_reentries.clear();
+                materialized.tiered_loop_reentry_raw_entry_addresses.clear();
                 materialized.llvm_jit_engine.reset();
                 materialized.llvm_context_holder.reset();
             }
@@ -623,10 +632,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
             llvm_module->setTargetTriple(target_machine->getTargetTriple());
             llvm_module->setDataLayout(target_machine->createDataLayout());
-            if(!optimize_lazy_llvm_jit_module(*llvm_module,
-                                              *target_machine,
-                                              options.codegen_opt_level,
-                                              options.compile_options.verify_llvm_jit_ir))
+            if(!optimize_lazy_llvm_jit_module(*llvm_module, *target_machine, options.codegen_opt_level, options.compile_options.verify_llvm_jit_ir))
                 [[unlikely]]
             {
                 return false;
@@ -656,9 +662,26 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const raw_function_name{all_details::get_llvm_wasm_raw_function_name(curr_module, function_index_u32)};
                 auto const entry_address{resolve_llvm_function_address(*engine, function_name)};
                 auto const raw_entry_address{resolve_llvm_function_address(*engine, raw_function_name)};
-                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]] { return false; }
+                if(entry_address == 0u || raw_entry_address == 0u) [[unlikely]]
+                {
+                    return false;
+                }
 
                 auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+                materialized.tiered_loop_reentries = materialized.local_func.tiered_loop_reentries;
+                materialized.tiered_loop_reentry_raw_entry_addresses.clear();
+                materialized.tiered_loop_reentry_raw_entry_addresses.reserve(materialized.tiered_loop_reentries.size());
+                for(auto const& reentry: materialized.tiered_loop_reentries)
+                {
+                    auto const reentry_function_name{
+                        all_details::get_llvm_wasm_tiered_loop_reentry_raw_function_name(curr_module, function_index_u32, reentry.wasm_code_offset)};
+                    auto const reentry_address{resolve_llvm_function_address(*engine, reentry_function_name)};
+                    if(reentry_address == 0u) [[unlikely]]
+                    {
+                        return false;
+                    }
+                    materialized.tiered_loop_reentry_raw_entry_addresses.push_back(reentry_address);
+                }
                 materialized.entry_address = entry_address;
                 materialized.raw_entry_address = raw_entry_address;
                 materialized.ready = true;
@@ -671,8 +694,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             return true;
         }
 
-        [[nodiscard]] inline ::std::size_t lazy_group_function_code_size(lazy_module_storage_t const& storage,
-                                                                          ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline ::std::size_t lazy_group_function_code_size(lazy_module_storage_t const& storage, ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return 0uz; }
             auto const& fn{storage.functions.index_unchecked(local_function_index)};
@@ -682,17 +704,13 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
 
         [[nodiscard]] inline bool lazy_group_contains_function(::uwvm2::utils::container::vector<::std::size_t> const& out,
                                                                ::std::size_t local_function_index) noexcept
-        {
-            return ::std::find(out.begin(), out.end(), local_function_index) != out.end();
-        }
+        { return ::std::find(out.begin(), out.end(), local_function_index) != out.end(); }
 
-        [[nodiscard]] inline bool should_consider_lazy_group_function(lazy_module_storage_t const& storage,
-                                                                      ::std::size_t local_function_index) noexcept
+        [[nodiscard]] inline bool should_consider_lazy_group_function(lazy_module_storage_t const& storage, ::std::size_t local_function_index) noexcept
         {
             if(local_function_index >= storage.functions.size()) [[unlikely]] { return false; }
             auto const st{storage.functions.index_unchecked(local_function_index).materialization_state.state.load(::std::memory_order_acquire)};
-            return st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled ||
-                   st == ::uwvm2::utils::thread::lazy_compile_state::queued;
+            return st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled || st == ::uwvm2::utils::thread::lazy_compile_state::queued;
         }
 
         [[nodiscard]] inline bool try_append_lazy_group_function(::uwvm2::utils::container::vector<::std::size_t>& out,
@@ -736,9 +754,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 auto const forward_index{entry_local_function_index + offset};
                 if(forward_index < local_count && should_consider_lazy_group_function(storage, forward_index))
                 {
-                    appended = try_append_lazy_group_function(
-                                   out, storage, forward_index, function_budget, code_size_budget, total_code_size, false) ||
-                               appended;
+                    appended =
+                        try_append_lazy_group_function(out, storage, forward_index, function_budget, code_size_budget, total_code_size, false) || appended;
                 }
 
                 if(out.size() == function_budget || total_code_size >= code_size_budget) { break; }
@@ -746,9 +763,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 if(entry_local_function_index >= offset && should_consider_lazy_group_function(storage, entry_local_function_index - offset))
                 {
                     auto const backward_index{entry_local_function_index - offset};
-                    appended = try_append_lazy_group_function(
-                                   out, storage, backward_index, function_budget, code_size_budget, total_code_size, false) ||
-                               appended;
+                    appended =
+                        try_append_lazy_group_function(out, storage, backward_index, function_budget, code_size_budget, total_code_size, false) || appended;
                 }
 
                 if(!appended && forward_index >= local_count && entry_local_function_index < offset) { break; }
@@ -766,13 +782,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             if(entry_local_function_index >= storage.functions.size()) [[unlikely]] { return; }
 
             ::std::size_t total_code_size{};
-            static_cast<void>(try_append_lazy_group_function(out,
-                                                             storage,
-                                                             entry_local_function_index,
-                                                             group_function_budget,
-                                                             group_code_size_budget,
-                                                             total_code_size,
-                                                             true));
+            static_cast<void>(
+                try_append_lazy_group_function(out, storage, entry_local_function_index, group_function_budget, group_code_size_budget, total_code_size, true));
 
             ::uwvm2::utils::container::vector<::std::size_t> callees{};
             for(::std::size_t cursor{}; cursor < out.size() && out.size() < group_function_budget && total_code_size < group_code_size_budget; ++cursor)
@@ -780,32 +791,24 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                 callees.clear();
                 if(!collect_direct_defined_callees(curr_module, out.index_unchecked(cursor), callees)) { continue; }
 
-                for(auto remaining{callees.size()};
-                    remaining != 0uz && out.size() < group_function_budget && total_code_size < group_code_size_budget;)
+                for(auto remaining{callees.size()}; remaining != 0uz && out.size() < group_function_budget && total_code_size < group_code_size_budget;)
                 {
                     --remaining;
                     auto const callee_local_index{callees.index_unchecked(remaining)};
                     if(!should_consider_lazy_group_function(storage, callee_local_index)) { continue; }
-                    static_cast<void>(try_append_lazy_group_function(
-                        out,
-                        storage,
-                        callee_local_index,
-                        group_function_budget,
-                        group_code_size_budget,
-                        total_code_size,
-                        false));
+                    static_cast<void>(try_append_lazy_group_function(out,
+                                                                     storage,
+                                                                     callee_local_index,
+                                                                     group_function_budget,
+                                                                     group_code_size_budget,
+                                                                     total_code_size,
+                                                                     false));
                 }
             }
 
             if(out.size() < group_function_budget && total_code_size < group_code_size_budget)
             {
-                append_lazy_group_adjacent_functions(
-                    storage,
-                    entry_local_function_index,
-                    group_function_budget,
-                    group_code_size_budget,
-                    total_code_size,
-                    out);
+                append_lazy_group_adjacent_functions(storage, entry_local_function_index, group_function_budget, group_code_size_budget, total_code_size, out);
             }
         }
 
@@ -825,10 +828,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             claimed_group.reserve(candidate_group.size());
             for(auto const local_function_index: candidate_group)
             {
-                if(local_function_index >= storage.functions.size() || local_function_index >= storage.materialized_functions.size()) [[unlikely]]
-                {
-                    continue;
-                }
+                if(local_function_index >= storage.functions.size() || local_function_index >= storage.materialized_functions.size()) [[unlikely]] { continue; }
 
                 auto& fn{storage.functions.index_unchecked(local_function_index)};
                 auto const st{fn.materialization_state.state.load(::std::memory_order_acquire)};
@@ -847,8 +847,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                         continue;
                     }
 
-                    if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled ||
-                       st == ::uwvm2::utils::thread::lazy_compile_state::queued)
+                    if(st == ::uwvm2::utils::thread::lazy_compile_state::uncompiled || st == ::uwvm2::utils::thread::lazy_compile_state::queued)
                     {
                         auto expected{st};
                         if(fn.materialization_state.state.compare_exchange_strong(expected,
@@ -867,11 +866,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                     continue;
                 }
 
-                if(st != ::uwvm2::utils::thread::lazy_compile_state::uncompiled &&
-                   st != ::uwvm2::utils::thread::lazy_compile_state::queued)
-                {
-                    continue;
-                }
+                if(st != ::uwvm2::utils::thread::lazy_compile_state::uncompiled && st != ::uwvm2::utils::thread::lazy_compile_state::queued) { continue; }
                 auto expected{st};
                 if(fn.materialization_state.state.compare_exchange_strong(expected,
                                                                           ::uwvm2::utils::thread::lazy_compile_state::compiling,
@@ -893,40 +888,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             try
 # endif
             {
-            for(auto const local_function_index: claimed_group) { validate_function_if_needed(curr_module, options, local_function_index, err); }
+                for(auto const local_function_index: claimed_group) { validate_function_if_needed(curr_module, options, local_function_index, err); }
 
-            llvm_jit_module_storage_t llvm_ir_storage{};
-            if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]]
-            {
-                ::fast_io::fast_terminate();
-            }
+                llvm_jit_module_storage_t llvm_ir_storage{};
+                if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-            compile_option emit_options{options.compile_options};
-            emit_options.route_wasm_calls_through_runtime_bridge = true;
-            for(auto const local_function_index: claimed_group)
-            {
-                auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
-                materialized.local_func = all_details::compile_all_from_uwvm_local_func(
-                    curr_module,
-                    storage.validation_module,
-                    emit_options,
-                    local_function_index,
-                    err,
-                    ::std::addressof(llvm_ir_storage));
-            }
-            llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
+                compile_option emit_options{options.compile_options};
+                emit_options.route_wasm_calls_through_runtime_bridge = true;
+                for(auto const local_function_index: claimed_group)
+                {
+                    auto& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+                    materialized.local_func = all_details::compile_all_from_uwvm_local_func(curr_module,
+                                                                                            storage.validation_module,
+                                                                                            emit_options,
+                                                                                            local_function_index,
+                                                                                            err,
+                                                                                            ::std::addressof(llvm_ir_storage));
+                }
+                llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
 
-            if(!materialize_lazy_local_function_group(curr_module, storage, options, claimed_group, llvm_ir_storage)) [[unlikely]]
-            {
-                ::fast_io::fast_terminate();
-            }
+                if(!materialize_lazy_local_function_group(curr_module, storage, options, claimed_group, llvm_ir_storage)) [[unlikely]]
+                {
+                    ::fast_io::fast_terminate();
+                }
 
-            for(auto const local_function_index: claimed_group)
-            {
-                auto& fn{storage.functions.index_unchecked(local_function_index)};
-                if(publish_materialized_function != nullptr) { publish_materialized_function(publish_user_data, local_function_index); }
-                mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
-            }
+                for(auto const local_function_index: claimed_group)
+                {
+                    auto& fn{storage.functions.index_unchecked(local_function_index)};
+                    if(publish_materialized_function != nullptr) { publish_materialized_function(publish_user_data, local_function_index); }
+                    mark_function_compile_units_state(storage, fn, ::uwvm2::utils::thread::lazy_compile_state::compiled);
+                }
             }
 # ifdef UWVM_CPP_EXCEPTIONS
             catch(...)
@@ -955,20 +946,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
             validate_function_if_needed(curr_module, options, local_function_index, err);
 
             llvm_jit_module_storage_t llvm_ir_storage{};
-            if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]]
-            {
-                ::fast_io::fast_terminate();
-            }
+            if(!all_details::try_prepare_runtime_llvm_jit_module_storage(curr_module, llvm_ir_storage)) [[unlikely]] { ::fast_io::fast_terminate(); }
 
             compile_option emit_options{options.compile_options};
             emit_options.route_wasm_calls_through_runtime_bridge = true;
-            materialized.local_func = all_details::compile_all_from_uwvm_local_func(
-                curr_module,
-                storage.validation_module,
-                emit_options,
-                local_function_index,
-                err,
-                ::std::addressof(llvm_ir_storage));
+            materialized.local_func = all_details::compile_all_from_uwvm_local_func(curr_module,
+                                                                                    storage.validation_module,
+                                                                                    emit_options,
+                                                                                    local_function_index,
+                                                                                    err,
+                                                                                    ::std::addressof(llvm_ir_storage));
             llvm_ir_storage.emitted = llvm_ir_storage.llvm_context_holder != nullptr && llvm_ir_storage.llvm_module != nullptr;
 
             if(!materialize_lazy_local_function(curr_module, storage, options, local_function_index, llvm_ir_storage)) [[unlikely]]
@@ -1129,9 +1116,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
     [[nodiscard]] inline bool collect_direct_defined_callees(runtime_module_storage_t const& curr_module,
                                                              ::std::size_t local_function_index,
                                                              ::uwvm2::utils::container::vector<::std::size_t>& callees) noexcept
-    {
-        return details::collect_direct_defined_callees(curr_module, local_function_index, callees);
-    }
+    { return details::collect_direct_defined_callees(curr_module, local_function_index, callees); }
 
     inline void compile_cu_from_lazy_validator(runtime_module_storage_t const& curr_module,
                                                lazy_module_storage_t& storage,
@@ -1247,7 +1232,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                compile_end_time - compile_start_time);
     }
 
-    [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context& ctx,
+    [[nodiscard]] inline ::uwvm2::utils::thread::lazy_compile_request make_lazy_compile_request(lazy_compile_request_context & ctx,
                                                                                                 unsigned priority = 0u) noexcept
     {
         if(ctx.lazy_storage == nullptr || ctx.compile_unit_index >= ctx.lazy_storage->compile_units.size()) [[unlikely]] { return {}; }
@@ -1289,6 +1274,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
         function_address = materialized.entry_address;
         return true;
     }
+
+    [[nodiscard]] inline bool try_get_lazy_tiered_loop_reentry_raw_entry_address(lazy_module_storage_t const& storage,
+                                                                                 ::std::size_t local_function_index,
+                                                                                 ::std::size_t wasm_code_offset,
+                                                                                 ::std::uintptr_t& function_address) noexcept
+    {
+        function_address = 0u;
+        if(local_function_index >= storage.materialized_functions.size()) [[unlikely]] { return false; }
+
+        auto const& materialized{storage.materialized_functions.index_unchecked(local_function_index)};
+        if(!materialized.ready ||
+           materialized.tiered_loop_reentries.size() != materialized.tiered_loop_reentry_raw_entry_addresses.size())
+        {
+            return false;
+        }
+
+        for(::std::size_t i{}; i != materialized.tiered_loop_reentries.size(); ++i)
+        {
+            if(materialized.tiered_loop_reentries.index_unchecked(i).wasm_code_offset != wasm_code_offset) { continue; }
+
+            function_address = materialized.tiered_loop_reentry_raw_entry_addresses.index_unchecked(i);
+            return function_address != 0u;
+        }
+
+        return false;
+    }
+
 }
 #endif
 

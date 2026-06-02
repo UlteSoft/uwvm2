@@ -23,8 +23,13 @@
 module;
 
 // std
+#include <bit>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
+#include <cstring>
+#include <limits>
 #include <memory>
 #include <type_traits>
 #include <utility>
@@ -34,10 +39,10 @@ module;
 #include <uwvm2/uwvm/runtime/macro/push_macros.h>
 // platform
 #include <uwvm2/runtime/lib/uwvm_runtime.h>
-
 export module uwvm2.uwvm.run:run;
 
 import fast_io;
+import uwvm2.utils.container;
 import uwvm2.utils.ansies;
 import uwvm2.utils.debug;
 import uwvm2.utils.madvise;

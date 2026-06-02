@@ -63,17 +63,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 # if defined(UWVM_IMPORT_WASI_WASIP1)
     namespace details
     {
-        [[nodiscard]] inline bool validate_wasip1_group_binding_for_loaded_module(
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
-            ::uwvm2::utils::container::u8string_view module_name) noexcept
+        [[nodiscard]] inline bool
+            validate_wasip1_group_binding_for_loaded_module(::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,
+                                                            ::uwvm2::utils::container::u8string_view module_name) noexcept
         {
             using namespace ::uwvm2::uwvm::imported::wasi::wasip1::storage;
 
             auto const anonymous_group_index{find_wasip1_anonymous_module_group_index(target_kind, module_name)};
             auto const named_group_index{find_named_wasip1_module_group_index(module_name)};
             if(anonymous_group_index == invalid_wasip1_group_index || named_group_index == invalid_wasip1_group_index ||
-               anonymous_group_index == named_group_index)
-                [[likely]]
+               anonymous_group_index == named_group_index) [[likely]]
             {
                 return true;
             }
@@ -185,9 +184,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::run
 
 #ifndef UWVM_DISABLE_LOCAL_IMPORTED_WASIP1
 # if defined(UWVM_IMPORT_WASI_WASIP1)
-        auto const need_wasip1_environment{
-            ::uwvm2::uwvm::wasm::storage::local_preload_wasip1 || ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api ||
-            ::uwvm2::uwvm::imported::wasi::wasip1::storage::has_any_configured_wasip1_module_override()};
+        auto const need_wasip1_environment{::uwvm2::uwvm::wasm::storage::local_preload_wasip1 || ::uwvm2::uwvm::wasm::storage::preload_expose_wasip1_host_api ||
+                                           ::uwvm2::uwvm::imported::wasi::wasip1::storage::has_any_configured_wasip1_module_override()};
 
         auto const wasip1_import_visible_for_loaded_wasm{
             [](::uwvm2::uwvm::imported::wasi::wasip1::storage::wasip1_module_target_kind_t target_kind,

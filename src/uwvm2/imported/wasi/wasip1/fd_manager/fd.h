@@ -74,7 +74,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
     {
         inline static constexpr ::std::size_t sizeof_dir_stack_entry_u{get_union_size<::fast_io::dir_file, ::fast_io::dir_io_observer>()};
 
-        union storage_u 
+        union storage_u
         {
             // dir file
             ::fast_io::dir_file file;
@@ -315,7 +315,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
                                                                                       ,
                                                                                       ::fast_io::native_io_observer>()};
 
-        union storage_u 
+        union storage_u
         {
             // native file (with flags)
             wasi_file_fd_t file_fd;
@@ -824,9 +824,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
 
     /// @brief Used to prevent default construction.
     struct wasi_no_construct_t
-    {
-        inline explicit constexpr wasi_no_construct_t() noexcept = default;
-    };
+    { inline explicit constexpr wasi_no_construct_t() noexcept = default; };
 
     inline constexpr wasi_no_construct_t wasi_no_construct{};
 
@@ -955,7 +953,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::fd_manager
         wasi_fd_t_fast_io_type_allocator::deallocate_n(fd_p, 1uz);
     }
 
-    struct wasi_fd_unique_ptr_t 
+    struct wasi_fd_unique_ptr_t
     {
         using wasi_fd_t_fast_io_type_allocator = ::fast_io::native_typed_global_allocator<wasi_fd_t>;
 

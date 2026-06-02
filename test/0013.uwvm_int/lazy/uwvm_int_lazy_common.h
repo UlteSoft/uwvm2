@@ -377,7 +377,7 @@ namespace uwvm2test::uwvm_int_lazy
     [[nodiscard]] inline lazy_module_t initialize_lazy_storage(runtime_module_t const& rt, lazy_split_config_t cfg)
     {
         ::uwvm2::validation::error::code_validation_error_impl err{};
-        lazy::compile_option cop{};
+        optable::compile_option cop{};
         auto storage{lazy::initialize_lazy_module_storage(rt, cop, err, cfg)};
         if(err.err_code != ::uwvm2::validation::error::code_validation_error_code::ok) [[unlikely]] { ::fast_io::fast_terminate(); }
         return storage;
@@ -387,7 +387,7 @@ namespace uwvm2test::uwvm_int_lazy
                                                                   lazy_validation_mode_t mode,
                                                                   ::std::size_t module_id = 0uz) noexcept
     {
-        lazy::compile_option cop{};
+        optable::compile_option cop{};
         cop.curr_wasm_id = module_id;
 
         lazy_compile_options_t options{};

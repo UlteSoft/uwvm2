@@ -11,6 +11,10 @@
 for(;;)
 {
     auto const instruction_begin{code_curr};
+    if(emit_llvm_jit_active && instruction_begin >= code_begin)
+    {
+        llvm_jit_emit_state.current_wasm_op_offset = static_cast<::std::size_t>(instruction_begin - code_begin);
+    }
 
     if(code_curr == code_end) [[unlikely]]
     {
@@ -61,9 +65,6 @@ for(;;)
 
     if(emit_llvm_jit_active && !llvm_jit_instruction_emitted_inline)
     {
-        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]]
-        {
-            emit_llvm_jit_active = false;
-        }
+        if(!try_emit_runtime_local_func_llvm_jit_instruction(llvm_jit_emit_state, instruction_begin, code_curr)) [[unlikely]] { emit_llvm_jit_active = false; }
     }
 }

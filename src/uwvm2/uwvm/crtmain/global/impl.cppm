@@ -26,6 +26,7 @@ export module uwvm2.uwvm.crtmain.global;
 export import :tzset;
 export import :ansi_win32;
 export import :consolecp_win32;
+export import :process_time;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE

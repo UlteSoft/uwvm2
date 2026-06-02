@@ -48,11 +48,11 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
     extern "C++"
-#else
+# else
     inline constexpr
-#endif
+# endif
         void runtime_compile_threads_pretreatment(char8_t const* const*& argv_curr,
                                                   char8_t const* const* argv_end,
                                                   ::uwvm2::utils::container::vector<::uwvm2::utils::cmdline::parameter_parsing_results>& pr) noexcept
@@ -82,11 +82,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         argv_curr = currp1;
     }
 
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
-#else
+# else
     UWVM_GNU_COLD inline constexpr
-#endif
+# endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_compile_threads_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
                                                                                             para_begin,
                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,

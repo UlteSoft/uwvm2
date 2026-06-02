@@ -48,11 +48,11 @@
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
 {
 #if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
-#else
+# else
     UWVM_GNU_COLD inline constexpr
-#endif
+# endif
         ::uwvm2::utils::cmdline::parameter_return_type runtime_custom_mode_callback([[maybe_unused]] ::uwvm2::utils::cmdline::parameter_parsing_results *
                                                                                         para_begin,
                                                                                     ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
@@ -63,21 +63,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         //      ^^ para_curr
 
         if(
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_int_existed ||
-#endif
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# endif
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_debug_existed ||
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_jit_existed ||
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_tiered_existed ||
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::uwvm2::uwvm::runtime::runtime_mode::is_runtime_mode_code_aot_existed ||
-#endif
+# endif
             false) [[unlikely]]
         {
             ::fast_io::io::perr(
@@ -93,32 +93,32 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                 u8"\" conflicts with shortcut runtime mode parameters "
                 u8"("
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
                 u8"--runtime-int"
-# if defined(UWVM_RUNTIME_LLVM_JIT)
+#  if defined(UWVM_RUNTIME_LLVM_JIT)
                 ,
                 u8"|"
+#  endif
 # endif
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# if defined(UWVM_RUNTIME_LLVM_JIT)
                 u8"--runtime-jit"
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                 ,
                 u8"|",
                 u8"--runtime-tiered"
-# endif
+#  endif
                 ,
                 u8"|",
                 u8"--runtime-aot"
-#endif
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+#  if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
                 ,
                 u8"|"
-# endif
+#  endif
                 ,
                 u8"--runtime-debug-int"
-#endif
+# endif
                 u8").\n"
                 u8"uwvm: ",
                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_LT_GREEN),

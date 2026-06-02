@@ -50,9 +50,9 @@
 #endif
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
-#if !(__cpp_pack_indexing >= 202311L)
-# error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
-#endif
+# if !(__cpp_pack_indexing >= 202311L)
+#  error "UWVM requires at least C++26 standard compiler. See https://en.cppreference.com/w/cpp/feature_test#cpp_pack_indexing"
+# endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
@@ -176,9 +176,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_invalid_conversion_to_integer_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
 
                 ::fast_io::fast_terminate();
             }
@@ -192,15 +192,16 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         /// @brief Trap helper used by float-to-int truncation when the conversion overflows the destination integer range.
         /// @details This is the implementation for Wasm's "integer overflow" trap (distinct from NaN invalid conversion).
         /// @note There's no need for `noreturn`; let the calling function handle it.
-        /// @note `trap_integer_overflow_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as a
+        /// @note `trap_integer_overflow_func` is expected to be set during interpreter initialization. If it is null (or returns unexpectedly), we terminate as
+        /// a
         ///       safe fallback.
         UWVM_NOINLINE UWVM_GNU_COLD [[noreturn]] inline void trap_integer_overflow() noexcept
         {
             if(::uwvm2::runtime::compiler::uwvm_int::optable::trap_integer_overflow_func == nullptr) [[unlikely]]
             {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                 ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
 
                 ::fast_io::fast_terminate();
             }
@@ -3031,9 +3032,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }
@@ -3088,9 +3089,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                         }
                         else
                         {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                             ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                             ::fast_io::fast_terminate();
                         }
                     }
@@ -3104,9 +3105,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                     }
                     else
                     {
-#if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
+# if (defined(_DEBUG) || defined(DEBUG)) && defined(UWVM_ENABLE_DETAILED_DEBUG_CHECK)
                         ::uwvm2::utils::debug::trap_and_inform_bug_pos();
-#endif
+# endif
                         ::fast_io::fast_terminate();
                     }
                 }

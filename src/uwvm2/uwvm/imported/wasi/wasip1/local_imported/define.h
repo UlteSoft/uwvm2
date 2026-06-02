@@ -614,7 +614,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::imported::wasi::wasip1::local_imported
             details::sock_shutdown
 #  endif
 
-            // wasm64
+        // wasm64
 #  if defined(UWVM_IMPORT_WASI_WASIP1_WASM64)
             ,
             details::args_get_wasm64,

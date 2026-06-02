@@ -49,20 +49,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasip1_group_socket_udp_bind_alias{u8"-I1Gudpbind"};
-#  if defined(UWVM_MODULE)
+#   if defined(UWVM_MODULE)
         extern "C++"
-#  else
+#   else
         inline constexpr
-#  endif
+#   endif
             ::uwvm2::utils::cmdline::parameter_return_type wasip1_group_socket_udp_bind_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
-    }
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+    }  // namespace details
 
-#  if defined(__clang__)
-#   pragma clang diagnostic push
-#   pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#  endif
+#   if defined(__clang__)
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wbraced-scalar-init"
+#   endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_group_socket_udp_bind{
         .name{u8"--wasip1-group-socket-udp-bind"},
         .describe{u8"Bind a WASI Preview 1 UDP socket for one named group."},
@@ -70,9 +70,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_group_socket_udp_bind_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_group_socket_udp_bind_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
-#  if defined(__clang__)
-#   pragma clang diagnostic pop
-#  endif
+#   if defined(__clang__)
+#    pragma clang diagnostic pop
+#   endif
 
 #  endif
 # endif

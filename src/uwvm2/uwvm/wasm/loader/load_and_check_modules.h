@@ -419,8 +419,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::loader
 
                                 // Keep parser storage untouched. Early dependency diagnostics still need to observe
                                 // the same import binding view that runtime initialization will apply later.
-                                if(auto const import_reset{
-                                       ::uwvm2::uwvm::wasm::storage::find_configured_import_reset_const(curr_module_name, import_module_name, import_extern_name)};
+                                if(auto const import_reset{::uwvm2::uwvm::wasm::storage::find_configured_import_reset_const(curr_module_name,
+                                                                                                                            import_module_name,
+                                                                                                                            import_extern_name)};
                                    import_reset != nullptr) [[unlikely]]
                                 {
                                     import_module_name = ::uwvm2::utils::container::u8string_view{import_reset->new_import_module_name.data(),

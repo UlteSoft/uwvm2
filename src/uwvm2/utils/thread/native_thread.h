@@ -77,13 +77,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         ::std::size_t buffer_count{};
 
         inline constexpr native_global_typed_allocator_buffer() noexcept = default;
-        inline explicit native_global_typed_allocator_buffer(::std::size_t n) noexcept : buffer{n == 0uz ? nullptr : allocator_type::allocate(n)}, buffer_count{n} {}
+
+        inline explicit native_global_typed_allocator_buffer(::std::size_t n) noexcept :
+            buffer{n == 0uz ? nullptr : allocator_type::allocate(n)}, buffer_count{n}
+        {
+        }
+
         inline constexpr native_global_typed_allocator_buffer(native_global_typed_allocator_buffer const&) noexcept = delete;
         inline constexpr native_global_typed_allocator_buffer& operator= (native_global_typed_allocator_buffer const&) noexcept = delete;
 
         inline constexpr native_global_typed_allocator_buffer(native_global_typed_allocator_buffer&& other) noexcept :
-            buffer{::std::exchange(other.buffer, nullptr)},
-            buffer_count{::std::exchange(other.buffer_count, 0uz)}
+            buffer{::std::exchange(other.buffer, nullptr)}, buffer_count{::std::exchange(other.buffer_count, 0uz)}
         {
         }
 
@@ -187,7 +191,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         ::std::atomic<lazy_compile_state> state{lazy_compile_state::uncompiled};
 
         inline constexpr lazy_compile_unit_state() noexcept = default;
+
         inline lazy_compile_unit_state(lazy_compile_unit_state const&) noexcept : state{lazy_compile_state::uncompiled} {}
+
         inline lazy_compile_unit_state& operator= (lazy_compile_unit_state const&) noexcept
         {
             this->state.store(lazy_compile_state::uncompiled, ::std::memory_order_relaxed);
@@ -195,7 +201,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         }
     };
 
-    inline void lazy_compile_notify_unit(lazy_compile_unit_state& unit) noexcept
+    inline void lazy_compile_notify_unit(lazy_compile_unit_state & unit) noexcept
     {
 #if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
         unit.state.notify_all();
@@ -242,10 +248,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
     struct lazy_compile_scheduler
     {
         struct worker_task;
+
         struct ring_slot
-        {
-            lazy_compile_request request{};
-        };
+        { lazy_compile_request request{}; };
 
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
         using native_thread_type = ::fast_io::native_thread;
@@ -386,9 +391,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 this->enqueue_failure_count.fetch_add(1uz, ::std::memory_order_relaxed);
                 expected = lazy_compile_state::queued;
                 (void)request.unit->state.compare_exchange_strong(expected,
-                                                                 lazy_compile_state::uncompiled,
-                                                                 ::std::memory_order_acq_rel,
-                                                                 ::std::memory_order_acquire);
+                                                                  lazy_compile_state::uncompiled,
+                                                                  ::std::memory_order_acq_rel,
+                                                                  ::std::memory_order_acquire);
                 this->notify_unit(*request.unit);
                 return false;
             }
@@ -450,9 +455,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                     {
                         auto expected{lazy_compile_state::uncompiled};
                         if(request.unit->state.compare_exchange_strong(expected,
-                                                                        lazy_compile_state::compiling,
-                                                                        ::std::memory_order_acq_rel,
-                                                                        ::std::memory_order_acquire))
+                                                                       lazy_compile_state::compiling,
+                                                                       ::std::memory_order_acq_rel,
+                                                                       ::std::memory_order_acquire))
                         {
                             this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                             request.compile(request.user_data);
@@ -466,9 +471,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                     {
                         auto expected{lazy_compile_state::queued};
                         if(request.unit->state.compare_exchange_strong(expected,
-                                                                        lazy_compile_state::compiling,
-                                                                        ::std::memory_order_acq_rel,
-                                                                        ::std::memory_order_acquire))
+                                                                       lazy_compile_state::compiling,
+                                                                       ::std::memory_order_acq_rel,
+                                                                       ::std::memory_order_acquire))
                         {
                             this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                             request.compile(request.user_data);
@@ -497,9 +502,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 {
                     auto expected{lazy_compile_state::uncompiled};
                     if(request.unit->state.compare_exchange_strong(expected,
-                                                                    lazy_compile_state::compiling,
-                                                                    ::std::memory_order_acq_rel,
-                                                                    ::std::memory_order_acquire))
+                                                                   lazy_compile_state::compiling,
+                                                                   ::std::memory_order_acq_rel,
+                                                                   ::std::memory_order_acquire))
                     {
                         this->inline_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
                         request.compile(request.user_data);
@@ -530,10 +535,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             }
         }
 
-        inline void notify_unit(lazy_compile_unit_state& unit) noexcept
-        {
-            lazy_compile_notify_unit(unit);
-        }
+        inline void notify_unit(lazy_compile_unit_state& unit) noexcept { lazy_compile_notify_unit(unit); }
 
         inline void mark_failed(lazy_compile_unit_state& unit) noexcept
         {
@@ -563,10 +565,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             }
 
             ::std::size_t write_index{};
-            if(request.priority == 0u)
-            {
-                write_index = (this->queue_head + current_count) % this->queue_capacity;
-            }
+            if(request.priority == 0u) { write_index = (this->queue_head + current_count) % this->queue_capacity; }
             else
             {
                 this->queue_head = this->queue_head == 0uz ? this->queue_capacity - 1uz : this->queue_head - 1uz;
@@ -628,15 +627,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void wait_for_unit_event(lazy_compile_unit_state& unit, lazy_compile_state observed_state) noexcept
         {
 #if defined(UWVM_UTILS_THREAD_HAS_STD_ATOMIC_WAIT)
-            while(unit.state.load(::std::memory_order_acquire) == observed_state)
-            {
-                unit.state.wait(observed_state, ::std::memory_order_acquire);
-            }
+            while(unit.state.load(::std::memory_order_acquire) == observed_state) { unit.state.wait(observed_state, ::std::memory_order_acquire); }
 #else
-            while(unit.state.load(::std::memory_order_acquire) == observed_state)
-            {
-                lazy_compile_thread_yield();
-            }
+            while(unit.state.load(::std::memory_order_acquire) == observed_state) { lazy_compile_thread_yield(); }
 #endif
         }
 
@@ -654,15 +647,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         inline void complete_request(lazy_compile_unit_state& unit) noexcept
         {
             auto expected{lazy_compile_state::compiling};
-            if(!unit.state.compare_exchange_strong(expected,
-                                                   lazy_compile_state::compiled,
-                                                   ::std::memory_order_release,
-                                                   ::std::memory_order_acquire))
+            if(!unit.state.compare_exchange_strong(expected, lazy_compile_state::compiled, ::std::memory_order_release, ::std::memory_order_acquire))
             {
-                if(expected != lazy_compile_state::failed)
-                {
-                    unit.state.store(lazy_compile_state::compiled, ::std::memory_order_release);
-                }
+                if(expected != lazy_compile_state::failed) { unit.state.store(lazy_compile_state::compiled, ::std::memory_order_release); }
             }
             this->notify_unit(unit);
         }
@@ -678,7 +665,10 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
             }
 
             if(worker_thread) { this->worker_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
-            else { this->helper_compile_count.fetch_add(1uz, ::std::memory_order_relaxed); }
+            else
+            {
+                this->helper_compile_count.fetch_add(1uz, ::std::memory_order_relaxed);
+            }
             request.compile(request.user_data);
             this->complete_request(*request.unit);
         }
@@ -741,22 +731,33 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         struct promise_type
         {
             [[nodiscard]] inline constexpr worker_task get_return_object() noexcept { return worker_task{handle_type::from_promise(*this)}; }
+
             [[nodiscard]] inline static constexpr worker_task get_return_object_on_allocation_failure() noexcept { return {}; }
+
             [[nodiscard]] inline constexpr ::std::suspend_always initial_suspend() const noexcept { return {}; }
+
             [[nodiscard]] inline constexpr ::std::suspend_always final_suspend() const noexcept { return {}; }
+
             inline constexpr void return_void() const noexcept {}
+
             [[noreturn]] inline void unhandled_exception() const noexcept { ::fast_io::fast_terminate(); }
+
             [[nodiscard]] inline static void* operator new (::std::size_t n) noexcept { return ::fast_io::native_global_allocator::allocate(n); }
+
             inline static void operator delete (void* p) noexcept { ::fast_io::native_global_allocator::deallocate(p); }
+
             inline static void operator delete (void* p, ::std::size_t n) noexcept { ::fast_io::native_global_allocator::deallocate_n(p, n); }
         };
 
         handle_type handle{};
 
         inline constexpr worker_task() noexcept = default;
+
         inline constexpr explicit worker_task(handle_type h) noexcept : handle{h} {}
+
         inline constexpr worker_task(worker_task const&) noexcept = delete;
         inline constexpr worker_task& operator= (worker_task const&) noexcept = delete;
+
         inline constexpr worker_task(worker_task&& other) noexcept : handle{other.handle} { other.handle = {}; }
 
         inline constexpr worker_task& operator= (worker_task&& other) noexcept
@@ -851,19 +852,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
                 auto handle{task.release()};
                 if(!handle) [[unlikely]] { ::fast_io::fast_terminate(); }
 
-#  ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                 try
-#  endif
+# endif
                 {
                     ::std::construct_at(this->workers.buffer + this->worker_count, native_thread_type{[handle]() noexcept { handle.resume(); }});
                 }
-#  ifdef UWVM_CPP_EXCEPTIONS
+# ifdef UWVM_CPP_EXCEPTIONS
                 catch(...)
                 {
                     handle.destroy();
                     throw;
                 }
-#  endif
+# endif
 
                 ::std::construct_at(this->worker_handles.buffer + this->worker_count, handle);
                 ++this->worker_count;
@@ -886,13 +887,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
         ::std::size_t handle_count{};
 
         inline constexpr scheduled_task_batch() noexcept = default;
+
         inline explicit scheduled_task_batch(::std::size_t n) noexcept : handles{n} {}
+
         inline constexpr scheduled_task_batch(scheduled_task_batch const&) noexcept = delete;
         inline constexpr scheduled_task_batch& operator= (scheduled_task_batch const&) noexcept = delete;
 
         inline constexpr scheduled_task_batch(scheduled_task_batch&& other) noexcept :
-            handles{::std::move(other.handles)},
-            handle_count{::std::exchange(other.handle_count, 0uz)}
+            handles{::std::move(other.handles)}, handle_count{::std::exchange(other.handle_count, 0uz)}
         {
         }
 
@@ -952,8 +954,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::utils::thread
 
         inline constexpr native_thread_pool([[maybe_unused]] native_thread_pool&& other) noexcept
 #ifdef UWVM_UTILS_HAS_FAST_IO_NATIVE_THREAD
-            : workers{::std::move(other.workers)},
-              worker_count{::std::exchange(other.worker_count, 0uz)}
+            : workers{::std::move(other.workers)}, worker_count{::std::exchange(other.worker_count, 0uz)}
 #endif
         {
         }

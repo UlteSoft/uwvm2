@@ -78,10 +78,7 @@ case wasm1_code::call:
     auto const param_count{static_cast<::std::size_t>(callee_type.parameter.end - callee_type.parameter.begin)};
     auto const result_count{static_cast<::std::size_t>(callee_type.result.end - callee_type.result.begin)};
 
-    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]]
-    {
-        report_operand_stack_underflow(op_begin, u8"call", param_count);
-    }
+    if(!is_polymorphic && concrete_operand_count() < param_count) [[unlikely]] { report_operand_stack_underflow(op_begin, u8"call", param_count); }
 
     // Type-check arguments when the stack is non-polymorphic.
     if(param_count != 0uz)

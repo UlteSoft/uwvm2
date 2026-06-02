@@ -121,18 +121,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"sock_accept_wasm64(",
-                                sock_fd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_fd_ptrsz),
-#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_addr_ptrsz),
-#  endif
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"sock_accept_wasm64(",
+                sock_fd,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_fd_ptrsz),
+# ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_addr_ptrsz),
+# endif
+                u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

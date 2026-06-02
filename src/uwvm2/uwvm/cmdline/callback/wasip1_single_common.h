@@ -73,9 +73,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         }
 
         [[nodiscard]] inline override_state_t* find_created_single(::uwvm2::utils::container::u8string_view module_name) noexcept
-        {
-            return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_targetless_wasip1_module_override(module_name);
-        }
+        { return ::uwvm2::uwvm::imported::wasi::wasip1::storage::find_targetless_wasip1_module_override(module_name); }
 
         [[nodiscard]] inline parameter_return_type apply_action(::uwvm2::utils::cmdline::parameter const& parameter,
                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results* para_curr,
@@ -90,14 +88,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             }
 
             auto target{find_created_single(module_name)};
-            if(target == nullptr) [[unlikely]]
-            {
-                return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 single module does not exist.");
-            }
+            if(target == nullptr) [[unlikely]] { return wasip1_module_details::print_usage_error(parameter, u8"WASI Preview 1 single module does not exist."); }
 
             return wasip1_module_details::apply_target_action(parameter, module_arg, para_end, *target, action);
         }
-    }
+    }  // namespace wasip1_single_details
 
 # endif
 #endif

@@ -64,6 +64,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
         code_size
     };
 
+#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    enum class runtime_llvm_jit_optimization_level_t : unsigned
+    {
+        default_level,
+        none,
+        less,
+        mid,
+        aggressive
+    };
+#endif
+
     inline bool custom_runtime_mode_existed{};      // [global]
     inline bool custom_runtime_compiler_existed{};  // [global]
 
@@ -129,20 +140,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief Whether runtime LLVM IR verification is disabled by command line.
-    inline bool runtime_disable_llvm_ir_verifaction{};  // [global]
+    /// @brief Whether the runtime LLVM JIT optimization level was explicitly configured.
+    inline bool runtime_llvm_jit_optimization_level_existed{};  // [global]
+
+    /// @brief Runtime LLVM JIT optimization level override.
+    /// @details `default_level` preserves each LLVM JIT policy's existing default.
+    inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{runtime_llvm_jit_optimization_level_t::default_level};  // [global]
+
+    /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
+    inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]
+#endif
+
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+    /// @brief Whether Tier 0 uwvm-int lazy interpreter fallback is disabled in tiered mode.
+    inline bool runtime_tiered_disable_uwvm_int_lazy_interpreter{};  // [global]
+
+    /// @brief Whether Tier 2 background full-module LLVM JIT is disabled in tiered mode.
+    inline bool runtime_tiered_disable_llvm_full_jit{};  // [global]
 #endif
 
     /// @brief   The global runtime mode.
-    /// @details default = full_compile
-    /// @todo    set default to lazy_compile
+    /// @details default = lazy_compile
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t global_runtime_mode{
-        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::full_compile
-    };  // [global]
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_mode_t::lazy_compile};  // [global]
 
-     /// @todo    set default to uwvm_interpreter_llvm_jit_tiered
+    /// @brief   The global runtime compiler backend.
+    /// @details default = uwvm_interpreter_llvm_jit_tiered when the tiered backend is available
     inline ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t global_runtime_compiler{
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+        ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered
+#elif defined(UWVM_RUNTIME_LLVM_JIT)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only
 #elif defined(UWVM_RUNTIME_UWVM_INTERPRETER)
         ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_only

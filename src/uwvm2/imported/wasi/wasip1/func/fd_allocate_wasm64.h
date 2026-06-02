@@ -109,14 +109,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"fd_allocate_wasm64(",
-                                fd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"fd_allocate_wasm64(",
+                fd,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(offset)>>>(offset),
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(len)>>>(len),
+                u8")");
         }
 
         return ::uwvm2::imported::wasi::wasip1::func::fd_allocate_base(env, fd, offset, len);

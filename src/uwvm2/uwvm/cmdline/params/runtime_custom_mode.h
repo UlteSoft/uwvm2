@@ -46,20 +46,20 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view runtime_custom_mode_alias{u8"-Rcm"};
-#if defined(UWVM_MODULE)
+# if defined(UWVM_MODULE)
         extern "C++"
-#else
+# else
         inline constexpr
-#endif
+# endif
             ::uwvm2::utils::cmdline::parameter_return_type runtime_custom_mode_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
                                                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
-#if defined(__clang__)
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wbraced-scalar-init"
+# endif
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_custom_mode{
         .name{u8"--runtime-custom-mode"},
         .describe{u8"Select the runtime compilation mode."},
@@ -68,9 +68,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .handle{::std::addressof(details::runtime_custom_mode_callback)},
         .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::custom_runtime_mode_existed)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
-#if defined(__clang__)
-# pragma clang diagnostic pop
-#endif
+# if defined(__clang__)
+#  pragma clang diagnostic pop
+# endif
 #endif
 }  // namespace uwvm2::uwvm::cmdline::params
 

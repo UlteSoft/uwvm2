@@ -1,3 +1,9 @@
+struct tiered_loop_reentry_storage_t
+{
+    ::std::size_t wasm_code_offset{};
+    ::std::uint_least32_t entry_id{};
+};
+
 struct local_func_storage_t
 {
     ::uwvm2::uwvm::runtime::storage::wasm_binfmt1_final_function_type_t const* function_type_ptr{};
@@ -7,6 +13,7 @@ struct local_func_storage_t
     ::std::size_t module_id{};
     ::std::size_t function_index{};
     ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const* runtime_module_ptr{};
+    ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t> tiered_loop_reentries{};
 };
 
 struct llvm_jit_module_storage_t
@@ -19,6 +26,7 @@ struct llvm_jit_module_storage_t
     llvm_jit_module_storage_t(llvm_jit_module_storage_t const&) = delete;
     llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t const&) = delete;
     llvm_jit_module_storage_t(llvm_jit_module_storage_t&&) noexcept = default;
+
     llvm_jit_module_storage_t& operator= (llvm_jit_module_storage_t&& other) noexcept
     {
         if(this == ::std::addressof(other)) [[unlikely]] { return *this; }
@@ -45,9 +53,7 @@ struct full_function_symbol_t
     ::std::size_t operand_stack_byte_max{};
 };
 
-inline constexpr bool default_verify_llvm_jit_ir{
-    true
-};
+inline constexpr bool default_verify_llvm_jit_ir{true};
 
 struct compile_option
 {
@@ -58,6 +64,8 @@ struct compile_option
     ::std::size_t lazy_defined_raw_call_target_count{};
     ::std::uintptr_t lazy_defined_typed_entry_target_base_address{};
     ::std::size_t lazy_defined_typed_entry_target_count{};
+    bool lazy_defined_targets_are_atomic{};
+    bool emit_tiered_loop_reentry_entries{};
 };
 
 enum class compile_task_split_policy_t : unsigned
@@ -567,7 +575,11 @@ namespace details
                                                       ::std::uintptr_t lazy_defined_raw_call_target_base_address = 0u,
                                                       ::std::size_t lazy_defined_raw_call_target_count = 0uz,
                                                       ::std::uintptr_t lazy_defined_typed_entry_target_base_address = 0u,
-                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz) UWVM_THROWS
+                                                      ::std::size_t lazy_defined_typed_entry_target_count = 0uz,
+                                                      bool lazy_defined_targets_are_atomic = false,
+                                                      bool emit_tiered_loop_reentry_entries = false,
+                                                      ::uwvm2::utils::container::vector<tiered_loop_reentry_storage_t>* tiered_loop_reentries_out = nullptr)
+        UWVM_THROWS
     {
         auto const function_index{local_func_storage.function_index};
         auto const code_begin{local_func_storage.code_begin};
@@ -814,18 +826,18 @@ namespace details
         auto code_curr{code_begin};
 
         runtime_local_func_llvm_jit_emit_state_t llvm_jit_emit_state{};
-        bool emit_llvm_jit_active{
-            emitted_llvm_jit_ir_storage != nullptr &&
-            try_prepare_runtime_local_func_llvm_jit_emit_state(
-                local_func_storage,
-                *emitted_llvm_jit_ir_storage,
-                llvm_jit_emit_state,
-                verify_llvm_jit_ir,
-                route_wasm_calls_through_runtime_bridge,
-                lazy_defined_raw_call_target_base_address,
-                lazy_defined_raw_call_target_count,
-                lazy_defined_typed_entry_target_base_address,
-                lazy_defined_typed_entry_target_count)};
+        bool emit_llvm_jit_active{emitted_llvm_jit_ir_storage != nullptr &&
+                                  try_prepare_runtime_local_func_llvm_jit_emit_state(local_func_storage,
+                                                                                     *emitted_llvm_jit_ir_storage,
+                                                                                     llvm_jit_emit_state,
+                                                                                     verify_llvm_jit_ir,
+                                                                                     route_wasm_calls_through_runtime_bridge,
+                                                                                     lazy_defined_raw_call_target_base_address,
+                                                                                     lazy_defined_raw_call_target_count,
+                                                                                     lazy_defined_typed_entry_target_base_address,
+                                                                                     lazy_defined_typed_entry_target_count,
+                                                                                     lazy_defined_targets_are_atomic,
+                                                                                     emit_tiered_loop_reentry_entries)};
 
         using wasm_value_type = ::uwvm2::parser::wasm::standard::wasm1::type::value_type;
 
@@ -979,8 +991,7 @@ namespace details
                                              report_operand_stack_underflow(op_begin, op_name, 1uz);
                                          }
 
-                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack &&
-                                                                                         addr.type != curr_operand_stack_value_type::i32)
+                                         if(auto const addr{try_pop_concrete_operand()}; addr.from_stack && addr.type != curr_operand_stack_value_type::i32)
                                              [[unlikely]]
                                          {
                                              err.err_curr = op_begin;
@@ -993,90 +1004,90 @@ namespace details
                                          operand_stack_push(result_type);
                                      }};
 
-        auto const validate_mem_store{
-            [&](::uwvm2::utils::container::u8string_view op_name,
-                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 const max_align,
-                curr_operand_stack_value_type const expected_value_type) constexpr UWVM_THROWS
-            {
-                auto const op_begin{code_curr};
-                ++code_curr;
+        auto const validate_mem_store{[&](::uwvm2::utils::container::u8string_view op_name,
+                                          ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 const max_align,
+                                          curr_operand_stack_value_type const expected_value_type) constexpr UWVM_THROWS
+                                      {
+                                          auto const op_begin{code_curr};
+                                          ++code_curr;
 
-                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
-                ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
+                                          ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 align;   // No initialization necessary
+                                          ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u32 offset;  // No initialization necessary
 
-                using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
+                                          using char8_t_const_may_alias_ptr UWVM_GNU_MAY_ALIAS = char8_t const*;
 
-                auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                            reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                            ::fast_io::mnp::leb128_get(align))};
-                if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_code = code_validation_error_code::invalid_memarg_align;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
-                }
+                                          auto const [align_next, align_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                                      reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                                      ::fast_io::mnp::leb128_get(align))};
+                                          if(align_err != ::fast_io::parse_code::ok) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_code = code_validation_error_code::invalid_memarg_align;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(align_err);
+                                          }
 
-                code_curr = reinterpret_cast<::std::byte const*>(align_next);
+                                          code_curr = reinterpret_cast<::std::byte const*>(align_next);
 
-                auto const [offset_next, offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
-                                                                              reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
-                                                                              ::fast_io::mnp::leb128_get(offset))};
-                if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_code = code_validation_error_code::invalid_memarg_offset;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
-                }
+                                          auto const [offset_next,
+                                                      offset_err]{::fast_io::parse_by_scan(reinterpret_cast<char8_t_const_may_alias_ptr>(code_curr),
+                                                                                           reinterpret_cast<char8_t_const_may_alias_ptr>(code_end),
+                                                                                           ::fast_io::mnp::leb128_get(offset))};
+                                          if(offset_err != ::fast_io::parse_code::ok) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_code = code_validation_error_code::invalid_memarg_offset;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(offset_err);
+                                          }
 
-                code_curr = reinterpret_cast<::std::byte const*>(offset_next);
+                                          code_curr = reinterpret_cast<::std::byte const*>(offset_next);
 
-                if(all_memory_count == 0u) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.no_memory.op_code_name = op_name;
-                    err.err_selectable.no_memory.align = align;
-                    err.err_selectable.no_memory.offset = offset;
-                    err.err_code = code_validation_error_code::no_memory;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                          if(all_memory_count == 0u) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_selectable.no_memory.op_code_name = op_name;
+                                              err.err_selectable.no_memory.align = align;
+                                              err.err_selectable.no_memory.offset = offset;
+                                              err.err_code = code_validation_error_code::no_memory;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                          }
 
-                if(align > max_align) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.illegal_memarg_alignment.op_code_name = op_name;
-                    err.err_selectable.illegal_memarg_alignment.align = align;
-                    err.err_selectable.illegal_memarg_alignment.max_align = max_align;
-                    err.err_code = code_validation_error_code::illegal_memarg_alignment;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                          if(align > max_align) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_selectable.illegal_memarg_alignment.op_code_name = op_name;
+                                              err.err_selectable.illegal_memarg_alignment.align = align;
+                                              err.err_selectable.illegal_memarg_alignment.max_align = max_align;
+                                              err.err_code = code_validation_error_code::illegal_memarg_alignment;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                          }
 
-                if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
-                {
-                    report_operand_stack_underflow(op_begin, op_name, 2uz);
-                }
+                                          if(!is_polymorphic && concrete_operand_count() < 2uz) [[unlikely]]
+                                          {
+                                              report_operand_stack_underflow(op_begin, op_name, 2uz);
+                                          }
 
-                auto const value{try_pop_concrete_operand()};
-                auto const addr{try_pop_concrete_operand()};
+                                          auto const value{try_pop_concrete_operand()};
+                                          auto const addr{try_pop_concrete_operand()};
 
-                if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
-                    err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
-                    err.err_code = code_validation_error_code::memarg_address_type_not_i32;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
+                                          if(addr.from_stack && addr.type != curr_operand_stack_value_type::i32) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_selectable.memarg_address_type_not_i32.op_code_name = op_name;
+                                              err.err_selectable.memarg_address_type_not_i32.addr_type = addr.type;
+                                              err.err_code = code_validation_error_code::memarg_address_type_not_i32;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                          }
 
-                if(value.from_stack && value.type != expected_value_type) [[unlikely]]
-                {
-                    err.err_curr = op_begin;
-                    err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
-                    err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_value_type);
-                    err.err_selectable.store_value_type_mismatch.actual_type = value.type;
-                    err.err_code = code_validation_error_code::store_value_type_mismatch;
-                    ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
-                }
-            }};
+                                          if(value.from_stack && value.type != expected_value_type) [[unlikely]]
+                                          {
+                                              err.err_curr = op_begin;
+                                              err.err_selectable.store_value_type_mismatch.op_code_name = op_name;
+                                              err.err_selectable.store_value_type_mismatch.expected_type = static_cast<wasm_value_type>(expected_value_type);
+                                              err.err_selectable.store_value_type_mismatch.actual_type = value.type;
+                                              err.err_code = code_validation_error_code::store_value_type_mismatch;
+                                              ::uwvm2::parser::wasm::base::throw_wasm_parse_code(::fast_io::parse_code::invalid);
+                                          }
+                                      }};
 
 #include "single_func_validation_dispatch.h"
     }
@@ -1121,17 +1132,19 @@ namespace details
     {
         local_func_storage_t local_func_storage{get_runtime_local_func_storage(curr_module, local_function_idx, err)};
         local_func_storage.module_id = options.curr_wasm_id;
-        validate_runtime_local_func(
-            validation_module,
-            local_func_storage,
-            err,
-            emitted_llvm_jit_ir_storage,
-            options.verify_llvm_jit_ir,
-            options.route_wasm_calls_through_runtime_bridge,
-            options.lazy_defined_raw_call_target_base_address,
-            options.lazy_defined_raw_call_target_count,
-            options.lazy_defined_typed_entry_target_base_address,
-            options.lazy_defined_typed_entry_target_count);
+        validate_runtime_local_func(validation_module,
+                                    local_func_storage,
+                                    err,
+                                    emitted_llvm_jit_ir_storage,
+                                    options.verify_llvm_jit_ir,
+                                    options.route_wasm_calls_through_runtime_bridge,
+                                    options.lazy_defined_raw_call_target_base_address,
+                                    options.lazy_defined_raw_call_target_count,
+                                    options.lazy_defined_typed_entry_target_base_address,
+                                    options.lazy_defined_typed_entry_target_count,
+                                    options.lazy_defined_targets_are_atomic,
+                                    options.emit_tiered_loop_reentry_entries,
+                                    ::std::addressof(local_func_storage.tiered_loop_reentries));
         return local_func_storage;
     }
 
@@ -1145,12 +1158,8 @@ namespace details
     {
         for(::std::size_t local_function_idx{task_group.begin_index}; local_function_idx != task_group.end_index; ++local_function_idx)
         {
-            storage.local_funcs.index_unchecked(local_function_idx) = compile_all_from_uwvm_local_func(curr_module,
-                                                                                                       validation_module,
-                                                                                                       options,
-                                                                                                       local_function_idx,
-                                                                                                       err,
-                                                                                                       emitted_llvm_jit_ir_storage);
+            storage.local_funcs.index_unchecked(local_function_idx) =
+                compile_all_from_uwvm_local_func(curr_module, validation_module, options, local_function_idx, err, emitted_llvm_jit_ir_storage);
         }
     }
 
@@ -1203,8 +1212,7 @@ namespace details
         try
 #endif
         {
-            compile_all_from_uwvm_local_func_group(
-                curr_module, validation_module, options, storage, task_group, local_err, emitted_llvm_jit_ir_storage);
+            compile_all_from_uwvm_local_func_group(curr_module, validation_module, options, storage, task_group, local_err, emitted_llvm_jit_ir_storage);
         }
 #ifdef UWVM_CPP_EXCEPTIONS
         catch(::fast_io::error const&)
@@ -1520,12 +1528,11 @@ inline constexpr void validate_runtime_wasm_code_for_module(::uwvm2::uwvm::runti
     return split_config;
 }
 
-[[nodiscard]] inline ::std::size_t resolve_effective_adaptive_extra_compile_threads(
-    ::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
-    compile_task_split_config split_config,
-    ::std::size_t extra_compile_threads_upper_bound,
-    ::std::size_t target_task_groups_per_adjusted_compile_thread,
-    bool split_was_adjusted) noexcept
+[[nodiscard]] inline ::std::size_t resolve_effective_adaptive_extra_compile_threads(::uwvm2::uwvm::runtime::storage::wasm_module_storage_t const& curr_module,
+                                                                                    compile_task_split_config split_config,
+                                                                                    ::std::size_t extra_compile_threads_upper_bound,
+                                                                                    ::std::size_t target_task_groups_per_adjusted_compile_thread,
+                                                                                    bool split_was_adjusted) noexcept
 {
     auto const useful_extra_compile_threads{
         ::uwvm2::utils::thread::clamp_extra_worker_count(details::calculate_local_function_task_group_count(curr_module, split_config),
@@ -1565,15 +1572,13 @@ inline full_function_symbol_t compile_all_from_uwvm(::uwvm2::uwvm::runtime::stor
             auto const emit_llvm_jit_active{details::try_prepare_runtime_llvm_jit_module_storage(curr_module, storage.llvm_jit_module)};
             for(::std::size_t local_function_idx{}; local_function_idx != local_func_count; ++local_function_idx)
             {
-                storage.local_funcs.index_unchecked(local_function_idx) = details::compile_all_from_uwvm_local_func(curr_module,
-                                                                                                                     validation_module,
-                                                                                                                     options,
-                                                                                                                     local_function_idx,
-                                                                                                                     err,
-                                                                                                                     emit_llvm_jit_active
-                                                                                                                         ? ::std::addressof(
-                                                                                                                               storage.llvm_jit_module)
-                                                                                                                         : nullptr);
+                storage.local_funcs.index_unchecked(local_function_idx) =
+                    details::compile_all_from_uwvm_local_func(curr_module,
+                                                              validation_module,
+                                                              options,
+                                                              local_function_idx,
+                                                              err,
+                                                              emit_llvm_jit_active ? ::std::addressof(storage.llvm_jit_module) : nullptr);
             }
             static_cast<void>(details::finalize_runtime_llvm_jit_module_storage(storage.llvm_jit_module, options.verify_llvm_jit_ir));
         }};

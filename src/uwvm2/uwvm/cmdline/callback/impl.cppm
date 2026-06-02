@@ -33,6 +33,7 @@ export import :debug_test;
 
 // wasm
 export import :wasm_set_main_module_name;
+export import :wasm_set_start_func;
 export import :wasm_preload_library;
 export import :wasm_register_dl;
 export import :wasm_reset_import;
@@ -49,6 +50,7 @@ export import :runtime_custom_compiler;
 export import :runtime_compiler_log;
 export import :runtime_compile_threads;
 export import :runtime_scheduling_policy;
+export import :runtime_llvm_jit_optimization_level;
 export import :runtime_debug_int;
 export import :runtime_int;
 export import :runtime_jit;

@@ -113,9 +113,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     }
 
     struct wasi_addr_ip6_t
-    {
-        ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n[16];
-    };
+    { ::uwvm2::parser::wasm::standard::wasm1::type::wasm_u8 n[16]; };
 
     inline constexpr ::std::size_t size_of_wasi_addr_ip6_t{16uz};
 
@@ -197,18 +195,19 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"sock_accept(",
-                                sock_fd,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_fd_ptrsz),
-#  ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_addr_ptrsz),
-#  endif
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"sock_accept(",
+                sock_fd,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(fd_flags)>>>(fd_flags),
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_fd_ptrsz),
+# ifdef UWVM_IMPORT_WASI_WASIP1_SUPPORT_WASIX_SOCKET
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_addr_ptrsz),
+# endif
+                u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

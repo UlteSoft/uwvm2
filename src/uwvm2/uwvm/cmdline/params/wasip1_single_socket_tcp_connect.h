@@ -49,20 +49,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline constexpr ::uwvm2::utils::container::u8string_view wasip1_single_socket_tcp_connect_alias{u8"-I1Stcpcon"};
-#  if defined(UWVM_MODULE)
+#   if defined(UWVM_MODULE)
         extern "C++"
-#  else
+#   else
         inline constexpr
-#  endif
-            ::uwvm2::utils::cmdline::parameter_return_type wasip1_single_socket_tcp_connect_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
-    }
+#   endif
+            ::uwvm2::utils::cmdline::parameter_return_type
+            wasip1_single_socket_tcp_connect_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                      ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+    }  // namespace details
 
-#  if defined(__clang__)
-#   pragma clang diagnostic push
-#   pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#  endif
+#   if defined(__clang__)
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wbraced-scalar-init"
+#   endif
     inline constexpr ::uwvm2::utils::cmdline::parameter wasip1_single_socket_tcp_connect{
         .name{u8"--wasip1-single-socket-tcp-connect"},
         .describe{u8"Connect a WASI Preview 1 TCP client socket for one single module."},
@@ -70,9 +71,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::wasip1_single_socket_tcp_connect_alias), 1uz}},
         .handle{::std::addressof(details::wasip1_single_socket_tcp_connect_callback)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};
-#  if defined(__clang__)
-#   pragma clang diagnostic pop
-#  endif
+#   if defined(__clang__)
+#    pragma clang diagnostic pop
+#   endif
 
 #  endif
 # endif

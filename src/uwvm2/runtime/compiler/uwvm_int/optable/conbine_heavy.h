@@ -59,7 +59,7 @@
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 {
-#ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
+# ifdef UWVM_ENABLE_UWVM_INT_HEAVY_COMBINE_OPS
 
     // ========================
     // Heavy combined opcodes (dense_compute / rare patterns)
@@ -1436,7 +1436,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     // These patterns (e.g. `local.get a; local.get b; f32.add`) are code-size heavy because they create a full family
     // of `*_2localget` opfuncs for {add,sub,mul,div,min,max} and both f32/f64.
     // They are therefore only built in `extra` mode.
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
     template <uwvm_interpreter_translate_option_t CompileOption, numeric_details::float_binop Op, ::std::size_t curr_stack_top, uwvm_int_stack_top_type... Type>
         requires (CompileOption.is_tail_call)
@@ -1684,7 +1684,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     /// - `type[0]` layout: see @ref uwvmint_conbine_byref_layout.
     /// - Immediates: `local_offset_t` (lhs), `local_offset_t` (rhs).
 
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
     // ----------------------------------------
     // float: local.get + unop (push T)
@@ -4053,9 +4053,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_i32 const b{conbine_details::load_local<wasm_i32>(type...[2u], b_off)};
         wasm_i32 const rem{numeric_details::eval_int_binop<numeric_details::int_binop::rem_u, wasm_i32, numeric_details::wasm_u32>(a, b)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(rem == wasm_i32{})
         {
             type...[0] = jmp_ip;
@@ -4139,9 +4139,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         conbine_details::store_local(type...[2u], i_off, next_i);
         bool const take_branch{details::eval_int_cmp<details::int_cmp::lt_u, wasm_i32, conbine_details::wasm_u32>(next_i, end)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -4226,9 +4226,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         wasm_f64 const next_i_d{static_cast<wasm_f64>(static_cast<::std::uint_least32_t>(next_i))};
         bool const lt{details::eval_float_cmp<details::float_cmp::lt, wasm_f64>(sqrt_n, next_i_d)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(!lt)
         {
             type...[0] = jmp_ip;
@@ -4806,9 +4806,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs);
         }
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -5105,9 +5105,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         bool const take_branch{details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -5197,9 +5197,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
         bool const take_branch{details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -5332,9 +5332,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -5431,9 +5431,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
             take_branch = !details::eval_float_cmp<Cmp, wasm_f64>(lhs, rhs);
         }
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
         [[clang::nomerge]]
-# endif
+#  endif
         if(take_branch)
         {
             type...[0] = jmp_ip;
@@ -5863,7 +5863,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f32_sub_from_imm_localget<Opt, Type...>; }
             };
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f32_add_2localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -5930,7 +5930,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f32_binop_2localget<Opt, numeric_details::float_binop::max, Type...>; }
             };
 
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             struct f32_abs_localget_op
             {
@@ -6098,7 +6098,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f64_sub_from_imm_localget<Opt, Type...>; }
             };
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f64_add_2localget_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -6173,7 +6173,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_f64_binop_2localget<Opt, numeric_details::float_binop::max, Type...>; }
             };
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             struct f64_abs_localget_op
             {
@@ -6363,7 +6363,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 { return uwvmint_f32_select_local_settee<Opt, true, Type...>; }
             };
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
             struct f32_add_2localget_local_tee_op
             {
                 template <uwvm_interpreter_translate_option_t Opt, ::std::size_t Pos, uwvm_int_stack_top_type... Type>
@@ -6385,7 +6385,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                 inline static constexpr uwvm_interpreter_opfunc_byref_t<Type...> fptr_byref() noexcept
                 { return uwvmint_f64_add_2localget_local_settee<Opt, true, Type...>; }
             };
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
             // Common-strength 2-local add update fusion (non-extra).
             struct f32_add_2localget_local_tee_common_op
@@ -7960,7 +7960,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                     Type...>(curr.f64_stack_top_curr_pos);
         }
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // f32 add/sub/mul/div/min/max (2localget)
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -8099,7 +8099,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f32_max_2localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f32_max_2localget_fptr<CompileOption, TypeInTuple...>(curr); }
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         // f32 unary
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -8442,7 +8442,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                     ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_sub_from_imm_localget_fptr<CompileOption, TypeInTuple...>(curr); }
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // f64 add/sub/mul/div/min/max (2localget)
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -8588,7 +8588,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f64_max_2localget_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                             ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_max_2localget_fptr<CompileOption, TypeInTuple...>(curr); }
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         // f64 unary
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
@@ -9754,7 +9754,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
                                                                                 ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_i64_mac_local_set_acc_fptr<CompileOption, TypeInTuple...>(curr); }
 
-# ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  ifdef UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
         // update_local: add_2localget -> local.set/local.tee
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -9861,7 +9861,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         inline constexpr auto get_uwvmint_f64_add_2localget_local_tee_fptr_from_tuple(uwvm_interpreter_stacktop_currpos_t const& curr,
                                                                                       ::uwvm2::utils::container::tuple<TypeInTuple...> const&) noexcept
         { return get_uwvmint_f64_add_2localget_local_tee_fptr<CompileOption, TypeInTuple...>(curr); }
-# endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
+#  endif  // UWVM_ENABLE_UWVM_INT_EXTRA_HEAVY_COMBINE_OPS
 
         template <uwvm_interpreter_translate_option_t CompileOption, uwvm_int_stack_top_type... Type>
             requires (CompileOption.is_tail_call)
@@ -11476,9 +11476,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             bool const take_branch{details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
             [[clang::nomerge]]
-# endif
+#  endif
             if(take_branch)
             {
                 type...[0] = jmp_ip;
@@ -11560,9 +11560,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             bool const take_branch{details::eval_float_cmp<Cmp, wasm_f32>(lhs, rhs)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
             [[clang::nomerge]]
-# endif
+#  endif
             if(take_branch)
             {
                 type...[0] = jmp_ip;
@@ -11638,9 +11638,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
 
             bool const take_branch{details::eval_int_cmp<Cmp, wasm_i32, wasm_u32>(lhs, cmp_imm)};
 
-# if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
+#  if UWVM_HAS_CPP_ATTRIBUTE(clang::nomerge)
             [[clang::nomerge]]
-# endif
+#  endif
             if(take_branch)
             {
                 type...[0] = jmp_ip;
@@ -14048,7 +14048,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         { return get_uwvmint_f64_store_local_plus_imm_fptr<CompileOption, TypeInTuple...>(curr_stacktop); }
 
     }  // namespace translate
-#endif
+# endif
 }  // namespace uwvm2::runtime::compiler::uwvm_int::optable
 #endif
 

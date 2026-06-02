@@ -32,7 +32,7 @@ template <bool upper = false, bool fll = false, bool showpos = false, typename T
 inline constexpr auto percentage_conventional(T num, U deno) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, false,
+		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, false, false,
 												  ::fast_io::manipulators::percentage_flag::percent>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -44,7 +44,7 @@ template <bool upper = false, bool fll = false, bool showpos = false, typename T
 inline constexpr auto comma_percentage_conventional(T num, U deno) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, true,
+		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, true, false,
 												  ::fast_io::manipulators::percentage_flag::percent>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -52,12 +52,12 @@ inline constexpr auto comma_percentage_conventional(T num, U deno) noexcept
 }
 
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
-		  typename T, typename U>
+		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto base_percentage_conventional(T num, U deno) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, false,
+		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, false, modern_octal,
 												  ::fast_io::manipulators::percentage_flag::percent>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -65,12 +65,12 @@ inline constexpr auto base_percentage_conventional(T num, U deno) noexcept
 }
 
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
-		  typename T, typename U>
+		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto comma_base_percentage_conventional(T num, U deno) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, true,
+		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, true, modern_octal,
 												  ::fast_io::manipulators::percentage_flag::percent>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -88,7 +88,7 @@ template <bool upper = false, bool fll = false, bool showpos = false, typename T
 inline constexpr auto percentage_sex_ratio(T male, U female) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, false,
+		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, false, false,
 												  ::fast_io::manipulators::percentage_flag::sexratio>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -100,7 +100,7 @@ template <bool upper = false, bool fll = false, bool showpos = false, typename T
 inline constexpr auto comma_percentage_sex_ratio(T male, U female) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, true,
+		::fast_io::details::base_mani_flags_cache<10, upper, false, fll, showpos, true, false,
 												  ::fast_io::manipulators::percentage_flag::sexratio>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -108,12 +108,12 @@ inline constexpr auto comma_percentage_sex_ratio(T male, U female) noexcept
 }
 
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
-		  typename T, typename U>
+		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto base_percentage_sex_ratio(T male, U female) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, false,
+		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, false, modern_octal,
 												  ::fast_io::manipulators::percentage_flag::sexratio>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -121,12 +121,12 @@ inline constexpr auto base_percentage_sex_ratio(T male, U female) noexcept
 }
 
 template <::std::size_t base, bool upper = false, bool shbase = false, bool fll = false, bool showpos = false,
-		  typename T, typename U>
+		  bool modern_octal = false, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr auto comma_base_percentage_sex_ratio(T male, U female) noexcept
 {
 	return ::fast_io::manipulators::scalar_manip_t<
-		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, true,
+		::fast_io::details::base_mani_flags_cache<base, upper, shbase, fll, showpos, true, modern_octal,
 												  ::fast_io::manipulators::percentage_flag::sexratio>,
 		::fast_io::manipulators::percentage_conventional_t<
 			typename ::fast_io::details::integer_alias_type_traits<T>::alias_type,
@@ -143,7 +143,7 @@ inline constexpr ::std::size_t print_reserve_size(
 									 flags, ::fast_io::manipulators::percentage_conventional_t<T, U>>>) noexcept
 {
 	constexpr auto val{
-		::fast_io::details::print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, T> + 5u};
+		::fast_io::details::print_integer_reserved_size_cache<flags.base, flags.showbase, flags.showpos, flags.modern_octal, T> + 5u};
 	if constexpr (flags.percentage == ::fast_io::manipulators::percentage_flag::percent)
 	{
 		return val + 1u;
@@ -155,7 +155,7 @@ inline constexpr ::std::size_t print_reserve_size(
 		if constexpr (flags.showbase)
 		{
 			constexpr ::std::size_t sexratioshowbase{percentagesexratiocommonsize +
-													 ::fast_io::details::print_showbase_length<flags.base>};
+													 ::fast_io::details::print_showbase_length<flags.base, flags.modern_octal>};
 			return sexratioshowbase;
 		}
 		else
@@ -189,16 +189,16 @@ template <::std::size_t base, typename T>
 	requires(2 <= base && base <= 36)
 inline constexpr T base_ul64_max_val{::fast_io::details::compute_base_ul64_max_val<base, T>()};
 
-template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool comma,
+template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool comma, bool modern_octal,
 		  ::std::integral chartype, typename T, typename U>
 	requires(::fast_io::details::my_unsigned_integral<T> && ::fast_io::details::my_unsigned_integral<U>)
 inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T numerator, U denominator) noexcept
 {
 	if constexpr (showbase)
 	{
-		iter = print_reserve_show_base_impl<base, uppercase_showbase>(iter);
-		return prrsv_percentage_main_common_impl<base, uppercase, false, false, full, comma>(iter, numerator,
-																							 denominator);
+		iter = print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(iter);
+		return prrsv_percentage_main_common_impl<base, uppercase, false, false, full, comma, modern_octal>(
+			iter, numerator, denominator);
 	}
 	else
 	{
@@ -229,7 +229,8 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 			else
 			{
 				iter = ::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, false,
-																		 uppercase, full>(iter, quotientdiv100);
+																		 uppercase, full, modern_octal>(iter,
+																										quotientdiv100);
 			}
 			*iter = ::fast_io::char_literal_v<(comma ? u8',' : u8'.'), chartype>;
 			++iter;
@@ -284,7 +285,8 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 				auto quotientdiv100{quotient / twodigits};
 				quotientmod100 = static_cast<unsigned>(quotient % twodigits);
 				iter = ::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, false,
-																		 uppercase, full>(iter, quotientdiv100);
+																		 uppercase, full, modern_octal>(iter,
+																										quotientdiv100);
 			}
 			else
 			{
@@ -309,7 +311,8 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 					auto quotientdiv100{quotientlow / twodigits};
 					quotientmod100 = static_cast<unsigned>(quotientlow % twodigits);
 					iter = ::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, false,
-																			 uppercase, full>(iter, quotientdiv100);
+																			 uppercase, full, modern_octal>(
+						iter, quotientdiv100);
 				}
 				else
 				{
@@ -330,7 +333,8 @@ inline constexpr chartype *prrsv_percentage_main_common_impl(chartype *iter, T n
 					{
 						iter =
 							::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, false,
-																			  uppercase, full>(iter, quotientlowlow);
+																			  uppercase, full, modern_octal>(
+								iter, quotientlowlow);
 					}
 					auto quotientdiv100{remainderlowlow / twodigits};
 					quotientmod100 = static_cast<unsigned>(remainderlowlow % twodigits);
@@ -454,13 +458,13 @@ inline constexpr chartype *prrsv_percentage_denominatorzero_impl(chartype *iter)
 }
 
 template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool showpos,
-		  bool comma, ::std::integral chartype, typename T>
+		  bool comma, bool modern_octal, ::std::integral chartype, typename T>
 	requires(::fast_io::details::my_integral<T>)
 inline constexpr chartype *prrsv_percentage_denominatorzero_sexratio_impl(chartype *iter, T numerator) noexcept
 {
 	iter =
-		::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full>(
-			iter, numerator);
+		::fast_io::details::print_reserve_integral_define<base, showbase, uppercase_showbase, showpos, uppercase, full,
+														  modern_octal>(iter, numerator);
 	if constexpr (showbase && base != 10)
 	{
 		if constexpr (comma)
@@ -561,7 +565,7 @@ inline constexpr chartype *prrsv_percentage_denominatorzero_sexratio_impl(charty
 				}
 			}
 		}
-		iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase>(iter);
+		iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(iter);
 		*iter = ::fast_io::char_literal_v<u8'0', chartype>;
 		++iter;
 	}
@@ -670,7 +674,7 @@ inline constexpr chartype *prrsv_percentage_denominatorzero_sexratio_impl(charty
 }
 
 template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool showpos,
-		  bool comma, ::std::integral chartype, typename T, typename U>
+		  bool comma, bool modern_octal, ::std::integral chartype, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr chartype *prrsv_percentage_sexratio_signed_impl(chartype *iter, T numerator, U denominator,
 																 bool denominatorisnegative) noexcept
@@ -678,12 +682,14 @@ inline constexpr chartype *prrsv_percentage_sexratio_signed_impl(chartype *iter,
 	if constexpr (sizeof(T) < sizeof(::std::uint_least32_t) && !full)
 	{
 		return prrsv_percentage_sexratio_signed_impl<base, uppercase, showbase, uppercase_showbase, full, showpos,
-													 comma>(iter, static_cast<::std::uint_least32_t>(numerator),
-															denominator, denominatorisnegative);
+													 comma, modern_octal>(iter,
+																		  static_cast<::std::uint_least32_t>(numerator),
+																		  denominator, denominatorisnegative);
 	}
 	else
 	{
-		iter = prrsv_percentage_main_common_impl<base, uppercase, showbase, uppercase_showbase, full, comma>(
+		iter = prrsv_percentage_main_common_impl<base, uppercase, showbase, uppercase_showbase, full, comma,
+												 modern_octal>(
 			iter, numerator, denominator);
 		*iter = ::fast_io::char_literal_v<u8':', chartype>;
 		++iter;
@@ -703,7 +709,7 @@ inline constexpr chartype *prrsv_percentage_sexratio_signed_impl(chartype *iter,
 		}
 		if constexpr (showbase && base != 10)
 		{
-			iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase>(iter);
+			iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(iter);
 		}
 		if constexpr (::std::same_as<chartype, char>)
 		{
@@ -730,11 +736,11 @@ inline constexpr chartype *prrsv_percentage_sexratio_signed_impl(chartype *iter,
 }
 
 template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool showpos,
-		  bool comma, ::std::integral chartype, typename T, typename U>
+		  bool comma, bool modern_octal, ::std::integral chartype, typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr chartype *prrsv_percentage_sexratio_unsigned_impl(chartype *iter, T numerator, U denominator) noexcept
 {
-	iter = prrsv_percentage_main_common_impl<base, uppercase, showbase, uppercase_showbase, full, comma>(
+	iter = prrsv_percentage_main_common_impl<base, uppercase, showbase, uppercase_showbase, full, comma, modern_octal>(
 		iter, numerator, denominator);
 	*iter = ::fast_io::char_literal_v<u8':', chartype>;
 	++iter;
@@ -745,7 +751,7 @@ inline constexpr chartype *prrsv_percentage_sexratio_unsigned_impl(chartype *ite
 	}
 	if constexpr (showbase && base != 10)
 	{
-		iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase>(iter);
+		iter = ::fast_io::details::print_reserve_show_base_impl<base, uppercase_showbase, modern_octal>(iter);
 	}
 	if constexpr (::std::same_as<chartype, char>)
 	{
@@ -771,8 +777,8 @@ inline constexpr chartype *prrsv_percentage_sexratio_unsigned_impl(chartype *ite
 }
 
 template <::std::size_t base, bool uppercase, bool showbase, bool uppercase_showbase, bool full, bool showpos,
-		  bool comma, ::fast_io::manipulators::percentage_flag percent, ::std::integral chartype, typename T,
-		  typename U>
+		  bool comma, bool modern_octal, ::fast_io::manipulators::percentage_flag percent, ::std::integral chartype,
+		  typename T, typename U>
 	requires(::fast_io::details::my_integral<T> && ::fast_io::details::my_integral<U>)
 inline constexpr chartype *prrsv_percentage_conventional_impl(chartype *iter, T numerator, U denominator) noexcept
 {
@@ -783,7 +789,7 @@ inline constexpr chartype *prrsv_percentage_conventional_impl(chartype *iter, T 
 		if constexpr (::fast_io::manipulators::percentage_flag::sexratio == percent)
 		{
 			return prrsv_percentage_denominatorzero_sexratio_impl<base, uppercase, showbase, uppercase_showbase, full,
-																  showpos, comma>(iter, numerator);
+																  showpos, comma, modern_octal>(iter, numerator);
 		}
 		else
 		{
@@ -847,29 +853,31 @@ inline constexpr chartype *prrsv_percentage_conventional_impl(chartype *iter, T 
 					  ::fast_io::details::my_signed_integral<U>)
 		{
 			return prrsv_percentage_sexratio_signed_impl<base, uppercase, showbase, uppercase_showbase, full, showpos,
-														 comma>(iter, unsignednum, unsignedden, denominatorisnegative);
+														 comma, modern_octal>(iter, unsignednum, unsignedden,
+																			  denominatorisnegative);
 		}
 		else
 		{
 			return prrsv_percentage_conventional_impl<base, uppercase, showbase, uppercase_showbase, full, showpos,
-													  comma, percent>(iter, unsignednum, unsignedden);
+													  comma, modern_octal, percent>(iter, unsignednum, unsignedden);
 		}
 	}
 	else if constexpr (sizeof(T) < sizeof(::std::uint_least32_t) && !full)
 	{
 		return prrsv_percentage_conventional_impl<base, uppercase, showbase, uppercase_showbase, full, showpos, comma,
-												  percent>(iter, static_cast<::std::uint_least32_t>(numerator),
-														   denominator);
+												  modern_octal, percent>(
+			iter, static_cast<::std::uint_least32_t>(numerator), denominator);
 	}
 	else if constexpr (percent == ::fast_io::manipulators::percentage_flag::sexratio)
 	{
 		return prrsv_percentage_sexratio_unsigned_impl<base, uppercase, showbase, uppercase_showbase, full, showpos,
-													   comma>(iter, numerator, denominator);
+													   comma, modern_octal>(iter, numerator, denominator);
 	}
 	else
 	{
 		iter = ::fast_io::details::prrsv_percentage_main_common_impl<base, uppercase, showbase, uppercase_showbase,
-																	 full, comma>(iter, numerator, denominator);
+																	 full, comma, modern_octal>(iter, numerator,
+																								denominator);
 		if constexpr (percent == ::fast_io::manipulators::percentage_flag::percent)
 		{
 			*iter = ::fast_io::char_literal_v<u8'%', chartype>;
@@ -891,7 +899,7 @@ inline constexpr chartype *print_reserve_define(
 {
 	return ::fast_io::details::prrsv_percentage_conventional_impl<flags.base, flags.uppercase, flags.showbase,
 																  flags.uppercase_showbase, flags.full, flags.showpos,
-																  flags.comma, flags.percentage>(
+																  flags.comma, flags.modern_octal, flags.percentage>(
 		iter, v.reference.numerator, v.reference.denominator);
 }
 

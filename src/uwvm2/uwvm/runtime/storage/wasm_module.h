@@ -695,11 +695,10 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_zero_default_constructible_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-                                             &&
-                                             ::fast_io::freestanding::is_zero_default_constructible_v<
-                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>>
+                                             && ::fast_io::freestanding::is_zero_default_constructible_v<
+                                                    ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>>
 #endif
-                                             ;
+            ;
     };
 
     template <>
@@ -730,11 +729,10 @@ UWVM_MODULE_EXPORT namespace fast_io::freestanding
                                              ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
                                                  ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::local_defined_data_storage_t>>
 #if defined(UWVM_RUNTIME_LLVM_JIT)
-                                             &&
-                                             ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
-                                                 ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>>
+                                             && ::fast_io::freestanding::is_trivially_copyable_or_relocatable_v<
+                                                    ::uwvm2::utils::container::vector<::uwvm2::uwvm::runtime::storage::llvm_jit_call_indirect_table_view_t>>
 #endif
-                                             ;
+            ;
     };
 }
 

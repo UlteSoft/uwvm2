@@ -59,6 +59,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 
             // wasm
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_main_module_name),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_set_start_func),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_preload_library),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_depend_recursion_limit),
 #if defined(UWVM_SUPPORT_PRELOAD_DL)
@@ -74,31 +75,36 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
 #endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::wasm_memory_grow_strict),
 
-            // runtime
+        // runtime
 #if defined(UWVM_RUNTIME_HAS_BACKEND) || defined(UWVM_RUNTIME_HAS_DEBUGGER_BACKEND)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_mode),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_custom_compiler),
-#if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
+# if defined(UWVM_RUNTIME_DEBUG_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_debug),
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_int),
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_jit),
-#endif
-#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered),
-#endif
-#if defined(UWVM_RUNTIME_LLVM_JIT)
+# endif
+# if defined(UWVM_RUNTIME_LLVM_JIT)
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_aot),
-#endif
+# endif
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compiler_log),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
-#if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_disable_llvm_ir_verifaction),
-#endif
+# if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_optimization_level),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_disable_ir_verifaction),
+# endif
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_uwvm_int_lazy_interpreter),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_tiered_disable_llvm_full_jit),
+# endif
 #endif
 
         // wasi

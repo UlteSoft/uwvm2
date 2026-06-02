@@ -33,6 +33,7 @@
 
 // wasm
 # include "wasm_set_main_module_name.h"
+# include "wasm_set_start_func.h"
 # include "wasm_preload_library.h"
 # include "wasm_register_dl.h"
 # include "wasm_reset_import.h"
@@ -49,6 +50,7 @@
 # include "runtime_compiler_log.h"
 # include "runtime_compile_threads.h"
 # include "runtime_scheduling_policy.h"
+# include "runtime_llvm_jit_optimization_level.h"
 # include "runtime_debug_int.h"
 # include "runtime_int.h"
 # include "runtime_jit.h"

@@ -118,20 +118,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
 
         if(trace_wasip1_call) [[unlikely]]
         {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
-                                u8"sock_recv(",
-                                sock_fd,
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ri_data_ptrsz),
-                                u8", ",
-                                ri_data_len,
-                                u8", ",
-                                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(ri_flags)>>>(ri_flags),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_data_len_ptrsz),
-                                u8", ",
-                                ::fast_io::mnp::addrvw(ro_flags_ptrsz),
-                                u8")");
+            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(
+                env,
+                u8"sock_recv(",
+                sock_fd,
+                u8", ",
+                ::fast_io::mnp::addrvw(ri_data_ptrsz),
+                u8", ",
+                ri_data_len,
+                u8", ",
+                static_cast<::std::underlying_type_t<::std::remove_cvref_t<decltype(ri_flags)>>>(ri_flags),
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_data_len_ptrsz),
+                u8", ",
+                ::fast_io::mnp::addrvw(ro_flags_ptrsz),
+                u8")");
         }
 
         // The negative value fd is invalid, and this check prevents subsequent undefined behavior.

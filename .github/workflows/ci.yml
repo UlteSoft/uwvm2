@@ -89,6 +89,53 @@ jobs:
         run: xmake test -v
 
   # ---------------------------------------------------------------------------
+  x86_64-linux-gnu-backend-tests:
+    if: ${{ !always() }}
+    name: Linux (x86_64) uwvm-int + llvm-jit
+    runs-on: ubuntu-latest
+    env:
+      XMAKE_JOBS: "4"
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      LSAN_OPTIONS: print_suppressions=0
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup
+        run: |
+          CODENAME=$(lsb_release -cs)
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository ppa:xmake-io/xmake
+          sudo add-apt-repository "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME main"
+          sudo apt-get install llvm-23-dev clang-tools-23 lld-23 xmake
+      - name: Configure
+        run: |
+          mkdir -p .github/tools
+          ln -sf "$(which clang++-23)" .github/tools/clang++
+          ln -sf "$(which clang-23)" .github/tools/clang
+          ln -sf "$(which llvm-config-23)" .github/tools/llvm-config
+          echo "$PWD/.github/tools" >> "$GITHUB_PATH"
+          export PATH="$PWD/.github/tools:$PATH"
+          xmake f -m debug \
+            --use-llvm-compiler=y \
+            --policies=build.sanitizer.address,build.sanitizer.leak,build.sanitizer.undefined \
+            --march=none \
+            --static=none \
+            --execution-int=uwvm-int \
+            --execution-jit=llvm \
+            --enable-test-uwvm-int=y \
+            --enable-test-llvm-jit=y
+      - name: Check UWVM version
+        run: |
+          xmake b -rv -j "${XMAKE_JOBS}" uwvm
+          xmake run uwvm --version
+      - name: Run uwvm-int lazy tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/lazy/run_lazy_full.sh
+      - name: Run uwvm-int strict tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0013.uwvm_int/strict/run_strict_basic_full.sh
+      - name: Run llvm-jit tests
+        run: UWVM_XMAKE_JOBS="${XMAKE_JOBS}" bash test/0014.llvm_jit/run_llvm_jit_full.sh
+
+  # ---------------------------------------------------------------------------
   x86_64-linux-gnu-sde-dmr:
     if: ${{ !always() }}
     name: Linux (x86_64, SDE DMR)
@@ -338,6 +385,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       version: "14.3"
+      freebsd_vm_memory: "8G"
     strategy:
       matrix:
         compiler: ["CLANG"]
@@ -350,6 +398,7 @@ jobs:
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             sudo mkdir -p /usr/local/etc/repos
             sudo tee /usr/local/etc/repos/FreeBSD.conf << EOF
@@ -368,29 +417,32 @@ jobs:
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y llvm21 gmake"
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --static=none"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y gcc16-devel gmake"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=none"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --march=none --static=none"
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "source ~/.xmake/profile && xmake b -rv"
+            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; dmesg | tail -n 80 || true; exit \$rc; }"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
-            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v"
+            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v -j1"

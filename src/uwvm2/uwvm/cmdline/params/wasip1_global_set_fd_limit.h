@@ -48,15 +48,17 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     namespace details
     {
         inline bool wasip1_global_set_fd_limit_is_exist{};  // [global]
-        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_set_fd_limit_alias{u8"--wasip1-set-fd-limit", u8"-I1fdlim"};
+        inline constexpr ::uwvm2::utils::container::array<::uwvm2::utils::container::u8string_view, 2uz> wasip1_global_set_fd_limit_alias{
+            u8"--wasip1-set-fd-limit",
+            u8"-I1fdlim"};
 #  if defined(UWVM_MODULE)
         extern "C++"
 #  else
         inline constexpr
 #  endif
             ::uwvm2::utils::cmdline::parameter_return_type wasip1_global_set_fd_limit_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                                                        ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+                                                                                               ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                               ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
 
     }  // namespace details
 
@@ -68,7 +70,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
         .name{u8"--wasip1-global-set-fd-limit"},
         .describe{u8"Set the global-default WASI Preview 1 file descriptor limit (0 = maximum)."},
         .usage{u8"<limit:size_t>"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_set_fd_limit_alias.data(), details::wasip1_global_set_fd_limit_alias.size()}},
+        .alias{
+            ::uwvm2::utils::cmdline::kns_u8_str_scatter_t{details::wasip1_global_set_fd_limit_alias.data(), details::wasip1_global_set_fd_limit_alias.size()}},
         .handle{::std::addressof(details::wasip1_global_set_fd_limit_callback)},
         .is_exist{::std::addressof(details::wasip1_global_set_fd_limit_is_exist)},
         .cate{::uwvm2::utils::cmdline::categorization::wasi}};

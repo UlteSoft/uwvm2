@@ -64,13 +64,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8"\n\n");
         }
 
-        [[nodiscard]] inline constexpr ::uwvm2::utils::utf::utf_error_code validate_wasm_name(
-            ::uwvm2::utils::container::u8string_view name) noexcept
+        [[nodiscard]] inline constexpr ::uwvm2::utils::utf::utf_error_code validate_wasm_name(::uwvm2::utils::container::u8string_view name) noexcept
         {
-            auto const [pos, err]{
-                ::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
-                                                                 name.cbegin(),
-                                                                 name.cend())};
+            auto const [pos, err]{::uwvm2::uwvm::wasm::feature::handle_text_format(::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_text_format_wapper,
+                                                                                   name.cbegin(),
+                                                                                   name.cend())};
             static_cast<void>(pos);
             return err;
         }
@@ -108,7 +106,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             print_invalid_utf8_error(field, value, err);
             return false;
         }
-    }
+    }  // namespace wasm_reset_import_details
 
 #if defined(UWVM_MODULE)
     extern "C++" UWVM_GNU_COLD
@@ -176,8 +174,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             return ::uwvm2::utils::cmdline::parameter_return_type::return_m1_imme;
         }
 
-        static_cast<void>(::uwvm2::uwvm::wasm::storage::upsert_configured_import_reset(
-            module_name, import_module_name, import_extern_name, new_import_module_name, new_import_extern_name));
+        static_cast<void>(::uwvm2::uwvm::wasm::storage::upsert_configured_import_reset(module_name,
+                                                                                       import_module_name,
+                                                                                       import_extern_name,
+                                                                                       new_import_module_name,
+                                                                                       new_import_extern_name));
 
         return ::uwvm2::utils::cmdline::parameter_return_type::def;
     }

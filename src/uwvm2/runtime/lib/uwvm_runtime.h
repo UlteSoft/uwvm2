@@ -39,12 +39,21 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::wasm::type { struct uwvm_preload_memor
 
 UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
 {
+    struct entry_function_abi_buffers
+    {
+        ::std::byte const* param_buffer{};
+        ::std::size_t param_bytes{};
+        ::std::byte* result_buffer{};
+        ::std::size_t result_bytes{};
+    };
+
     struct full_compile_run_config
     {
         /// @brief The first function index to enter in the main module.
         /// @note  This is the WASM function index space (imports first, then local-defined).
         /// @note  Imported entries are only supported when they resolve to a wasm-defined `() -> ()` function.
         ::std::size_t entry_function_index{};
+        entry_function_abi_buffers entry_abi_buffers{};
     };
 
     struct lazy_compile_run_config
@@ -53,6 +62,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
         /// @note  This is the WASM function index space (imports first, then local-defined).
         /// @note  Imported entries are only supported when they resolve to a wasm-defined `() -> ()` function.
         ::std::size_t entry_function_index{};
+        entry_function_abi_buffers entry_abi_buffers{};
         bool assume_full_code_verified{};
     };
 
@@ -63,6 +73,12 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::lib
     /// @brief Lazily compile and run the main module using the configured lazy-capable backend.
     /// @note  This expects uwvm runtime initialization to be complete (runtime storages + import resolution).
     extern "C++" void lazy_compile_and_run_main_module(::uwvm2::utils::container::u8string_view main_module_name, lazy_compile_run_config) noexcept;
+
+    /// @brief Stop lazy background compilation before a WASI proc_exit leaves the normal run loop.
+    /// @note WASI proc_exit can terminate the process directly. Lazy compiler workers must be joined before that
+    ///       happens, otherwise they may still be inside LLVM or runtime-log code while global objects are being
+    ///       destroyed by the host process exit path.
+    extern "C++" void lazy_compile_stop_before_proc_exit_host_api() noexcept;
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
     /// @brief Clear compiled runtime state before loading a fresh module set in the same process.

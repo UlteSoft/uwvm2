@@ -94,11 +94,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::imported::wasi::wasip1::func
     {
         auto const trace_wasip1_call{env.trace_wasip1_call};
 
-        if(trace_wasip1_call) [[unlikely]]
-        {
-            ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env,
- u8"fd_datasync_wasm64(", fd, u8")");
-        }
+        if(trace_wasip1_call) [[unlikely]] { ::uwvm2::imported::wasi::wasip1::func::print_wasip1_trace_message(env, u8"fd_datasync_wasm64(", fd, u8")"); }
 
         return ::uwvm2::imported::wasi::wasip1::func::fd_datasync_base(env, fd);
     }
