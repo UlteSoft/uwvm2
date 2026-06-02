@@ -84,6 +84,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm
         return ::uwvm2::uwvm::run::run();
     }
 
+    /// @brief    whole process time
+    /// @details  The destructor for this global variable is called during `atexit`, and the initializer is called during `.init_array`
+    ///           there are no other global dependencies.
+    inline ::uwvm2::uwvm::global::process_time whole_process_time{};  // [global]
+
 #if !((defined(_WIN32) && !defined(__CYGWIN__)) && !defined(_WIN32_WINDOWS))  // NOT WINNT
 
     /// @brief      uwvm c++ main function (nont winnt)

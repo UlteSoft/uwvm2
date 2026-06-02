@@ -26,4 +26,5 @@
 # include "tzset.h"
 # include "ansi_win32.h"
 # include "consolecp_win32.h"
+# include "process_time.h"
 #endif

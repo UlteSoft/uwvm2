@@ -5,9 +5,9 @@
  *************************************************************/
 
 /**
- * @author      24bit-xjkp
+ * @author      MacroModel
  * @version     2.0.0
- * @date        2025-03-21
+ * @date        2026-06-02
  * @copyright   APL-2.0 License
  */
 
@@ -22,11 +22,15 @@
 
 module;
 
-export module uwvm2.uwvm.crtmain.global;
-export import :tzset;
-export import :ansi_win32;
-export import :consolecp_win32;
-export import :process_time;
+// macro
+#include <uwvm2/utils/macro/push_macros.h>
+#include <uwvm2/uwvm/utils/ansies/uwvm_color_push_macro.h>
+
+export module uwvm2.uwvm.crtmain.global:process_time;
+
+import fast_io;
+import uwvm2.uwvm.io;
+import uwvm2.uwvm.utils.ansies;
 
 #ifndef UWVM_MODULE
 # define UWVM_MODULE
@@ -35,4 +39,4 @@ export import :process_time;
 # define UWVM_MODULE_EXPORT export
 #endif
 
-#include "impl.h"
+#include "process_time.h"
