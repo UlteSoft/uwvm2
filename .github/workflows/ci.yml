@@ -385,6 +385,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       version: "14.3"
+      freebsd_vm_memory: "8G"
     strategy:
       matrix:
         compiler: ["CLANG"]
@@ -397,6 +398,7 @@ jobs:
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             sudo mkdir -p /usr/local/etc/repos
             sudo tee /usr/local/etc/repos/FreeBSD.conf << EOF
@@ -415,29 +417,32 @@ jobs:
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y llvm21 gmake"
             bash -c "sudo ln -sf $(command -v llvm-config21) /usr/local/bin/llvm-config"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --static=none"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --use-llvm-compiler=y --sdk="$(llvm-config21 --prefix)" --march=none --static=none"
       - name: Configure
         if: matrix.compiler == 'GCC'
         uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
             bash -c "sudo pkg install -y gcc16-devel gmake"
             bash -c "curl -fsSL https://raw.githubusercontent.com/tboox/xmake/master/scripts/get.sh -o xmake-get.sh"
             bash -c "bash xmake-get.sh"
-            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --static=none"
+            bash -c "source ~/.xmake/profile && xmake f -m ${{ matrix.mode }} --policies=${{ matrix.policies }} --cc=gcc16 --cxx=g++16 --ld=g++16 --march=none --static=none"
       - name: Build and check
         uses: cross-platform-actions/action@v0.30.0
         with:
           operating_system: freebsd
           version: ${{ env.version }}
+          memory: ${{ env.freebsd_vm_memory }}
           run: |
-            bash -c "source ~/.xmake/profile && xmake b -rv -j1"
+            bash -c "source ~/.xmake/profile && xmake b -rv -j1 || { rc=\$?; swapinfo || true; dmesg | tail -n 80 || true; exit \$rc; }"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v -j1"
