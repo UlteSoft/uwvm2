@@ -140,8 +140,11 @@ With `--runtime-compile-log`, tiered summaries include:
 
 - interpreter fallback counts and timing;
 - loop OSR callback, ready, miss, and stall timing;
+- loop OSR deferral counts from the counter-only request gate;
 - Tier 2 request, ready, failed, and publish counts;
 - Tier 2 translation, materialization, and publication time in nanoseconds.
+- per-module counter summaries, including entry/OSR counters, thresholds, lazy
+  materialization states, and compile-unit size buckets.
 
 The log names use the `tiered_full_*` prefix for full-tier data and
 `tiered_osr_*` / `tiered_int_*` for interpreter and OSR data.
@@ -175,27 +178,42 @@ misses on the same local function before the bridge enqueues LLVM work for
 small modules. The threshold scales up for large modules and large functions:
 modules with at least 512 local functions require 16384 entry misses, modules
 with at least 1024 local functions require 65536 entry misses, and modules with
-at least 4096 local functions require 131072 entry misses. Compile units of up
+at least 8192 local functions require 1048576 entry misses. Compile units of up
 to 128/512/1024 bytes can lower that large-module threshold back to
 8192/16384/32768 misses while the module has fewer than 4096 local functions,
 because tiny helpers are cheap to materialize and often sit on hot indirect-call
-paths. Modules at CPython scale keep the larger 131072 entry-miss threshold even
+paths. Modules at CPython scale keep the larger 1048576 entry-miss threshold even
 for tiny helpers. Compile units of at least 4096/8192 bytes require at least
 65536/262144 entry misses, and compile units of at least 32768 bytes are kept
 out of entry-triggered lazy LLVM. This keeps large projects such as SQLite or
 CPython from starting dozens of expensive LLVM entry materializations from
 short-lived helper calls.
 
-Loop OSR uses mutable bytecode immediates as per-loop counters. Loop headers in
-functions of at least 4096 bytes poll after 4 iterations and then retry every 64
-missed polls, and require 4096 expired polls before requesting LLVM. Functions
-of at least 1024 bytes poll after 16 iterations, retry every 128 missed polls,
-and require 512 expired polls before requesting LLVM. Smaller functions poll
-every 1024 iterations and require 2048 expired polls before requesting LLVM.
-Block polls keep the older 8192-iteration cadence, but use request-count
-thresholds of 4096, 512, or 64 expired polls for large, medium, and small
-functions respectively. Functions of at least 32768 bytes do not get OSR polls,
-because their LLVM compile cost is too large to pay without much stronger
-evidence than benchmark-sized loops provide. This keeps short hot helpers from
-starting expensive LLVM materialization while still promoting loops that have
-proven hot by executed backedge counts.
+Entry hotness counters are sampled for larger modules to keep the miss path
+cheap while preserving a counter-based policy. Modules with fewer than 512 local
+functions count every miss, modules with at least 512/1024/8192 local functions
+use entry probe strides of 2/4/16 respectively. The counter is advanced by the
+stride on sampled misses, so thresholds continue to be expressed as estimated
+miss counts rather than elapsed time.
+
+Loop and block OSR use mutable bytecode immediates as local counters. Loop
+headers in functions of at least 4096 bytes poll after 4 iterations and then
+retry every 64 missed polls, and require 512 expired polls before reaching the
+runtime OSR gate. Functions of at least 1024 bytes poll after 16 iterations,
+retry every 128 missed polls, and require 512 expired polls before reaching the
+gate. Smaller functions poll every 1024 iterations and require 2048 expired
+polls before reaching the gate. Block polls keep the older 8192-block cadence,
+but use request-count thresholds of 512, 512, or 64 expired polls for large,
+medium, and small functions respectively. Functions of at least 32768 bytes do
+not get OSR polls, because their LLVM compile cost is too large to pay without
+much stronger evidence than benchmark-sized loops provide.
+
+After the bytecode-local OSR counter expires, a per-function runtime counter
+decides whether to request LLVM. Small and medium modules request on the first
+runtime OSR signal. Modules at CPython scale, currently modules with at least
+8192 local functions, do not get Tier 0 OSR polls during interpreter bytecode
+translation and cannot request LLVM from OSR; they rely on entry counters
+instead. This avoids both the hot-loop poll overhead and the expensive
+single-function LLVM materialization from Python bytecode loops that are shorter
+than the compile cost. This is still counter-only policy; elapsed time is only
+reported for offline calibration.

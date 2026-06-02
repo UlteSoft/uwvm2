@@ -120,17 +120,33 @@ case wasm1_code::block:
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     if constexpr(CompileOption.enable_tiered_loop_osr_poll)
     {
-        if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+        if(!::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_func_count))
+        {
+            if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_module_count; }
+        }
+        else if(is_polymorphic || !operand_stack.empty() || !codegen_operand_stack.empty())
+        {
+            if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_stack_count; }
+        }
+        else
         {
             auto const result_begin{curr_func_type.result.begin};
             auto const result_end{curr_func_type.result.end};
             auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-            if(result_count <= 1uz)
+            if(result_count > 1uz)
+            {
+                if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_result_count; }
+            }
+            else
             {
                 ::std::size_t result_bytes{};
                 if(result_count == 1uz) { result_bytes = operand_stack_valtype_size(result_begin[0]); }
 
-                if(result_count == 0uz || result_bytes != 0uz)
+                if(result_count != 0uz && result_bytes == 0uz)
+                {
+                    if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_result_count; }
+                }
+                else
                 {
                     namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                     using poll_imm_t = ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_loop_osr_immediate_t;
@@ -140,6 +156,7 @@ case wasm1_code::block:
                             function_code_size)};
                     if(request_countdown != ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
                     {
+                        if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.block_poll_count; }
                         poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
                                             .func_index = function_index,
                                             .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
@@ -152,6 +169,10 @@ case wasm1_code::block:
                             bytecode,
                             translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
                         emit_imm(poll_imm);
+                    }
+                    else if(runtime_log_on) [[unlikely]]
+                    {
+                        ++tiered_osr_runtime_log_stats.skip_countdown_count;
                     }
                 }
             }
@@ -324,12 +345,25 @@ case wasm1_code::loop:
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                                       if constexpr(CompileOption.enable_tiered_loop_osr_poll)
                                       {
-                                          if(!is_polymorphic && operand_stack.empty() && codegen_operand_stack.empty())
+                                          if(!::uwvm2::runtime::compiler::uwvm_int::optable::
+                                                 interpreter_tiered_osr_poll_enabled_for_module_local_function_count(local_func_count))
+                                          {
+                                              if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_module_count; }
+                                          }
+                                          else if(is_polymorphic || !operand_stack.empty() || !codegen_operand_stack.empty())
+                                          {
+                                              if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_stack_count; }
+                                          }
+                                          else
                                           {
                                               auto const result_begin{curr_func_type.result.begin};
                                               auto const result_end{curr_func_type.result.end};
                                               auto const result_count{result_begin == nullptr ? 0uz : static_cast<::std::size_t>(result_end - result_begin)};
-                                              if(result_count <= 1uz)
+                                              if(result_count > 1uz)
+                                              {
+                                                  if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_result_count; }
+                                              }
+                                              else
                                               {
                                                   ::std::size_t result_bytes{};
                                                   if(result_count == 1uz)
@@ -337,7 +371,11 @@ case wasm1_code::loop:
                                                       result_bytes = operand_stack_valtype_size(result_begin[0]);
                                                   }
 
-                                                  if(result_count == 0uz || result_bytes != 0uz)
+                                                  if(result_count != 0uz && result_bytes == 0uz)
+                                                  {
+                                                      if(runtime_log_on) [[unlikely]] { ++tiered_osr_runtime_log_stats.skip_result_count; }
+                                                  }
+                                                  else
                                                   {
                                                       namespace translate = ::uwvm2::runtime::compiler::uwvm_int::optable::translate;
                                                       using poll_imm_t =
@@ -350,6 +388,10 @@ case wasm1_code::loop:
                                                          ::uwvm2::runtime::compiler::uwvm_int::optable::
                                                              interpreter_tiered_osr_request_countdown_disabled)
                                                       {
+                                                          if(runtime_log_on) [[unlikely]]
+                                                          {
+                                                              ++tiered_osr_runtime_log_stats.loop_poll_count;
+                                                          }
                                                           poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
                                                                               .func_index = function_index,
                                                                               .loop_wasm_code_offset =
@@ -365,6 +407,10 @@ case wasm1_code::loop:
                                                               translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(
                                                                   curr_stacktop, interpreter_tuple));
                                                           emit_imm(poll_imm);
+                                                      }
+                                                      else if(runtime_log_on) [[unlikely]]
+                                                      {
+                                                          ++tiered_osr_runtime_log_stats.skip_countdown_count;
                                                       }
                                                   }
                                               }
@@ -1121,7 +1167,26 @@ case wasm1_code::end:
                                  u8",loop_tr=",
                                  runtime_log_stats.cf_loop_entry_transform_count,
                                  u8",loop_mem=",
-                                 runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count,
+                                 runtime_log_stats.cf_loop_entry_canonicalize_to_mem_count);
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            if constexpr(CompileOption.enable_tiered_loop_osr_poll)
+            {
+                ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
+                                 u8"} osr{block=",
+                                 tiered_osr_runtime_log_stats.block_poll_count,
+                                 u8",loop=",
+                                 tiered_osr_runtime_log_stats.loop_poll_count,
+                                 u8",skip_module=",
+                                 tiered_osr_runtime_log_stats.skip_module_count,
+                                 u8",skip_stack=",
+                                 tiered_osr_runtime_log_stats.skip_stack_count,
+                                 u8",skip_result=",
+                                 tiered_osr_runtime_log_stats.skip_result_count,
+                                 u8",skip_countdown=",
+                                 tiered_osr_runtime_log_stats.skip_countdown_count);
+            }
+#endif
+            ::fast_io::io::print(::uwvm2::uwvm::io::u8runtime_log_output,
                                  u8"} stacktop{spill1=",
                                  runtime_log_stats.stacktop_spill1_count,
                                  u8",spillN=",
