@@ -202,6 +202,101 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
         using configured_import_reset_t = ::uwvm2::uwvm::wasm::storage::configured_import_reset_t;
         using configured_import_reset_vec_t = ::uwvm2::uwvm::wasm::storage::configured_import_reset_vec_t;
 
+        [[nodiscard]] inline constexpr ::std::size_t default_linear_memory_page_size_bytes() noexcept
+        { return static_cast<::std::size_t>(::uwvm2::object::memory::wasm_page::default_wasm32_page_size); }
+
+        [[nodiscard]] inline constexpr ::std::size_t linear_memory_page_size_bytes_from_log2(unsigned page_size_log2) noexcept
+        {
+            if(page_size_log2 >= ::std::numeric_limits<::std::size_t>::digits) [[unlikely]] { ::fast_io::fast_terminate(); }
+            return 1uz << page_size_log2;
+        }
+
+        [[nodiscard]] inline constexpr bool linear_memory_byte_count_overflows(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
+        { return page_size_bytes != 0uz && page_count > (::std::numeric_limits<::std::size_t>::max)() / page_size_bytes; }
+
+        [[nodiscard]] inline constexpr ::std::size_t linear_memory_byte_count_unchecked(::std::size_t page_count, ::std::size_t page_size_bytes) noexcept
+        { return page_count * page_size_bytes; }
+
+        inline constexpr void emit_local_memory_init_verbose(::uwvm2::utils::container::u8string_view stage,
+                                                             ::std::size_t memory_index,
+                                                             ::uwvm2::parser::wasm::standard::wasm1::type::limits_type const& declared_limits,
+                                                             runtime_memory_limits_t const& effective_limits,
+                                                             ::std::size_t page_size_bytes) noexcept
+        {
+            if(!::uwvm2::uwvm::io::show_verbose) [[likely]] { return; }
+
+            auto const initial_pages{effective_limits.min};
+            auto const initial_bytes_overflow{linear_memory_byte_count_overflows(initial_pages, page_size_bytes)};
+
+            if(initial_bytes_overflow) [[unlikely]]
+            {
+                verbose_module_info(u8"Init: ",
+                                    stage,
+                                    u8" local memory (memory_idx=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    memory_index,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", backend=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::object::memory::linear::native_memory_t::name,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\", declared=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::parser::wasm::standard::wasm1::type::section_details(declared_limits),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\", effective=\"",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    ::uwvm2::uwvm::wasm::type::section_details(effective_limits),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"\", page_size_bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    page_size_bytes,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", initial_pages=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    initial_pages,
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", initial_bytes=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    u8"overflow",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"). ");
+                return;
+            }
+
+            verbose_module_info(u8"Init: ",
+                                stage,
+                                u8" local memory (memory_idx=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                memory_index,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", backend=\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::object::memory::linear::native_memory_t::name,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", declared=\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::parser::wasm::standard::wasm1::type::section_details(declared_limits),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", effective=\"",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                ::uwvm2::uwvm::wasm::type::section_details(effective_limits),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"\", page_size_bytes=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                page_size_bytes,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", initial_pages=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                initial_pages,
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8", initial_bytes=",
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                linear_memory_byte_count_unchecked(initial_pages, page_size_bytes),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                u8"). ");
+        }
+
         inline constexpr void runtime_warning_to_fatal() noexcept
         {
             ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -400,15 +495,15 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                 override_source,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8" memory limit override to local-defined memory (memory_idx=",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 memory_index,
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8", declared=\"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 ::uwvm2::parser::wasm::standard::wasm1::type::section_details(declared_limits),
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\", effective=\"",
-                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_YELLOW),
+                                ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 ::uwvm2::uwvm::wasm::type::section_details(effective_limits),
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8"\"). ");
@@ -2692,6 +2787,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
             // local defined function + code
             {
                 auto const defined_func_count{funcsec.funcs.size()};
+                auto const defined_code_count{codesec.codes.size()};
+                auto const imported_func_count{importsec.importdesc.index_unchecked(importdesc_func_index).size()};
                 if(defined_func_count != codesec.codes.size()) [[unlikely]]
                 {
                     ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
@@ -2717,10 +2814,44 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                     ::fast_io::fast_terminate();
                 }
 
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local functions/code reserve begin (imported_funcs=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        imported_func_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", local_funcs=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        defined_func_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", code_bodies=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        defined_code_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", type_count=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        typesec.types.size(),
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
+
                 details::check_reserve_limit(u8"local_defined_functions", defined_func_count, initializer_limit.max_local_defined_functions);
                 details::check_reserve_limit(u8"local_defined_codes", defined_func_count, initializer_limit.max_local_defined_codes);
                 out.local_defined_function_vec_storage.reserve(defined_func_count);
                 out.local_defined_code_vec_storage.reserve(defined_func_count);
+
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local functions/code reserve done (function_records=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        defined_func_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", code_records=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        defined_func_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
 
                 for(::std::size_t i{}; i != defined_func_count; ++i)
                 {
@@ -2754,13 +2885,60 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                         ::fast_io::fast_terminate();
                     }
 
+                    auto const& function_type{typesec.types.index_unchecked(type_idx)};
+                    auto const& code_type{codesec.codes.index_unchecked(i)};
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        auto const param_count{safe_ptr_range_size(function_type.parameter.begin, function_type.parameter.end)};
+                        auto const result_count{safe_ptr_range_size(function_type.result.begin, function_type.result.end)};
+                        auto const code_body_bytes{safe_ptr_range_size(code_type.body.code_begin, code_type.body.code_end)};
+                        auto const expr_bytes{safe_ptr_range_size(code_type.body.expr_begin, code_type.body.code_end)};
+                        verbose_module_info(u8"Init: bind local function/code (local_func_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            i,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", wasm_func_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            imported_func_count + i,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", type_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            type_idx,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", params=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            param_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", results=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            result_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", local_decl_groups=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            code_type.locals.size(),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", local_values=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            code_type.all_local_count,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", code_body_bytes=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            code_body_bytes,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", expr_bytes=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            expr_bytes,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"). ");
+                    }
+
                     ::uwvm2::uwvm::runtime::storage::local_defined_function_storage_t f{};
-                    f.function_type_ptr = ::std::addressof(typesec.types.index_unchecked(type_idx));
-                    f.wasm_code_ptr = ::std::addressof(codesec.codes.index_unchecked(i));
+                    f.function_type_ptr = ::std::addressof(function_type);
+                    f.wasm_code_ptr = ::std::addressof(code_type);
                     out.local_defined_function_vec_storage.push_back_unchecked(f);
 
                     ::uwvm2::uwvm::runtime::storage::local_defined_code_storage_t c{};
-                    c.code_type_ptr = ::std::addressof(codesec.codes.index_unchecked(i));
+                    c.code_type_ptr = ::std::addressof(code_type);
                     c.func_ptr = ::std::addressof(out.local_defined_function_vec_storage.back());
                     out.local_defined_code_vec_storage.push_back_unchecked(c);
                 }
@@ -2770,37 +2948,162 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
 
             // local defined table
             {
-                details::check_reserve_limit(u8"local_defined_tables", tablesec.tables.size(), initializer_limit.max_local_defined_tables);
-                out.local_defined_table_vec_storage.reserve(tablesec.tables.size());
+                auto const local_table_count{tablesec.tables.size()};
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local tables reserve begin (local_tables=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        local_table_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", imported_tables=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        out.imported_table_vec_storage.size(),
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
+
+                details::check_reserve_limit(u8"local_defined_tables", local_table_count, initializer_limit.max_local_defined_tables);
+                out.local_defined_table_vec_storage.reserve(local_table_count);
+
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local tables reserve done (table_records=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        local_table_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
+
+                ::std::size_t table_idx{};
                 for(auto const& table_type: tablesec.tables)
                 {
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        verbose_module_info(u8"Init: resize local table begin (table_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            table_idx,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", table_type=\"",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            ::uwvm2::parser::wasm::standard::wasm1::type::section_details(table_type),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"\", initial_elems=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            static_cast<::std::size_t>(table_type.limits.min),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"). ");
+                    }
+
                     ::uwvm2::uwvm::runtime::storage::local_defined_table_storage_t rec{};
                     rec.table_type_ptr = ::std::addressof(table_type);
                     rec.owner_module_rt_ptr = ::std::addressof(out);
                     rec.elems.resize(static_cast<::std::size_t>(table_type.limits.min));
                     out.local_defined_table_vec_storage.push_back_unchecked(::std::move(rec));
+
+                    if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                    {
+                        verbose_module_info(u8"Init: resize local table done (table_idx=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            table_idx,
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8", stored_elems=",
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                            out.local_defined_table_vec_storage.back().elems.size(),
+                                            ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                            u8"). ");
+                    }
+
+                    ++table_idx;
                 }
             }
 
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                verbose_module_info(u8"Init: resize LLVM JIT call_indirect table views begin (imported_tables=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    out.imported_table_vec_storage.size(),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8", local_tables=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    out.local_defined_table_vec_storage.size(),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"). ");
+            }
             out.llvm_jit_call_indirect_table_views.resize(out.imported_table_vec_storage.size() + out.local_defined_table_vec_storage.size());
+            if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+            {
+                verbose_module_info(u8"Init: resize LLVM JIT call_indirect table views done (views=",
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                    out.llvm_jit_call_indirect_table_views.size(),
+                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                    u8"). ");
+            }
 #endif
 
             if(::uwvm2::uwvm::io::show_verbose) [[unlikely]] { verbose_module_info(u8"Init: local memories. "); }
 
             // local defined memory
             {
-                details::check_reserve_limit(u8"local_defined_memories", memorysec.memories.size(), initializer_limit.max_local_defined_memories);
-                out.local_defined_memory_vec_storage.reserve(memorysec.memories.size());
+                auto const local_memory_count{memorysec.memories.size()};
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local memories reserve begin (local_memories=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        local_memory_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", imported_memories=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        out.imported_memory_vec_storage.size(),
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", backend=\"",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::object::memory::linear::native_memory_t::name,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"\", backend_can_mmap=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::object::memory::linear::native_memory_t::can_mmap,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8", backend_multi_thread=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        ::uwvm2::object::memory::linear::native_memory_t::support_multi_thread,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
+
+                details::check_reserve_limit(u8"local_defined_memories", local_memory_count, initializer_limit.max_local_defined_memories);
+                out.local_defined_memory_vec_storage.reserve(local_memory_count);
+
+                if(::uwvm2::uwvm::io::show_verbose) [[unlikely]]
+                {
+                    verbose_module_info(u8"Init: local memories reserve done (memory_records=",
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
+                                        local_memory_count,
+                                        ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                        u8"). ");
+                }
+
                 ::std::size_t memory_idx{};
                 for(auto const& memory_type: memorysec.memories)
                 {
+                    auto const local_defined_memory_limit_override{resolve_configured_local_defined_memory_limit(module_memory_limit_override, memory_idx)};
+                    auto const effective_limits{
+                        resolve_effective_runtime_memory_limits(memory_type.limits, local_defined_memory_limit_override.limits, u8"local-defined", memory_idx)};
+
+                    emit_local_memory_init_verbose(u8"construct record begin",
+                                                   memory_idx,
+                                                   memory_type.limits,
+                                                   effective_limits,
+                                                   default_linear_memory_page_size_bytes());
+
                     out.local_defined_memory_vec_storage.emplace_back();
                     auto& rec{out.local_defined_memory_vec_storage.back()};
                     rec.memory_type_ptr = ::std::addressof(memory_type);
-                    auto const local_defined_memory_limit_override{resolve_configured_local_defined_memory_limit(module_memory_limit_override, memory_idx)};
-                    rec.effective_limits =
-                        resolve_effective_runtime_memory_limits(memory_type.limits, local_defined_memory_limit_override.limits, u8"local-defined", memory_idx);
+                    rec.effective_limits = effective_limits;
+
+                    auto const runtime_page_size_bytes{linear_memory_page_size_bytes_from_log2(rec.memory.custom_page_size_log2)};
+                    emit_local_memory_init_verbose(u8"construct record done", memory_idx, memory_type.limits, rec.effective_limits, runtime_page_size_bytes);
+
                     if(local_defined_memory_limit_override.limits != nullptr) [[unlikely]]
                     {
                         emit_runtime_memory_limit_override_verbose(memory_idx,
@@ -2808,7 +3111,11 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::initializer
                                                                    memory_type.limits,
                                                                    rec.effective_limits);
                     }
+
+                    emit_local_memory_init_verbose(u8"init_by_page_count begin", memory_idx, memory_type.limits, rec.effective_limits, runtime_page_size_bytes);
                     rec.memory.init_by_page_count(rec.effective_limits.min);
+                    emit_local_memory_init_verbose(u8"init_by_page_count done", memory_idx, memory_type.limits, rec.effective_limits, runtime_page_size_bytes);
+
                     ++memory_idx;
                 }
             }
