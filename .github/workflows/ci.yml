@@ -438,6 +438,6 @@ jobs:
           operating_system: freebsd
           version: ${{ env.version }}
           run: |
-            bash -c "source ~/.xmake/profile && xmake b -rv"
+            bash -c "source ~/.xmake/profile && xmake b -rv -j1"
             bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake run uwvm --version"
-            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v"
+            bash -c "source ~/.xmake/profile && export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 && xmake test -v -j1"
