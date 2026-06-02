@@ -45,7 +45,7 @@ uwvm2 provides **three** concrete host-side models for implementing the
 WebAssembly linear address space. They live under
 `uwvm2::object::memory::linear` and are selected via the `native_memory_t`
 alias in `linear/native.h`. The Xmake option
-`--wasm-memory-model=default|mmap|multithread-alloc|single-thread-alloc`
+`--wasm-memory-model=default|mmap|multi-thread-alloc|single-thread-alloc`
 can keep the platform default or force one backend.
 
 #### 3.1 mmap-based linear memory (`mmap_memory_t`)
@@ -72,7 +72,7 @@ support multi-threading and C++20 atomic wait/notify primitives.
 
 - Enabled when `UWVM_USE_MULTITHREAD_ALLOCATOR` is defined and the standard
   library provides `std::atomic::wait` / `notify_*`; Xmake sets this when
-  `--wasm-memory-model=multithread-alloc` is selected.
+  `--wasm-memory-model=multi-thread-alloc` is selected.
 - Backed by a generic aligned allocator instead of virtual memory.
 - Implements a careful synchronization protocol for `memory.grow` and
   in-flight memory operations:

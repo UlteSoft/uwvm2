@@ -70,7 +70,7 @@ function def_build(opt)
 		-- Keep the existing automatic backend selection.
 	elseif wasm_memory_model == "mmap" then
 		add_defines("UWVM_FORCE_USE_MMAP")
-	elseif wasm_memory_model == "multithread-alloc" then
+	elseif wasm_memory_model == "multi-thread-alloc" then
 		add_defines("UWVM_FORCE_DISABLE_MMAP")
 		add_defines("UWVM_USE_MULTITHREAD_ALLOCATOR")
 	elseif wasm_memory_model == "single-thread-alloc" then

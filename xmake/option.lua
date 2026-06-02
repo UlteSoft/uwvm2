@@ -493,12 +493,12 @@ option("wasm-memory-model", function()
         "Select the WebAssembly linear memory backend.",
         "default: keep the platform default selection.",
         "mmap: force the mmap/VirtualAlloc backend and fail when unavailable.",
-        "multithread-alloc: force the multithread allocator backend and fail when unavailable.",
+        "multi-thread-alloc: force the multithread allocator backend and fail when unavailable.",
         "single-thread-alloc: force the single-thread allocator backend.",
         "default = default"
     )
     set_default("default")
-    set_values("default", "mmap", "multithread-alloc", "single-thread-alloc")
+    set_values("default", "mmap", "multi-thread-alloc", "single-thread-alloc")
 end)
 
 option("disable-local-imported-wasip1", function()

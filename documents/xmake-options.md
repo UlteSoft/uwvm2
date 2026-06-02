@@ -301,7 +301,7 @@ Disables C++ exceptions for the project (sets Xmake exception policy `no-cxx`). 
 - **Example:**
   - `xmake f --fno-exceptions=y`
 
-### `--wasm-memory-model=<default|mmap|multithread-alloc|single-thread-alloc>`
+### `--wasm-memory-model=<default|mmap|multi-thread-alloc|single-thread-alloc>`
 
 Selects the WebAssembly linear memory backend.
 
@@ -309,12 +309,12 @@ Selects the WebAssembly linear memory backend.
 - **Values:**
   - `default`: keep the existing platform-driven selection.
   - `mmap`: force the mmap/VirtualAlloc backend. The build fails when that backend is unavailable.
-  - `multithread-alloc`: force the multithread allocator backend. The build fails when required atomic wait/notify support is unavailable.
+  - `multi-thread-alloc`: force the multithread allocator backend. The build fails when required atomic wait/notify support is unavailable.
   - `single-thread-alloc`: force the single-thread allocator backend.
 - **Impact:** Changes the compiled runtime memory backend instead of only changing the non-mmap allocator fallback.
 - **Example:**
   - `xmake f --wasm-memory-model=mmap`
-  - `xmake f --wasm-memory-model=multithread-alloc`
+  - `xmake f --wasm-memory-model=multi-thread-alloc`
   - `xmake f --wasm-memory-model=single-thread-alloc`
 
 ### `--disable-local-imported-wasip1=[y|n]`
