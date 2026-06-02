@@ -580,11 +580,16 @@
 ///               memory usage and OOM in fuzzing/CI environments.
 #pragma push_macro("UWVM_SUPPORT_MMAP")
 #undef UWVM_SUPPORT_MMAP
+#if defined(UWVM_FORCE_USE_MMAP) && defined(UWVM_FORCE_DISABLE_MMAP)
+# error "UWVM_FORCE_USE_MMAP conflicts with UWVM_FORCE_DISABLE_MMAP"
+#endif
 #if !defined(UWVM_FORCE_DISABLE_MMAP) &&                                                                                                                       \
     (((defined(_WIN32) || defined(__CYGWIN__)) ||                                                                                                              \
       (!defined(__NEWLIB__) && !(defined(__MSDOS__) || defined(__DJGPP__)) && (!defined(__wasm__) || (defined(__wasi__) && defined(_WASI_EMULATED_MMAN))) &&   \
        __has_include(<sys/mman.h>)))) && !(UWVM_HAS_FEATURE(address_sanitizer) || defined(__SANITIZE_ADDRESS__))
 # define UWVM_SUPPORT_MMAP
+#elif defined(UWVM_FORCE_USE_MMAP)
+# error "UWVM_FORCE_USE_MMAP requested, but mmap-backed linear memory is unavailable on this platform/toolchain"
 #endif
 
 #pragma push_macro("UWVM_SUPPORT_WEAK_SYMBOL")

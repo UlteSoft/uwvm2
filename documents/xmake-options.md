@@ -301,14 +301,21 @@ Disables C++ exceptions for the project (sets Xmake exception policy `no-cxx`). 
 - **Example:**
   - `xmake f --fno-exceptions=y`
 
-### `--use-multithread-allocator-memory=[y|n]`
+### `--wasm-memory-model=<default|mmap|multithread-alloc|single-thread-alloc>`
 
-Enables a multithread allocator memory mode (defines `UWVM_USE_MULTITHREAD_ALLOCATOR`). Intended for platforms that lack `mmap` but support multithreading.
+Selects the WebAssembly linear memory backend.
 
-- **Default:** `n`
-- **Impact:** Changes allocator/memory strategy; platform-specific.
+- **Default:** `default`
+- **Values:**
+  - `default`: keep the existing platform-driven selection.
+  - `mmap`: force the mmap/VirtualAlloc backend. The build fails when that backend is unavailable.
+  - `multithread-alloc`: force the multithread allocator backend. The build fails when required atomic wait/notify support is unavailable.
+  - `single-thread-alloc`: force the single-thread allocator backend.
+- **Impact:** Changes the compiled runtime memory backend instead of only changing the non-mmap allocator fallback.
 - **Example:**
-  - `xmake f --use-multithread-allocator-memory=y`
+  - `xmake f --wasm-memory-model=mmap`
+  - `xmake f --wasm-memory-model=multithread-alloc`
+  - `xmake f --wasm-memory-model=single-thread-alloc`
 
 ### `--disable-local-imported-wasip1=[y|n]`
 

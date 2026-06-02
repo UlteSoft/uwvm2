@@ -65,9 +65,18 @@ function def_build(opt)
 		add_defines("UWVM_TIMER")
 	end
 
-	local enable_multithread_allocator_mem = get_config("use-multithread-allocator-memory")
-	if enable_multithread_allocator_mem then
+	local wasm_memory_model = get_config("wasm-memory-model") or "default"
+	if wasm_memory_model == "default" then
+		-- Keep the existing automatic backend selection.
+	elseif wasm_memory_model == "mmap" then
+		add_defines("UWVM_FORCE_USE_MMAP")
+	elseif wasm_memory_model == "multithread-alloc" then
+		add_defines("UWVM_FORCE_DISABLE_MMAP")
 		add_defines("UWVM_USE_MULTITHREAD_ALLOCATOR")
+	elseif wasm_memory_model == "single-thread-alloc" then
+		add_defines("UWVM_FORCE_DISABLE_MMAP")
+	else
+		error("unsupported wasm-memory-model: " .. tostring(wasm_memory_model))
 	end
 
 	local disable_local_imported_wasip1 = get_config("disable-local-imported-wasip1")

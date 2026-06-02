@@ -1061,7 +1061,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                             u8"Memory Map"
 #else
 # if defined(UWVM_USE_MULTITHREAD_ALLOCATOR)
-        // Enable on platforms that do not support mmap but support multithreading.
+        // Select the multithread allocator backend.
 
         // check support atomic wait, notify_*
 #  if !(__cpp_lib_atomic_wait >= 201907L)

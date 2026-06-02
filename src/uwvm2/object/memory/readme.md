@@ -5,7 +5,7 @@ the `uwvm2::object::memory` subsystem to implement WebAssembly linear memory.
 
 It explains how logical WebAssembly pages, platform pages and host-side linear
 memory backends relate to each other, and how `native_memory_t` selects an
-appropriate implementation for the current platform.
+appropriate implementation for the current build configuration and platform.
 
 ---
 
@@ -44,11 +44,14 @@ page size and APIs (for example `VirtualAlloc`, `mmap`, and related calls).
 uwvm2 provides **three** concrete host-side models for implementing the
 WebAssembly linear address space. They live under
 `uwvm2::object::memory::linear` and are selected via the `native_memory_t`
-alias in `linear/native.h`.
+alias in `linear/native.h`. The Xmake option
+`--wasm-memory-model=default|mmap|multithread-alloc|single-thread-alloc`
+can keep the platform default or force one backend.
 
 #### 3.1 mmap-based linear memory (`mmap_memory_t`)
 
-- Enabled when `UWVM_SUPPORT_MMAP` is defined.
+- Enabled when `UWVM_SUPPORT_MMAP` is defined, or forced with
+  `--wasm-memory-model=mmap`.
 - Uses the operating system's virtual memory facilities (for example,
   `VirtualAlloc` on Windows and `mmap` on POSIX) to reserve a large contiguous
   address range for the linear memory.
@@ -68,7 +71,8 @@ This model is used on platforms that **do not** support `mmap` but **do**
 support multi-threading and C++20 atomic wait/notify primitives.
 
 - Enabled when `UWVM_USE_MULTITHREAD_ALLOCATOR` is defined and the standard
-  library provides `std::atomic::wait` / `notify_*`.
+  library provides `std::atomic::wait` / `notify_*`; Xmake sets this when
+  `--wasm-memory-model=multithread-alloc` is selected.
 - Backed by a generic aligned allocator instead of virtual memory.
 - Implements a careful synchronization protocol for `memory.grow` and
   in-flight memory operations:
@@ -104,7 +108,11 @@ for multi-threaded access to the WebAssembly linear memory.
 
 At compile time exactly **one** of these three implementations becomes the
 `native_memory_t` alias, providing a uniform interface to the rest of the
-object subsystem while allowing the backend to be tailored to the host.
+object subsystem while allowing the backend to be tailored to the host. With
+`--wasm-memory-model=default`, uwvm2 preserves the existing automatic choice:
+use mmap when available, otherwise use the single-thread allocator unless the
+multithread allocator build macro is explicitly defined. Forced selections
+fail at build time when the requested backend is not supported.
 
 ---
 
