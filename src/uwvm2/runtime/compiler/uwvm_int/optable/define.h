@@ -415,9 +415,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
         ::std::uint_least32_t request_countdown{};
     };
 
+    inline constexpr ::std::uint_least32_t interpreter_tiered_osr_request_countdown_disabled{
+        (::std::numeric_limits<::std::uint_least32_t>::max)()};
+
     [[nodiscard]] inline constexpr interpreter_tiered_loop_osr_counter_policy_t
         interpreter_tiered_loop_osr_counter_policy_for_function_size(::std::size_t function_code_size) noexcept
     {
+        if(function_code_size >= 32768uz)
+        {
+            return {.initial_countdown = interpreter_tiered_osr_request_countdown_disabled,
+                    .reset_countdown = interpreter_tiered_osr_request_countdown_disabled,
+                    .request_countdown = interpreter_tiered_osr_request_countdown_disabled};
+        }
         if(function_code_size >= 4096uz) { return {.initial_countdown = 4u, .reset_countdown = 64u, .request_countdown = 4096u}; }
         if(function_code_size >= 1024uz) { return {.initial_countdown = 16u, .reset_countdown = 128u, .request_countdown = 512u}; }
         return {.initial_countdown = 1024u, .reset_countdown = 1024u, .request_countdown = 2048u};
@@ -426,6 +435,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::uwvm_int::optable
     [[nodiscard]] inline constexpr ::std::uint_least32_t
         interpreter_tiered_block_osr_request_countdown_for_function_size(::std::size_t function_code_size) noexcept
     {
+        if(function_code_size >= 32768uz) { return interpreter_tiered_osr_request_countdown_disabled; }
         if(function_code_size >= 4096uz) { return 4096u; }
         if(function_code_size >= 1024uz) { return 512u; }
         return 64u;

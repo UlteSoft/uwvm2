@@ -162,13 +162,26 @@ The log names use the `tiered_full_*` prefix for full-tier data and
 ## Tuning Notes
 
 The current trigger waits for 65536 successful switches into native tiered code
-before enqueueing Tier 2. This keeps Tier 2 from stealing CPU from a hot
-single-entry run that is still trying to reach Tier 1 loop reentry, while still
-promoting workloads that repeatedly return to native tiered code.
+before enqueueing Tier 2 for small modules. Modules with at least 512 local
+functions require 1048576 switches, and modules with at least 1024 local
+functions are kept out of full-module Tier 2. This keeps Tier 2 from stealing
+CPU from hot large modules that are still benefiting from targeted lazy Tier 1
+functions, while still promoting small workloads that repeatedly return to
+native tiered code.
 
 Tier 1 policy is counter-only: elapsed time is reported in logs, but it does
 not decide when tiering happens. Ordinary function-entry misses require 4096
-misses on the same local function before the bridge enqueues LLVM work.
+misses on the same local function before the bridge enqueues LLVM work for
+small modules. The threshold scales up for large modules and large functions:
+modules with at least 512 local functions require 16384 entry misses, and
+modules with at least 1024 local functions require 65536 entry misses. Compile
+units of up to 128/512/1024 bytes can lower that large-module threshold back to
+8192/16384/32768 misses, because tiny helpers are cheap to materialize and often
+sit on hot indirect-call paths. Compile units of at least 4096/8192 bytes
+require at least 65536/262144 entry misses, and compile units of at least 32768
+bytes are kept out of entry-triggered lazy LLVM. This keeps large projects such
+as SQLite or CPython from starting dozens of expensive LLVM entry
+materializations from short-lived helper calls.
 
 Loop OSR uses mutable bytecode immediates as per-loop counters. Loop headers in
 functions of at least 4096 bytes poll after 4 iterations and then retry every 64
@@ -178,6 +191,8 @@ and require 512 expired polls before requesting LLVM. Smaller functions poll
 every 1024 iterations and require 2048 expired polls before requesting LLVM.
 Block polls keep the older 8192-iteration cadence, but use request-count
 thresholds of 4096, 512, or 64 expired polls for large, medium, and small
-functions respectively. This keeps short hot helpers from starting expensive
-LLVM materialization while still promoting loops that have proven hot by
-executed backedge counts.
+functions respectively. Functions of at least 32768 bytes do not get OSR polls,
+because their LLVM compile cost is too large to pay without much stronger
+evidence than benchmark-sized loops provide. This keeps short hot helpers from
+starting expensive LLVM materialization while still promoting loops that have
+proven hot by executed backedge counts.

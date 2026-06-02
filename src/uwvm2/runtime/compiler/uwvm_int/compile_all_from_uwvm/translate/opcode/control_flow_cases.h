@@ -138,17 +138,21 @@ case wasm1_code::block:
                     auto const request_countdown{
                         ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_block_osr_request_countdown_for_function_size(
                             function_code_size)};
-                    poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                        .func_index = function_index,
-                                        .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
-                                        .result_bytes = result_bytes,
-                                        .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
-                                        .countdown = 8192u,
-                                        .reset_countdown = 8192u,
-                                        .request_countdown = request_countdown};
-                    emit_opfunc_to(bytecode,
-                                   translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
-                    emit_imm(poll_imm);
+                    if(request_countdown != ::uwvm2::runtime::compiler::uwvm_int::optable::interpreter_tiered_osr_request_countdown_disabled)
+                    {
+                        poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
+                                            .func_index = function_index,
+                                            .loop_wasm_code_offset = static_cast<::std::size_t>(op_begin - code_begin),
+                                            .result_bytes = result_bytes,
+                                            .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                            .countdown = 8192u,
+                                            .reset_countdown = 8192u,
+                                            .request_countdown = request_countdown};
+                        emit_opfunc_to(
+                            bytecode,
+                            translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop, interpreter_tuple));
+                        emit_imm(poll_imm);
+                    }
                 }
             }
         }
@@ -342,20 +346,26 @@ case wasm1_code::loop:
                                                       auto const poll_policy{
                                                           ::uwvm2::runtime::compiler::uwvm_int::optable::
                                                               interpreter_tiered_loop_osr_counter_policy_for_function_size(function_code_size)};
-                                                      poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
-                                                                          .func_index = function_index,
-                                                                          .loop_wasm_code_offset =
-                                                                              static_cast<::std::size_t>(op_begin - code_begin),
-                                                                          .result_bytes = result_bytes,
-                                                                          .local_bytes = local_func_symbol.local_bytes_max - internal_temp_local_size,
-                                                                          .countdown = poll_policy.initial_countdown,
-                                                                          .reset_countdown = poll_policy.reset_countdown,
-                                                                          .request_countdown = poll_policy.request_countdown};
-                                                      emit_opfunc_to(
-                                                          bytecode,
-                                                          translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(curr_stacktop,
-                                                                                                                                     interpreter_tuple));
-                                                      emit_imm(poll_imm);
+                                                      if(poll_policy.request_countdown !=
+                                                         ::uwvm2::runtime::compiler::uwvm_int::optable::
+                                                             interpreter_tiered_osr_request_countdown_disabled)
+                                                      {
+                                                          poll_imm_t poll_imm{.wasm_module_id = options.curr_wasm_id,
+                                                                              .func_index = function_index,
+                                                                              .loop_wasm_code_offset =
+                                                                                  static_cast<::std::size_t>(op_begin - code_begin),
+                                                                              .result_bytes = result_bytes,
+                                                                              .local_bytes =
+                                                                                  local_func_symbol.local_bytes_max - internal_temp_local_size,
+                                                                              .countdown = poll_policy.initial_countdown,
+                                                                              .reset_countdown = poll_policy.reset_countdown,
+                                                                              .request_countdown = poll_policy.request_countdown};
+                                                          emit_opfunc_to(
+                                                              bytecode,
+                                                              translate::get_uwvmint_tiered_loop_osr_poll_fptr_from_tuple<CompileOption>(
+                                                                  curr_stacktop, interpreter_tuple));
+                                                          emit_imm(poll_imm);
+                                                      }
                                                   }
                                               }
                                           }
