@@ -116,17 +116,6 @@ namespace uwvm2::runtime::lib
         using lazy_compile_scheduler_stats_snapshot_t = ::uwvm2::utils::thread::lazy_compile_scheduler_stats_snapshot;
         using lazy_parser_module_storage_t = ::uwvm2::uwvm::wasm::feature::wasm_binfmt_ver1_module_storage_t;
 
-        template <typename>
-        struct member_function_first_argument;
-
-        template <typename R, typename C, typename A0>
-        struct member_function_first_argument<R (C::*)(A0)>
-        {
-            using type = A0;
-        };
-
-        using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
-
         struct compiled_module_record;
         [[nodiscard]] inline lazy_parser_module_storage_t const*
             find_lazy_validator_module_storage(::uwvm2::utils::container::u8string_view module_name) noexcept;
@@ -156,6 +145,17 @@ namespace uwvm2::runtime::lib
         [[nodiscard]] inline bool lazy_background_refill_callback(void*, ::uwvm2::utils::thread::lazy_compile_scheduler& scheduler) noexcept;
 #endif
 #if defined(UWVM_RUNTIME_LLVM_JIT)
+        template <typename>
+        struct member_function_first_argument;
+
+        template <typename R, typename C, typename A0>
+        struct member_function_first_argument<R (C::*)(A0)>
+        {
+            using type = A0;
+        };
+
+        using llvm_module_owner_t = typename member_function_first_argument<decltype(&::llvm::ExecutionEngine::addModule)>::type;
+
         using llvm_jit_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_all_from_uwvm::full_function_symbol_t;
         using llvm_jit_lazy_compiled_module_t = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_module_storage_t;
         using llvm_jit_lazy_compile_options_t = ::uwvm2::runtime::compiler::llvm_jit::compile_cu_from_lazy_validator::lazy_compile_options;
@@ -1141,7 +1141,9 @@ namespace uwvm2::runtime::lib
             g_runtime.lazy_prefetch_lock.clear(::std::memory_order_release);
             return queued;
         }
+#endif
 
+#if defined(UWVM_RUNTIME_UWVM_INTERPRETER) || defined(UWVM_RUNTIME_LLVM_JIT)
         [[nodiscard]] inline ::fast_io::unix_timestamp lazy_clock_now() noexcept
         {
             ::fast_io::unix_timestamp ts{};
@@ -1159,6 +1161,7 @@ namespace uwvm2::runtime::lib
             return ts;
         }
 
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
         [[nodiscard]] inline ::std::uint_least64_t lazy_clock_now_ns() noexcept
         {
             auto const ts{lazy_clock_now()};
@@ -1179,6 +1182,7 @@ namespace uwvm2::runtime::lib
         {
             target.fetch_add(lazy_elapsed_ns(begin_ns, end_ns), ::std::memory_order_relaxed);
         }
+# endif
 
         [[nodiscard]] inline ::std::size_t lazy_total_function_count() noexcept
         {
@@ -1251,6 +1255,7 @@ namespace uwvm2::runtime::lib
             auto const compiled_functions{lazy_compiled_function_count()};
             auto const miss_count{g_runtime.lazy_runtime_miss_count.load(::std::memory_order_relaxed)};
             auto const compiled_hit_count{g_runtime.lazy_runtime_compiled_hit_count.load(::std::memory_order_relaxed)};
+# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             ::std::size_t tiered_switches{};
             ::std::size_t tiered_direct_switches{};
             ::std::size_t tiered_interpreter_entries{};
@@ -1275,7 +1280,6 @@ namespace uwvm2::runtime::lib
             ::std::uint_least64_t tiered_int_outer_compile_wait_ns{};
             ::std::uint_least64_t tiered_int_outer_exec_ns{};
             ::std::uint_least64_t tiered_int_outer_total_ns{};
-# if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
             auto const tiered_backend{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler ==
                                       ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::uwvm_interpreter_llvm_jit_tiered};
             if(tiered_backend)
@@ -2116,13 +2120,17 @@ namespace uwvm2::runtime::lib
         {
             ::std::uint_least32_t threshold{4096u};
             auto const local_n{rec.llvm_jit_lazy_compiled.functions.size()};
-            if(local_n >= 1024uz) { threshold = 65536u; }
+            if(local_n >= 4096uz) { threshold = 131072u; }
+            else if(local_n >= 1024uz) { threshold = 65536u; }
             else if(local_n >= 512uz) { threshold = 16384u; }
 
             auto const code_size{llvm_jit_lazy_compile_unit_code_size(rec, local_index)};
-            if(code_size <= 128uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
-            else if(code_size <= 512uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
-            else if(code_size <= 1024uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
+            if(local_n < 4096uz)
+            {
+                if(code_size <= 128uz) { threshold = (threshold > 8192u) ? 8192u : threshold; }
+                else if(code_size <= 512uz) { threshold = (threshold > 16384u) ? 16384u : threshold; }
+                else if(code_size <= 1024uz) { threshold = (threshold > 32768u) ? 32768u : threshold; }
+            }
 
             if(code_size >= 32768uz) { threshold = ::std::numeric_limits<::std::uint_least32_t>::max(); }
             else if(code_size >= 8192uz) { threshold = (threshold < 262144u) ? 262144u : threshold; }
@@ -4515,6 +4523,9 @@ namespace uwvm2::runtime::lib
                                                                                  ::std::size_t function_index,
                                                                                  bool allow_tiered) noexcept
         {
+# if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            static_cast<void>(allow_tiered);
+# endif
             auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
             auto const llvm_jit_lazy_backend{runtime_compiler == ::uwvm2::uwvm::runtime::runtime_mode::runtime_compiler_t::llvm_jit_only};
             auto const tiered_lazy_backend{
@@ -5774,6 +5785,9 @@ namespace uwvm2::runtime::lib
                                                                           bool publish_full_ready,
                                                                           ::llvm::CodeGenOptLevel default_codegen_opt_level) noexcept
         {
+# if !defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
+            static_cast<void>(publish_full_ready);
+# endif
             auto const llvm_jit_materialize_runtime_log_now{[]() noexcept
                                                             {
                                                                 ::fast_io::unix_timestamp ts{};
@@ -6493,6 +6507,13 @@ namespace uwvm2::runtime::lib
         {
             ensure_runtime_process_exit_handler_registered();
 
+#if !defined(UWVM_RUNTIME_HAS_BACKEND)
+            static_cast<void>(initialize_interpreter_bridges);
+            ::fast_io::fast_terminate();
+#else
+# if !defined(UWVM_RUNTIME_UWVM_INTERPRETER)
+            static_cast<void>(initialize_interpreter_bridges);
+# endif
             auto const runtime_compiler{::uwvm2::uwvm::runtime::runtime_mode::global_runtime_compiler};
             auto const compile_uwvm_int_translation{runtime_compiler_requests_uwvm_int_translation()};
             auto const compile_llvm_jit_translation{runtime_compiler_requests_llvm_jit_translation()};
@@ -7409,6 +7430,7 @@ namespace uwvm2::runtime::lib
 
             g_runtime.compiled_all.store(true, ::std::memory_order_release);
             compile_lock.clear(::std::memory_order_release);
+#endif
         }
 
 #if defined(UWVM_RUNTIME_UWVM_INTERPRETER)
@@ -7750,10 +7772,7 @@ namespace uwvm2::runtime::lib
             auto const tiered_targets_backend{tiered_t0_backend || tiered_t2_backend};
             if(tiered_t0_backend) { ensure_bridges_initialized(); }
 # else
-            constexpr bool tiered_backend{};
             constexpr bool tiered_t0_backend{};
-            constexpr bool tiered_t2_backend{};
-            constexpr bool tiered_targets_backend{};
 # endif
 
             if(g_runtime.lazy_initialized.load(::std::memory_order_acquire)) { return; }

@@ -311,6 +311,9 @@ function def_build(opt)
 	)
 end
 
+local uwvm_has_runtime_backend = (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
+	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default")
+
 target("uwvm")
 	set_kind("binary")
 	local uwvm_uses_llvm_jit = (get_config("execution-jit") == "llvm") or (get_config("execution-jit") == "default")
@@ -380,81 +383,83 @@ target("uwvm")
 		add_files("src/uwvm2/uwvm/host_api.default.cpp")
 	end
 
-	-- uwvm_runtime (shared full-compile runtime unit for int/jit backends)
-	if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-		(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
-		add_deps("uwvm_runtime")
-	end
+	-- uwvm_runtime also provides non-backend host API shims used by uwvm.
+	add_deps("uwvm_runtime")
 
 target_end()
 
--- uwvm_runtime: build the shared full-compile runtime unit separately so it can use its own FP flags.
-if (get_config("execution-int") == "uwvm-int" or get_config("execution-int") == "default") or
-	(get_config("execution-jit") == "llvm" or get_config("execution-jit") == "default") then
-	target("uwvm_runtime")
-		set_kind("object")
-		def_build({ skip_static_libcxx = true })
-			
-		-- Interpreter/runtime execution unit: disable observable floating-point side effects
-		-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
-		add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
+-- uwvm_runtime: build the shared runtime unit separately so it can use its own FP flags.
+target("uwvm_runtime")
+	set_kind("object")
+	def_build({ skip_static_libcxx = true })
 
-		-- third-parties/fast_float
-		add_includedirs("third-parties/fast_float/include")
+	-- Interpreter/runtime execution unit: disable observable floating-point side effects
+	-- (errno, traps, dynamic rounding, and FMA contraction) to preserve WebAssembly FP semantics.
+	add_cxflags("-fno-math-errno", "-fno-trapping-math", "-fno-rounding-math", "-ffp-contract=off")
 
-		-- third-parties/fast_io
-		add_includedirs("third-parties/fast_io/include")
+	-- third-parties/fast_float
+	add_includedirs("third-parties/fast_float/include")
 
+	-- third-parties/fast_io
+	add_includedirs("third-parties/fast_io/include")
+
+	if enable_cxx_module then
+		add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
+		add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
+	end
+
+	-- third-parties/bizwen
+	add_includedirs("third-parties/bizwen/include")
+
+	-- third-parties/boost
+	add_includedirs("third-parties/boost_unordered/include")
+
+	-- src
+	add_includedirs("src/")
+
+	add_defines("UWVM=2")
+
+	if enable_cxx_module then
+		-- uwvm predefine
+		add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
+
+		-- utils
+		add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
+
+		-- object
+		add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
+
+		-- imported
+		add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
+
+		-- wasm parser
+		add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
+
+		-- validation
+		add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
+
+		-- uwvm
+		add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
+
+		-- runtime
+		add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
+	end
+
+	if uwvm_has_runtime_backend then
 		if enable_cxx_module then
-			add_files("third-parties/fast_io/share/fast_io/fast_io.cppm", { public = is_debug_mode })
-			add_files("third-parties/fast_io/share/fast_io/fast_io_crypto.cppm", { public = is_debug_mode })
-		end
-		-- third-parties/bizwen
-		add_includedirs("third-parties/bizwen/include")
-		-- third-parties/boost
-		add_includedirs("third-parties/boost_unordered/include")
-
-		-- src
-		add_includedirs("src/")
-
-		add_defines("UWVM=2")
-
-		if enable_cxx_module then
-			-- uwvm predefine
-			add_files("src/uwvm2/uwvm_predefine/**.cppm", { public = is_debug_mode })
-
-			-- utils
-			add_files("src/uwvm2/utils/**.cppm", { public = is_debug_mode })
-
-			-- object
-			add_files("src/uwvm2/object/**.cppm", { public = is_debug_mode })
-
-			-- imported
-			add_files("src/uwvm2/imported/**.cppm", { public = is_debug_mode })
-
-			-- wasm parser
-			add_files("src/uwvm2/parser/**.cppm", { public = is_debug_mode })
-
-			-- validation
-			add_files("src/uwvm2/validation/**.cppm", { public = is_debug_mode })
-
-			-- uwvm
-			add_files("src/uwvm2/uwvm/**.cppm", { public = is_debug_mode })
-
-			-- runtime
-			add_files("src/uwvm2/runtime/**.cppm", { public = is_debug_mode })
-		end
-
-		if enable_cxx_module then
-			-- uwvm int main
 			add_files("src/uwvm2/runtime/lib/uwvm_runtime.module.cpp")
 		else
-			-- uwvm int main
 			add_files("src/uwvm2/runtime/lib/uwvm_runtime.default.cpp")
 		end
-		
-	target_end()
-end
+	else
+		if enable_cxx_module then
+			add_files("src/uwvm2/runtime/lib/uwvm_stub_runtime.module.cpp")
+		else
+			add_files("src/uwvm2/runtime/lib/uwvm_stub_runtime.default.cpp")
+		end
+	end
+
+target_end()
 
 -- test unit
 for _, file in ipairs(os.files("test/**.cc")) do

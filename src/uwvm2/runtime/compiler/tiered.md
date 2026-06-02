@@ -176,12 +176,14 @@ small modules. The threshold scales up for large modules and large functions:
 modules with at least 512 local functions require 16384 entry misses, and
 modules with at least 1024 local functions require 65536 entry misses. Compile
 units of up to 128/512/1024 bytes can lower that large-module threshold back to
-8192/16384/32768 misses, because tiny helpers are cheap to materialize and often
-sit on hot indirect-call paths. Compile units of at least 4096/8192 bytes
-require at least 65536/262144 entry misses, and compile units of at least 32768
-bytes are kept out of entry-triggered lazy LLVM. This keeps large projects such
-as SQLite or CPython from starting dozens of expensive LLVM entry
-materializations from short-lived helper calls.
+8192/16384/32768 misses while the module has fewer than 4096 local functions,
+because tiny helpers are cheap to materialize and often sit on hot indirect-call
+paths. Modules at CPython scale keep the larger 65536 entry-miss threshold even
+for tiny helpers. Compile units of at least 4096/8192 bytes require at least
+65536/262144 entry misses, and compile units of at least 32768 bytes are kept
+out of entry-triggered lazy LLVM. This keeps large projects such as SQLite or
+CPython from starting dozens of expensive LLVM entry materializations from
+short-lived helper calls.
 
 Loop OSR uses mutable bytecode immediates as per-loop counters. Loop headers in
 functions of at least 4096 bytes poll after 4 iterations and then retry every 64
