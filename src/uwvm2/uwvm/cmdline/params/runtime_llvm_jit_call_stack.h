@@ -42,11 +42,11 @@
 
 #pragma push_macro("UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND")
 #undef UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
-#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) && !defined(_WIN32) && \
-    (__has_include(<libunwind.h>) || __has_include(<unwind.h>))
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 1
-#else
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 0
+#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) &&                                                              \
+    ((!defined(_WIN32) && (__has_include(<libunwind.h>) || __has_include(<unwind.h>))) ||                                                                  \
+     (defined(_WIN64) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&              \
+      !defined(__CYGWIN__) && __has_include(<windows.h>)))
+# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
 #endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
@@ -72,7 +72,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
     inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_call_stack{
         .name{u8"--runtime-llvm-jit-call-stack"},
         .describe{u8"Select the runtime LLVM JIT call-stack tracking mode."},
-# if UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
+# ifdef UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
         .usage{u8"[auto|instruction|none|unwind|unwind-uncheck]"},
 # else
         .usage{u8"[auto|instruction|none]"},

@@ -50,6 +50,7 @@ module;
 # include <llvm/Transforms/Scalar.h>
 # include <llvm/Transforms/Scalar/GVN.h>
 # include <llvm/Transforms/Utils.h>
+# include <uwvm2/runtime/compiler/llvm_jit/section_memory_manager.h>
 #endif
 
 export module uwvm2.runtime.compiler.llvm_jit.compile_cu_from_lazy_validator:translate;

@@ -23,7 +23,7 @@ Source focus:
 | `--runtime-llvm-jit-policy` | `-Rllvm-policy` | `[debug|default|fast-compile|balanced|max]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the high-level LLVM JIT strategy policy. |
 | `--runtime-llvm-jit-lazy-policy` | `-Rllvm-lazy-policy` | `[auto|debug|light|balanced]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the lazy/tier-1 LLVM JIT strategy. |
 | `--runtime-llvm-jit-full-policy` | `-Rllvm-full-policy` | `[auto|debug|legacy-light|pb-o1|pb-o2|pb-o3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the full/tier-2 LLVM JIT strategy. |
-| `--runtime-llvm-jit-call-stack` | `-Rllvm-call-stack` | `[auto|instruction|none|unwind]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select LLVM-JIT call-stack tracking mode. |
+| `--runtime-llvm-jit-call-stack` | `-Rllvm-call-stack` | `[auto|instruction|none|unwind|unwind-uncheck]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select LLVM-JIT call-stack tracking mode. |
 | `--runtime-llvm-jit-disable-ir-verifaction` | `-Rllvm-noverify` | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
@@ -240,7 +240,7 @@ Behavior:
 - `unwind-unchecked`: accepted as an alias for `unwind-uncheck`.
 - Default: `auto`.
 - uwvm itself may still be built without unwind tables. Host-runtime unwindability is not a requirement for JIT unwind mode, and uwvm does not warn when ordinary host-runtime frames cannot be walked.
-- On Apple targets, uwvm registers generated `.eh_frame` FDEs directly, matching WAVM's libunwind model.
+- On Apple targets, uwvm registers generated `.eh_frame` FDEs directly. On Win64 x86_64 targets, uwvm registers generated SEH function tables with the OS.
 - This command is independent of `--runtime-llvm-jit-policy`, `--runtime-llvm-jit-lazy-policy`, and `--runtime-llvm-jit-full-policy`.
 - Runtime compiler logs report the selected mode as `call_stack=`, the selected unwind backend as `unwind_backend=`, the live-probe decision as `unwind_check=live-jit|skipped|off`, whether generated-code unwind metadata is allowed to replace instruction frames as `unwind_replace_frames=`, and the actual instruction-frame emission as `call_stack_frames=`.
 

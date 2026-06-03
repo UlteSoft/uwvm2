@@ -53,6 +53,7 @@
 #  include <llvm/Transforms/Scalar.h>
 #  include <llvm/Transforms/Scalar/GVN.h>
 #  include <llvm/Transforms/Utils.h>
+#  include <uwvm2/runtime/compiler/llvm_jit/section_memory_manager.h>
 # endif
 // import
 # include <fast_io.h>
@@ -544,6 +545,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                 .setOptLevel(options.codegen_opt_level)
                                 .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                                 .setMAttrs(host_target_attributes)
+                                .setMCJITMemoryManager(::std::make_unique<
+                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
                                 .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
@@ -643,6 +646,8 @@ UWVM_MODULE_EXPORT namespace uwvm2::runtime::compiler::llvm_jit::compile_cu_from
                                 .setOptLevel(options.codegen_opt_level)
                                 .setMCPU(all_details::get_llvm_string_ref(target_config.cpu_name))
                                 .setMAttrs(host_target_attributes)
+                                .setMCJITMemoryManager(::std::make_unique<
+                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
                                 .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());

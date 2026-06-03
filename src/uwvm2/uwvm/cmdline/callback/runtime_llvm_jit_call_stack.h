@@ -47,11 +47,11 @@
 
 #pragma push_macro("UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND")
 #undef UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
-#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) && !defined(_WIN32) && \
-    (__has_include(<libunwind.h>) || __has_include(<unwind.h>))
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 1
-#else
-# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND 0
+#if (defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)) &&                                                              \
+    ((!defined(_WIN32) && (__has_include(<libunwind.h>) || __has_include(<unwind.h>))) ||                                                                  \
+     (defined(_WIN64) && ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) &&              \
+      !defined(__CYGWIN__) && __has_include(<windows.h>)))
+# define UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
 #endif
 
 UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
@@ -67,19 +67,18 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_curr,
             ::uwvm2::utils::cmdline::parameter_parsing_results * para_end) noexcept
     {
-        auto print_usage_error{
-            []() constexpr noexcept
-            {
-                ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
-                                    u8"uwvm: ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
-                                    u8"[error] ",
-                                    ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
-                                    u8"Usage: ",
-                                    ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_call_stack),
-                                    u8"\n\n");
-            }};
+        auto print_usage_error{[]() constexpr noexcept
+                               {
+                                   ::fast_io::io::perr(::uwvm2::uwvm::io::u8log_output,
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RST_ALL_AND_SET_WHITE),
+                                                       u8"uwvm: ",
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_RED),
+                                                       u8"[error] ",
+                                                       ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
+                                                       u8"Usage: ",
+                                                       ::uwvm2::utils::cmdline::print_usage(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_call_stack),
+                                                       u8"\n\n");
+                               }};
 
         auto currp1{para_curr + 1u};
         if(currp1 == para_end || currp1->type != ::uwvm2::utils::cmdline::parameter_parsing_results_type::arg) [[unlikely]]
@@ -92,23 +91,14 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
         auto const currp1_str{currp1->str};
 
         using runtime_llvm_jit_call_stack_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_call_stack_t;
-        if(currp1_str == u8"auto")
-        {
-            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::auto_policy;
-        }
+        if(currp1_str == u8"auto") { ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::auto_policy; }
         else if(currp1_str == u8"instruction")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::instruction;
         }
-        else if(currp1_str == u8"none")
-        {
-            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::none;
-        }
+        else if(currp1_str == u8"none") { ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::none; }
 # if UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
-        else if(currp1_str == u8"unwind")
-        {
-            ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind;
-        }
+        else if(currp1_str == u8"unwind") { ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind; }
         else if(currp1_str == u8"unwind-uncheck" || currp1_str == u8"unwind-unchecked")
         {
             ::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_call_stack = runtime_llvm_jit_call_stack_t::unwind_uncheck;
@@ -137,7 +127,7 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params::details
                                 u8", ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),
                                 u8"none",
-# if UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
+# ifdef UWVM2_UWVM_CMDLINE_RUNTIME_LLVM_JIT_CALL_STACK_HAS_UNWIND
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_WHITE),
                                 u8", or ",
                                 ::fast_io::mnp::cond(::uwvm2::uwvm::utils::ansies::put_color, UWVM_COLOR_U8_CYAN),

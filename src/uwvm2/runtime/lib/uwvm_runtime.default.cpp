@@ -72,11 +72,17 @@
 #  include <llvm/Transforms/Utils.h>
 # endif
 
+# if defined(UWVM_RUNTIME_LLVM_JIT) && defined(_WIN64) &&                                                                                                     \
+     ((defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)) && !(defined(__arm64ec__) || defined(_M_ARM64EC))) && !defined(__CYGWIN__) &&              \
+     __has_include(<windows.h>)
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE 1
+# else
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE 0
+# endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && defined(__APPLE__) && !defined(_WIN32) && __has_include(<unwind.h>)
 #  include <unwind.h>
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE 0
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 1
-#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 1
 extern "C" void __register_frame(void const*);
 extern "C" void __deregister_frame(void const*);
 # elif defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<libunwind.h>)
@@ -86,15 +92,17 @@ extern "C" void __deregister_frame(void const*);
 #  include <libunwind.h>
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE 1
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 0
-#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 1
 # elif defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<unwind.h>)
 #  include <unwind.h>
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE 0
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 1
-#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 1
 # else
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE 0
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE 0
+# endif
+# if UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE || UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE || UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+#  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 1
+# else
 #  define UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_BACKTRACE 0
 # endif
 # if defined(UWVM_RUNTIME_LLVM_JIT) && !defined(_WIN32) && __has_include(<execinfo.h>)
@@ -118,6 +126,7 @@ extern "C" void __deregister_frame(void const*);
 # include <uwvm2/runtime/compiler/uwvm_int/optable/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_all_from_uwvm/impl.h>
 # include <uwvm2/runtime/compiler/llvm_jit/compile_cu_from_lazy_validator/impl.h>
+# include <uwvm2/runtime/compiler/llvm_jit/section_memory_manager.h>
 # include <uwvm2/utils/container/impl.h>
 # include <uwvm2/runtime/compiler/uwvm_int/utils/impl.h>
 # include <uwvm2/uwvm/io/impl.h>
@@ -836,6 +845,8 @@ namespace uwvm2::runtime::lib
         {
 # if UWVM2_RUNTIME_LLVM_JIT_HAS_LIBUNWIND_BACKTRACE
             return u8"libunwind";
+# elif UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+            return u8"win64-seh";
 # elif UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
             return u8"unwind.h";
 # else
@@ -876,6 +887,27 @@ namespace uwvm2::runtime::lib
                 auto frame_ip{static_cast<::std::uintptr_t>(ip)};
                 if(frame_index != 0uz && frame_ip != 0u) { --frame_ip; }
                 storage.frames[storage.size++] = frame_ip;
+            }
+
+            return storage;
+        }
+#  elif UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+        [[nodiscard]] inline llvm_jit_unwind_backtrace_storage capture_llvm_jit_unwind_backtrace(::std::size_t omit) noexcept
+        {
+            llvm_jit_unwind_backtrace_storage storage{};
+            if(omit > static_cast<::std::size_t>((::std::numeric_limits<::ULONG>::max)())) [[unlikely]] { return storage; }
+
+            void* frames[llvm_jit_unwind_backtrace_storage::max_frames]{};
+            auto const captured{::RtlCaptureStackBackTrace(static_cast<::ULONG>(omit),
+                                                           static_cast<::ULONG>(llvm_jit_unwind_backtrace_storage::max_frames),
+                                                           frames,
+                                                           nullptr)};
+            storage.size = static_cast<::std::size_t>(captured);
+            for(::std::size_t i{}; i != storage.size; ++i)
+            {
+                auto frame_ip{reinterpret_cast<::std::uintptr_t>(frames[i])};
+                if(i != 0uz && frame_ip != 0u) { --frame_ip; }
+                storage.frames[i] = frame_ip;
             }
 
             return storage;
@@ -941,7 +973,7 @@ namespace uwvm2::runtime::lib
 
         [[nodiscard]] inline bool runtime_llvm_jit_unwind_can_replace_instruction_frames() noexcept
         {
-            // JIT unwind mode only requires generated code to carry registered .eh_frame FDEs.
+            // JIT unwind mode only requires generated code to carry registered native unwind tables.
             // Host uwvm2 frames may still be built without unwind tables; trap reporting falls
             // back to the captured JIT return address for the innermost generated frame.
 # if UWVM2_RUNTIME_LLVM_JIT_UNWIND_REPLACES_INSTRUCTION_FRAMES
@@ -951,92 +983,9 @@ namespace uwvm2::runtime::lib
 # endif
         }
 
-#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
-        struct runtime_llvm_jit_eh_frame_record
-        {
-            ::std::uint8_t* addr{};
-            ::std::size_t size{};
-        };
-
-        template <typename Visit>
-        inline void visit_runtime_llvm_jit_eh_frame_fdes(::std::uint8_t* addr, ::std::size_t size, Visit visit) noexcept
-        {
-            auto const end{addr + size};
-            auto curr{addr};
-            while(curr < end)
-            {
-                auto const record{curr};
-                if(static_cast<::std::size_t>(end - curr) < sizeof(::std::uint_least32_t)) [[unlikely]] { return; }
-
-                ::std::uint_least32_t length32{};
-                ::std::memcpy(::std::addressof(length32), curr, sizeof(length32));
-                curr += sizeof(length32);
-                if(length32 == 0u) { return; }
-
-                ::std::size_t length{};
-                if(length32 == 0xffffffffu)
-                {
-                    if(static_cast<::std::size_t>(end - curr) < sizeof(::std::uint_least64_t)) [[unlikely]] { return; }
-                    ::std::uint_least64_t length64{};
-                    ::std::memcpy(::std::addressof(length64), curr, sizeof(length64));
-                    curr += sizeof(length64);
-                    if(length64 > static_cast<::std::uint_least64_t>(::std::numeric_limits<::std::size_t>::max())) [[unlikely]] { return; }
-                    length = static_cast<::std::size_t>(length64);
-                }
-                else
-                {
-                    length = static_cast<::std::size_t>(length32);
-                }
-
-                if(length > static_cast<::std::size_t>(end - curr)) [[unlikely]] { return; }
-                auto const next{curr + length};
-                if(length < sizeof(::std::uint_least32_t)) [[unlikely]]
-                {
-                    curr = next;
-                    continue;
-                }
-
-                ::std::uint_least32_t cie_offset{};
-                ::std::memcpy(::std::addressof(cie_offset), curr, sizeof(cie_offset));
-                if(cie_offset != 0u) { visit(record); }
-                curr = next;
-            }
-        }
-#endif
-
-        class runtime_llvm_jit_section_memory_manager final : public ::llvm::SectionMemoryManager
-        {
-        public:
-            ~runtime_llvm_jit_section_memory_manager() override
-            {
-#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
-                for(auto const& frame: eh_frame_records_)
-                {
-                    visit_runtime_llvm_jit_eh_frame_fdes(frame.addr, frame.size, [](::std::uint8_t* fde) noexcept { __deregister_frame(fde); });
-                }
-#endif
-            }
-
-            void registerEHFrames(::std::uint8_t* addr, ::std::uint64_t load_addr, ::std::size_t size) override
-            {
-#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
-                static_cast<void>(load_addr);
-                visit_runtime_llvm_jit_eh_frame_fdes(addr, size, [](::std::uint8_t* fde) noexcept { __register_frame(fde); });
-                eh_frame_records_.push_back(runtime_llvm_jit_eh_frame_record{addr, size});
-#else
-                ::llvm::SectionMemoryManager::registerEHFrames(addr, load_addr, size);
-#endif
-            }
-
-        private:
-#if defined(__APPLE__) && UWVM2_RUNTIME_LLVM_JIT_HAS_UNWIND_H_BACKTRACE
-            ::uwvm2::utils::container::vector<runtime_llvm_jit_eh_frame_record> eh_frame_records_{};
-#endif
-        };
-
         inline bool ensure_llvm_jit_native_target_initialized() noexcept;
 
-# if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
+# if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE || UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
         struct runtime_llvm_jit_live_unwind_probe_state
         {
             inline static constexpr int max_frames{64};
@@ -1066,6 +1015,17 @@ namespace uwvm2::runtime::lib
             return false;
         }
 
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_WIN64_SEH_BACKTRACE
+        UWVM_NOINLINE inline void runtime_llvm_jit_live_unwind_probe_capture(runtime_llvm_jit_live_unwind_probe_state* state) noexcept
+        {
+            if(state == nullptr) [[unlikely]] { return; }
+
+            state->frame_count = static_cast<int>(
+                ::RtlCaptureStackBackTrace(0u, static_cast<::ULONG>(runtime_llvm_jit_live_unwind_probe_state::max_frames), state->frames, nullptr));
+            ::std::atomic_signal_fence(::std::memory_order_seq_cst);
+        }
+#  endif
+
         [[nodiscard]] inline bool runtime_llvm_jit_live_unwind_probe() noexcept
         {
             if(!ensure_llvm_jit_native_target_initialized()) [[unlikely]] { return false; }
@@ -1086,11 +1046,22 @@ namespace uwvm2::runtime::lib
             auto* const i32_type{::llvm::Type::getInt32Ty(context)};
             auto* const void_type{::llvm::Type::getVoidTy(context)};
             auto* const ptr_type{::llvm::PointerType::getUnqual(context)};
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             auto* const backtrace_type{::llvm::FunctionType::get(i32_type, {ptr_type, i32_type}, false)};
             auto* const backtrace_function{
                 ::llvm::Function::Create(backtrace_type, ::llvm::GlobalValue::ExternalLinkage, "backtrace", *module)};
 
             auto* const probe_type{::llvm::FunctionType::get(void_type, {ptr_type, ptr_type}, false)};
+#  else
+            static_cast<void>(i32_type);
+            auto* const capture_type{::llvm::FunctionType::get(void_type, {ptr_type}, false)};
+            auto* const capture_function{::llvm::Function::Create(capture_type,
+                                                                   ::llvm::GlobalValue::ExternalLinkage,
+                                                                   "uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
+                                                                   *module)};
+
+            auto* const probe_type{::llvm::FunctionType::get(void_type, {ptr_type}, false)};
+#  endif
             auto* const probe_function{
                 ::llvm::Function::Create(probe_type,
                                          ::llvm::GlobalValue::ExternalLinkage,
@@ -1103,24 +1074,36 @@ namespace uwvm2::runtime::lib
 
             auto* const entry_block{::llvm::BasicBlock::Create(context, "entry", probe_function)};
             ::llvm::IRBuilder<> builder{entry_block};
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             auto* const frames_arg{probe_function->getArg(0)};
             auto* const count_arg{probe_function->getArg(1)};
             auto* const count_value{
                 builder.CreateCall(backtrace_function,
                                    {frames_arg,
-                                    ::llvm::ConstantInt::get(i32_type, runtime_llvm_jit_live_unwind_probe_state::max_frames)})};
+	                                    ::llvm::ConstantInt::get(i32_type, runtime_llvm_jit_live_unwind_probe_state::max_frames)})};
             builder.CreateStore(count_value, count_arg);
+#  else
+            auto* const state_arg{probe_function->getArg(0)};
+            builder.CreateCall(capture_function, {state_arg});
+#  endif
             builder.CreateRetVoid();
 
             if(::llvm::verifyModule(*module)) [[unlikely]] { return false; }
 
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             ::llvm::sys::DynamicLibrary::AddSymbol("backtrace",
                                                    reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&backtrace)));
+#  else
+            ::llvm::sys::DynamicLibrary::AddSymbol(
+                "uwvm2_runtime_llvm_jit_live_unwind_probe_capture",
+                reinterpret_cast<void*>(reinterpret_cast<::std::uintptr_t>(&runtime_llvm_jit_live_unwind_probe_capture)));
+#  endif
 
             auto raw_engine{::llvm::EngineBuilder(llvm_module_owner_t{module.release()})
                                 .setEngineKind(::llvm::EngineKind::JIT)
                                 .setOptLevel(::llvm::CodeGenOptLevel::None)
-                                .setMCJITMemoryManager(::std::make_unique<runtime_llvm_jit_section_memory_manager>())
+                                .setMCJITMemoryManager(::std::make_unique<
+                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
                                 .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]] { return false; }
             static_cast<void>(target_machine.release());
@@ -1134,9 +1117,15 @@ namespace uwvm2::runtime::lib
             runtime_llvm_jit_live_unwind_probe_state state{};
             state.function_address = probe_address;
 
+#  if UWVM2_RUNTIME_LLVM_JIT_HAS_EXECINFO_BACKTRACE
             using probe_func_t = void (*)(void**, int*) noexcept;
             auto const probe_func{reinterpret_cast<probe_func_t>(probe_address)};
             probe_func(state.frames, ::std::addressof(state.frame_count));
+#  else
+            using probe_func_t = void (*)(runtime_llvm_jit_live_unwind_probe_state*) noexcept;
+            auto const probe_func{reinterpret_cast<probe_func_t>(probe_address)};
+            probe_func(::std::addressof(state));
+#  endif
 
             return runtime_llvm_jit_live_unwind_probe_saw_jit_frame(state);
         }
@@ -7278,7 +7267,8 @@ namespace uwvm2::runtime::lib
                                 .setOptLevel(codegen_opt_level)
                                 .setMCPU(host_cpu_name)
                                 .setMAttrs(host_target_attributes)
-                                .setMCJITMemoryManager(::std::make_unique<runtime_llvm_jit_section_memory_manager>())
+                                .setMCJITMemoryManager(::std::make_unique<
+                                                       ::uwvm2::runtime::compiler::llvm_jit::details::runtime_llvm_jit_section_memory_manager>())
                                 .create(target_machine.get())};
             if(raw_engine == nullptr) [[unlikely]]
             {
