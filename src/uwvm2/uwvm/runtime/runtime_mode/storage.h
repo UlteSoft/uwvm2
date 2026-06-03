@@ -65,13 +65,31 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     };
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    enum class runtime_llvm_jit_optimization_level_t : unsigned
+    enum class runtime_llvm_jit_policy_t : unsigned
     {
-        default_level,
-        none,
-        less,
-        mid,
-        aggressive
+        debug,
+        default_policy,
+        fast_compile,
+        balanced,
+        max
+    };
+
+    enum class runtime_llvm_jit_lazy_policy_t : unsigned
+    {
+        auto_policy,
+        debug,
+        light,
+        balanced
+    };
+
+    enum class runtime_llvm_jit_full_policy_t : unsigned
+    {
+        auto_policy,
+        debug,
+        legacy_light,
+        passbuilder_o1,
+        passbuilder_o2,
+        passbuilder_o3
     };
 #endif
 
@@ -140,12 +158,23 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::runtime::runtime_mode
     inline ::std::size_t global_runtime_scheduling_size{default_runtime_scheduling_size};  // [global]
 
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-    /// @brief Whether the runtime LLVM JIT optimization level was explicitly configured.
-    inline bool runtime_llvm_jit_optimization_level_existed{};  // [global]
+    /// @brief Whether the high-level runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_policy_existed{};  // [global]
 
-    /// @brief Runtime LLVM JIT optimization level override.
-    /// @details `default_level` preserves each LLVM JIT policy's existing default.
-    inline runtime_llvm_jit_optimization_level_t global_runtime_llvm_jit_optimization_level{runtime_llvm_jit_optimization_level_t::default_level};  // [global]
+    /// @brief High-level LLVM JIT policy preset.
+    inline runtime_llvm_jit_policy_t global_runtime_llvm_jit_policy{runtime_llvm_jit_policy_t::default_policy};  // [global]
+
+    /// @brief Whether the lazy/tier-1 runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_lazy_policy_existed{};  // [global]
+
+    /// @brief Lazy/tier-1 LLVM JIT policy override.
+    inline runtime_llvm_jit_lazy_policy_t global_runtime_llvm_jit_lazy_policy{runtime_llvm_jit_lazy_policy_t::auto_policy};  // [global]
+
+    /// @brief Whether the full/tier-2 runtime LLVM JIT policy was explicitly configured.
+    inline bool runtime_llvm_jit_full_policy_existed{};  // [global]
+
+    /// @brief Full/tier-2 LLVM JIT policy override.
+    inline runtime_llvm_jit_full_policy_t global_runtime_llvm_jit_full_policy{runtime_llvm_jit_full_policy_t::auto_policy};  // [global]
 
     /// @brief Whether runtime LLVM JIT IR verification is disabled by command line.
     inline bool runtime_llvm_jit_disable_ir_verifaction{};  // [global]

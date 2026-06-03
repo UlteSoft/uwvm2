@@ -7,7 +7,7 @@
 /**
  * @author      MacroModel
  * @version     2.0.0
- * @date        2026-05-26
+ * @date        2026-06-03
  * @copyright   APL-2.0 License
  */
 
@@ -45,29 +45,28 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline::params
 #if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
     namespace details
     {
-        inline constexpr ::uwvm2::utils::container::u8string_view runtime_llvm_jit_optimization_level_alias{u8"-Rllvm-opt"};
+        inline constexpr ::uwvm2::utils::container::u8string_view runtime_llvm_jit_lazy_policy_alias{u8"-Rllvm-lazy-policy"};
 # if defined(UWVM_MODULE)
         extern "C++"
 # else
         inline constexpr
 # endif
-            ::uwvm2::utils::cmdline::parameter_return_type
-            runtime_llvm_jit_optimization_level_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*,
-                                                         ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
+            ::uwvm2::utils::cmdline::parameter_return_type runtime_llvm_jit_lazy_policy_callback(::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*,
+                                                                                                 ::uwvm2::utils::cmdline::parameter_parsing_results*) noexcept;
     }  // namespace details
 
 # if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wbraced-scalar-init"
 # endif
-    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_optimization_level{
-        .name{u8"--runtime-llvm-jit-optimization-level"},
-        .describe{u8"Force the runtime LLVM JIT optimization level."},
-        .usage{u8"[0|1|2|3]"},
-        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_optimization_level_alias), 1uz}},
-        .handle{::std::addressof(details::runtime_llvm_jit_optimization_level_callback)},
-        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_existed)},
+    inline constexpr ::uwvm2::utils::cmdline::parameter runtime_llvm_jit_lazy_policy{
+        .name{u8"--runtime-llvm-jit-lazy-policy"},
+        .describe{u8"Select the lazy/tier-1 runtime LLVM JIT strategy policy."},
+        .usage{u8"[auto|debug|light|balanced]"},
+        .alias{::uwvm2::utils::cmdline::kns_u8_str_scatter_t{::std::addressof(details::runtime_llvm_jit_lazy_policy_alias), 1uz}},
+        .handle{::std::addressof(details::runtime_llvm_jit_lazy_policy_callback)},
+        .is_exist{::std::addressof(::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_lazy_policy_existed)},
         .cate{::uwvm2::utils::cmdline::categorization::runtime}};
 # if defined(__clang__)
 #  pragma clang diagnostic pop

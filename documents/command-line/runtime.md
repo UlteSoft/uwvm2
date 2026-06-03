@@ -20,7 +20,9 @@ Source focus:
 | `--runtime-tiered` | `-Rtiered` | None | Once | `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Shortcut: lazy tiered interpreter plus LLVM JIT. |
 | `--runtime-aot` | `-Raot` | None | Once | `UWVM_RUNTIME_LLVM_JIT` | Shortcut: full compilation with LLVM JIT. |
 | `--runtime-compiler-log` | `-Rclog` | `[out|err|file <file:path>]` | Once | Runtime backend support | Route runtime compiler logs. |
-| `--runtime-llvm-jit-optimization-level` | `-Rllvm-opt` | `[0|1|2|3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Force LLVM JIT optimization level. |
+| `--runtime-llvm-jit-policy` | `-Rllvm-policy` | `[debug|default|fast-compile|balanced|max]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the high-level LLVM JIT strategy policy. |
+| `--runtime-llvm-jit-lazy-policy` | `-Rllvm-lazy-policy` | `[auto|debug|light|balanced]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the lazy/tier-1 LLVM JIT strategy. |
+| `--runtime-llvm-jit-full-policy` | `-Rllvm-full-policy` | `[auto|debug|legacy-light|pb-o1|pb-o2|pb-o3]` | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Select the full/tier-2 LLVM JIT strategy. |
 | `--runtime-llvm-jit-disable-ir-verifaction` | `-Rllvm-noverify` | None | Once | `UWVM_RUNTIME_LLVM_JIT` or `UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED` | Disable LLVM IR verification in LLVM-JIT runtime paths. |
 | `--runtime-compile-threads` | `-Rct` | `[default|aggressive|<count:ssize_t>]` | Once | Runtime backend support | Set compile-thread policy or numeric thread count. |
 | `--runtime-scheduling-policy` | `-Rsp` | `[func_count <count:size_t>|code_size <bytes:size_t>]` | Once | Runtime backend support | Set full-compile task splitting policy. |
@@ -137,32 +139,75 @@ Behavior:
 
 This log is for runtime compiler internals. It is separate from main diagnostics configured by `--log-output`.
 
-## `--runtime-llvm-jit-optimization-level`
+## `--runtime-llvm-jit-policy`
 
 Syntax:
 
 ```bash
-uwvm --runtime-llvm-jit-optimization-level 0
-uwvm --runtime-llvm-jit-optimization-level 1
-uwvm --runtime-llvm-jit-optimization-level 2
-uwvm --runtime-llvm-jit-optimization-level 3
-uwvm -Rllvm-opt 2
+uwvm --runtime-llvm-jit-policy default
+uwvm --runtime-llvm-jit-policy debug
+uwvm --runtime-llvm-jit-policy fast-compile
+uwvm --runtime-llvm-jit-policy balanced
+uwvm --runtime-llvm-jit-policy max
+uwvm -Rllvm-policy balanced
 ```
 
 Behavior:
 
-- The option accepts only unsigned integer values `0`, `1`, `2`, and `3`.
-- Values greater than `3`, negative values, and non-numeric strings are command-line errors.
-- If omitted, each LLVM JIT policy keeps its existing default optimization level.
-- If set, the provided value is a force setting for all LLVM-JIT runtime paths.
-- The mapping is `0 = none`, `1 = less`, `2 = mid/default`, `3 = aggressive`.
-- The override applies to LLVM-JIT full, lazy, and tiered runtime paths.
+- `default`: preserve existing defaults. Lazy/tier-1 stays latency-oriented; full/tier-2 keeps the legacy lightweight pipeline.
+- `debug`: disable LLVM optimization for both lazy/tier-1 and full/tier-2. This is intended for future debug-symbol and source/Wasm/native correlation work.
+- `fast-compile`: keep lazy/tier-1 and full/tier-2 compile latency low. Full/tier-2 uses `legacy-light` with LLVM codegen `less`.
+- `balanced`: keep lazy/tier-1 light, but make full/tier-2 use the tuned PassBuilder O1 pipeline. This is the preferred CPython long-run tradeoff found by local probes so far.
+- `max`: keep lazy/tier-1 light, but make full/tier-2 use the tuned PassBuilder O3 pipeline with aggressive codegen.
+- The policy is a strategy preset, not a wall-clock feedback input. Runtime tiering decisions must still be driven by counters and execution events.
+- This high-level preset is mutually exclusive with scoped policies. Do not combine it with `--runtime-llvm-jit-lazy-policy` or `--runtime-llvm-jit-full-policy`.
+- Use the scoped policy pair when you need a custom lazy/full combination.
 
-Example:
+## `--runtime-llvm-jit-lazy-policy`
+
+Syntax:
 
 ```bash
-uwvm --runtime-jit --runtime-llvm-jit-optimization-level 1 --run app.wasm
+uwvm --runtime-llvm-jit-lazy-policy auto
+uwvm --runtime-llvm-jit-lazy-policy debug
+uwvm --runtime-llvm-jit-lazy-policy light
+uwvm --runtime-llvm-jit-lazy-policy balanced
+uwvm -Rllvm-lazy-policy light
 ```
+
+Behavior:
+
+- `auto`: use the backend default.
+- `debug`: force lazy/tier-1 LLVM codegen to `none` and avoid LLVM codegen optimization.
+- `light`: force lazy/tier-1 LLVM codegen to `less`.
+- `balanced`: force lazy/tier-1 LLVM codegen to `default`.
+- Lazy/tier-1 intentionally does not select the full PassBuilder module pipeline; it remains the low-latency path for short tasks and tiered warmup.
+- This scoped policy can be combined with `--runtime-llvm-jit-full-policy`, but it conflicts with `--runtime-llvm-jit-policy`.
+
+## `--runtime-llvm-jit-full-policy`
+
+Syntax:
+
+```bash
+uwvm --runtime-llvm-jit-full-policy auto
+uwvm --runtime-llvm-jit-full-policy debug
+uwvm --runtime-llvm-jit-full-policy legacy-light
+uwvm --runtime-llvm-jit-full-policy pb-o1
+uwvm --runtime-llvm-jit-full-policy pb-o2
+uwvm --runtime-llvm-jit-full-policy pb-o3
+uwvm -Rllvm-full-policy pb-o1
+```
+
+Behavior:
+
+- `auto`: use the backend default.
+- `debug`: use no full-module optimizer pipeline and LLVM codegen `none`.
+- `legacy-light`: use the old lightweight full-module optimizer with the backend default codegen level.
+- `pb-o1`: use the tuned PassBuilder O1 full-module pipeline and LLVM codegen `less`.
+- `pb-o2`: use the tuned PassBuilder O2 full-module pipeline and LLVM codegen `default`.
+- `pb-o3`: use the tuned PassBuilder O3 full-module pipeline and LLVM codegen `aggressive`.
+- Runtime compiler logs include `policy=`, `pipeline=`, and `codegen_opt=` on `[llvm-jit-full] optimize-start` lines.
+- This scoped policy can be combined with `--runtime-llvm-jit-lazy-policy`, but it conflicts with `--runtime-llvm-jit-policy`.
 
 ## `--runtime-llvm-jit-disable-ir-verifaction`
 

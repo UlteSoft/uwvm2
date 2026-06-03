@@ -98,7 +98,9 @@ UWVM_MODULE_EXPORT namespace uwvm2::uwvm::cmdline
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_compile_threads),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_scheduling_policy),
 # if defined(UWVM_RUNTIME_LLVM_JIT) || defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
-            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_optimization_level),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_policy),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_lazy_policy),
+            ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_full_policy),
             ::std::addressof(::uwvm2::uwvm::cmdline::params::runtime_llvm_jit_disable_ir_verifaction),
 # endif
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)

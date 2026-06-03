@@ -52,8 +52,11 @@
 #  include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #  include <llvm/InitializePasses.h>
 #  include <llvm/IR/LegacyPassManager.h>
+#  include <llvm/IR/PassManager.h>
 #  include <llvm/Linker/Linker.h>
 #  include <llvm/PassRegistry.h>
+#  include <llvm/Passes/OptimizationLevel.h>
+#  include <llvm/Passes/PassBuilder.h>
 #  include <llvm/Support/SourceMgr.h>
 #  include <llvm/Support/TargetSelect.h>
 #  include <llvm/Target/TargetMachine.h>
@@ -6049,24 +6052,169 @@ namespace uwvm2::runtime::lib
             for(auto const& attr: attr_storage) { attr_refs.push_back(llvm_jit_translate_details::get_llvm_string_ref(attr)); }
         }
 
-        [[nodiscard]] inline ::llvm::CodeGenOptLevel resolve_runtime_llvm_jit_codegen_opt_level(::llvm::CodeGenOptLevel default_level) noexcept
+        enum class runtime_llvm_jit_full_pipeline_kind : unsigned
         {
-            if(!::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_existed) { return default_level; }
+            none,
+            legacy_light,
+            passbuilder_tuned
+        };
 
-            using runtime_llvm_jit_optimization_level_t = ::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_optimization_level_t;
-            switch(::uwvm2::uwvm::runtime::runtime_mode::global_runtime_llvm_jit_optimization_level)
+        struct runtime_llvm_jit_full_materialize_strategy
+        {
+            runtime_llvm_jit_full_pipeline_kind pipeline{};
+            ::llvm::CodeGenOptLevel codegen_opt_level{};
+            ::uwvm2::utils::container::u8string_view policy_name{};
+        };
+
+        [[nodiscard]] inline ::llvm::CodeGenOptLevel resolve_runtime_llvm_jit_lazy_codegen_opt_level(
+            ::llvm::CodeGenOptLevel default_level) noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+
+            using runtime_llvm_jit_lazy_policy_t = runtime_mode::runtime_llvm_jit_lazy_policy_t;
+            if(runtime_mode::runtime_llvm_jit_lazy_policy_existed)
             {
-                case runtime_llvm_jit_optimization_level_t::default_level: return default_level;
-                case runtime_llvm_jit_optimization_level_t::none: return ::llvm::CodeGenOptLevel::None;
-                case runtime_llvm_jit_optimization_level_t::less: return ::llvm::CodeGenOptLevel::Less;
-                case runtime_llvm_jit_optimization_level_t::mid: return ::llvm::CodeGenOptLevel::Default;
-                case runtime_llvm_jit_optimization_level_t::aggressive: return ::llvm::CodeGenOptLevel::Aggressive;
+                switch(runtime_mode::global_runtime_llvm_jit_lazy_policy)
+                {
+                    case runtime_llvm_jit_lazy_policy_t::auto_policy: break;
+                    case runtime_llvm_jit_lazy_policy_t::debug: return ::llvm::CodeGenOptLevel::None;
+                    case runtime_llvm_jit_lazy_policy_t::light: return ::llvm::CodeGenOptLevel::Less;
+                    case runtime_llvm_jit_lazy_policy_t::balanced: return ::llvm::CodeGenOptLevel::Default;
+                }
+            }
+
+            using runtime_llvm_jit_policy_t = runtime_mode::runtime_llvm_jit_policy_t;
+            if(runtime_mode::runtime_llvm_jit_policy_existed)
+            {
+                switch(runtime_mode::global_runtime_llvm_jit_policy)
+                {
+                    case runtime_llvm_jit_policy_t::debug: return ::llvm::CodeGenOptLevel::None;
+                    case runtime_llvm_jit_policy_t::default_policy: break;
+                    case runtime_llvm_jit_policy_t::fast_compile: return ::llvm::CodeGenOptLevel::Less;
+                    case runtime_llvm_jit_policy_t::balanced: return ::llvm::CodeGenOptLevel::Less;
+                    case runtime_llvm_jit_policy_t::max: return ::llvm::CodeGenOptLevel::Less;
+                }
+            }
+
+            return default_level;
+        }
+
+        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy make_runtime_llvm_jit_full_materialize_strategy(
+            runtime_llvm_jit_full_pipeline_kind pipeline,
+            ::llvm::CodeGenOptLevel codegen_opt_level,
+            ::uwvm2::utils::container::u8string_view policy_name) noexcept
+        {
+            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { pipeline = runtime_llvm_jit_full_pipeline_kind::none; }
+            return {.pipeline = pipeline, .codegen_opt_level = codegen_opt_level, .policy_name = policy_name};
+        }
+
+        [[nodiscard]] inline runtime_llvm_jit_full_materialize_strategy resolve_runtime_llvm_jit_full_materialize_strategy(
+            ::llvm::CodeGenOptLevel default_level) noexcept
+        {
+            namespace runtime_mode = ::uwvm2::uwvm::runtime::runtime_mode;
+
+            using runtime_llvm_jit_full_policy_t = runtime_mode::runtime_llvm_jit_full_policy_t;
+            if(runtime_mode::runtime_llvm_jit_full_policy_existed)
+            {
+                switch(runtime_mode::global_runtime_llvm_jit_full_policy)
+                {
+                    case runtime_llvm_jit_full_policy_t::auto_policy: break;
+                    case runtime_llvm_jit_full_policy_t::debug:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::none,
+                                                                               ::llvm::CodeGenOptLevel::None,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"full:debug", 10uz});
+                    case runtime_llvm_jit_full_policy_t::legacy_light:
+                        return make_runtime_llvm_jit_full_materialize_strategy(
+                            runtime_llvm_jit_full_pipeline_kind::legacy_light,
+                            default_level,
+                            ::uwvm2::utils::container::u8string_view{u8"full:legacy-light", 17uz});
+                    case runtime_llvm_jit_full_policy_t::passbuilder_o1:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                               ::llvm::CodeGenOptLevel::Less,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"full:pb-o1", 10uz});
+                    case runtime_llvm_jit_full_policy_t::passbuilder_o2:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                               ::llvm::CodeGenOptLevel::Default,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"full:pb-o2", 10uz});
+                    case runtime_llvm_jit_full_policy_t::passbuilder_o3:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                               ::llvm::CodeGenOptLevel::Aggressive,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"full:pb-o3", 10uz});
+                }
+            }
+
+            using runtime_llvm_jit_policy_t = runtime_mode::runtime_llvm_jit_policy_t;
+            if(runtime_mode::runtime_llvm_jit_policy_existed)
+            {
+                switch(runtime_mode::global_runtime_llvm_jit_policy)
+                {
+                    case runtime_llvm_jit_policy_t::debug:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::none,
+                                                                               ::llvm::CodeGenOptLevel::None,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"policy:debug", 12uz});
+                    case runtime_llvm_jit_policy_t::default_policy: break;
+                    case runtime_llvm_jit_policy_t::fast_compile:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::legacy_light,
+                                                                               ::llvm::CodeGenOptLevel::Less,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"policy:fast-compile", 19uz});
+                    case runtime_llvm_jit_policy_t::balanced:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                               ::llvm::CodeGenOptLevel::Less,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"policy:balanced", 15uz});
+                    case runtime_llvm_jit_policy_t::max:
+                        return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned,
+                                                                               ::llvm::CodeGenOptLevel::Aggressive,
+                                                                               ::uwvm2::utils::container::u8string_view{u8"policy:max", 10uz});
+                }
+            }
+
+            return make_runtime_llvm_jit_full_materialize_strategy(runtime_llvm_jit_full_pipeline_kind::legacy_light,
+                                                                   default_level,
+                                                                   ::uwvm2::utils::container::u8string_view{u8"default", 7uz});
+        }
+
+        [[nodiscard]] inline constexpr ::llvm::OptimizationLevel get_runtime_llvm_jit_pipeline_opt_level(
+            ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        {
+            switch(codegen_opt_level)
+            {
+                case ::llvm::CodeGenOptLevel::None: return ::llvm::OptimizationLevel::O0;
+                case ::llvm::CodeGenOptLevel::Less: return ::llvm::OptimizationLevel::O1;
+                case ::llvm::CodeGenOptLevel::Default: return ::llvm::OptimizationLevel::O2;
+                case ::llvm::CodeGenOptLevel::Aggressive: return ::llvm::OptimizationLevel::O3;
+            }
+            ::fast_io::fast_terminate();
+        }
+
+        [[nodiscard]] inline ::uwvm2::utils::container::u8string_view get_runtime_llvm_jit_full_pipeline_name(
+            runtime_llvm_jit_full_pipeline_kind pipeline) noexcept
+        {
+            switch(pipeline)
+            {
+                case runtime_llvm_jit_full_pipeline_kind::none: return ::uwvm2::utils::container::u8string_view{u8"none", 4uz};
+                case runtime_llvm_jit_full_pipeline_kind::legacy_light: return ::uwvm2::utils::container::u8string_view{u8"legacy-light", 12uz};
+                case runtime_llvm_jit_full_pipeline_kind::passbuilder_tuned:
+                    return ::uwvm2::utils::container::u8string_view{u8"passbuilder-tuned", 17uz};
+            }
+            ::fast_io::fast_terminate();
+        }
+
+        [[nodiscard]] inline constexpr ::uwvm2::utils::container::u8string_view get_runtime_llvm_jit_codegen_opt_level_name(
+            ::llvm::CodeGenOptLevel codegen_opt_level) noexcept
+        {
+            switch(codegen_opt_level)
+            {
+                case ::llvm::CodeGenOptLevel::None: return ::uwvm2::utils::container::u8string_view{u8"none", 4uz};
+                case ::llvm::CodeGenOptLevel::Less: return ::uwvm2::utils::container::u8string_view{u8"less", 4uz};
+                case ::llvm::CodeGenOptLevel::Default: return ::uwvm2::utils::container::u8string_view{u8"default", 7uz};
+                case ::llvm::CodeGenOptLevel::Aggressive: return ::uwvm2::utils::container::u8string_view{u8"aggressive", 10uz};
             }
             ::fast_io::fast_terminate();
         }
 
         [[nodiscard]] inline bool optimize_runtime_llvm_jit_module(::llvm::Module& module,
                                                                    ::llvm::TargetMachine& target_machine,
+                                                                   runtime_llvm_jit_full_pipeline_kind pipeline,
                                                                    ::llvm::CodeGenOptLevel codegen_opt_level,
                                                                    bool verify_llvm_jit_ir) noexcept
         {
@@ -6081,26 +6229,57 @@ namespace uwvm2::runtime::lib
                 }
             }
 
-            if(codegen_opt_level == ::llvm::CodeGenOptLevel::None) { return true; }
+            if(pipeline == runtime_llvm_jit_full_pipeline_kind::none) { return true; }
 
-            ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
-            function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
-            function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
-            function_pass_manager.add(::llvm::createInstructionCombiningPass());
-            function_pass_manager.add(::llvm::createReassociatePass());
-            function_pass_manager.add(::llvm::createGVNPass());
-            function_pass_manager.add(::llvm::createCFGSimplificationPass());
-            function_pass_manager.add(::llvm::createLICMPass());
-            function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
-            function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
-
-            function_pass_manager.doInitialization();
-            for(auto& function: module)
+            if(pipeline == runtime_llvm_jit_full_pipeline_kind::legacy_light)
             {
-                if(function.isDeclaration()) { continue; }
-                function_pass_manager.run(function);
+                ::llvm::legacy::FunctionPassManager function_pass_manager(::std::addressof(module));
+                function_pass_manager.add(::llvm::createTargetTransformInfoWrapperPass(target_machine.getTargetIRAnalysis()));
+                function_pass_manager.add(::llvm::createPromoteMemoryToRegisterPass());
+                function_pass_manager.add(::llvm::createInstructionCombiningPass());
+                function_pass_manager.add(::llvm::createReassociatePass());
+                function_pass_manager.add(::llvm::createGVNPass());
+                function_pass_manager.add(::llvm::createCFGSimplificationPass());
+                function_pass_manager.add(::llvm::createLICMPass());
+                function_pass_manager.add(::llvm::createInstSimplifyLegacyPass());
+                function_pass_manager.add(::llvm::createDeadCodeEliminationPass());
+
+                function_pass_manager.doInitialization();
+                for(auto& function: module)
+                {
+                    if(function.isDeclaration()) { continue; }
+                    function_pass_manager.run(function);
+                }
+                function_pass_manager.doFinalization();
             }
-            function_pass_manager.doFinalization();
+            else
+            {
+                ::llvm::LoopAnalysisManager loop_analysis_manager{};
+                ::llvm::FunctionAnalysisManager function_analysis_manager{};
+                ::llvm::CGSCCAnalysisManager cgscc_analysis_manager{};
+                ::llvm::ModuleAnalysisManager module_analysis_manager{};
+                auto const pipeline_opt_level{get_runtime_llvm_jit_pipeline_opt_level(codegen_opt_level)};
+                ::llvm::PipelineTuningOptions pipeline_tuning_options{};
+                auto const pipeline_speed_level{pipeline_opt_level.getSpeedupLevel()};
+                pipeline_tuning_options.LoopUnrolling = pipeline_speed_level > 1u;
+                pipeline_tuning_options.LoopInterleaving = pipeline_tuning_options.LoopUnrolling;
+                pipeline_tuning_options.LoopVectorization = pipeline_speed_level > 1u;
+                pipeline_tuning_options.SLPVectorization = pipeline_speed_level == 2u;
+                ::llvm::PassBuilder pass_builder{::std::addressof(target_machine), pipeline_tuning_options};
+
+                pass_builder.registerModuleAnalyses(module_analysis_manager);
+                pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);
+                pass_builder.registerFunctionAnalyses(function_analysis_manager);
+                pass_builder.registerLoopAnalyses(loop_analysis_manager);
+                pass_builder.crossRegisterProxies(loop_analysis_manager,
+                                                  function_analysis_manager,
+                                                  cgscc_analysis_manager,
+                                                  module_analysis_manager);
+
+                auto module_pass_manager{
+                    pass_builder.buildPerModuleDefaultPipeline(pipeline_opt_level)};
+                module_pass_manager.run(module, module_analysis_manager);
+            }
 
             if(verify_llvm_jit_ir)
             {
@@ -6225,7 +6404,8 @@ namespace uwvm2::runtime::lib
             ::llvm::SmallVector<::llvm::StringRef, 16> host_target_attributes{};
             append_llvm_jit_host_target_attribute_refs(host_target_attribute_storage, host_target_attributes);
 
-            auto const codegen_opt_level{resolve_runtime_llvm_jit_codegen_opt_level(default_codegen_opt_level)};
+            auto const full_materialize_strategy{resolve_runtime_llvm_jit_full_materialize_strategy(default_codegen_opt_level)};
+            auto const codegen_opt_level{full_materialize_strategy.codegen_opt_level};
 
             ::llvm::EngineBuilder target_builder{};
             target_builder.setEngineKind(::llvm::EngineKind::JIT).setOptLevel(codegen_opt_level).setMCPU(host_cpu_name).setMAttrs(host_target_attributes);
@@ -6244,9 +6424,17 @@ namespace uwvm2::runtime::lib
             merged_module->setTargetTriple(target_machine->getTargetTriple());
             merged_module->setDataLayout(target_machine->createDataLayout());
             auto const optimize_start_time{llvm_jit_materialize_runtime_log_now()};
-            llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"", rec.module_name, u8"\"");
+            llvm_jit_materialize_runtime_log_line(u8"optimize-start module=\"",
+                                                  rec.module_name,
+                                                  u8"\" policy=",
+                                                  full_materialize_strategy.policy_name,
+                                                  u8" pipeline=",
+                                                  get_runtime_llvm_jit_full_pipeline_name(full_materialize_strategy.pipeline),
+                                                  u8" codegen_opt=",
+                                                  get_runtime_llvm_jit_codegen_opt_level_name(codegen_opt_level));
             if(!optimize_runtime_llvm_jit_module(*merged_module,
                                                  *target_machine,
+                                                 full_materialize_strategy.pipeline,
                                                  codegen_opt_level,
                                                  !::uwvm2::uwvm::runtime::runtime_mode::runtime_llvm_jit_disable_ir_verifaction)) [[unlikely]]
             {
@@ -8190,7 +8378,7 @@ namespace uwvm2::runtime::lib
 
                 rec.llvm_jit_lazy_compile_options.compile_options = opt;
                 rec.llvm_jit_lazy_compile_options.validation_mode = lazy_validation_mode;
-                rec.llvm_jit_lazy_compile_options.codegen_opt_level = resolve_runtime_llvm_jit_codegen_opt_level(
+                rec.llvm_jit_lazy_compile_options.codegen_opt_level = resolve_runtime_llvm_jit_lazy_codegen_opt_level(
 # if defined(UWVM_RUNTIME_UWVM_INTERPRETER_LLVM_JIT_TIERED)
                     tiered_backend ? ::llvm::CodeGenOptLevel::Less :
 # endif

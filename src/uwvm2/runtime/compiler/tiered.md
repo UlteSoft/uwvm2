@@ -144,8 +144,9 @@ request goes through the normal lazy scheduler. The request carries no extra
 staleness callback state.
 
 The default Tier 2 codegen optimization level is `Less` (LLVM O1), matching the
-lazy tier. `-Rllvm-opt` still overrides this, so experiments can compare O0,
-O1, O2, and O3 without changing the tiered implementation.
+lazy tier. Use `-Rllvm-policy` for preset tuning, `-Rllvm-lazy-policy` for
+Tier 1 latency/quality experiments, and `-Rllvm-full-policy` for Tier 2
+full-module optimizer experiments without changing the tiered implementation.
 
 ## Runtime Logging
 

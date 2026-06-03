@@ -9,6 +9,7 @@ local llvm_jit_required_components = {
     "linker",
     "executionengine",
     "mcjit",
+    "passes",
     "scalaropts",
     "transformutils",
     "instcombine",
@@ -34,6 +35,7 @@ local llvm_component_link_names = {
     instcombine = { "LLVMInstCombine" },
     linker = { "LLVMLinker" },
     mcjit = { "LLVMMCJIT" },
+    passes = { "LLVMPasses" },
     scalaropts = { "LLVMScalarOpts" },
     support = { "LLVMSupport" },
     target = { "LLVMTarget" },
@@ -838,7 +840,7 @@ function get_llvm_jit_options()
     local link_static = static_mode == "non-system"
 
     local cache_key = table.concat({
-        "llvm-jit-v13",
+        "llvm-jit-v14",
         llvm_config.program,
         llvm_config.version or "",
         get_config("plat") or "",
