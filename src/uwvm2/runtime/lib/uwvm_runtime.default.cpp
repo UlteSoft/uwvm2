@@ -6264,7 +6264,7 @@ namespace uwvm2::runtime::lib
                 pipeline_tuning_options.LoopUnrolling = pipeline_speed_level > 1u;
                 pipeline_tuning_options.LoopInterleaving = pipeline_tuning_options.LoopUnrolling;
                 pipeline_tuning_options.LoopVectorization = pipeline_speed_level > 1u;
-                pipeline_tuning_options.SLPVectorization = pipeline_speed_level == 2u;
+                pipeline_tuning_options.SLPVectorization = pipeline_speed_level > 1u;
                 ::llvm::PassBuilder pass_builder{::std::addressof(target_machine), pipeline_tuning_options};
 
                 pass_builder.registerModuleAnalyses(module_analysis_manager);
